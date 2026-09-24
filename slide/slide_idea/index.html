@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HackFlow — Nền Tảng Quản Trị Hackathon Toàn Diện</title>
+  <style>
+    /* ==========================================================================
+       RESET & THEME VARIABLES (Dark Modern Tech Style)
+       ========================================================================== */
+    :root {
+      --bg-body: #060911;
+      --bg-stage: #0b1120;
+      --bg-card: rgba(22, 32, 53, 0.75);
+      --bg-card-hover: rgba(30, 45, 74, 0.9);
+      --border-card: rgba(255, 255, 255, 0.08);
+      --border-card-hover: rgba(59, 130, 246, 0.4);
+      --primary: #3b82f6;
+      --primary-light: #60a5fa;
+      --primary-glow: rgba(59, 130, 246, 0.3);
+      --accent-cyan: #06b6d4;
+      --accent-teal: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-body);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Ambient background gradient blur */
+    body::before {
+      content: "";
+      position: fixed;
+      width: 55vw;
+      height: 55vh;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.12) 0%, transparent 70%);
+      top: -12vh;
+      right: -10vw;
+      filter: blur(85px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      width: 50vw;
+      height: 50vh;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(6, 182, 212, 0.09) 0%, transparent 70%);
+      bottom: -10vh;
+      left: -10vw;
+      filter: blur(85px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ==========================================================================
+       PRESENTATION CONTAINER (16:9 Aspect Ratio & Responsive Scaler)
+       ========================================================================== */
+    #presentation-stage {
+      position: relative;
+      width: min(96vw, calc(96vh * 16 / 9));
+      height: min(calc(96vw * 9 / 16), 96vh);
+      background: radial-gradient(circle at 50% 15%, #131c31 0%, #0b1120 100%);
+      border-radius: 18px;
+      box-shadow: 0 25px 65px -15px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    /* Top Progress Bar */
+    #progress-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.06);
+      z-index: 100;
+    }
+
+    #progress-bar {
+      height: 100%;
+      width: 9%;
+      background: linear-gradient(90deg, #2563eb, #3b82f6, #06b6d4);
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.8);
+      transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ==========================================================================
+       SLIDE COMPONENT & SMOOTH TRANSITION
+       ========================================================================== */
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: 2.2rem 3rem;
+      display: none;
+      flex-direction: column;
+      justify-content: space-between;
+      opacity: 0;
+      transform: translateY(12px) scale(0.995);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      overflow: hidden;
+    }
+
+    .slide.active {
+      display: flex;
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      animation: slideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.99);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    /* ==========================================================================
+       HEADER & TYPOGRAPHY SYSTEM
+       ========================================================================== */
+    .slide-header {
+      margin-bottom: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      margin-bottom: 0.35rem;
+    }
+
+    .badge-teal {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-amber {
+      background: rgba(245, 158, 11, 0.15);
+      color: #fbbf24;
+      border-color: rgba(245, 158, 11, 0.3);
+    }
+
+    .slide-title {
+      font-size: clamp(1.4rem, 2.2vw, 1.8rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+      line-height: 1.25;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .slide-subtitle {
+      font-size: clamp(0.82rem, 1.05vw, 0.92rem);
+      color: var(--text-muted);
+      margin-top: 0.2rem;
+      line-height: 1.35;
+    }
+
+    .content-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 0.9rem;
+      min-height: 0;
+    }
+
+    /* Card Standard */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-card);
+      border-radius: 14px;
+      padding: 1rem 1.15rem;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.35);
+      transition: all 0.25s ease;
+      position: relative;
+    }
+
+    .card:hover {
+      border-color: var(--border-card-hover);
+      background: var(--bg-card-hover);
+      transform: translateY(-2px);
+    }
+
+    /* Alert / Callout Bar */
+    .alert-box {
+      border-radius: 12px;
+      padding: 0.75rem 1.1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      flex-shrink: 0;
+    }
+
+    .alert-warning {
+      background: rgba(239, 68, 68, 0.12);
+      border: 1px solid rgba(239, 68, 68, 0.28);
+      color: #fca5a5;
+    }
+
+    .alert-primary {
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.28);
+      color: #93c5fd;
+    }
+
+    .alert-success {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      color: #86efac;
+    }
+
+    /* Grid Layouts */
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.9rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.1rem;
+    }
+
+    /* ==========================================================================
+       VISUAL & VECTOR SVG GRAPHICS STYLES
+       ========================================================================== */
+    .svg-icon {
+      display: inline-block;
+      vertical-align: middle;
+      flex-shrink: 0;
+    }
+
+    .icon-bubble {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: rgba(59, 130, 246, 0.15);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.5rem;
+      color: #60a5fa;
+    }
+
+    .icon-bubble-cyan {
+      background: rgba(6, 182, 212, 0.15);
+      border-color: rgba(6, 182, 212, 0.3);
+      color: #22d3ee;
+    }
+
+    .icon-bubble-teal {
+      background: rgba(16, 185, 129, 0.15);
+      border-color: rgba(16, 185, 129, 0.3);
+      color: #34d399;
+    }
+
+    .icon-bubble-rose {
+      background: rgba(244, 63, 94, 0.15);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: #fb7185;
+    }
+
+    /* Visual Mockup Windows */
+    .mock-window {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+
+    .mock-header {
+      background: rgba(30, 41, 59, 0.8);
+      padding: 5px 8px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .mock-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .mock-body {
+      padding: 8px;
+    }
+
+    /* Visual Pipeline Flow */
+    .pipeline-container {
+      display: flex;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+
+    .pipeline-step {
+      flex: 1;
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 0.85rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .pipeline-arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #64748b;
+      font-size: 1.1rem;
+    }
+
+    /* ==========================================================================
+       SLIDE 1: COVER HERO
+       ========================================================================== */
+    .cover-hero {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      height: 100%;
+      padding: 0 0.8rem;
+    }
+
+    .cover-tag-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 0.6rem;
+    }
+
+    .hero-title {
+      font-size: clamp(2.4rem, 4.2vw, 3.8rem);
+      font-weight: 900;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      background: linear-gradient(135deg, #ffffff 25%, #93c5fd 75%, #38bdf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.4rem;
+    }
+
+    .hero-subtitle {
+      font-size: clamp(1rem, 1.4vw, 1.25rem);
+      color: #cbd5e1;
+      font-weight: 400;
+      line-height: 1.4;
+      margin-bottom: 1.6rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hero-pill {
+      background: rgba(59, 130, 246, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #93c5fd;
+      padding: 2px 10px;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 0.9em;
+    }
+
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.9rem;
+      margin-top: 0.4rem;
+    }
+
+    .team-card {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      padding: 0.95rem;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .team-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, #3b82f6, #06b6d4);
+      opacity: 0.85;
+    }
+
+    .team-name {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 0.2rem;
+    }
+
+    .team-role {
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      margin-bottom: 0.5rem;
+      display: block;
+    }
+
+    .team-desc {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    /* ==========================================================================
+       SLIDE 2: HACKATHON LÀ GÌ?
+       ========================================================================== */
+    .hackathon-diagram {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 1.4rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .equation-box {
+      text-align: center;
+      padding: 0.6rem 1.2rem;
+      background: rgba(30, 41, 59, 0.8);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .equation-title {
+      font-size: 1.3rem;
+      font-weight: 900;
+      color: #38bdf8;
+    }
+
+    .equation-sub {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .equation-symbol {
+      font-size: 1.8rem;
+      font-weight: 900;
+      color: #64748b;
+    }
+
+    /* ==========================================================================
+       SLIDE 4: 8 TÍNH NĂNG GRID
+       ========================================================================== */
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 0.8rem;
+    }
+
+    .feat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-card);
+      border-radius: 12px;
+      padding: 0.85rem 0.95rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      transition: all 0.2s ease;
+    }
+
+    .feat-card:hover {
+      border-color: rgba(59, 130, 246, 0.4);
+      background: rgba(30, 45, 74, 0.8);
+      transform: translateY(-2px);
+    }
+
+    .feat-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .feat-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .feat-desc {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.35;
+    }
+
+    /* ==========================================================================
+       SLIDE 8: MVP SCOPE
+       ========================================================================== */
+    .mvp-scope-card {
+      background: var(--bg-card);
+      border-radius: 14px;
+      padding: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      height: 100%;
+    }
+
+    .mvp-in {
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      background: rgba(16, 185, 129, 0.05);
+    }
+
+    .mvp-out {
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      background: rgba(245, 158, 11, 0.05);
+    }
+
+    .list-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.82rem;
+      line-height: 1.38;
+      color: #e2e8f0;
+    }
+
+    /* ==========================================================================
+       FLOATING CONTROLS & HINTS
+       ========================================================================== */
+    #floating-controls {
+      position: fixed;
+      bottom: 1.4rem;
+      right: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+      z-index: 1000;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 9999px;
+      padding: 0.35rem 0.5rem;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+    }
+
+    .ctrl-btn {
+      background: rgba(255, 255, 255, 0.06);
+      color: #f8fafc;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 9999px;
+      padding: 0.42rem 0.85rem;
+      font-size: 0.82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    .ctrl-btn:hover:not(:disabled) {
+      background: #3b82f6;
+      border-color: #3b82f6;
+      box-shadow: 0 0 14px rgba(59, 130, 246, 0.6);
+      transform: translateY(-1px);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    #slide-indicator {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #94a3b8;
+      padding: 0 0.5rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #keyboard-hints {
+      position: fixed;
+      bottom: 1.6rem;
+      left: 2rem;
+      color: #64748b;
+      font-size: 0.78rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(10px);
+      padding: 0.35rem 0.9rem;
+      border-radius: 9999px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      z-index: 1000;
+    }
+
+    .key-badge {
+      display: inline-block;
+      padding: 1px 6px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      color: #cbd5e1;
+      font-size: 0.7rem;
+      font-family: monospace;
+      font-weight: 700;
+    }
+
+    @media (max-width: 900px) {
+      #presentation-stage {
+        border-radius: 0;
+        width: 100vw;
+        height: 100vh;
+      }
+      .slide {
+        padding: 1.2rem;
+      }
+      #keyboard-hints {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Presentation Stage Box -->
+  <main id="presentation-stage">
+
+    <!-- Top Progress Bar -->
+    <div id="progress-container">
+      <div id="progress-bar"></div>
+    </div>
+
+    <!-- ======================================================================
+         SLIDE 1: COVER — TÊN NGẮN GỌN NHẮC ĐẾN HACKATHON
+         ====================================================================== -->
+    <section class="slide active" data-index="0">
+      <div class="cover-hero">
+        <div class="cover-tag-bar">
+          <span class="badge">CHUYÊN ĐỀ CÔNG NGHỆ THÔNG TIN</span>
+          <span style="font-size: 0.78rem; color: var(--accent-cyan); font-weight: 700;">BÁO CÁO Ý TƯỞNG ĐỀ TÀI</span>
+        </div>
+
+        <h1 class="hero-title">HACKFLOW</h1>
+        
+        <div class="hero-subtitle">
+          <span class="hero-pill">HACKATHON PLATFORM</span>
+          <span>Nền tảng Quản trị & Vận hành Hackathon Tập trung</span>
+        </div>
+
+        <div style="font-size: 0.8rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 8px;">
+          <svg class="svg-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+          NHÓM THỰC HIỆN DỰ ÁN — NHÓM 9
+        </div>
+
+        <div class="team-grid">
+          <div class="team-card" style="text-align: center; padding: 1.25rem 0.8rem;">
+            <div class="team-name" style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 0;">Lê Tiến Minh</div>
+          </div>
+          <div class="team-card" style="text-align: center; padding: 1.25rem 0.8rem;">
+            <div class="team-name" style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 0;">Đinh Phương Ly</div>
+          </div>
+          <div class="team-card" style="text-align: center; padding: 1.25rem 0.8rem;">
+            <div class="team-name" style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 0;">Nông Lan Anh</div>
+          </div>
+          <div class="team-card" style="text-align: center; padding: 1.25rem 0.8rem;">
+            <div class="team-name" style="font-size: 1.15rem; font-weight: 700; color: #ffffff; margin-bottom: 0;">Phạm Thị Huyền Linh</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SLIDE 2: HACKATHON LÀ GÌ? (SLIDE MỚI - MINH HỌA TRỰC QUAN)
+         ====================================================================== -->
+    <section class="slide" data-index="1">
+      <div class="slide-header">
+        <span class="badge badge-cyan">TỔNG QUAN KHÁI NIỆM</span>
+        <h2 class="slide-title">
+          <svg class="svg-icon" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Cuộc Thi Hackathon Là Gì?
+        </h2>
+        <p class="slide-subtitle">Sự kết hợp giữa sáng tạo công nghệ đột phá và tinh thần chạy đua marathon bền bỉ</p>
+      </div>
+
+      <div class="content-body">
+        <!-- Visual Equation -->
+        <div class="hackathon-diagram">
+          <div class="equation-box">
+            <div class="equation-title">"HACK"</div>
+            <div class="equation-sub">Đột phá • Lập trình • Sáng tạo</div>
+          </div>
+          <div class="equation-symbol">+</div>
+          <div class="equation-box">
+            <div class="equation-title">"MARATHON"</div>
+            <div class="equation-sub">Đua sức • Bền bỉ • Tốc độ</div>
+          </div>
+          <div class="equation-symbol">=</div>
+          <div class="equation-box" style="background: rgba(37, 99, 235, 0.2); border-color: rgba(59, 130, 246, 0.5);">
+            <div class="equation-title" style="color: #60a5fa;">HACKATHON</div>
+            <div class="equation-sub" style="color: #cbd5e1;">Cuộc thi Lập trình Tốc độ cao</div>
+          </div>
+        </div>
+
+        <!-- 3 Pillars of a Hackathon with SVG visual icons -->
+        <div class="grid-3">
+          <div class="card" style="text-align: center;">
+            <div class="icon-bubble icon-bubble-cyan" style="margin: 0 auto 0.6rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+            </div>
+            <h3 style="font-size: 0.98rem; font-weight: 700; color: #ffffff; margin-bottom: 0.25rem;">Áp Lực 24h - 48h</h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4;">
+              Thời gian giới hạn nghiêm ngặt. Các đội thi phải liên tục lập trình xuyên đêm để hoàn thành sản phẩm.
+            </p>
+          </div>
+
+          <div class="card" style="text-align: center;">
+            <div class="icon-bubble icon-bubble-teal" style="margin: 0 auto 0.6rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            </div>
+            <h3 style="font-size: 0.98rem; font-weight: 700; color: #ffffff; margin-bottom: 0.25rem;">Tác Chiến Nhóm (3-5 Người)</h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4;">
+              Kết hợp đa vai trò: Lập trình viên (Dev), Thiết kế (Designer) và Nghiệp vụ (Business/Pitcher).
+            </p>
+          </div>
+
+          <div class="card" style="text-align: center;">
+            <div class="icon-bubble icon-bubble-rose" style="margin: 0 auto 0.6rem;">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+            </div>
+            <h3 style="font-size: 0.98rem; font-weight: 700; color: #ffffff; margin-bottom: 0.25rem;">Working Demo Thực Chiến</h3>
+            <p style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.4;">
+              Không chỉ là ý tưởng trên giấy — bắt buộc phải nộp mã nguồn chạy được và demo trực tiếp cho Giám khảo.
+            </p>
+          </div>
+        </div>
+
+        <div class="alert-box alert-primary" style="margin-top: 0.1rem;">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          <div>
+            <strong>ĐẶC THÙ VẬN HÀNH HACKATHON:</strong> Khối lượng tương tác dồn dập, nhiều mốc deadline theo giờ và số lượng bài thi lớn đòi hỏi một nền tảng quản trị tự động hóa chuyên biệt.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SLIDE 3: THỰC TRẠNG PHÂN MẢNH CÔNG CỤ (MINH HỌA GRAPHIC)
+         ====================================================================== -->
+    <section class="slide" data-index="2">
+      <div class="slide-header">
+        <span class="badge">01. THỰC TRẠNG</span>
+        <h2 class="slide-title">Vấn Đề Phân Mảnh Công Cụ Trong Hackathon</h2>
+        <p class="slide-subtitle">Sự chắp vá giữa các nền tảng rời rạc gây quá tải vận hành và mất kiểm soát dữ liệu</p>
+      </div>
+
+      <div class="content-body">
+        <div class="grid-3">
+          <div class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="font-size: 1.6rem;">📝</span>
+              <span class="badge" style="margin: 0; background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3);">Rời rạc</span>
+            </div>
+            <h3 style="font-size: 1rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.2rem;">Google Forms</h3>
+            <div style="font-size: 0.78rem; font-weight: 600; color: #ffffff; margin-bottom: 0.45rem;">Đăng ký hồ sơ ban đầu</div>
+            
+            <div class="mock-window">
+              <div class="mock-header">
+                <div class="mock-dot" style="background: #ef4444;"></div>
+                <div class="mock-dot" style="background: #f59e0b;"></div>
+                <div class="mock-dot" style="background: #10b981;"></div>
+              </div>
+              <div class="mock-body" style="font-size: 0.7rem; color: #94a3b8; line-height: 1.3;">
+                ❌ Dữ liệu tĩnh, thiếu xác thực mã mời<br>
+                ❌ Khó kiểm soát trùng lặp đề tài
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="font-size: 1.6rem;">📊</span>
+              <span class="badge" style="margin: 0; background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3);">Dễ sai lệch</span>
+            </div>
+            <h3 style="font-size: 1rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.2rem;">Google Sheets</h3>
+            <div style="font-size: 0.78rem; font-weight: 600; color: #ffffff; margin-bottom: 0.45rem;">Tổng hợp & Chấm điểm</div>
+
+            <div class="mock-window">
+              <div class="mock-header">
+                <div class="mock-dot" style="background: #ef4444;"></div>
+                <div class="mock-dot" style="background: #f59e0b;"></div>
+                <div class="mock-dot" style="background: #10b981;"></div>
+              </div>
+              <div class="mock-body" style="font-size: 0.7rem; color: #94a3b8; line-height: 1.3;">
+                ❌ Nhập điểm và ghép phòng thi thủ công<br>
+                ❌ Dễ lỗi hàm tính, không bảo mật điểm
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem;">
+              <span style="font-size: 1.6rem;">💬</span>
+              <span class="badge" style="margin: 0; background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3);">Trôi tin</span>
+            </div>
+            <h3 style="font-size: 1rem; font-weight: 700; color: #60a5fa; margin-bottom: 0.2rem;">Zalo / Discord</h3>
+            <div style="font-size: 0.78rem; font-weight: 600; color: #ffffff; margin-bottom: 0.45rem;">Trao đổi & Hỗ trợ kỹ thuật</div>
+
+            <div class="mock-window">
+              <div class="mock-header">
+                <div class="mock-dot" style="background: #ef4444;"></div>
+                <div class="mock-dot" style="background: #f59e0b;"></div>
+                <div class="mock-dot" style="background: #10b981;"></div>
+              </div>
+              <div class="mock-body" style="font-size: 0.7rem; color: #94a3b8; line-height: 1.3;">
+                ❌ Tin nhắn trôi rất nhanh khi đông thí sinh<br>
+                ❌ Bỏ sót câu hỏi khẩn cấp từ các đội
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert-box alert-warning">
+          <svg class="svg-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <div>
+            <strong>HẬU QUẢ PHÂN MẢNH:</strong>
+            Quá tải vận hành • Mất kiểm soát hạn nộp bài • Dễ sai lệch điểm số • Không có dấu vết cam kết mã nguồn minh bạch.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SLIDE 4: BÀI TOÁN THỰC TẾ & NỖI ĐAU CỦA 4 VAI TRÒ
+         ====================================================================== -->
+    <section class="slide" data-index="3">
+      <div class="slide-header">
+        <span class="badge">02. BÀI TOÁN THỰC TẾ</span>
+        <h2 class="slide-title">Nỗi Đau (Pain Points) Của Các Bên Tham Gia</h2>
+        <p class="slide-subtitle">Mỗi đối tượng đều gặp trở ngại lớn khi thiếu một nền tảng quản trị tập trung</p>
+      </div>
+
+      <div class="content-body">
+        <div class="grid-4">
+          <div class="card">
+            <div class="icon-bubble">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </div>
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #ffffff;">Ban Tổ Chức</h3>
+            <span style="font-size: 0.72rem; font-weight: 700; color: #f87171; text-transform: uppercase;">Quá tải thủ công</span>
+            <ul style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; margin-top: 0.4rem; padding-left: 1rem;">
+              <li>Cấu hình cuộc thi phức tạp</li>
+              <li>Ghép đội & duyệt hồ sơ chậm</li>
+              <li>Khó kiểm soát deadline nộp</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="icon-bubble icon-bubble-cyan">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 12l-4-4-4 4"></path><path d="M12 16V8"></path></svg>
+            </div>
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #ffffff;">Ban Giám Khảo</h3>
+            <span style="font-size: 0.72rem; font-weight: 700; color: #f87171; text-transform: uppercase;">Chấm thi rời rạc</span>
+            <ul style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; margin-top: 0.4rem; padding-left: 1rem;">
+              <li>Mở nhiều link mã nguồn rời</li>
+              <li>Chấm điểm trên sheet phân tán</li>
+              <li>Khó so sánh kết quả cùng barem</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="icon-bubble icon-bubble-teal">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+            </div>
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #ffffff;">Thí Sinh Dự Thi</h3>
+            <span style="font-size: 0.72rem; font-weight: 700; color: #f87171; text-transform: uppercase;">Trải nghiệm bối rối</span>
+            <ul style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; margin-top: 0.4rem; padding-left: 1rem;">
+              <li>Khó tìm đồng đội, mã mời</li>
+              <li>Chọn đề tài dễ trùng lặp</li>
+              <li>Lo ngại bài nộp thất lạc</li>
+            </ul>
+          </div>
+
+          <div class="card">
+            <div class="icon-bubble icon-bubble-rose">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+            </div>
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #ffffff;">Mentor Cố Vấn</h3>
+            <span style="font-size: 0.72rem; font-weight: 700; color: #f87171; text-transform: uppercase;">Hỗ trợ quá tải</span>
+            <ul style="font-size: 0.76rem; color: var(--text-muted); line-height: 1.45; margin-top: 0.4rem; padding-left: 1rem;">
+              <li>Tin nhắn trôi trong group chat</li>
+              <li>Nhiều đội hỏi cùng một lỗi</li>
+              <li>Thiếu kênh báo cáo lên BTC</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="alert-box alert-primary">
+          <svg class="svg-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 14 14"></polyline></svg>
+          <div>
+            <div style="font-size: 0.74rem; font-weight: 700; color: #60a5fa; text-transform: uppercase;">BÀI TOÁN CỐT LÕI ĐẶT RA:</div>
+            <div style="font-size: 0.96rem; font-weight: 700; color: #ffffff; margin-top: 2px;">
+              "Làm thế nào để quản trị toàn bộ vòng đời Hackathon trên MỘT NỀN TẢNG DUY NHẤT, rõ ràng và minh bạch hơn?"
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SLIDE 5: GIẢI PHÁP HACKFLOW – ALL-IN-ONE
+         ====================================================================== -->
+    <section class="slide" data-index="4">
+      <div class="slide-header">
+        <span class="badge">03. GIẢI PHÁP</span>
+        <h2 class="slide-title">HackFlow — Hệ Thống Vận Hành Hackathon Tập Trung</h2>
+        <p class="slide-subtitle">Tất cả hoạt động và đối tượng tham gia tương tác trên cùng một hệ sinh thái đồng bộ</p>
+      </div>
+
+      <div class="content-body">
+        <div class="feat-grid">
+          <div class="feat-card">
+            <div class="feat-header">
+              <span style="font-size: 1.2rem;">🔐</span>
+              <span class="feat-title">1. Phân Quyền 4 Vai Trò</span>
+            </div>
+            <p class="feat-desc">Đăng nhập an toàn, phân định rành mạch quyền hạn cho Thí sinh, BTC, Giám khảo và Mentor.</p>
+          </div>
+
+          <div class="feat-card">
+            <div class="feat-header">
+              <span style="font-size: 1.2rem;">👥</span>
+              <span class="feat-title">2. Lập Đội & Mã Mời</span>
+            </div>
+            <p class="feat-desc">Tạo đội thi và ghép thành viên nhanh chóng thông qua mã mời bảo mật (Invite Code).</p>
+          </div>
+
+          <div class="feat-card">
+            <div class="feat-header">
+              <span style="font-size: 1.2rem;">📋</span>
+              <span class="feat-title">3. Đăng Ký Đề Tài</span>
+            </div>
+            <p class="feat-desc">Duyệt danh mục đề tài, đăng ký trực tuyến có kiểm soát giới hạn tránh tình trạng trùng lặp.</p>
+          </div>
+
+          <div class="feat-card">
+            <div class="feat-header">
+              <span style="font-size: 1.2rem;">⏱️</span>
+              <span class="feat-title">4. Nộp Bài Checkpoint</span>
+            </div>
+            <p class="feat-desc">Quản lý nộp bài theo từng mốc tiến độ chuẩn (Ý tưởng, Prototype, Báo cáo & Source Code).</p>
+          </div>
+
+          <div class="feat-card">
+            <div class="feat-header">
+              <span style="font-size: 1.2rem;">📜</span>
+              <span class="feat-title">5. Lịch Sử & Freeze Code</span>
+            </div>
+            <p class="feat-desc">Ghi nhận timestamp máy chủ, lưu vết phiên bản bài nộp và tự động khóa cổng sau deadline.</p>
+          </div>
+
+          <div class="feat-card">
+            <div class="feat-header">
+              <span style="font-size: 1.2rem;">⚖️</span>
+              <span class="feat-title">6. Chấm Điểm Rubric</span>
+            </div>
+            <p class="feat-desc">Giám khảo đánh giá bài nộp trực tiếp trên web theo thang tiêu chí Rubric minh bạch.</p>
+          </div>
+
+          <div class="feat-card">
+            <div class="feat-header">
+              <span style="font-size: 1.2rem;">📊</span>
+              <span class="feat-title">7. Trạng Thái Kỳ Thi</span>
+            </div>
+            <p class="feat-desc">Cung cấp cái nhìn toàn cảnh về tiến độ các đội thi và trạng thái vận hành sự kiện realtime.</p>
+          </div>
+
+          <div class="feat-card">
+            <div class="feat-header">
+              <span style="font-size: 1.2rem;">🎫</span>
+              <span class="feat-title">8. Ticket Hỗ Trợ Mentor</span>
+            </div>
+            <p class="feat-desc">Kênh tiếp nhận và giải đáp khó khăn kỹ thuật chuyên nghiệp, không lo bị trôi tin nhắn.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SLIDE 6: QUY TRÌNH VẬN HÀNH 5 BƯỚC (FLOW GRAPHIC)
+         ====================================================================== -->
+    <section class="slide" data-index="5">
+      <div class="slide-header">
+        <span class="badge">04. QUY TRÌNH</span>
+        <h2 class="slide-title">Chu Trình Vận Hành Khép Kín 5 Bước</h2>
+        <p class="slide-subtitle">Dòng chảy công việc liền mạch từ lúc cấu hình cuộc thi cho đến chấm thi và hỗ trợ</p>
+      </div>
+
+      <div class="content-body">
+        <div class="pipeline-container">
+          <!-- Step 1 -->
+          <div class="pipeline-step">
+            <span class="badge" style="background: #2563eb; color: #fff; border: none; align-self: flex-start;">BƯỚC 1</span>
+            <div style="font-size: 0.92rem; font-weight: 700; color: #ffffff; margin-top: 0.4rem;">Cấu Hình Kỳ Thi</div>
+            <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Ban Tổ Chức</div>
+            <p style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.4rem; line-height: 1.35;">
+              Thiết lập thời gian, danh sách đề tài, quy mô đội, các checkpoint và barem rubric.
+            </p>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <!-- Step 2 -->
+          <div class="pipeline-step">
+            <span class="badge" style="background: #0284c7; color: #fff; border: none; align-self: flex-start;">BƯỚC 2</span>
+            <div style="font-size: 0.92rem; font-weight: 700; color: #ffffff; margin-top: 0.4rem;">Ghép Đội & Đề Tài</div>
+            <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Thí Sinh</div>
+            <p style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.4rem; line-height: 1.35;">
+              Đăng nhập, tạo đội hoặc nhập mã mời; đăng ký đề tài thi phù hợp trên hệ thống.
+            </p>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <!-- Step 3 -->
+          <div class="pipeline-step">
+            <span class="badge" style="background: #0d9488; color: #fff; border: none; align-self: flex-start;">BƯỚC 3</span>
+            <div style="font-size: 0.92rem; font-weight: 700; color: #ffffff; margin-top: 0.4rem;">Nộp Checkpoint</div>
+            <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Đội Thi</div>
+            <p style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.4rem; line-height: 1.35;">
+              Nộp bài theo từng mốc. Hệ thống ghi nhận timestamp và tự động khóa cổng sau hạn.
+            </p>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <!-- Step 4 -->
+          <div class="pipeline-step">
+            <span class="badge" style="background: #4f46e5; color: #fff; border: none; align-self: flex-start;">BƯỚC 4</span>
+            <div style="font-size: 0.92rem; font-weight: 700; color: #ffffff; margin-top: 0.4rem;">Chấm Thi Rubric</div>
+            <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Giám Khảo</div>
+            <p style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.4rem; line-height: 1.35;">
+              Truy cập mã nguồn/demo bài thi và chấm điểm trực tiếp theo tiêu chí chuẩn hóa.
+            </p>
+          </div>
+
+          <div class="pipeline-arrow">➔</div>
+
+          <!-- Step 5 -->
+          <div class="pipeline-step">
+            <span class="badge" style="background: #e11d48; color: #fff; border: none; align-self: flex-start;">BƯỚC 5</span>
+            <div style="font-size: 0.92rem; font-weight: 700; color: #ffffff; margin-top: 0.4rem;">Hỗ Trợ Ticket</div>
+            <div style="font-size: 0.72rem; color: #38bdf8; font-weight: 600;">Mentor & Thí Sinh</div>
+            <p style="font-size: 0.74rem; color: var(--text-muted); margin-top: 0.4rem; line-height: 1.35;">
+              Gửi và tiếp nhận ticket giải đáp kỹ thuật, chuyển tiếp sự cố khẩn cấp lên BTC.
+            </p>
+          </div>
+        </div>
+
+        <div class="alert-box alert-primary" style="margin-top: 0.4rem;">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+          <div>
+            <strong>ĐỒNG BỘ TRẠNG THÁI TỰ ĐỘNG:</strong> Dữ liệu từ các bước được kết nối liên tục, loại bỏ hoàn toàn các bước xuất nhập file Excel thủ công.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SLIDE 7: ĐIỂM KHÁC BIỆT – COMMIT SHA FREEZE (VISUAL)
+         ====================================================================== -->
+    <section class="slide" data-index="6">
+      <div class="slide-header">
+        <span class="badge">05. ĐIỂM KHÁC BIỆT</span>
+        <h2 class="slide-title">HackFlow Giải Quyết Vấn Đề Mà Nền Tảng Khác Bỏ Ngỏ</h2>
+        <p class="slide-subtitle">Ba tính năng cốt lõi không có trong bất kỳ nền tảng hackathon quốc tế hiện hành nào</p>
+      </div>
+
+      <div class="content-body">
+        <div class="grid-2">
+          <!-- SHA Freeze - big card left -->
+          <div class="card" style="border-color: rgba(244,63,94,0.35); background: rgba(244,63,94,0.05);">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.5rem;">
+              <span style="font-size:1.5rem;">🔒</span>
+              <h3 style="font-size:1rem;font-weight:800;color:#f87171;">Commit SHA Freeze — Chống Gian Lận Tận Gốc</h3>
+            </div>
+            <p style="font-size:0.78rem;color:var(--text-muted);line-height:1.4;margin-bottom:0.65rem;">
+              Google Form chỉ lưu <em>chuỗi URL</em> — thí sinh có thể tiếp tục
+              <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:0.76rem;">git push</code>
+              sau deadline rồi trình bày bản code mới trước giám khảo. HackFlow đóng băng <strong>mã Commit SHA</strong> ngay tại thời điểm nộp.
+            </p>
+            <!-- Timeline visual -->
+            <div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;flex-wrap:wrap;">
+              <div style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.4);border-radius:8px;padding:6px 12px;color:#34d399;font-weight:700;text-align:center;">
+                23:00 — Nộp bài<br><span style="color:#94a3b8;font-weight:400;">SHA: a1b2c3 ✅ Đóng băng</span>
+              </div>
+              <span style="color:#475569;font-size:1.1rem;font-weight:300;">→</span>
+              <div style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);border-radius:8px;padding:6px 12px;color:#f87171;font-weight:700;text-align:center;">
+                00:30 — Git push<br><span style="color:#94a3b8;font-weight:400;">SHA: x9y8z7 ≠ Phát hiện!</span>
+              </div>
+              <span style="color:#475569;font-size:1.1rem;font-weight:300;">→</span>
+              <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);border-radius:8px;padding:6px 12px;color:#fbbf24;font-weight:700;text-align:center;">
+                ⚠️ Cảnh báo đỏ<br><span style="color:#94a3b8;font-weight:400;">Hiện cho Giám khảo</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: 2 smaller cards stacked -->
+          <div style="display:flex;flex-direction:column;gap:0.65rem;">
+            <div class="card" style="border-color:rgba(16,185,129,0.3);background:rgba(16,185,129,0.05);">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.3rem;">
+                <span style="font-size:1.25rem;">📋</span>
+                <h3 style="font-size:0.95rem;font-weight:800;color:#34d399;">Checkpoint Có Kiểm Soát Thời Gian</h3>
+              </div>
+              <p style="font-size:0.77rem;color:var(--text-muted);line-height:1.4;">
+                Nút nộp bài <strong>tự động mở/khóa đúng giờ quy định</strong> — kiểm tra phía server, không thể bypass. BTC theo dõi tiến độ từng đội theo mốc thay vì tổng hợp nhiều Sheet riêng lẻ.
+              </p>
+            </div>
+
+            <div class="card" style="border-color:rgba(59,130,246,0.3);background:rgba(59,130,246,0.05);">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:0.3rem;">
+                <span style="font-size:1.25rem;">🎟️</span>
+                <h3 style="font-size:0.95rem;font-weight:800;color:#60a5fa;">Ticket Mentor Có Tổ Chức</h3>
+              </div>
+              <p style="font-size:0.77rem;color:var(--text-muted);line-height:1.4;">
+                Thay thế Zalo/Discord lộn xộn bằng hệ thống ticket 3 trạng thái. Mentor được phân công theo chủ đề — BTC đo được hiệu quả hỗ trợ và không bỏ sót câu hỏi.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="alert-box alert-primary" style="margin-top:0.35rem;">
+          <svg class="svg-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+          <div>
+            <strong>TẠI SAO KHÔNG DÙNG DEVPOST / HACKEREARTH?</strong> — Các nền tảng quốc tế được thiết kế cho hackathon startup-style: thí sinh tự đề xuất ý tưởng, nộp 1 lần cuối, không có checkpoint, không có portal mentor. Mô hình này không phù hợp với hackathon học thuật Việt Nam nơi <strong>BTC cấp đề tài sẵn và mentor là giảng viên có trách nhiệm cụ thể.</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SLIDE 8: TỔNG KẾT & ĐỊNH HƯỚNG TRIỂN KHAI
+         ====================================================================== -->
+    <section class="slide" data-index="7">
+      <div class="slide-header">
+        <span class="badge badge-teal">06. TỔNG KẾT &amp; ĐỊNH HƯỚNG</span>
+        <h2 class="slide-title">Tổng Kết Dự Án &amp; Định Hướng Triển Khai</h2>
+        <p class="slide-subtitle">Khép kín 4 vai trò · Giải quyết triệt để 3 bài toán phân mảnh · Lộ trình 4 Sprint khả thi</p>
+      </div>
+
+      <div class="content-body">
+        <!-- Roadmap row at top: 4 Sprints matching the 5 steps and 8 features -->
+        <div style="display:flex;gap:0.5rem;margin-bottom:0.6rem;">
+          <div style="flex:1;background:rgba(37,99,235,0.15);border:1px solid rgba(37,99,235,0.35);border-radius:8px;padding:0.45rem 0.65rem;">
+            <div style="font-size:0.68rem;font-weight:800;color:#60a5fa;text-transform:uppercase;margin-bottom:2px;">Sprint 1 • Nền Tảng</div>
+            <div style="font-size:0.78rem;font-weight:700;color:#fff;">Phân Tích &amp; CSDL</div>
+            <div style="font-size:0.68rem;color:#94a3b8;">Tài liệu BRD/SRS · Schema PostgreSQL</div>
+          </div>
+          <div style="flex:1;background:rgba(2,132,199,0.15);border:1px solid rgba(2,132,199,0.35);border-radius:8px;padding:0.45rem 0.65rem;">
+            <div style="font-size:0.68rem;font-weight:800;color:#38bdf8;text-transform:uppercase;margin-bottom:2px;">Sprint 2 • Bước 1 &amp; 2</div>
+            <div style="font-size:0.78rem;font-weight:700;color:#fff;">Xác Thực &amp; Đội Thi</div>
+            <div style="font-size:0.68rem;color:#94a3b8;">Auth 4 vai trò · Ghép đội · Chọn đề tài</div>
+          </div>
+          <div style="flex:1;background:rgba(13,148,136,0.15);border:1px solid rgba(13,148,136,0.35);border-radius:8px;padding:0.45rem 0.65rem;">
+            <div style="font-size:0.68rem;font-weight:800;color:#34d399;text-transform:uppercase;margin-bottom:2px;">Sprint 3 • Bước 3</div>
+            <div style="font-size:0.78rem;font-weight:700;color:#fff;">Checkpoint &amp; Nộp Bài</div>
+            <div style="font-size:0.68rem;color:#94a3b8;">Time-gated gate · Freeze Commit SHA</div>
+          </div>
+          <div style="flex:1;background:rgba(79,70,229,0.15);border:1px solid rgba(79,70,229,0.35);border-radius:8px;padding:0.45rem 0.65rem;">
+            <div style="font-size:0.68rem;font-weight:800;color:#a78bfa;text-transform:uppercase;margin-bottom:2px;">Sprint 4 • Bước 4 &amp; 5</div>
+            <div style="font-size:0.78rem;font-weight:700;color:#fff;">Chấm Thi &amp; Hỗ Trợ</div>
+            <div style="font-size:0.68rem;color:#94a3b8;">Barem Rubric · Ticket Mentor · UAT</div>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <!-- Left: 3 Core Values -->
+          <div class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-size: 0.92rem; font-weight: 800; color: #60a5fa; margin-bottom: 0.55rem; display: flex; align-items: center; gap: 6px;">
+                <span>🎯</span> 3 GIÁ TRỊ CỐT LÕI HỆ THỐNG MANG LẠI
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.55rem;">
+                <div>
+                  <div style="font-size: 0.84rem; font-weight: 700; color: #ffffff;">1. Thống nhất 4 vai trò trên 1 nền tảng duy nhất:</div>
+                  <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 2px; line-height: 1.35;">
+                    Xóa bỏ hoàn toàn tình trạng dùng rời rạc Google Forms, Sheets &amp; Zalo. Mọi dữ liệu thí sinh, đội thi và điểm số tập trung 100%.
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 0.84rem; font-weight: 700; color: #ffffff;">2. Minh bạch tiến độ &amp; Chống gian lận deadline:</div>
+                  <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 2px; line-height: 1.35;">
+                    Kiểm soát nộp bài theo từng mốc Checkpoint và tự động đóng băng mã <strong>Commit SHA</strong> để ngăn chặn sửa code sau hạn chót.
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 0.84rem; font-weight: 700; color: #ffffff;">3. Chuẩn hóa chấm thi &amp; Phân luồng hỗ trợ:</div>
+                  <div style="font-size: 0.73rem; color: var(--text-muted); margin-top: 2px; line-height: 1.35;">
+                    Chấm điểm theo barem Rubric tự động tính theo trọng số, kèm hệ thống Ticket phân luồng theo chuyên môn Mentor tránh trôi tin nhắn.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 0.74rem; font-weight: 600; color: #34d399; margin-top: 0.5rem; padding-top: 0.45rem; border-top: 1px solid rgba(255,255,255,0.08);">
+              💡 Định hướng: Bám sát mô hình Hackathon học thuật thực tế tại các trường đại học.
+            </div>
+          </div>
+
+          <!-- Right: Output Commitments & Quality Goals (Replacing Teacher Questions) -->
+          <div class="card" style="background: rgba(30,58,138,0.25); border-color: rgba(59,130,246,0.35); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="font-size: 0.92rem; font-weight: 800; color: #93c5fd; margin-bottom: 0.55rem; display: flex; align-items: center; gap: 6px;">
+                <span>🏆</span> MỤC TIÊU ĐẦU RA &amp; TIÊU CHÍ NGHIỆM THU
+              </div>
+              <div style="display: flex; flex-direction: column; gap: 0.55rem;">
+                <div>
+                  <div style="font-size: 0.83rem; font-weight: 700; color: #ffffff;">1. Sản phẩm Working Demo thực chiến:</div>
+                  <div style="font-size: 0.73rem; color: #cbd5e1; margin-top: 2px; line-height: 1.35;">
+                    Vận hành mượt mà toàn bộ quy trình 5 bước: Cấu hình kỳ thi, Tạo đội &amp; ghép mã mời, Nộp checkpoint, Chấm thi Rubric và Ticket mentor.
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 0.83rem; font-weight: 700; color: #ffffff;">2. Kiểm chứng tính năng kỹ thuật cốt lõi:</div>
+                  <div style="font-size: 0.73rem; color: #cbd5e1; margin-top: 2px; line-height: 1.35;">
+                    Xác thực tính năng Commit SHA Freeze gọi GitHub API đóng băng mã nguồn đúng hạn và cơ chế Time-gating kiểm tra chặt chẽ ở server-side.
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 0.83rem; font-weight: 700; color: #ffffff;">3. Hồ sơ kỹ thuật &amp; Kịch bản kiểm thử:</div>
+                  <div style="font-size: 0.73rem; color: #cbd5e1; margin-top: 2px; line-height: 1.35;">
+                    Hoàn thiện trọn bộ tài liệu phân tích nghiệp vụ BRD, đặc tả SRS, thiết kế CSDL PostgreSQL và bộ test case kịch bản UAT.
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="font-size: 0.74rem; font-weight: 600; color: #38bdf8; margin-top: 0.5rem; padding-top: 0.45rem; border-top: 1px solid rgba(59,130,246,0.25);">
+              🚀 Cam kết: Hoàn thành đúng tiến độ 4 Sprint, đảm bảo chất lượng nghiệm thu học phần.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ======================================================================
+         SLIDE 9: CẢM ƠN THẦY VÀ CÁC BẠN ĐÃ LẮNG NGHE
+         ====================================================================== -->
+    <section class="slide" data-index="8">
+      <div class="content-body" style="justify-content: center; align-items: center; text-align: center; height: 100%;">
+        
+        <div style="max-width: 820px; display: flex; flex-direction: column; align-items: center;">
+          <div class="icon-bubble icon-bubble-cyan" style="width: 64px; height: 64px; margin-bottom: 1.2rem; border-radius: 16px;">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+          </div>
+
+          <span class="badge badge-teal" style="font-size: 0.82rem; padding: 5px 16px; margin-bottom: 1rem; letter-spacing: 0.08em;">
+            KẾT THÚC BÁO CÁO Ý TƯỞNG
+          </span>
+
+          <h1 style="font-size: clamp(2.4rem, 4.5vw, 3.6rem); font-weight: 900; letter-spacing: -0.02em; line-height: 1.2; background: linear-gradient(135deg, #ffffff 30%, #93c5fd 70%, #38bdf8 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 1.2rem;">
+            CẢM ƠN THẦY VÀ CÁC BẠN<br>ĐÃ LẮNG NGHE!
+          </h1>
+
+          <p style="font-size: 1.15rem; color: #94a3b8; font-weight: 500; line-height: 1.5; margin-bottom: 1.5rem;">
+            Dự Án <strong style="color: #60a5fa;">HackFlow</strong> — Nền Tảng Quản Trị &amp; Vận Hành Hackathon Tập Trung
+          </p>
+
+          <div style="display: inline-flex; align-items: center; gap: 10px; padding: 0.6rem 1.4rem; background: rgba(59, 130, 246, 0.12); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 9999px; color: #cbd5e1; font-size: 0.9rem;">
+            <span>💬</span> Nhóm 9 rất mong nhận được những ý kiến đóng góp và định hướng từ Thầy cùng các bạn!
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================================
+       BOTTOM FLOATING CONTROLS & KEYBOARD HINTS
+       ====================================================================== -->
+  <div id="keyboard-hints">
+    <span>Điều hướng:</span>
+    <span class="key-badge">◄</span>
+    <span class="key-badge">►</span>
+    <span>hoặc</span>
+    <span class="key-badge">Space</span>
+    <span>•</span>
+    <span class="key-badge">F</span>
+    <span>Toàn màn hình</span>
+  </div>
+
+  <nav id="floating-controls" aria-label="Slide Navigation">
+    <button class="ctrl-btn" id="prev-btn" title="Slide trước (Phím mũi tên Trái)">❮ Prev</button>
+    <span id="slide-indicator">01 / 09</span>
+    <button class="ctrl-btn" id="next-btn" title="Slide sau (Phím mũi tên Phải hoặc Space)">Next ❯</button>
+    <button class="ctrl-btn" id="fullscreen-btn" title="Bật/Tắt toàn màn hình (Phím F)">⛶</button>
+  </nav>
+
+  <!-- ======================================================================
+       JAVASCRIPT LOGIC (SLIDE ENGINE)
+       ====================================================================== -->
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const slides = document.querySelectorAll(".slide");
+      const totalSlides = slides.length;
+      let currentIndex = 0;
+
+      const prevBtn = document.getElementById("prev-btn");
+      const nextBtn = document.getElementById("next-btn");
+      const fullscreenBtn = document.getElementById("fullscreen-btn");
+      const slideIndicator = document.getElementById("slide-indicator");
+      const progressBar = document.getElementById("progress-bar");
+
+      // Update Slide State
+      function updateSlide(newIndex) {
+        if (newIndex < 0 || newIndex >= totalSlides) return;
+
+        // Hide current
+        slides[currentIndex].classList.remove("active");
+
+        // Activate new
+        currentIndex = newIndex;
+        slides[currentIndex].classList.add("active");
+
+        // Update Counter
+        const formattedCurrent = String(currentIndex + 1).padStart(2, "0");
+        const formattedTotal = String(totalSlides).padStart(2, "0");
+        slideIndicator.textContent = `${formattedCurrent} / ${formattedTotal}`;
+
+        // Update Progress Bar
+        const percentage = ((currentIndex + 1) / totalSlides) * 100;
+        progressBar.style.width = `${percentage}%`;
+
+        // Update Buttons Disabled state
+        prevBtn.disabled = currentIndex === 0;
+        nextBtn.disabled = currentIndex === totalSlides - 1;
+      }
+
+      function nextSlide() {
+        if (currentIndex < totalSlides - 1) {
+          updateSlide(currentIndex + 1);
+        }
+      }
+
+      function prevSlide() {
+        if (currentIndex > 0) {
+          updateSlide(currentIndex - 1);
+        }
+      }
+
+      // Toggle Fullscreen
+      function toggleFullscreen() {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch((err) => {
+            console.warn("Fullscreen request error:", err);
+          });
+        } else {
+          if (document.exitFullscreen) {
+            document.exitFullscreen();
+          }
+        }
+      }
+
+      // Button Events
+      nextBtn.addEventListener("click", nextSlide);
+      prevBtn.addEventListener("click", prevSlide);
+      fullscreenBtn.addEventListener("click", toggleFullscreen);
+
+      // Keyboard Events
+      window.addEventListener("keydown", (e) => {
+        // Prevent default scrolling for Space / Arrow keys
+        if (["Space", "ArrowRight", "ArrowLeft", "PageUp", "PageDown"].includes(e.code)) {
+          e.preventDefault();
+        }
+
+        switch (e.code) {
+          case "ArrowRight":
+          case "Space":
+          case "PageDown":
+            nextSlide();
+            break;
+          case "ArrowLeft":
+          case "Backspace":
+          case "PageUp":
+            prevSlide();
+            break;
+          case "Home":
+            updateSlide(0);
+            break;
+          case "End":
+            updateSlide(totalSlides - 1);
+            break;
+          case "KeyF":
+            toggleFullscreen();
+            break;
+        }
+      });
+
+      // Touch / Swipe Navigation for touch devices
+      let touchStartX = 0;
+      let touchEndX = 0;
+
+      window.addEventListener("touchstart", (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+      }, { passive: true });
+
+      window.addEventListener("touchend", (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        const diffX = touchEndX - touchStartX;
+        if (Math.abs(diffX) > 50) {
+          if (diffX < 0) {
+            nextSlide(); // Swiped left -> next
+          } else {
+            prevSlide(); // Swiped right -> prev
+          }
+        }
+      }, { passive: true });
+
+      // Initialize
+      updateSlide(0);
+    });
+  </script>
+</body>
+</html>
