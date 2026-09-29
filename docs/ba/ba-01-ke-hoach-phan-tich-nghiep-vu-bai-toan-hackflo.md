@@ -98,11 +98,11 @@ Xây dựng nền tảng nghiệp vụ đủ rõ để nhóm kỹ thuật **khô
 
 | AC | Kịch bản | Given | When | Then |
 |----|---------|-------|------|------|
-| AC-1.1 | Đăng nhập lần đầu thành công | Email GitHub nằm trong Whitelist | Người dùng bấm "Đăng nhập bằng GitHub" và cấp quyền | Hệ thống định danh, gán role, tạo phiên và chuyển hướng đến màn hình Onboarding |
-| AC-1.2 | Đăng nhập từ lần 2 trở đi | Đã hoàn tất Onboarding, email trong Whitelist | Người dùng đăng nhập lại | Xác thực thành công, khôi phục phiên đúng vai trò, chuyển thẳng đến màn hình chức năng (bỏ qua Onboarding) |
-| AC-1.3 | Email không trong Whitelist | Xác thực GitHub thành công nhưng email không có trong Whitelist | Hệ thống đối chiếu email với CSDL | Từ chối phiên, thông báo lỗi "chưa được cấp quyền", hướng dẫn liên hệ BTC/Mentor |
-| AC-1.4 | Lỗi xác thực / phiên hết hạn | Token GitHub lỗi hoặc phiên đã hết hạn | Người dùng truy cập hoặc gọi API bảo mật | Không hiển thị dữ liệu bảo mật, trả mã lỗi xác thực, bắt buộc đăng nhập lại |
-| AC-1.5 | Truy cập trái phép | Đã đăng nhập với vai trò thí sinh | Người dùng cố gọi API hoặc truy cập giao diện vai trò khác | RBAC từ chối ở cả UI lẫn Backend, trả 403 FORBIDDEN, ghi log |
+| AC-01.1 | Đăng nhập lần đầu thành công | Email GitHub nằm trong Whitelist | Người dùng bấm "Đăng nhập bằng GitHub" và cấp quyền | Hệ thống định danh, gán role, tạo phiên và chuyển hướng đến màn hình Onboarding |
+| AC-01.2 | Đăng nhập từ lần 2 trở đi | Đã hoàn tất Onboarding, email trong Whitelist | Người dùng đăng nhập lại | Xác thực thành công, khôi phục phiên đúng vai trò, chuyển thẳng đến màn hình chức năng (bỏ qua Onboarding) |
+| AC-01.3 | Email không trong Whitelist | Xác thực GitHub thành công nhưng email không có trong Whitelist | Hệ thống đối chiếu email với CSDL | Từ chối phiên, thông báo lỗi "chưa được cấp quyền", hướng dẫn liên hệ BTC/Mentor |
+| AC-01.4 | Lỗi xác thực / phiên hết hạn | Token GitHub lỗi hoặc phiên đã hết hạn | Người dùng truy cập hoặc gọi API bảo mật | Không hiển thị dữ liệu bảo mật, trả mã lỗi xác thực, bắt buộc đăng nhập lại |
+| AC-01.5 | Truy cập trái phép | Đã đăng nhập với vai trò thí sinh | Người dùng cố gọi API hoặc truy cập giao diện vai trò khác | RBAC từ chối ở cả UI lẫn Backend, trả 403 FORBIDDEN, ghi log |
 
 ---
 
@@ -170,30 +170,61 @@ Xây dựng nền tảng nghiệp vụ đủ rõ để nhóm kỹ thuật **khô
 
 ---
 
+### US-08 — Gửi yêu cầu thay đổi thông tin/email đăng nhập
+
+**Đầu vào:** Thí sinh đã đăng nhập, thông tin/email mới cần thay đổi, lý do, minh chứng đính kèm.
+
+- **AC-08.1** Thí sinh gửi form yêu cầu cập nhật thông tin/email với đầy đủ lý do hợp lệ.
+- **AC-08.2** Hệ thống tiếp nhận, tạo yêu cầu ở trạng thái `PENDING` và gửi thông báo tới Ban tổ chức.
+- **AC-08.3** Thí sinh theo dõi trạng thái yêu cầu (`PENDING`, `APPROVED`, `REJECTED`) trên giao diện cá nhân.
+
+---
+
 ### US-09 — Tạo & cấu hình cuộc thi
 
-- **AC-08.1** Lưu bản nháp khi đủ trường tối thiểu (bản nháp chưa cho thí sinh tham gia).
-- **AC-08.2** Công bố khi đủ trường bắt buộc + thời gian hợp lệ → ghi nhận người & thời điểm công bố.
-- **AC-08.3** Từ chối thời gian kết thúc < thời gian bắt đầu, checkpoint ngoài khung cuộc thi.
-- **AC-08.4** Sau khi có đội/bài nộp → khóa hoặc yêu cầu xác nhận cao hơn khi sửa trường ảnh hưởng tính toàn vẹn dữ liệu.
+- **AC-09.1** Lưu bản nháp khi đủ trường tối thiểu (bản nháp chưa cho thí sinh tham gia).
+- **AC-09.2** Công bố khi đủ trường bắt buộc + thời gian hợp lệ → ghi nhận người & thời điểm công bố.
+- **AC-09.3** Từ chối thời gian kết thúc < thời gian bắt đầu, checkpoint ngoài khung cuộc thi.
+- **AC-09.4** Sau khi có đội/bài nộp → khóa hoặc yêu cầu xác nhận cao hơn khi sửa trường ảnh hưởng tính toàn vẹn dữ liệu.
 
 ---
 
 ### US-10 — Quản lý hồ sơ & đội thi
 
-- **AC-09.1** Thêm/xóa/cập nhật Whitelist email.
-- **AC-09.2** Lọc đội theo trạng thái, đề tài, đăng ký; hiển thị lý do đội chưa hợp lệ.
-- **AC-09.3** Chỉ người có quyền thay đổi thành viên; kiểm tra trùng đội, giới hạn số lượng, lưu lịch sử.
-- **AC-09.4** Email sai định dạng hoặc thiếu trường bắt buộc → từ chối, nêu rõ dòng/trường lỗi.
+- **AC-10.1** Thêm/xóa/cập nhật Whitelist email và danh sách thí sinh.
+- **AC-10.2** Lọc đội theo trạng thái, đề tài, đăng ký; hiển thị lý do đội chưa hợp lệ.
+- **AC-10.3** Chỉ người có quyền thay đổi thành viên; kiểm tra trùng đội, giới hạn số lượng, lưu lịch sử.
+- **AC-10.4** Email sai định dạng hoặc thiếu trường bắt buộc → từ chối, nêu rõ dòng/trường lỗi.
 
 ---
 
 ### US-11 — Theo dõi checkpoint & sự cố
 
-- **AC-10.1** Dashboard: số đội, bài nộp theo trạng thái/checkpoint, lỗi chính trong phạm vi cuộc thi.
-- **AC-10.2** Lọc theo đội, checkpoint, trạng thái, khoảng thời gian; mở danh sách bản ghi từ chỉ số.
-- **AC-10.3** Phát hiện lỗi/lưu lượng bất thường → ghi nhận sự cố, hiển thị cho BTC.
-- **AC-10.4** Chỉ BTC xem dữ liệu giám sát tổng hợp và thông tin sự cố nội bộ.
+- **AC-11.1** Dashboard: số đội, bài nộp theo trạng thái/checkpoint, lỗi chính trong phạm vi cuộc thi.
+- **AC-11.2** Lọc theo đội, checkpoint, trạng thái, khoảng thời gian; mở danh sách bản ghi từ chỉ số.
+- **AC-11.3** Phát hiện lỗi/lưu lượng bất thường → ghi nhận sự cố, hiển thị cảnh báo cho BTC.
+- **AC-11.4** Chỉ BTC xem dữ liệu giám sát tổng hợp và thông tin sự cố nội bộ.
+
+---
+
+### US-12 — Quản lý Whitelist email thí sinh đủ điều kiện
+
+**Đầu vào:** File danh sách email (CSV/Excel) hoặc nhập email đơn lẻ từ Ban tổ chức.
+
+- **AC-12.1** BTC import danh sách email Whitelist từ file CSV/Excel hoặc nhập trực tiếp từng email.
+- **AC-12.2** Hệ thống tự động kiểm tra trùng lặp email, chuẩn hóa định dạng chữ thường và loại bỏ khoảng trắng.
+- **AC-12.3** Tra cứu, thêm mới hoặc xóa email khỏi Whitelist theo thời gian thực.
+- **AC-12.4** Ghi log lịch sử thay đổi danh sách Whitelist (người thực hiện, thời điểm, nội dung thay đổi).
+
+---
+
+### US-13 — Duyệt yêu cầu thay đổi tài khoản/email của thí sinh
+
+**Đầu vào:** Danh sách yêu cầu thay đổi thông tin/email từ thí sinh (`status = PENDING`).
+
+- **AC-13.1** BTC xem danh sách các yêu cầu thay đổi tài khoản/email đang chờ duyệt kèm lý do và minh chứng.
+- **AC-13.2** BTC phê duyệt (`APPROVED`) → hệ thống tự động cập nhật email/thông tin tài khoản và đồng bộ Whitelist.
+- **AC-13.3** BTC từ chối (`REJECTED`) → bắt buộc nhập lý do từ chối và gửi thông báo phản hồi cho thí sinh.
 
 ---
 
@@ -203,66 +234,66 @@ Xây dựng nền tảng nghiệp vụ đủ rõ để nhóm kỹ thuật **khô
 
 | AC | Kịch bản | Given | When | Then |
 |----|---------|-------|------|------|
-| AC-11.1 | Phân công thành công | Đội hợp lệ, giám khảo có sẵn | BTC xác nhận phân công | Ghi nhận, cập nhật danh sách phụ trách, người được gán thấy ngay dữ liệu |
-| AC-11.2 | Giới hạn phạm vi | Giám khảo/Mentor đã đăng nhập | Cố truy cập dữ liệu ngoài danh sách được giao | Chặn, trả lỗi bảo mật, không hiển thị thông tin ngoài phạm vi |
-| AC-11.3 | Phân công sai vai trò | BTC gán việc cho tài khoản sai vai trò | Hệ thống kiểm tra trước khi lưu | Từ chối, thông báo lỗi, giữ nguyên trạng thái cũ |
-| AC-11.4 | Lưu lịch sử | BTC thực hiện phân công mới hoặc điều chuyển | Hệ thống hoàn tất thao tác | Lưu đầy đủ: lịch sử thay đổi, thời điểm, danh tính người thao tác |
+| AC-14.1 | Phân công thành công | Đội hợp lệ, giám khảo có sẵn | BTC xác nhận phân công | Ghi nhận, cập nhật danh sách phụ trách, người được gán thấy ngay dữ liệu |
+| AC-14.2 | Giới hạn phạm vi | Giám khảo/Mentor đã đăng nhập | Cố truy cập dữ liệu ngoài danh sách được giao | Chặn, trả lỗi bảo mật, không hiển thị thông tin ngoài phạm vi |
+| AC-14.3 | Phân công sai vai trò | BTC gán việc cho tài khoản sai vai trò | Hệ thống kiểm tra trước khi lưu | Từ chối, thông báo lỗi, giữ nguyên trạng thái cũ |
+| AC-14.4 | Lưu lịch sử | BTC thực hiện phân công mới hoặc điều chuyển | Hệ thống hoàn tất thao tác | Lưu đầy đủ: lịch sử thay đổi, thời điểm, danh tính người thao tác |
 
 ---
 
 ### US-15 — Tổng hợp & công bố kết quả
 
-- **AC-12.1** Gom điểm theo cấu hình, kiểm tra đủ điều kiện, chỉ cho phép chuyển bước tiếp khi không còn lỗi nghiêm trọng.
-- **AC-12.2** Tính điểm trung bình, gắn cờ cảnh báo điểm lệch vượt ngưỡng, xử lý đồng điểm theo tiêu chí phụ.
-- **AC-12.3** Trạng thái `DRAFT → PUBLISHED`: BTC rà soát xong → xác nhận → kích hoạt hiển thị công khai đúng phạm vi.
-- **AC-12.4** Ghi nhận người công bố, thời điểm, mã phiên bản; sau công bố khóa cứng dữ liệu, không cho sửa trực tiếp.
-- **AC-12.5** Xuất file Excel đầy đủ điểm thành phần, tổng kết, thứ hạng.
+- **AC-15.1** Gom điểm theo cấu hình, kiểm tra đủ điều kiện, chỉ cho phép chuyển bước tiếp khi không còn lỗi nghiêm trọng.
+- **AC-15.2** Tính điểm trung bình, gắn cờ cảnh báo điểm lệch vượt ngưỡng, xử lý đồng điểm theo tiêu chí phụ.
+- **AC-15.3** Trạng thái `DRAFT → PUBLISHED`: BTC rà soát xong → xác nhận → kích hoạt hiển thị công khai đúng phạm vi.
+- **AC-15.4** Ghi nhận người công bố, thời điểm, mã phiên bản; sau công bố khóa cứng dữ liệu, không cho sửa trực tiếp.
+- **AC-15.5** Xuất file Excel đầy đủ điểm thành phần, tổng kết, thứ hạng.
 
 ---
 
 ### US-16 — Giám khảo xem đội & bài nộp
 
-- **AC-13.1** Chỉ thấy đội/bài nộp được phân công và trạng thái xử lý cá nhân.
-- **AC-13.2** Chế độ ẩn danh: che tên đội, tên thành viên, tên trường — chỉ hiển thị mã định danh ẩn danh.
-- **AC-13.3** Giao diện chia đôi màn hình: bên trái demo URL của thí sinh, bên phải bảng tiêu chí chấm điểm.
-- **AC-13.4** Chưa được phân công → danh sách rỗng kèm thông báo.
+- **AC-16.1** Chỉ thấy đội/bài nộp được phân công và trạng thái xử lý cá nhân.
+- **AC-16.2** Chế độ ẩn danh: che tên đội, tên thành viên, tên trường — chỉ hiển thị mã định danh ẩn danh.
+- **AC-16.3** Giao diện chia đôi màn hình: bên trái demo URL của thí sinh, bên phải bảng tiêu chí chấm điểm.
+- **AC-16.4** Chưa được phân công → danh sách rỗng kèm thông báo.
 
 ---
 
 ### US-17 — Chấm điểm theo tiêu chí
 
-- **AC-14.1** Chỉ nhập điểm trong khoảng cho phép của từng tiêu chí; hiển thị tổng điểm tạm tính.
-- **AC-14.2** Thiếu tiêu chí bắt buộc → không cho lưu hoàn tất, chỉ rõ tiêu chí còn thiếu.
-- **AC-14.3** Lưu bản nháp, tiếp tục chỉnh sửa trong thời gian được phép; lịch sử chỉnh sửa được ghi nhận.
-- **AC-14.4** Không xem điểm/nhận xét của người chấm khác (nếu chưa được phép), không sửa bài nộp thí sinh.
+- **AC-17.1** Chỉ nhập điểm trong khoảng cho phép của từng tiêu chí; hiển thị tổng điểm tạm tính.
+- **AC-17.2** Thiếu tiêu chí bắt buộc → không cho lưu hoàn tất, chỉ rõ tiêu chí còn thiếu.
+- **AC-17.3** Lưu bản nháp, tiếp tục chỉnh sửa trong thời gian được phép; lịch sử chỉnh sửa được ghi nhận.
+- **AC-17.4** Không xem điểm/nhận xét của người chấm khác (nếu chưa được phép), không sửa bài nộp thí sinh.
 
 ---
 
 ### US-18 — Xác nhận bảng điểm
 
-- **AC-15.1** Đủ tiêu chí + dữ liệu hợp lệ → xem bản tổng hợp, xác nhận → trạng thái "Đã xác nhận".
-- **AC-15.2** Còn thiếu tiêu chí / điểm ngoài phạm vi → không cho xác nhận, nêu rõ nguyên nhân.
-- **AC-15.3** Sau xác nhận → bảng điểm không thể sửa trực tiếp; nếu cần phải qua quy trình mở khóa có lưu lịch sử.
+- **AC-18.1** Đủ tiêu chí + dữ liệu hợp lệ → xem bản tổng hợp, xác nhận → trạng thái "Đã xác nhận".
+- **AC-18.2** Còn thiếu tiêu chí / điểm ngoài phạm vi → không cho xác nhận, nêu rõ nguyên nhân.
+- **AC-18.3** Sau xác nhận → bảng điểm không thể sửa trực tiếp; nếu cần phải qua quy trình mở khóa có lưu lịch sử.
 
 ---
 
 ### US-19 — Mentor xem ticket & tiến độ đội
 
-- **AC-16.1** Xem ticket được giao: mã, tiêu đề, loại vấn đề, ưu tiên, trạng thái, thời điểm cập nhật.
-- **AC-16.2** Vòng đời ticket: `open → in_progress → resolved`.
-- **AC-16.3** Chỉ xem trạng thái checkpoint/tiến độ chung của đội được cấp quyền.
-- **AC-16.4** Lọc ticket theo trạng thái, loại vấn đề, ưu tiên, đội.
-- **AC-16.5** Mentor **tuyệt đối không** được xem bài nộp, repo link, điểm số. Cố truy cập → 403 ngay lập tức.
+- **AC-19.1** Xem ticket được giao: mã, tiêu đề, loại vấn đề, ưu tiên, trạng thái, thời điểm cập nhật.
+- **AC-19.2** Vòng đời ticket: `open → in_progress → resolved`.
+- **AC-19.3** Chỉ xem trạng thái checkpoint/tiến độ chung của đội được cấp quyền.
+- **AC-19.4** Lọc ticket theo trạng thái, loại vấn đề, ưu tiên, đội.
+- **AC-19.5** Mentor **tuyệt đối không** được xem bài nộp, repo link, điểm số. Cố truy cập → 403 ngay lập tức.
 
 ---
 
 ### US-20 — Mentor xử lý ticket
 
-- **AC-17.1** Gửi phản hồi → lưu người gửi, thời điểm, cập nhật trạng thái "Đã trả lời"/"Đang xử lý".
-- **AC-17.2** Phải có loại vấn đề và mức độ ưu tiên hợp lệ trước khi đóng/chuyển tiếp.
-- **AC-17.3** Vượt thẩm quyền → chuyển cho BTC kèm lý do, người nhận, trạng thái "Đã chuyển".
-- **AC-17.4** Chỉ người có quyền mới đóng ticket; lịch sử trao đổi vẫn được giữ sau khi đóng.
-- **AC-17.5** Lưu thất bại → báo lỗi, không tạo bản ghi, giữ nội dung người dùng đã nhập.
+- **AC-20.1** Gửi phản hồi → lưu người gửi, thời điểm, cập nhật trạng thái "Đã trả lời"/"Đang xử lý".
+- **AC-20.2** Phải có loại vấn đề và mức độ ưu tiên hợp lệ trước khi đóng/chuyển tiếp.
+- **AC-20.3** Vượt thẩm quyền → chuyển cho BTC kèm lý do, người nhận, trạng thái "Đã chuyển".
+- **AC-20.4** Chỉ người có quyền mới đóng ticket; lịch sử trao đổi vẫn được giữ sau khi đóng.
+- **AC-20.5** Lưu thất bại → báo lỗi, không tạo bản ghi, giữ nội dung người dùng đã nhập.
 
 ---
 
@@ -278,13 +309,14 @@ Xây dựng nền tảng nghiệp vụ đủ rõ để nhóm kỹ thuật **khô
 
 ---
 
-## 5. Điểm cần chốt trước khi triển khai
+## 5. Sáu quyết định kỹ thuật đã chốt sau Review 1-1 với PM
 
-1. **Phương thức đăng nhập:** GitHub OAuth chính thức; cơ chế fallback khi xác thực lỗi là gì?
-2. **Định dạng bài nộp:** Link repo + Commit SHA (đã chốt); có cho phép nộp lại sau deadline không?
-3. **Quy tắc chọn đề tài:** Một đề tài → nhiều đội hay chỉ một đội? Thời điểm khóa lựa chọn?
-4. **Tính điểm:** Quy tắc xử lý đồng điểm, quyền xem điểm tạm, thời điểm công bố chính thức.
-5. **Ngưỡng cảnh báo:** Lưu lượng/sự cố và cơ chế chạy thử/chấm tự động.
+1. **Phương thức đăng nhập:** Thí sinh bắt buộc dùng GitHub OAuth 2.0; Ban tổ chức (Admin), Ban Giám khảo (Judge) và Mentor dùng Email/Password nội bộ (mã hóa mật khẩu chuẩn SHA-256 + Salt, xác thực bằng JWT Bearer Token).
+2. **Vòng đời tài khoản & Phê duyệt Onboarding:** Thí sinh đăng nhập lần đầu có trạng thái `PENDING`. Chỉ khi Ban tổ chức phê duyệt sang `APPROVED` mới được phép tạo đội, tham gia đội và nộp bài. Nếu bị `REJECTED`, hệ thống khóa toàn bộ chức năng và hiển thị lý do từ chối.
+3. **Đóng băng bài nộp & cơ chế Commit SHA:** Khi thí sinh bấm nộp bài Checkpoint, Backend tự động gọi GitHub REST API để lấy chính xác HEAD Commit SHA tại thời điểm đó và lưu vào CSDL (`submissions`) kèm Server Timestamp UTC (`datetime.now(timezone.utc)`), ngăn chặn tuyệt đối việc chỉnh sửa code sau deadline.
+4. **Deadline & cơ chế gia hạn có kiểm soát:** Hệ thống từ chối mọi bài nộp sau deadline (`server_timestamp > deadline`), trả về mã lỗi `400 DEADLINE_EXCEEDED`. Việc gia hạn chỉ do Ban tổ chức thực hiện thông qua việc mở lại cửa sổ nộp bài và bắt buộc lưu log kiểm toán (audit log) chi tiết.
+5. **Khóa tranh chấp khi chọn đề tài (Concurrency Lock):** Áp dụng `SELECT FOR UPDATE` trong transaction PostgreSQL khi đội thi đăng ký đề tài để ngăn chặn race condition khi nhiều đội cùng tranh chấp slot cuối cùng của đề tài.
+6. **Phân quyền và bảo mật dữ liệu (RBAC):** Ban Giám khảo chấm thi theo cơ chế Blind Judging (ẩn danh toàn bộ thông tin đội thi và thành viên). Mentor chỉ được phân công xem và xử lý Ticket hỗ trợ, tuyệt đối không được xem bài nộp, repo URL hay điểm số của thí sinh (trả về 403 FORBIDDEN nếu cố tình truy cập).
 
 ---
 
