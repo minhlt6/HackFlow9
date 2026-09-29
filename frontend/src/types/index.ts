@@ -1,8 +1,13 @@
+export type UserRole = 'admin' | 'judge' | 'mentor' | 'participant' | 'candidate';
+
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'judge' | 'candidate' | 'mentor';
+  role: UserRole;
+  approval_status: ApprovalStatus;
 }
 
 export interface Team {
