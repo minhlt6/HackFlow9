@@ -17,8 +17,15 @@ export function App() {
           <Route path="/onboarding" element={<div className="p-8 text-2xl font-bold text-slate-900">Trang Onboarding - Tài khoản đang chờ phê duyệt</div>} />
         </Route>
 
-        {/* Các route yêu cầu đã đăng nhập và được approved (Participant và chung) */}
-        <Route element={<ProtectedRoute requiredApprovalStatus="approved" />}>
+        {/* Các route dành cho participant đã được approved */}
+        <Route
+          element={
+            <ProtectedRoute
+              allowedRoles={['participant']}
+              requiredApprovalStatus="approved"
+            />
+          }
+        >
           <Route path="/" element={<MainLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
