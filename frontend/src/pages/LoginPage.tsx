@@ -1,15 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Lock, Mail } from 'lucide-react';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const navigate = useNavigate();
+  const login = useAuthStore((state) => state.login);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (email && password) {
+      login(
+        {
+          id: email,
+          email,
+          fullName: email.split('@')[0],
+          role: 'participant',
+          approvalStatus: 'approved',
+        },
+        `demo-token-${email}`,
+      );
       navigate('/dashboard');
     } else {
       alert('Vui lòng nhập đầy đủ thông tin!');

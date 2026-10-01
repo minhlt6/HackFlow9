@@ -3,6 +3,7 @@ import { LoginPage } from './pages/LoginPage';
 import { MainLayout } from './layouts/MainLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { TeamsPage } from './pages/TeamsPage';
+import { UIPreviewPage } from './pages/UIPreviewPage'; // <-- 1. Import trang preview vừa tạo
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export function App() {
@@ -12,13 +13,23 @@ export function App() {
         {/* Route công khai */}
         <Route path="/login" element={<LoginPage />} />
 
+        {/* Route test UI Atoms tạm thời cho task HF-13 (Không cần đăng nhập) */}
+        <Route path="/preview" element={<UIPreviewPage />} />
+
         {/* Route onboarding cho tài khoản pending */}
         <Route element={<ProtectedRoute requiredApprovalStatus="pending" />}>
           <Route path="/onboarding" element={<div className="p-8 text-2xl font-bold text-slate-900">Trang Onboarding - Tài khoản đang chờ phê duyệt</div>} />
         </Route>
 
-        {/* Các route yêu cầu đã đăng nhập và được approved (Participant và chung) */}
-        <Route element={<ProtectedRoute requiredApprovalStatus="approved" />}>
+        {/* Các route dành cho participant đã được approved */}
+        <Route
+          element={
+            <ProtectedRoute
+              allowedRoles={['participant']}
+              requiredApprovalStatus="approved"
+            />
+          }
+        >
           <Route path="/" element={<MainLayout />}>
             <Route index element={<DashboardPage />} />
             <Route path="dashboard" element={<DashboardPage />} />
