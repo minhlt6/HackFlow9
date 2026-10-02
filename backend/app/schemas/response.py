@@ -1,6 +1,7 @@
 from typing import Any, Generic, Optional, TypeVar
-from pydantic import BaseModel, ConfigDict
+from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict
 
 T = TypeVar("T")
 
@@ -37,10 +38,11 @@ def success_response(
 ) -> JSONResponse:
     """
     Helper function to return a formatted JSONResponse with ApiResponse envelope.
+    Uses jsonable_encoder to safely serialize Pydantic models, dates, and enums.
     """
     content = {
         "success": True,
-        "data": data,
+        "data": jsonable_encoder(data) if data is not None else None,
         "message": message,
     }
     return JSONResponse(status_code=status_code, content=content)
@@ -56,7 +58,7 @@ def error_response(
     """
     content = {
         "success": False,
-        "data": data,
+        "data": jsonable_encoder(data) if data is not None else None,
         "message": message,
     }
     return JSONResponse(status_code=status_code, content=content)
