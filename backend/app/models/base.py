@@ -38,9 +38,18 @@ class UUIDMixin:
 class BaseModel(Base, UUIDMixin, TimestampMixin):
     """
     Abstract declarative base model with UUID primary key and timestamps.
-    Subclasses define their own table attributes.
+    Automatically populates scalar and callable column defaults upon instantiation.
     """
     __abstract__ = True
+
+    def __init__(self, **kwargs):
+        for col in self.__table__.columns:
+            if col.name not in kwargs and col.default is not None:
+                if col.default.is_scalar:
+                    kwargs[col.name] = col.default.arg
+                elif col.default.is_callable:
+                    kwargs[col.name] = col.default.arg(None)
+        super().__init__(**kwargs)
 
     def to_dict(self) -> dict:
         """
