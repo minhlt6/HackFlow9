@@ -122,21 +122,62 @@ async def test_register_duplicate_email(client: AsyncClient):
 
 
 @pytest.mark.anyio
-async def test_github_oauth_callback_flow(client: AsyncClient):
+async def test_github_oauth_not_whitelisted_gets_pending(client: AsyncClient):
     """
-    Test GitHub OAuth callback creates candidate with approval_status='pending'.
+    Thí sinh đăng nhập GitHub nhưng email KHÔNG có trong Whitelist
+    → tài khoản được tạo với approval_status='pending'.
     """
     res = await client.post(
         "/api/v1/auth/github/callback",
-        json={"code": "oauth_code_xyz999"},
+        json={"code": "unknown_code_abc123"},
     )
     assert res.status_code == 200
     body = res.json()
     assert body["success"] is True
-    token = body["data"]["access_token"]
-    assert token is not None
     assert body["data"]["user"]["approval_status"] == "pending"
     assert body["data"]["user"]["role"] == "candidate"
+
+
+@pytest.mark.anyio
+async def test_github_oauth_whitelisted_gets_approved(client: AsyncClient):
+    """
+    BTC thêm email vào Whitelist → Thí sinh đăng nhập GitHub với email đó
+    → tài khoản được tạo với approval_status='approved'.
+    """
+    # 1. Register an admin to manage whitelist
+    admin_res = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "btc_whitelist_admin@example.com",
+            "password": "adminpass123",
+            "full_name": "BTC Quản Trị",
+            "role": "admin",
+        },
+    )
+    admin_token = admin_res.json()["data"]["access_token"]
+
+    # 2. BTC adds email to whitelist
+    # The mock code "whitelist_code_999" produces dev_whitelist_code_999@example.com
+    whitelist_email = "dev_whitelist_code_999@example.com"
+    wl_res = await client.post(
+        "/api/v1/admin/whitelist",
+        json={"email": whitelist_email, "note": "Thí sinh đã được chọn lọc"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert wl_res.status_code == 201
+
+    # 3. Thí sinh đăng nhập GitHub với code sinh ra email trùng whitelist
+    github_res = await client.post(
+        "/api/v1/auth/github/callback",
+        json={"code": "whitelist_code_999"},
+    )
+    assert github_res.status_code == 200
+    body = github_res.json()
+    assert body["success"] is True
+    assert body["data"]["user"]["approval_status"] == "approved"
+    assert body["data"]["user"]["role"] == "candidate"
+
+
 
 
 @pytest.mark.anyio

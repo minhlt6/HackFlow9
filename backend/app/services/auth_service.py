@@ -11,7 +11,9 @@ from app.core.exceptions import (
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import ApprovalStatus, User, UserRole
 from app.repositories.user_repo import user_repo
+from app.repositories.whitelist_repo import whitelist_repo
 from app.schemas.auth import RegisterRequest
+
 
 
 class AuthService:
@@ -178,22 +180,37 @@ class AuthService:
         if not email:
             raise BadRequestException(message="Tài khoản GitHub không cung cấp email hợp lệ.")
 
-        # 3. Check existing user by github_id or email
+        # 3. Check whitelist: whitelisted emails get APPROVED immediately,
+        #    unknown emails get PENDING and wait for BTC manual review.
+        whitelist_entry = await whitelist_repo.get_by_email(db, email)
+        initial_approval = (
+            ApprovalStatus.APPROVED.value
+            if whitelist_entry
+            else ApprovalStatus.PENDING.value
+        )
+
+        # 4. Check existing user by github_id or email
         user = await user_repo.get_by_github_id(db, github_id)
         if not user:
             user = await user_repo.get_by_email(db, email)
 
         if user:
-            # Update user info if linked
+            # Update github linkage and avatar
             if not user.github_id:
                 user.github_id = github_id
             user.github_username = github_username
             if avatar_url:
                 user.avatar_url = avatar_url
+            # If user was PENDING and now email is in whitelist → promote to APPROVED
+            if (
+                user.approval_status == ApprovalStatus.PENDING.value
+                and whitelist_entry
+            ):
+                user.approval_status = ApprovalStatus.APPROVED.value
             db.add(user)
             await db.flush()
         else:
-            # Create new participant user with PENDING approval status
+            # Create new user with approval status based on whitelist
             user = User(
                 email=email.lower().strip(),
                 full_name=full_name or "Thí sinh Hackathon",
@@ -201,7 +218,7 @@ class AuthService:
                 github_username=github_username,
                 avatar_url=avatar_url,
                 role=UserRole.CANDIDATE.value,
-                approval_status=ApprovalStatus.PENDING.value,
+                approval_status=initial_approval,
                 is_active=True,
             )
             user = await user_repo.create(db, user)
@@ -211,3 +228,4 @@ class AuthService:
 
 
 auth_service = AuthService()
+

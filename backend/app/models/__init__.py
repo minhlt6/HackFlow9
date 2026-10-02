@@ -7,6 +7,7 @@ from app.models.checkpoint import Checkpoint, Submission, SubmissionStatus
 from app.models.evaluation import RubricCriteria, Evaluation
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
 from app.models.config import HackathonConfig
+from app.models.whitelist import WhitelistEntry
 
 __all__ = [
     "Base",
@@ -30,4 +31,6 @@ __all__ = [
     "TicketStatus",
     "TicketPriority",
     "HackathonConfig",
+    "WhitelistEntry",
 ]
+

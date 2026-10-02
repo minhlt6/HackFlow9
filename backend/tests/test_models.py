@@ -22,9 +22,9 @@ from app.models import (
 )
 
 
-def test_metadata_contains_all_11_tables():
+def test_metadata_contains_all_12_tables():
     """
-    Ensure all 10 core tables (+ hackathon_config) are registered on SQLAlchemy Base.metadata.
+    Ensure all 12 tables (10 core + hackathon_config + whitelists) are registered on Base.metadata.
     """
     expected_tables = {
         "users",
@@ -38,9 +38,11 @@ def test_metadata_contains_all_11_tables():
         "evaluations",
         "support_tickets",
         "hackathon_config",
+        "whitelists",
     }
     actual_tables = set(Base.metadata.tables.keys())
     assert expected_tables.issubset(actual_tables), f"Missing tables: {expected_tables - actual_tables}"
+
 
 
 def test_user_model_defaults_and_constraints():
