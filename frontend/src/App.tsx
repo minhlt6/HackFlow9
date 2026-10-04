@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
+import { AuthCallback } from './pages/AuthCallback'; // <-- 1. Import trang callback OAuth
+import { OnboardingPage } from './pages/OnboardingPage';
 import { MainLayout } from './layouts/MainLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { TeamsPage } from './pages/TeamsPage';
-import { UIPreviewPage } from './pages/UIPreviewPage'; // <-- 1. Import trang preview vừa tạo
+import { UIPreviewPage } from './pages/UIPreviewPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export function App() {
@@ -12,13 +14,16 @@ export function App() {
       <Routes>
         {/* Route công khai */}
         <Route path="/login" element={<LoginPage />} />
+        
+        {/* Route hứng callback sau khi GitHub OAuth thành công */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
-        {/* Route test UI Atoms tạm thời cho task HF-13 (Không cần đăng nhập) */}
+        {/* Route test UI Atoms tạm thời cho task HF-13 */}
         <Route path="/preview" element={<UIPreviewPage />} />
 
         {/* Route onboarding cho tài khoản pending */}
         <Route element={<ProtectedRoute requiredApprovalStatus="pending" />}>
-          <Route path="/onboarding" element={<div className="p-8 text-2xl font-bold text-slate-900">Trang Onboarding - Tài khoản đang chờ phê duyệt</div>} />
+          <Route path="/onboarding" element={<OnboardingPage />} />
         </Route>
 
         {/* Các route dành cho participant đã được approved */}
