@@ -6,10 +6,14 @@ from app.main import app as fastapi_app
 from app.core.database import Base, get_db
 import app.models  # Ensure all models are loaded onto Base.metadata
 
-# In-memory async SQLite engine for lightning-fast, isolated tests
+from sqlalchemy.pool import StaticPool
+
+# In-memory async SQLite engine with shared cache for lightning-fast, isolated tests
 test_engine = create_async_engine(
-    "sqlite+aiosqlite:///:memory:",
+    "sqlite+aiosqlite:///file:testmem?mode=memory&cache=shared&uri=true",
     echo=False,
+    poolclass=StaticPool,
+    connect_args={"check_same_thread": False},
 )
 
 TestSessionLocal = async_sessionmaker(
@@ -31,6 +35,7 @@ async def setup_test_database():
     yield
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
+    await test_engine.dispose()
 
 
 @pytest.fixture

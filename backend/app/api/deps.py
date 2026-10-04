@@ -42,16 +42,22 @@ async def get_current_user(
     return user
 
 
-def require_role(allowed_roles: List[str]):
+from typing import List, Optional, Union
+
+
+def require_role(allowed_roles: Union[List[str], str]):
     """
     Role-Based Access Control (RBAC) dependency factory.
     Verifies that the current user has one of the required roles.
     Returns HTTP 403 FORBIDDEN if the role is insufficient.
     """
+    roles = [allowed_roles] if isinstance(allowed_roles, str) else allowed_roles
+
     async def role_checker(user: User = Depends(get_current_user)) -> User:
-        if user.role not in allowed_roles:
+        if user.role not in roles:
             raise ForbiddenException(
-                message=f"Truy cập trái phép. Chức năng yêu cầu vai trò: {', '.join(allowed_roles)}."
+                message=f"Truy cập trái phép. Chức năng yêu cầu vai trò: {', '.join(roles)}.",
+                error_code="FORBIDDEN_ROLE",
             )
         return user
 
@@ -72,7 +78,8 @@ def require_approved():
                 else "Bị từ chối (REJECTED)"
             )
             raise ForbiddenException(
-                message=f"Tài khoản chưa được kích hoạt tham gia thi đấu. Trạng thái: {status_vn}."
+                message=f"Tài khoản chưa được kích hoạt tham gia thi đấu. Trạng thái: {status_vn}.",
+                error_code="ACCOUNT_NOT_APPROVED",
             )
         return user
 
