@@ -21,11 +21,11 @@ export function App() {
           <Route path="/onboarding" element={<div className="p-8 text-2xl font-bold text-slate-900">Trang Onboarding - Tài khoản đang chờ phê duyệt</div>} />
         </Route>
 
-        {/* Các route dành cho participant đã được approved */}
+        {/* Các route dành cho candidate đã được approved */}
         <Route
           element={
             <ProtectedRoute
-              allowedRoles={['participant']}
+              allowedRoles={['candidate']}
               requiredApprovalStatus="approved"
             />
           }

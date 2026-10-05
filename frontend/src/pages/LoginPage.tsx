@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { axiosClient } from '../api/axiosClient';
 import { useAuthStore } from '../store/useAuthStore';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
@@ -32,7 +33,7 @@ export const LoginPage: React.FC = () => {
             id: email,
             email,
             fullName: email.split('@')[0],
-            role: 'participant',
+            role: 'candidate',
             approvalStatus: 'approved',
           },
           `demo-token-${email}`,
@@ -45,24 +46,19 @@ export const LoginPage: React.FC = () => {
     }
   };
 
-  const handleGithubLogin = () => {
+  const handleGithubLogin = async () => {
     setIsLoadingGithub(true);
     setErrorMessage(null);
 
     try {
-      // Trỏ đúng endpoint GitHub OAuth, không hard-code chết nếu có env
-      const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '');
-      const apiBaseUrl = configuredBaseUrl
-        ? configuredBaseUrl.endsWith('/api/v1')
-          ? configuredBaseUrl
-          : `${configuredBaseUrl}/api/v1`
-        : import.meta.env.DEV
-          ? 'http://localhost:8000/api/v1'
-          : '/api/v1';
+      const response = await axiosClient.get<{ data?: { url?: string }; url?: string }>('/auth/github');
+      const authUrl = response.data.data?.url || response.data.url;
 
-      const authEndpoint = `${apiBaseUrl}/auth/github`;
-        
-      window.location.href = authEndpoint;
+      if (!authUrl) {
+        throw new Error('GitHub OAuth URL is missing');
+      }
+
+      window.location.href = authUrl;
     } catch {
       setErrorMessage('Không thể kết nối đến máy chủ xác thực GitHub. Vui lòng thử lại sau.');
       setIsLoadingGithub(false);
@@ -70,18 +66,18 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-900 px-4">
-      <div className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-800 space-y-6">
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4">
+      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700 space-y-6">
         
         {/* Logo HackFlow và slogan */}
         <div className="text-center">
-          <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">HackFlow</h2>
-          <p className="text-sm text-slate-500 mt-2">Hệ thống quản lý dự án Hackathon chuyên nghiệp</p>
+          <h2 className="text-3xl font-extrabold text-white tracking-tight">HackFlow</h2>
+          <p className="text-sm text-slate-400 mt-2">Hệ thống quản lý dự án Hackathon chuyên nghiệp</p>
         </div>
 
         {/* Hiển thị lỗi thân thiện trên giao diện nếu có */}
         {errorMessage && (
-          <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg">
+          <div className="p-3 text-sm text-red-200 bg-red-950/50 border border-red-800 rounded-lg">
             {errorMessage}
           </div>
         )}
@@ -117,10 +113,10 @@ export const LoginPage: React.FC = () => {
 
         <div className="relative my-4">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-slate-200"></div>
+            <div className="w-full border-t border-slate-600"></div>
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-slate-400">Hoặc</span>
+            <span className="bg-slate-800 px-2 text-slate-400">Hoặc</span>
           </div>
         </div>
 
