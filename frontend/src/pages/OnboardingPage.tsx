@@ -139,7 +139,7 @@ export const OnboardingPage: React.FC = () => {
         student_id: form.studentId.trim(),
         school: form.university.trim(),
         phone: form.phone.trim(),
-        skills: form.skills.join(', '),
+        skills: form.skills,
       };
       const response = await axiosClient.post<ProfileApiResponse>('/users/profile', payload);
       const responseData = response.data.data || response.data;
