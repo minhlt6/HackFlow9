@@ -11,7 +11,7 @@ interface ProfileForm {
   studentId: string;
   university: string;
   phone: string;
-  skills: string;
+  skills: string[];
 }
 
 interface ProfileResponse {
@@ -35,14 +35,25 @@ const initialForm: ProfileForm = {
   studentId: '',
   university: '',
   phone: '',
-  skills: '',
+  skills: [],
 };
+
+const skillOptions = [
+  'Frontend (FE)',
+  'Backend (BE)',
+  'UI/UX Design',
+  'AI / Machine Learning',
+  'Mobile App',
+  'DevOps / Cloud',
+  'Fullstack',
+  'Data Science',
+];
 
 const getRolePath = (role: UserRole): string => ({
   admin: '/admin/dashboard',
   judge: '/judge',
   mentor: '/mentor',
-  participant: '/dashboard',
+  candidate: '/dashboard',
 }[role]);
 
 export const OnboardingPage: React.FC = () => {
@@ -53,12 +64,37 @@ export const OnboardingPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [customSkill, setCustomSkill] = useState('');
   const [responseApprovalStatus, setResponseApprovalStatus] = useState<ApprovalStatus | null>(null);
   const approvalStatus = responseApprovalStatus || user?.approvalStatus || 'pending';
 
-  const updateField = (field: keyof ProfileForm, value: string) => {
+  const updateField = (field: Exclude<keyof ProfileForm, 'skills'>, value: string) => {
     setForm((currentForm) => ({ ...currentForm, [field]: value }));
     setFieldErrors((currentErrors) => ({ ...currentErrors, [field]: undefined }));
+  };
+
+  const toggleSkill = (skill: string) => {
+    setForm((currentForm) => ({
+      ...currentForm,
+      skills: currentForm.skills.includes(skill)
+        ? currentForm.skills.filter((currentSkill) => currentSkill !== skill)
+        : [...currentForm.skills, skill],
+    }));
+    setFieldErrors((currentErrors) => ({ ...currentErrors, skills: undefined }));
+  };
+
+  const addCustomSkill = () => {
+    const skill = customSkill.trim();
+    if (!skill) {
+      return;
+    }
+
+    setForm((currentForm) => ({
+      ...currentForm,
+      skills: currentForm.skills.includes(skill) ? currentForm.skills : [...currentForm.skills, skill],
+    }));
+    setCustomSkill('');
+    setFieldErrors((currentErrors) => ({ ...currentErrors, skills: undefined }));
   };
 
   const validateForm = (): FieldErrors => {
@@ -76,9 +112,9 @@ export const OnboardingPage: React.FC = () => {
     if (!form.university.trim()) {
       errors.university = 'Vui lòng nhập Trường / Viện.';
     }
-    if (!form.skills.trim()) {
-      errors.skills = 'Vui lòng nhập kỹ năng chính.';
-    } else if (form.skills.trim().length > 500) {
+    if (form.skills.length === 0) {
+      errors.skills = 'Vui lòng chọn ít nhất một kỹ năng.';
+    } else if (form.skills.join(', ').length > 500) {
       errors.skills = 'Kỹ năng chính không được vượt quá 500 ký tự.';
     }
 
@@ -98,7 +134,14 @@ export const OnboardingPage: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const response = await axiosClient.post<ProfileApiResponse>('/users/profile', form);
+      const payload = {
+        full_name: form.fullName.trim(),
+        student_id: form.studentId.trim(),
+        school: form.university.trim(),
+        phone: form.phone.trim(),
+        skills: form.skills.join(', '),
+      };
+      const response = await axiosClient.post<ProfileApiResponse>('/users/profile', payload);
       const responseData = response.data.data || response.data;
       const nextApprovalStatus =
         responseData.approvalStatus || responseData.user?.approvalStatus;
@@ -120,7 +163,7 @@ export const OnboardingPage: React.FC = () => {
         updateUser({ approvalStatus: 'approved' });
         setSuccessMessage('Hồ sơ đã được duyệt. Đang chuyển đến trang làm việc...');
         window.setTimeout(() => {
-          navigate(getRolePath(user?.role || 'participant'), { replace: true });
+          navigate(getRolePath(user?.role || 'candidate'), { replace: true });
         }, 700);
         return;
       }
@@ -145,7 +188,7 @@ export const OnboardingPage: React.FC = () => {
     <div className="min-h-screen bg-slate-50 px-4 py-8">
       <main className="mx-auto max-w-3xl space-y-6">
         {approvalStatus === 'pending' && (
-          <section className="border border-amber-200 bg-amber-50 p-5 text-amber-900" role="status">
+          <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-900 shadow-sm" role="status">
             <h1 className="text-xl font-bold">Tài khoản đang chờ duyệt</h1>
             <p className="mt-1 text-sm">
               Vui lòng hoàn thiện hồ sơ. Các chức năng tham gia đội thi sẽ mở sau khi hồ sơ được phê duyệt.
@@ -154,20 +197,20 @@ export const OnboardingPage: React.FC = () => {
         )}
 
         {approvalStatus === 'approved' && (
-          <section className="border border-emerald-200 bg-emerald-50 p-5 text-emerald-900" role="status">
+          <section className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-emerald-900 shadow-sm" role="status">
             <h1 className="text-xl font-bold">Hồ sơ đã được duyệt</h1>
             <p className="mt-1 text-sm">Bạn có thể bắt đầu sử dụng HackFlow.</p>
           </section>
         )}
 
         {approvalStatus === 'rejected' && (
-          <section className="border border-red-200 bg-red-50 p-5 text-red-900" role="alert">
+          <section className="rounded-xl border border-red-200 bg-red-50 p-5 text-red-900 shadow-sm" role="alert">
             <h1 className="text-xl font-bold">Hồ sơ chưa được duyệt</h1>
             <p className="mt-1 text-sm">Vui lòng cập nhật thông tin theo lý do bên dưới và gửi lại.</p>
           </section>
         )}
 
-        <section className="bg-white p-6 shadow-sm sm:p-8">
+        <section className="rounded-2xl bg-white p-6 shadow-md sm:p-8">
           <div className="mb-6">
             <p className="text-sm font-semibold uppercase tracking-wide text-blue-600">Hồ sơ thí sinh</p>
             <h2 className="mt-1 text-2xl font-bold text-slate-900">Hoàn thiện thông tin của bạn</h2>
@@ -218,20 +261,60 @@ export const OnboardingPage: React.FC = () => {
               onChange={(event) => updateField('phone', event.target.value)}
               placeholder="0900000000"
             />
-            <label className="flex flex-col gap-1 sm:col-span-2">
+            <div className="flex flex-col gap-3 sm:col-span-2" aria-invalid={Boolean(fieldErrors.skills)}>
               <span className="text-sm font-medium text-slate-700">Kỹ năng chính</span>
-              <textarea
-                required
-                maxLength={500}
-                value={form.skills}
-                onChange={(event) => updateField('skills', event.target.value)}
-                placeholder="React, TypeScript, UI/UX..."
-                rows={4}
-                aria-invalid={Boolean(fieldErrors.skills)}
-                className={`rounded-lg border px-3 py-2 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 ${fieldErrors.skills ? 'border-red-500' : 'border-slate-300'}`}
-              />
+              <div className="flex flex-wrap gap-2">
+                {skillOptions.map((skill) => {
+                  const isSelected = form.skills.includes(skill);
+                  return (
+                    <button
+                      key={skill}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => toggleSkill(skill)}
+                      className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                        isSelected
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-300 bg-white text-slate-700 hover:border-blue-400 hover:text-blue-700'
+                      }`}
+                    >
+                      {skill}
+                    </button>
+                  );
+                })}
+                {form.skills
+                  .filter((skill) => !skillOptions.includes(skill))
+                  .map((skill) => (
+                    <button
+                      key={skill}
+                      type="button"
+                      aria-pressed="true"
+                      onClick={() => toggleSkill(skill)}
+                      className="rounded-full border border-blue-600 bg-blue-600 px-3 py-1.5 text-sm text-white"
+                    >
+                      {skill}
+                    </button>
+                  ))}
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  value={customSkill}
+                  onChange={(event) => setCustomSkill(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      addCustomSkill();
+                    }
+                  }}
+                  placeholder="Thêm kỹ năng khác"
+                  className="flex-1 rounded-lg border border-slate-300 px-3 py-2 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                />
+                <Button type="button" variant="secondary" onClick={addCustomSkill}>
+                  Thêm kỹ năng
+                </Button>
+              </div>
               {fieldErrors.skills && <span className="text-xs text-red-500">{fieldErrors.skills}</span>}
-            </label>
+            </div>
             <Button
               type="submit"
               isLoading={isLoading}
