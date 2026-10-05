@@ -26,11 +26,11 @@ export function App() {
           <Route path="/onboarding" element={<OnboardingPage />} />
         </Route>
 
-        {/* Các route dành cho participant đã được approved */}
+        {/* Các route dành cho candidate đã được approved */}
         <Route
           element={
             <ProtectedRoute
-              allowedRoles={['participant']}
+              allowedRoles={['candidate']}
               requiredApprovalStatus="approved"
             />
           }
