@@ -85,6 +85,7 @@ export const LoginPage: React.FC = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <Input
             label="Email tài khoản"
+            labelClassName="text-slate-200"
             type="email"
             required
             value={email}
@@ -94,6 +95,7 @@ export const LoginPage: React.FC = () => {
 
           <Input
             label="Mật khẩu"
+            labelClassName="text-slate-200"
             type="password"
             required
             value={password}
