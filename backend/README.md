@@ -154,20 +154,35 @@ Cách 2 (Chạy qua main.py):
 python main.py
 ```
 
-### 5. Truy cập tài liệu tương tác
+### 5. Truy cập tài liệu tương tác & OpenAPI Specification
 
-- **Swagger UI**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
-- **ReDoc**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
-- **Health Check**: [http://127.0.0.1:8000/api/v1/health](http://127.0.0.1:8000/api/v1/health)
+- **Swagger UI (Interactive)**: [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) (Hỗ trợ gọi thử API trực tiếp, lưu token xác thực Bearer)
+- **ReDoc (Technical Documentation)**: [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- **Raw OpenAPI 3.1.0 Spec**: [http://127.0.0.1:8000/api/v1/openapi.json](http://127.0.0.1:8000/api/v1/openapi.json)
+- **Tài liệu Bàn giao API Contract**: [`docs/backend/api-contract-handover.md`](../docs/backend/api-contract-handover.md)
+- **Lược đồ OpenAPI xuất sẵn cho Postman**: [`docs/backend/openapi.json`](../docs/backend/openapi.json)
+
+#### Lệnh xuất lại file `openapi.json` khi cập nhật API:
+```powershell
+python export_openapi.py
+```
 
 ---
 
-## 🧪 Chạy Kiểm thử tự động (Unit Tests)
+## 🧪 Chạy Kiểm thử tự động (Unit & Integration Tests)
 
-Bộ kiểm thử được viết bằng `pytest` và `httpx`:
+Bộ kiểm thử được xây dựng bằng `pytest` và `httpx`, sử dụng SQLite in-memory engine mô phỏng toàn bộ hành vi database:
 
 ```powershell
 pytest -v
 ```
 
-Kết quả: Toàn bộ 7 bài test về Root, Health Check, CORS headers, và định dạng ApiResponse Envelope (Success, 400, 404, 422) đều vượt qua.
+Kết quả: **43/43 bài test vượt qua (100% Pass)**:
+- `tests/test_health.py` (3 tests): Liveness, Database check, CORS headers.
+- `tests/test_docs.py` (3 tests): Swagger UI (/docs), ReDoc (/redoc), OpenAPI JSON schema (/api/v1/openapi.json).
+- `tests/test_envelope.py` (4 tests): Định dạng chuẩn ApiResponse envelope (200, 400, 404, 422).
+- `tests/test_auth.py` (9 tests): Đăng nhập, Đăng ký, GitHub OAuth mock, RBAC, phân quyền vai trò.
+- `tests/test_admin_whitelist.py` (8 tests): Quản lý Whitelist, bulk import, auto-whitelist khi duyệt ứng viên.
+- `tests/test_teams.py` (7 tests): Tạo đội, gia nhập đội, sinh mã mời ngẫu nhiên 6 ký tự, kiểm tra giới hạn 3-5 thành viên.
+- `tests/test_topics.py` (9 tests): Danh sách đề tài, quota giới hạn số đội, giao dịch nguyên tử chống tranh chấp đồng thời (`SELECT FOR UPDATE`), hủy đề tài.
+

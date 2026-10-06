@@ -1,3 +1,4 @@
+from typing import List, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,112 +10,144 @@ from app.repositories.user_repo import user_repo
 from app.repositories.whitelist_repo import whitelist_repo
 from app.schemas.admin import (
     CandidateApprovalRequest,
+    CandidatePendingResponse,
     WhitelistAddRequest,
     WhitelistBulkAddRequest,
+    WhitelistBulkAddResponse,
+    WhitelistDeactivateResponse,
     WhitelistEntryResponse,
 )
 from app.schemas.auth import UserResponse
-from app.schemas.response import success_response
+from app.schemas.response import ApiResponse, success_response
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 # ─── Whitelist Management ────────────────────────────────────────────────────
 
 
-@router.get("/whitelist", summary="Xem toàn bộ Whitelist")
+@router.get(
+    "/whitelist",
+    response_model=ApiResponse[List[WhitelistEntryResponse]],
+    summary="Xem toàn bộ Whitelist",
+)
 async def list_whitelist(
     include_inactive: bool = False,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
-):
+) -> ApiResponse[List[WhitelistEntryResponse]]:
     """BTC xem danh sách email được phép đăng nhập."""
     entries = await whitelist_repo.get_all(db, include_inactive=include_inactive)
     data = [
-        {
-            "id": str(e.id),
-            "email": e.email,
-            "is_active": e.is_active,
-            "note": e.note,
-            "added_by": str(e.added_by) if e.added_by else None,
-            "created_at": e.created_at.isoformat() if e.created_at else None,
-        }
+        WhitelistEntryResponse(
+            id=str(e.id),
+            email=e.email,
+            is_active=e.is_active,
+            note=e.note,
+            added_by=str(e.added_by) if e.added_by else None,
+            created_at=e.created_at.isoformat() if e.created_at else None,
+        )
         for e in entries
     ]
     return success_response(data=data, message=f"Có {len(data)} email trong whitelist.")
 
 
-@router.post("/whitelist", summary="Thêm 1 email vào Whitelist", status_code=201)
+@router.post(
+    "/whitelist",
+    response_model=ApiResponse[WhitelistEntryResponse],
+    summary="Thêm 1 email vào Whitelist",
+    status_code=201,
+)
 async def add_to_whitelist(
     body: WhitelistAddRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
-):
+) -> ApiResponse[WhitelistEntryResponse]:
     """BTC thêm 1 email đơn lẻ vào Whitelist."""
     entry = await whitelist_repo.add_email(
         db, body.email, added_by=str(current_user.id), note=body.note
     )
     await db.commit()
     await db.refresh(entry)
+    data = WhitelistEntryResponse(
+        id=str(entry.id),
+        email=entry.email,
+        is_active=entry.is_active,
+        note=entry.note,
+        added_by=str(entry.added_by) if entry.added_by else None,
+        created_at=entry.created_at.isoformat() if entry.created_at else None,
+    )
     return success_response(
-        data={
-            "id": str(entry.id),
-            "email": entry.email,
-            "is_active": entry.is_active,
-            "note": entry.note,
-        },
+        data=data,
         message="Email đã được thêm vào whitelist.",
         status_code=201,
     )
 
 
-@router.post("/whitelist/bulk", summary="Import nhiều email vào Whitelist", status_code=201)
+@router.post(
+    "/whitelist/bulk",
+    response_model=ApiResponse[WhitelistBulkAddResponse],
+    summary="Import nhiều email vào Whitelist",
+    status_code=201,
+)
 async def bulk_add_whitelist(
     body: WhitelistBulkAddRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
-):
+) -> ApiResponse[WhitelistBulkAddResponse]:
     """BTC import danh sách email từ kết quả chọn lọc thí sinh."""
     entries = await whitelist_repo.bulk_add(
         db, body.emails, added_by=str(current_user.id), note=body.note
     )
     await db.commit()
+    data = WhitelistBulkAddResponse(
+        imported=len(entries),
+        emails=[e.email for e in entries],
+    )
     return success_response(
-        data={"imported": len(entries), "emails": [e.email for e in entries]},
+        data=data,
         message=f"Đã import {len(entries)} email vào whitelist.",
         status_code=201,
     )
 
 
-@router.delete("/whitelist/{entry_id}", summary="Vô hiệu hóa 1 email khỏi Whitelist")
+@router.delete(
+    "/whitelist/{entry_id}",
+    response_model=ApiResponse[WhitelistDeactivateResponse],
+    summary="Vô hiệu hóa 1 email khỏi Whitelist",
+)
 async def deactivate_whitelist_entry(
     entry_id: str,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
-):
+) -> ApiResponse[WhitelistDeactivateResponse]:
     """BTC vô hiệu hóa (soft-delete) 1 email khỏi Whitelist."""
     entry = await whitelist_repo.deactivate(db, entry_id)
     if not entry:
         raise NotFoundException(message="Không tìm thấy entry Whitelist.")
     await db.commit()
     return success_response(
-        data={"id": entry_id, "email": entry.email, "is_active": False},
+        data=WhitelistDeactivateResponse(id=entry_id, email=entry.email, is_active=False),
         message="Email đã bị vô hiệu hóa khỏi whitelist.",
     )
 
 
-@router.patch("/whitelist/{entry_id}/reactivate", summary="Kích hoạt lại 1 email")
+@router.patch(
+    "/whitelist/{entry_id}/reactivate",
+    response_model=ApiResponse[WhitelistDeactivateResponse],
+    summary="Kích hoạt lại 1 email",
+)
 async def reactivate_whitelist_entry(
     entry_id: str,
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
-):
+) -> ApiResponse[WhitelistDeactivateResponse]:
     """BTC kích hoạt lại email đã tắt trong Whitelist."""
     entry = await whitelist_repo.reactivate(db, entry_id)
     if not entry:
         raise NotFoundException(message="Không tìm thấy entry Whitelist.")
     await db.commit()
     return success_response(
-        data={"id": entry_id, "email": entry.email, "is_active": True},
+        data=WhitelistDeactivateResponse(id=entry_id, email=entry.email, is_active=True),
         message="Email đã được kích hoạt lại trong whitelist.",
     )
 
@@ -122,11 +155,15 @@ async def reactivate_whitelist_entry(
 # ─── Candidate Approval ──────────────────────────────────────────────────────
 
 
-@router.get("/candidates/pending", summary="Danh sách thí sinh chờ duyệt")
+@router.get(
+    "/candidates/pending",
+    response_model=ApiResponse[List[CandidatePendingResponse]],
+    summary="Danh sách thí sinh chờ duyệt",
+)
 async def list_pending_candidates(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
-):
+) -> ApiResponse[List[CandidatePendingResponse]]:
     """BTC xem toàn bộ tài khoản thí sinh đang ở trạng thái PENDING."""
     from sqlalchemy import select
     from app.models.user import User as UserModel, UserRole
@@ -143,14 +180,14 @@ async def list_pending_candidates(
     candidates = result.scalars().all()
 
     data = [
-        {
-            "id": str(c.id),
-            "email": c.email,
-            "full_name": c.full_name,
-            "github_username": c.github_username,
-            "avatar_url": c.avatar_url,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
-        }
+        CandidatePendingResponse(
+            id=str(c.id),
+            email=c.email,
+            full_name=c.full_name,
+            github_username=c.github_username,
+            avatar_url=c.avatar_url,
+            created_at=c.created_at.isoformat() if c.created_at else None,
+        )
         for c in candidates
     ]
     return success_response(
@@ -161,6 +198,7 @@ async def list_pending_candidates(
 
 @router.post(
     "/candidates/{user_id}/approval",
+    response_model=ApiResponse[UserResponse],
     summary="BTC duyệt hoặc từ chối thí sinh",
 )
 async def approve_or_reject_candidate(
@@ -168,7 +206,7 @@ async def approve_or_reject_candidate(
     body: CandidateApprovalRequest,
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(require_role("admin")),
-):
+) -> ApiResponse[UserResponse]:
     """
     BTC duyệt (approve) hoặc từ chối (reject) tài khoản thí sinh PENDING.
 
@@ -202,7 +240,7 @@ async def approve_or_reject_candidate(
         )
         await db.commit()
         return success_response(
-            data=UserResponse.model_validate(candidate).model_dump(),
+            data=UserResponse.model_validate(candidate),
             message=f"Tài khoản {candidate.email} đã được phê duyệt và thêm vào Whitelist.",
         )
 
@@ -211,6 +249,6 @@ async def approve_or_reject_candidate(
         db.add(candidate)
         await db.commit()
         return success_response(
-            data=UserResponse.model_validate(candidate).model_dump(),
+            data=UserResponse.model_validate(candidate),
             message=f"Tài khoản {candidate.email} đã bị từ chối.",
         )
