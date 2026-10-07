@@ -98,10 +98,10 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
       {
         id: 'cand-topic',
         stepNum: 3,
-        title: 'Bước 3: Đăng ký đề tài thi đấu',
-        description: 'Khảo sát các đề tài nhánh và đăng ký khóa đề tài trước khi hết hạn ngạch.',
+        title: 'Bước 3: Đăng ký đề tài (Có thể chọn sau)',
+        description: 'Khảo sát các đề tài nhánh và đăng ký khóa đề tài. Đội có thể thảo luận và đăng ký sau tại trang Đề tài.',
         isCompleted: isStep3Done,
-        actionLabel: isStep3Done ? 'Đã khóa đề tài' : 'Chọn đề tài',
+        actionLabel: isStep3Done ? 'Đã khóa đề tài' : 'Chọn đề tài (hoặc để sau)',
         icon: <Lightbulb size={16} className="text-amber-400" />,
       },
       {
@@ -219,10 +219,23 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
 
   const completedCount = items.filter((i) => i.isCompleted).length;
   const progressPercent = Math.round((completedCount / items.length) * 100);
-  const isAllDone = completedCount === items.length;
 
-  // Find first unfinished step
-  const firstUnfinished = items.find((i) => !i.isCompleted) || items[0];
+  const isAllMandatoryDone =
+    role === 'candidate'
+      ? Boolean(
+          items.find((i) => i.stepNum === 1)?.isCompleted &&
+          items.find((i) => i.stepNum === 2)?.isCompleted &&
+          items.find((i) => i.stepNum === 4)?.isCompleted
+        )
+      : completedCount === items.length;
+
+  const isAllDone = !!onboardingCompletedUsers[currentUser.id] || isAllMandatoryDone;
+
+  // Find first unfinished mandatory step
+  const firstUnfinished =
+    items.find((i) => !i.isCompleted && (role !== 'candidate' || i.stepNum !== 3)) ||
+    items.find((i) => !i.isCompleted) ||
+    items[0];
 
   return (
     <div className="rounded-[16px] border border-[#6366F1]/40 bg-gradient-to-br from-[#1E293B] via-[#1E293B]/95 to-[#162033] p-5 lg:p-6 shadow-xl relative overflow-hidden transition-all duration-300">

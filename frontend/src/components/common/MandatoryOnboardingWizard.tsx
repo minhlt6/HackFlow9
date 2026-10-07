@@ -93,11 +93,12 @@ export const MandatoryOnboardingWizard: React.FC = () => {
   }, [currentUser, myTeam]);
 
   // Candidate step completions
+  const [topicSkipped, setTopicSkipped] = useState(false);
   const isCandidateStep1Done = Boolean(
     currentUser.studentId && currentUser.school && currentUser.phone
   );
   const isCandidateStep2Done = Boolean(currentUser.teamId && myTeam);
-  const isCandidateStep3Done = Boolean(myTeam?.topicId || myTeam?.subTopicId);
+  const isCandidateStep3Done = Boolean(myTeam?.topicId || myTeam?.subTopicId || topicSkipped);
   const isCandidateStep4Done = Boolean(pledgedUsers[currentUser.id]);
 
   // Overall check
@@ -107,7 +108,7 @@ export const MandatoryOnboardingWizard: React.FC = () => {
   const calculateCandidateNextStep = () => {
     if (!isCandidateStep1Done) return 1;
     if (!isCandidateStep2Done) return 2;
-    if (!isCandidateStep3Done) return 3;
+    if (!isCandidateStep3Done && !topicSkipped) return 3;
     if (!isCandidateStep4Done) return 4;
     return 4;
   };
@@ -601,13 +602,33 @@ export const MandatoryOnboardingWizard: React.FC = () => {
               {wizardStep === 3 && (
                 <div className="space-y-4">
                   <div className="space-y-1">
-                    <h3 className="font-['Righteous'] text-lg text-white">
-                      Bước 3: Lựa Chọn Đề Tài Thi Đấu
-                    </h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-['Righteous'] text-lg text-white">
+                        Bước 3: Lựa Chọn Đề Tài Thi Đấu
+                      </h3>
+                      <Badge variant="neutral" className="text-[10px]">Có thể chọn sau</Badge>
+                    </div>
                     <p className="text-xs text-slate-300">
-                      Mỗi đề tài có giới hạn hạn ngạch tối đa 10 đội.
-                      {!isLeader && myTeam && ' (Đội trưởng chịu trách nhiệm chốt đề tài)'}
+                      Mỗi đề tài có giới hạn hạn ngạch tối đa 10 đội. Đội của bạn có thể thảo luận và đăng ký sau tại trang Đề tài trước hạn chót.
                     </p>
+                  </div>
+
+                  {/* Quick skip notice banner */}
+                  <div className="p-3 rounded-[10px] bg-indigo-500/10 border border-indigo-500/30 flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-200">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">💡</span>
+                      <span>Chưa quyết định ngay? Đội bạn có thể bỏ qua bước này và đăng ký sau.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTopicSkipped(true);
+                        handleNextStep();
+                      }}
+                      className="text-xs text-[#818CF8] hover:text-white font-bold underline cursor-pointer shrink-0"
+                    >
+                      Bỏ qua bước này &rarr;
+                    </button>
                   </div>
 
                   {!myTeam ? (
@@ -687,20 +708,36 @@ export const MandatoryOnboardingWizard: React.FC = () => {
                     </div>
                   )}
 
-                  <div className="pt-3 border-t border-[#334155] flex justify-between">
+                  <div className="pt-3 border-t border-[#334155] flex flex-wrap items-center justify-between gap-3">
                     <Button variant="secondary" onClick={handlePrevStep} className="gap-2">
                       <ArrowLeft size={16} />
                       <span>Quay lại</span>
                     </Button>
-                    <Button
-                      variant="primary"
-                      onClick={handleNextStep}
-                      disabled={isLeader && !selectedSubTopicId}
-                      className="gap-2 disabled:opacity-40"
-                    >
-                      <span>Tiếp tục Bước 4</span>
-                      <ArrowRight size={16} />
-                    </Button>
+                    <div className="flex items-center gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTopicSkipped(true);
+                          handleNextStep();
+                        }}
+                        className="px-3.5 py-2 rounded-[8px] border border-[#334155] bg-[#0F172A] hover:bg-[#1E293B] text-slate-300 hover:text-white text-xs font-semibold transition-colors cursor-pointer"
+                      >
+                        Bỏ qua bước này (Chọn sau)
+                      </button>
+                      <Button
+                        variant="primary"
+                        onClick={() => {
+                          if (!selectedSubTopicId) {
+                            setTopicSkipped(true);
+                          }
+                          handleNextStep();
+                        }}
+                        className="gap-2"
+                      >
+                        <span>{selectedSubTopicId ? 'Tiếp tục Bước 4' : 'Bỏ qua & Sang Bước 4'}</span>
+                        <ArrowRight size={16} />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
