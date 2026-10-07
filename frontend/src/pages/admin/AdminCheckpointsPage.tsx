@@ -18,6 +18,8 @@ import {
   ArrowUpDown,
 } from 'lucide-react';
 import type { Checkpoint } from '../../types';
+import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
+import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
 
 export const AdminCheckpointsPage: React.FC = () => {
   const {
@@ -46,6 +48,35 @@ export const AdminCheckpointsPage: React.FC = () => {
   const [newDurationMinutes, setNewDurationMinutes] = useState(180);
   const [newWeight, setNewWeight] = useState(25);
   const [insertPosition, setInsertPosition] = useState<string>('end');
+
+  const isAddDirty = isAddOpen && (newTitle.trim() !== '' || newDescription.trim() !== '');
+  const isEditDirty = Boolean(editingCp) && (
+    editTitle !== (editingCp?.title || editingCp?.name || '') ||
+    editDescription !== (editingCp?.description || '') ||
+    editDurationMinutes !== (editingCp?.durationMinutes || 180) ||
+    editWeight !== (editingCp?.weight || 25)
+  );
+  const isDirty = isAddDirty || isEditDirty;
+
+  const blocker = useUnsavedChangesWarning(isDirty);
+
+  const handleCloseAdd = () => {
+    if (isAddDirty && !window.confirm('Bạn có nội dung chặng nộp chưa lưu. Bạn có chắc muốn đóng và hủy bỏ?')) {
+      return;
+    }
+    setIsAddOpen(false);
+    setNewTitle('');
+    setNewDescription('');
+    setNewDurationMinutes(180);
+    setNewWeight(25);
+  };
+
+  const handleCloseEdit = () => {
+    if (isEditDirty && !window.confirm('Bạn có thay đổi chưa lưu cho chặng này. Bạn có chắc muốn đóng và hủy bỏ?')) {
+      return;
+    }
+    setEditingCp(null);
+  };
 
   const durationPresets = [
     { label: '60 phút (1h)', value: 60 },
@@ -339,7 +370,7 @@ export const AdminCheckpointsPage: React.FC = () => {
       {/* Add Modal */}
       <Modal
         isOpen={isAddOpen}
-        onClose={() => setIsAddOpen(false)}
+        onClose={handleCloseAdd}
         title="Thêm Chặng Nộp Mới (Cấu Hình Theo Số Phút)"
       >
         <form onSubmit={handleAdd} className="space-y-4 font-['Roboto']">
@@ -448,7 +479,7 @@ export const AdminCheckpointsPage: React.FC = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-3 border-t border-[#334155]">
-            <Button variant="ghost" type="button" onClick={() => setIsAddOpen(false)}>
+            <Button variant="ghost" type="button" onClick={handleCloseAdd}>
               Hủy
             </Button>
             <Button variant="primary" type="submit">
@@ -461,7 +492,7 @@ export const AdminCheckpointsPage: React.FC = () => {
       {/* Edit Modal */}
       <Modal
         isOpen={Boolean(editingCp)}
-        onClose={() => setEditingCp(null)}
+        onClose={handleCloseEdit}
         title={`Chỉnh Sửa Chặng: ${editingCp?.title || ''}`}
       >
         <form onSubmit={handleSave} className="space-y-4 font-['Roboto']">
@@ -542,7 +573,7 @@ export const AdminCheckpointsPage: React.FC = () => {
           />
 
           <div className="flex justify-end gap-3 pt-3 border-t border-[#334155]">
-            <Button variant="ghost" type="button" onClick={() => setEditingCp(null)}>
+            <Button variant="ghost" type="button" onClick={handleCloseEdit}>
               Hủy
             </Button>
             <Button variant="primary" type="submit">
@@ -551,6 +582,19 @@ export const AdminCheckpointsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Route Navigation Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        isOpen={blocker.state === 'blocked'}
+        onStay={() => {
+          if (blocker.reset) blocker.reset();
+        }}
+        onLeave={() => {
+          if (blocker.proceed) blocker.proceed();
+        }}
+        title="Xác Nhận Rời Khỏi Trang"
+        message="Bạn đang có thay đổi chặng nộp bài chưa được lưu. Nếu rời đi bây giờ, mọi nội dung vừa nhập sẽ bị hủy bỏ."
+      />
     </div>
   );
 };

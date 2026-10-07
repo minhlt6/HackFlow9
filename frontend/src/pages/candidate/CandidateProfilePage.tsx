@@ -14,6 +14,9 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 
+import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
+import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
+
 export const CandidateProfilePage: React.FC = () => {
   const { currentUser, teams, updateCurrentUserProfile } = useMockStore();
 
@@ -26,6 +29,13 @@ export const CandidateProfilePage: React.FC = () => {
     'Sinh viên năm 4 đam mê Computer Vision và Generative AI. Đã có kinh nghiệm tham gia 2 kỳ Hackathon.',
   );
   const [isSaved, setIsSaved] = useState(false);
+
+  const isDirty =
+    fullName !== currentUser.fullName ||
+    university !== (currentUser.university || 'Đại học Bách Khoa Hà Nội') ||
+    studentId !== (currentUser.studentId || '2023-CS-0842');
+
+  const blocker = useUnsavedChangesWarning(isDirty);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,6 +167,19 @@ export const CandidateProfilePage: React.FC = () => {
           </div>
         </form>
       </div>
+
+      {/* Unsaved Changes Dialog */}
+      <UnsavedChangesDialog
+        isOpen={blocker.state === 'blocked'}
+        onStay={() => {
+          if (blocker.reset) blocker.reset();
+        }}
+        onLeave={() => {
+          if (blocker.proceed) blocker.proceed();
+        }}
+        title="Xác Nhận Rời Khỏi Hồ Sơ"
+        message="Bạn đang có các thông tin hồ sơ vừa chỉnh sửa chưa được lưu. Nếu rời đi bây giờ, thay đổi sẽ bị mất."
+      />
     </div>
   );
 };

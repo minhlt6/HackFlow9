@@ -27,6 +27,9 @@ import {
   Lock,
 } from 'lucide-react';
 
+import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
+import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
+
 export const AdminConfigPage: React.FC = () => {
   const {
     config,
@@ -48,6 +51,31 @@ export const AdminConfigPage: React.FC = () => {
     config.finalSubmissionDeadline ? config.finalSubmissionDeadline.slice(0, 16) : ''
   );
   const [alert, setAlert] = useState<string | null>(null);
+
+  const initialName = config.name;
+  const initialPhase = config.currentPhase;
+  const initialMaxTeam = config.maxTeamMembers || 4;
+  const initialDeadline = config.finalSubmissionDeadline ? config.finalSubmissionDeadline.slice(0, 16) : '';
+
+  const isDirty =
+    name !== initialName ||
+    currentPhase !== initialPhase ||
+    Number(maxTeamMembers) !== Number(initialMaxTeam) ||
+    finalDeadline !== initialDeadline;
+
+  const blocker = useUnsavedChangesWarning(isDirty);
+
+  const handleSaveAndLeave = () => {
+    updateConfig({
+      name,
+      currentPhase,
+      maxTeamMembers: Number(maxTeamMembers),
+      finalSubmissionDeadline: new Date(finalDeadline).toISOString(),
+    });
+    if (blocker.proceed) {
+      blocker.proceed();
+    }
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,6 +162,20 @@ export const AdminConfigPage: React.FC = () => {
           >
             Đóng
           </button>
+        </div>
+      )}
+
+      {isDirty && (
+        <div className="p-4 rounded-[12px] bg-amber-500/10 border border-amber-500/40 text-xs sm:text-sm text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-amber-950/20 animate-in fade-in">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle size={18} className="text-amber-400 shrink-0" />
+            <span>
+              Bạn đang có thay đổi cấu hình chưa được lưu. Hãy bấm nút <strong>"Lưu Cấu Hình Hackathon"</strong> bên dưới để áp dụng.
+            </span>
+          </div>
+          <span className="text-xs bg-amber-500/20 text-amber-200 px-3 py-1 rounded-full font-bold self-start sm:self-auto shrink-0 border border-amber-500/30">
+            Thay đổi chưa lưu
+          </span>
         </div>
       )}
 
@@ -493,6 +535,20 @@ export const AdminConfigPage: React.FC = () => {
           </div>
         </div>
       </form>
+
+      {/* Unsaved Changes Route Navigation Blocker Modal */}
+      <UnsavedChangesDialog
+        isOpen={blocker.state === 'blocked'}
+        onStay={() => {
+          if (blocker.reset) blocker.reset();
+        }}
+        onLeave={() => {
+          if (blocker.proceed) blocker.proceed();
+        }}
+        onSaveAndLeave={handleSaveAndLeave}
+        title="Xác Nhận Rời Khỏi Cấu Hình"
+        message="Bạn đang có các thông số cấu hình cuộc thi vừa thay đổi chưa được lưu. Nếu rời khỏi trang bây giờ, toàn bộ chỉnh sửa này sẽ bị hủy bỏ."
+      />
     </div>
   );
 };

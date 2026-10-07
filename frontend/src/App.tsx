@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { RejectedAccountPage } from './pages/RejectedAccountPage';
@@ -39,62 +39,63 @@ import { MentorTicketsPage } from './pages/mentor/MentorTicketsPage';
 import { MentorTeamsPage } from './pages/mentor/MentorTeamsPage';
 import { MentorCheckpointsPage } from './pages/mentor/MentorCheckpointsPage';
 
+const router = createBrowserRouter([
+  // Public Authentication Pages
+  { path: '/login', element: <LoginPage /> },
+  { path: '/onboarding', element: <OnboardingPage /> },
+  { path: '/rejected', element: <RejectedAccountPage /> },
+
+  // Authenticated Application with Dark Master Layout
+  {
+    element: <MainLayout />,
+    children: [
+      // Candidate Routes
+      { path: '/', element: <CandidateDashboardPage /> },
+      { path: '/dashboard', element: <CandidateDashboardPage /> },
+      { path: '/teams', element: <CandidateTeamsPage /> },
+      { path: '/topics', element: <CandidateTopicsPage /> },
+      { path: '/checkpoints', element: <CandidateCheckpointsPage /> },
+      { path: '/final-submission', element: <CandidateFinalSubmissionPage /> },
+      { path: '/scoreboard', element: <CandidateLeaderboardPage /> },
+      { path: '/tickets', element: <CandidateTicketsPage /> },
+      { path: '/profile', element: <CandidateProfilePage /> },
+
+      // Admin Routes
+      { path: '/admin', element: <AdminDashboardPage /> },
+      { path: '/admin/dashboard', element: <AdminDashboardPage /> },
+      { path: '/admin/approvals', element: <AdminApprovalsPage /> },
+      { path: '/admin/whitelist', element: <AdminWhitelistPage /> },
+      { path: '/admin/teams', element: <AdminTeamsPage /> },
+      { path: '/admin/topics', element: <AdminTopicsPage /> },
+      { path: '/admin/checkpoints', element: <AdminCheckpointsPage /> },
+      { path: '/admin/criteria', element: <AdminCriteriaPage /> },
+      { path: '/admin/personnel', element: <AdminMentorsJudgesPage /> },
+      { path: '/admin/results', element: <AdminResultsPage /> },
+      { path: '/admin/announcements', element: <AdminAnnouncementsPage /> },
+      { path: '/admin/config', element: <AdminConfigPage /> },
+
+      // Judge Routes
+      { path: '/judge', element: <JudgeDashboardPage /> },
+      { path: '/judge/dashboard', element: <JudgeDashboardPage /> },
+      { path: '/judge/split-screen', element: <JudgeSplitScreenPage /> },
+      { path: '/judge/topics', element: <JudgeTopicsPage /> },
+      { path: '/judge/results', element: <JudgeResultsPage /> },
+
+      // Mentor Routes
+      { path: '/mentor', element: <MentorDashboardPage /> },
+      { path: '/mentor/dashboard', element: <MentorDashboardPage /> },
+      { path: '/mentor/tickets', element: <MentorTicketsPage /> },
+      { path: '/mentor/teams', element: <MentorTeamsPage /> },
+      { path: '/mentor/checkpoints', element: <MentorCheckpointsPage /> },
+    ],
+  },
+
+  // Fallback
+  { path: '*', element: <Navigate to="/login" replace /> },
+]);
+
 export function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        {/* Public Authentication Pages */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
-        <Route path="/rejected" element={<RejectedAccountPage />} />
-
-        {/* Authenticated Application with Dark Master Layout */}
-        <Route element={<MainLayout />}>
-          {/* Candidate Routes */}
-          <Route path="/" element={<CandidateDashboardPage />} />
-          <Route path="/dashboard" element={<CandidateDashboardPage />} />
-          <Route path="/teams" element={<CandidateTeamsPage />} />
-          <Route path="/topics" element={<CandidateTopicsPage />} />
-          <Route path="/checkpoints" element={<CandidateCheckpointsPage />} />
-          <Route path="/final-submission" element={<CandidateFinalSubmissionPage />} />
-          <Route path="/scoreboard" element={<CandidateLeaderboardPage />} />
-          <Route path="/tickets" element={<CandidateTicketsPage />} />
-          <Route path="/profile" element={<CandidateProfilePage />} />
-
-          {/* Admin Routes */}
-          <Route path="/admin" element={<AdminDashboardPage />} />
-          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
-          <Route path="/admin/approvals" element={<AdminApprovalsPage />} />
-          <Route path="/admin/whitelist" element={<AdminWhitelistPage />} />
-          <Route path="/admin/teams" element={<AdminTeamsPage />} />
-          <Route path="/admin/topics" element={<AdminTopicsPage />} />
-          <Route path="/admin/checkpoints" element={<AdminCheckpointsPage />} />
-          <Route path="/admin/criteria" element={<AdminCriteriaPage />} />
-          <Route path="/admin/personnel" element={<AdminMentorsJudgesPage />} />
-          <Route path="/admin/results" element={<AdminResultsPage />} />
-          <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
-          <Route path="/admin/config" element={<AdminConfigPage />} />
-
-          {/* Judge Routes */}
-          <Route path="/judge" element={<JudgeDashboardPage />} />
-          <Route path="/judge/dashboard" element={<JudgeDashboardPage />} />
-          <Route path="/judge/split-screen" element={<JudgeSplitScreenPage />} />
-          <Route path="/judge/topics" element={<JudgeTopicsPage />} />
-          <Route path="/judge/results" element={<JudgeResultsPage />} />
-
-          {/* Mentor Routes */}
-          <Route path="/mentor" element={<MentorDashboardPage />} />
-          <Route path="/mentor/dashboard" element={<MentorDashboardPage />} />
-          <Route path="/mentor/tickets" element={<MentorTicketsPage />} />
-          <Route path="/mentor/teams" element={<MentorTeamsPage />} />
-          <Route path="/mentor/checkpoints" element={<MentorCheckpointsPage />} />
-        </Route>
-
-        {/* Fallback */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export default App;
