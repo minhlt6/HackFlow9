@@ -1,17 +1,32 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, UserRound, Lock, AlertCircle, LogIn } from 'lucide-react';
+import { Eye, EyeOff, UserRound, Lock, AlertCircle, LogIn, Mail, GraduationCap, ShieldCheck } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMockStore } from '../store/useMockStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { mockUsers } from '../mock/mockData';
 import { Button } from '../components/Button';
+import { GithubIcon } from '../components/common/Icons';
+
+type LoginTab = 'candidate' | 'others';
 
 export const LoginPage: React.FC = () => {
   const [searchParams] = useSearchParams();
-  const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('123456');
+  const navigate = useNavigate();
+  const { switchPersona } = useMockStore();
+
+  const [activeTab, setActiveTab] = useState<LoginTab>('candidate');
+
+  // Candidate form states
+  const [candidateEmail, setCandidateEmail] = useState('leader@cybersamurai.team');
+  const [candidatePassword, setCandidatePassword] = useState('123456');
+
+  // Other roles form states
+  const [otherUsername, setOtherUsername] = useState('admin');
+  const [otherPassword, setOtherPassword] = useState('123456');
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingGithub, setIsLoadingGithub] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(() =>
     searchParams.get('error') === 'auth_rejected'
       ? 'Tài khoản chưa được phê duyệt để truy cập hệ thống.'
@@ -20,24 +35,118 @@ export const LoginPage: React.FC = () => {
       : null,
   );
 
-  const navigate = useNavigate();
-  const { switchPersona } = useMockStore();
-
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  // Handle Candidate login (Email + Password)
+  const handleCandidateLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const userClean = username.trim().toLowerCase();
-    const passClean = password.trim();
+    const emailClean = candidateEmail.trim().toLowerCase();
+    const passClean = candidatePassword.trim();
 
-    if (!userClean || !passClean) {
-      setErrorMessage('Vui lòng nhập đầy đủ tài khoản và mật khẩu.');
+    if (!emailClean || !passClean) {
+      setErrorMessage('Vui lòng nhập đầy đủ email và mật khẩu.');
       return;
     }
 
     setIsLoading(true);
 
     setTimeout(() => {
+      // If entered admin / judge / mentor by mistake
+      if (emailClean === 'admin' || emailClean === 'judge' || emailClean === 'mentor') {
+        setIsLoading(false);
+        setErrorMessage('Tài khoản này thuộc vai trò quản lý. Vui lòng chuyển sang tab "Vai trò khác" để đăng nhập.');
+        return;
+      }
+
+      // 1. Leader
+      if (
+        (emailClean === 'leader@cybersamurai.team' || emailClean === 'leader' || emailClean === 'user' || emailClean === 'candidate') &&
+        (passClean === '123456' || passClean === '123')
+      ) {
+        switchPersona('leader');
+        useAuthStore.getState().login(mockUsers.leader, 'mock-jwt-leader-token');
+        setIsLoading(false);
+        navigate('/dashboard');
+        return;
+      }
+
+      // 2. Member
+      if (
+        (emailClean === 'member@cybersamurai.team' || emailClean === 'member') &&
+        (passClean === '123456' || passClean === '123')
+      ) {
+        switchPersona('member');
+        useAuthStore.getState().login(mockUsers.member, 'mock-jwt-member-token');
+        setIsLoading(false);
+        navigate('/dashboard');
+        return;
+      }
+
+      // 3. Pending
+      if (
+        (emailClean === 'pending@hust.edu.vn' || emailClean === 'pending') &&
+        (passClean === '123456' || passClean === '123')
+      ) {
+        switchPersona('pending');
+        useAuthStore.getState().login(mockUsers.pending, 'mock-jwt-pending-token');
+        setIsLoading(false);
+        navigate('/onboarding');
+        return;
+      }
+
+      // 4. Rejected
+      if (
+        (emailClean === 'rejected@fpt.edu.vn' || emailClean === 'rejected') &&
+        (passClean === '123456' || passClean === '123')
+      ) {
+        switchPersona('rejected');
+        useAuthStore.getState().login(mockUsers.rejected, 'mock-jwt-rejected-token');
+        setIsLoading(false);
+        navigate('/rejected');
+        return;
+      }
+
+      setIsLoading(false);
+      setErrorMessage('Email hoặc mật khẩu thí sinh không chính xác. Vui lòng kiểm tra lại.');
+    }, 500);
+  };
+
+  // Handle GitHub OAuth login for Candidate
+  const handleGithubLogin = () => {
+    setErrorMessage(null);
+    setIsLoadingGithub(true);
+
+    setTimeout(() => {
+      switchPersona('leader');
+      useAuthStore.getState().login(mockUsers.leader, 'mock-jwt-github-token');
+      setIsLoadingGithub(false);
+      navigate('/dashboard');
+    }, 600);
+  };
+
+  // Handle Other roles login (Username/Email + Password only)
+  const handleOthersLogin = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    const userClean = otherUsername.trim().toLowerCase();
+    const passClean = otherPassword.trim();
+
+    if (!userClean || !passClean) {
+      setErrorMessage('Vui lòng nhập đầy đủ tên tài khoản và mật khẩu.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    setTimeout(() => {
+      // If entered candidate email by mistake
+      if (userClean === 'leader@cybersamurai.team' || userClean === 'member@cybersamurai.team' || userClean === 'candidate' || userClean === 'user') {
+        setIsLoading(false);
+        setErrorMessage('Tài khoản này là thí sinh. Vui lòng chuyển sang tab "Thí sinh" để đăng nhập.');
+        return;
+      }
+
       // 1. Quản trị viên (Admin)
       if (
         (userClean === 'admin' || userClean === 'admin@hackflow.dev' || userClean === 'admin@hackflow.io') &&
@@ -50,19 +159,7 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
-      // 2. Thí sinh / Đội trưởng (Candidate / Leader)
-      if (
-        (userClean === 'user' || userClean === 'candidate' || userClean === 'leader' || userClean === 'leader@cybersamurai.team') &&
-        (passClean === '123456' || passClean === '123')
-      ) {
-        switchPersona('leader');
-        useAuthStore.getState().login(mockUsers.leader, 'mock-jwt-leader-token');
-        setIsLoading(false);
-        navigate('/dashboard');
-        return;
-      }
-
-      // 3. Giám khảo (Judge)
+      // 2. Ban Giám khảo (Judge)
       if (
         (userClean === 'judge' || userClean === 'judge.tech@hackathon.org') &&
         (passClean === '123456' || passClean === '123')
@@ -74,7 +171,7 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
-      // 4. Cố vấn (Mentor)
+      // 3. Cố vấn chuyên môn (Mentor)
       if (
         (userClean === 'mentor' || userClean === 'mentor.ai@ailab.org.vn') &&
         (passClean === '123456' || passClean === '123')
@@ -86,9 +183,8 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
-      // Thông tin đăng nhập không hợp lệ
       setIsLoading(false);
-      setErrorMessage('Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.');
+      setErrorMessage('Tên tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.');
     }, 500);
   };
 
@@ -121,10 +217,10 @@ export const LoginPage: React.FC = () => {
           </section>
 
           {/* Right Login Card */}
-          <section className="w-full max-w-[480px] mx-auto rounded-[20px] border border-[#334155] bg-[#1E293B]/95 p-8 shadow-2xl backdrop-blur-md sm:p-10">
+          <section className="w-full max-w-[500px] mx-auto rounded-[20px] border border-[#334155] bg-[#1E293B]/95 p-6 shadow-2xl backdrop-blur-md sm:p-9">
             <div className="flex flex-col items-center">
               <h1
-                className="text-center font-['Righteous'] text-[42px] font-normal leading-none sm:text-[52px]"
+                className="text-center font-['Righteous'] text-[38px] font-normal leading-none sm:text-[48px]"
                 style={{
                   background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
                   WebkitBackgroundClip: 'text',
@@ -136,7 +232,7 @@ export const LoginPage: React.FC = () => {
 
               <div className="mt-2 text-center">
                 <p
-                  className="text-[18px] font-medium leading-normal sm:text-[20px]"
+                  className="text-[17px] font-medium leading-normal sm:text-[19px]"
                   style={{
                     background: 'linear-gradient(90deg, #6366F1 0%, #EDEDED 100%)',
                     WebkitBackgroundClip: 'text',
@@ -145,14 +241,53 @@ export const LoginPage: React.FC = () => {
                 >
                   Cổng đăng nhập hệ thống
                 </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Nhập tài khoản và mật khẩu để tiếp tục
-                </p>
               </div>
+
+              {/* Two Tabs Selector */}
+              <div className="mt-5 grid grid-cols-2 gap-2 w-full rounded-[14px] bg-[#0F172A] p-1.5 border border-[#334155]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('candidate');
+                    setErrorMessage(null);
+                  }}
+                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[10px] text-xs sm:text-sm font-semibold transition-all ${
+                    activeTab === 'candidate'
+                      ? 'bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/60'
+                  }`}
+                >
+                  <GraduationCap size={18} />
+                  <span>Thí sinh</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab('others');
+                    setErrorMessage(null);
+                  }}
+                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[10px] text-xs sm:text-sm font-semibold transition-all ${
+                    activeTab === 'others'
+                      ? 'bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/30'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/60'
+                  }`}
+                >
+                  <ShieldCheck size={18} />
+                  <span>Vai trò khác</span>
+                </button>
+              </div>
+
+              {/* Subtitle depending on active tab */}
+              <p className="mt-2.5 text-xs text-slate-400 text-center">
+                {activeTab === 'candidate'
+                  ? 'Dành cho Thí sinh & Đội thi tham dự'
+                  : 'Dành cho Cố vấn, Ban Giám khảo & Quản trị viên'}
+              </p>
 
               {errorMessage && (
                 <div
-                  className="mt-5 flex items-start gap-2.5 w-full rounded-xl border border-red-800/80 bg-red-950/70 p-3.5 text-sm text-red-200 animate-in fade-in duration-200"
+                  className="mt-4 flex items-start gap-2.5 w-full rounded-xl border border-red-800/80 bg-red-950/70 p-3 text-xs sm:text-sm text-red-200 animate-in fade-in duration-200"
                   role="alert"
                 >
                   <AlertCircle size={18} className="shrink-0 text-red-400 mt-0.5" />
@@ -160,73 +295,195 @@ export const LoginPage: React.FC = () => {
                 </div>
               )}
 
-              <form onSubmit={handleLogin} className="mt-6 flex w-full flex-col gap-4">
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                    Tài khoản
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      placeholder="admin"
-                      required
-                      className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-3 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
-                    />
-                    <UserRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                  </div>
-                </div>
+              {/* TAB 1: THÍ SINH */}
+              {activeTab === 'candidate' && (
+                <div className="w-full mt-5 space-y-4">
+                  <form onSubmit={handleCandidateLogin} className="flex w-full flex-col gap-3.5">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        Email thí sinh
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={candidateEmail}
+                          onChange={(e) => setCandidateEmail(e.target.value)}
+                          placeholder="leader@cybersamurai.team"
+                          required
+                          className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
+                        />
+                        <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      </div>
+                    </div>
 
-                <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                    Mật khẩu
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder="••••••"
-                      required
-                      className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-3 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
-                    />
-                    <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <button
-                      type="button"
-                      aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                      onClick={() => setShowPassword((prev) => !prev)}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        Mật khẩu
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={candidatePassword}
+                          onChange={(e) => setCandidatePassword(e.target.value)}
+                          placeholder="••••••"
+                          required
+                          className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
+                        />
+                        <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <button
+                          type="button"
+                          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      isLoading={isLoading}
+                      className="mt-1 !min-h-[48px] !w-full !rounded-[12px] !bg-[#6366F1] px-6 py-2.5 font-['Roboto'] text-[15px] font-bold text-white hover:!bg-[#5558d9] shadow-lg shadow-[#6366F1]/25 transition-all"
                     >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </button>
-                  </div>
-                </div>
+                      <LogIn size={18} className="mr-2" />
+                      <span>Đăng nhập</span>
+                    </Button>
+                  </form>
 
-                {/* Subtle account hint box */}
-                <div className="rounded-[12px] border border-[#334155]/80 bg-[#0F172A]/70 p-3 text-xs text-slate-300 space-y-1.5">
-                  <div className="font-medium text-[#818CF8]">💡 Tài khoản đăng nhập:</div>
-                  <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
-                    <div className="rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
-                      <span className="font-semibold text-white">Quản trị viên:</span>
-                      <div className="font-mono text-slate-400">admin / 123456</div>
+                  {/* Divider */}
+                  <div className="relative my-2">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-[#334155]" />
                     </div>
-                    <div className="rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
-                      <span className="font-semibold text-white">Thí sinh:</span>
-                      <div className="font-mono text-slate-400">user / 123456</div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-[#1E293B] px-3 text-slate-400 font-medium">Hoặc tiếp tục với</span>
                     </div>
                   </div>
-                </div>
 
-                <Button
-                  type="submit"
-                  isLoading={isLoading}
-                  className="mt-2 !min-h-[52px] !w-full !rounded-[12px] !bg-[#6366F1] px-6 py-3 font-['Roboto'] text-[16px] font-bold text-white hover:!bg-[#5558d9] shadow-lg shadow-[#6366F1]/25 transition-all"
-                >
-                  <LogIn size={18} className="mr-2" />
-                  <span>Đăng nhập</span>
-                </Button>
-              </form>
+                  {/* GitHub OAuth Button */}
+                  <button
+                    type="button"
+                    onClick={handleGithubLogin}
+                    disabled={isLoadingGithub}
+                    className="flex items-center justify-center gap-3 w-full rounded-[12px] border border-[#334155] bg-[#0F172A] hover:bg-[#152033] hover:border-slate-400 px-4 py-3 text-sm font-semibold text-white transition-all duration-200 shadow-md disabled:opacity-50"
+                  >
+                    {isLoadingGithub ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    ) : (
+                      <GithubIcon size={20} className="text-white" />
+                    )}
+                    <span>{isLoadingGithub ? 'Đang kết nối GitHub...' : 'Đăng nhập bằng GitHub'}</span>
+                  </button>
+
+                  {/* Candidate Account Hint */}
+                  <div className="rounded-[12px] border border-[#334155]/80 bg-[#0F172A]/70 p-3 text-xs text-slate-300 space-y-1.5">
+                    <div className="font-medium text-[#818CF8]">💡 Tài khoản thí sinh thử nghiệm:</div>
+                    <div className="space-y-1 text-[11px] text-slate-300">
+                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
+                        <div>
+                          <span className="font-semibold text-white">Đội trưởng: </span>
+                          <span className="font-mono text-slate-400">leader@cybersamurai.team</span>
+                        </div>
+                        <span className="font-mono text-indigo-300">123456</span>
+                      </div>
+                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
+                        <div>
+                          <span className="font-semibold text-white">Thành viên: </span>
+                          <span className="font-mono text-slate-400">member@cybersamurai.team</span>
+                        </div>
+                        <span className="font-mono text-indigo-300">123456</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: VAI TRÒ KHÁC (MENTOR, ADMIN, BAN GIÁM KHẢO) - USER & PASS ONLY */}
+              {activeTab === 'others' && (
+                <div className="w-full mt-5 space-y-4">
+                  <form onSubmit={handleOthersLogin} className="flex w-full flex-col gap-3.5">
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        Tên tài khoản hoặc Email
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={otherUsername}
+                          onChange={(e) => setOtherUsername(e.target.value)}
+                          placeholder="admin, judge hoặc mentor"
+                          required
+                          className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
+                        />
+                        <UserRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                        Mật khẩu
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={otherPassword}
+                          onChange={(e) => setOtherPassword(e.target.value)}
+                          placeholder="••••••"
+                          required
+                          className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
+                        />
+                        <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <button
+                          type="button"
+                          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="submit"
+                      isLoading={isLoading}
+                      className="mt-1 !min-h-[48px] !w-full !rounded-[12px] !bg-[#6366F1] px-6 py-2.5 font-['Roboto'] text-[15px] font-bold text-white hover:!bg-[#5558d9] shadow-lg shadow-[#6366F1]/25 transition-all"
+                    >
+                      <LogIn size={18} className="mr-2" />
+                      <span>Đăng nhập hệ thống</span>
+                    </Button>
+                  </form>
+
+                  {/* Others Account Hint */}
+                  <div className="rounded-[12px] border border-[#334155]/80 bg-[#0F172A]/70 p-3 text-xs text-slate-300 space-y-1.5">
+                    <div className="font-medium text-[#818CF8]">💡 Tài khoản điều hành & chuyên môn:</div>
+                    <div className="space-y-1 text-[11px] text-slate-300">
+                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
+                        <div>
+                          <span className="font-semibold text-white">Quản trị viên: </span>
+                          <span className="font-mono text-slate-400">admin</span>
+                        </div>
+                        <span className="font-mono text-indigo-300">123456</span>
+                      </div>
+                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
+                        <div>
+                          <span className="font-semibold text-white">Ban Giám khảo: </span>
+                          <span className="font-mono text-slate-400">judge</span>
+                        </div>
+                        <span className="font-mono text-indigo-300">123456</span>
+                      </div>
+                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
+                        <div>
+                          <span className="font-semibold text-white">Cố vấn chuyên môn: </span>
+                          <span className="font-mono text-slate-400">mentor</span>
+                        </div>
+                        <span className="font-mono text-indigo-300">123456</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
         </div>
