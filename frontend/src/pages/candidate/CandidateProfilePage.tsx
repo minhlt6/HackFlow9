@@ -3,9 +3,9 @@ import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Badge } from '../../components/Badge';
+import { GithubIcon } from '../../components/common/Icons';
 import {
   User,
-  Github,
   Mail,
   School,
   Save,
@@ -77,7 +77,7 @@ export const CandidateProfilePage: React.FC = () => {
             </div>
             <p className="text-xs text-slate-400 flex items-center justify-center sm:justify-start gap-2">
               <span className="flex items-center gap-1">
-                <Github size={13} />
+                <GithubIcon size={13} />
                 <span>@{currentUser.githubUsername || 'github_user'}</span>
               </span>
               <span>•</span>

@@ -1,66 +1,96 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
-import { AuthCallback } from './pages/AuthCallback'; // <-- 1. Import trang callback OAuth
 import { OnboardingPage } from './pages/OnboardingPage';
+import { RejectedAccountPage } from './pages/RejectedAccountPage';
 import { MainLayout } from './layouts/MainLayout';
-import { DashboardPage } from './pages/DashboardPage';
-import { TeamsPage } from './pages/TeamsPage';
-import { UIPreviewPage } from './pages/UIPreviewPage';
-import { ProtectedRoute } from './components/ProtectedRoute';
+
+// Candidate Pages
+import { CandidateDashboardPage } from './pages/candidate/CandidateDashboardPage';
+import { CandidateTeamsPage } from './pages/candidate/CandidateTeamsPage';
+import { CandidateTopicsPage } from './pages/candidate/CandidateTopicsPage';
+import { CandidateCheckpointsPage } from './pages/candidate/CandidateCheckpointsPage';
+import { CandidateFinalSubmissionPage } from './pages/candidate/CandidateFinalSubmissionPage';
+import { CandidateLeaderboardPage } from './pages/candidate/CandidateLeaderboardPage';
+import { CandidateTicketsPage } from './pages/candidate/CandidateTicketsPage';
+import { CandidateProfilePage } from './pages/candidate/CandidateProfilePage';
+
+// Admin Pages
+import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
+import { AdminApprovalsPage } from './pages/admin/AdminApprovalsPage';
+import { AdminWhitelistPage } from './pages/admin/AdminWhitelistPage';
+import { AdminTeamsPage } from './pages/admin/AdminTeamsPage';
+import { AdminTopicsPage } from './pages/admin/AdminTopicsPage';
+import { AdminCheckpointsPage } from './pages/admin/AdminCheckpointsPage';
+import { AdminCriteriaPage } from './pages/admin/AdminCriteriaPage';
+import { AdminMentorsJudgesPage } from './pages/admin/AdminMentorsJudgesPage';
+import { AdminResultsPage } from './pages/admin/AdminResultsPage';
+import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
+import { AdminConfigPage } from './pages/admin/AdminConfigPage';
+
+// Judge Pages
+import { JudgeDashboardPage } from './pages/judge/JudgeDashboardPage';
+import { JudgeSplitScreenPage } from './pages/judge/JudgeSplitScreenPage';
+import { JudgeTopicsPage } from './pages/judge/JudgeTopicsPage';
+import { JudgeResultsPage } from './pages/judge/JudgeResultsPage';
+
+// Mentor Pages
+import { MentorDashboardPage } from './pages/mentor/MentorDashboardPage';
+import { MentorTicketsPage } from './pages/mentor/MentorTicketsPage';
+import { MentorTeamsPage } from './pages/mentor/MentorTeamsPage';
+import { MentorCheckpointsPage } from './pages/mentor/MentorCheckpointsPage';
 
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Route công khai */}
+        {/* Public Authentication Pages */}
         <Route path="/login" element={<LoginPage />} />
-        
-        {/* Route hứng callback sau khi GitHub OAuth thành công */}
-        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/rejected" element={<RejectedAccountPage />} />
 
-        {/* Route test UI Atoms tạm thời cho task HF-13 */}
-        <Route path="/preview" element={<UIPreviewPage />} />
+        {/* Authenticated Application with Dark Master Layout */}
+        <Route element={<MainLayout />}>
+          {/* Candidate Routes */}
+          <Route path="/" element={<CandidateDashboardPage />} />
+          <Route path="/dashboard" element={<CandidateDashboardPage />} />
+          <Route path="/teams" element={<CandidateTeamsPage />} />
+          <Route path="/topics" element={<CandidateTopicsPage />} />
+          <Route path="/checkpoints" element={<CandidateCheckpointsPage />} />
+          <Route path="/final-submission" element={<CandidateFinalSubmissionPage />} />
+          <Route path="/scoreboard" element={<CandidateLeaderboardPage />} />
+          <Route path="/tickets" element={<CandidateTicketsPage />} />
+          <Route path="/profile" element={<CandidateProfilePage />} />
 
-        {/* Route onboarding cho tài khoản pending */}
-        <Route element={<ProtectedRoute requiredApprovalStatus="pending" />}>
-          <Route path="/onboarding" element={<OnboardingPage />} />
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminDashboardPage />} />
+          <Route path="/admin/dashboard" element={<AdminDashboardPage />} />
+          <Route path="/admin/approvals" element={<AdminApprovalsPage />} />
+          <Route path="/admin/whitelist" element={<AdminWhitelistPage />} />
+          <Route path="/admin/teams" element={<AdminTeamsPage />} />
+          <Route path="/admin/topics" element={<AdminTopicsPage />} />
+          <Route path="/admin/checkpoints" element={<AdminCheckpointsPage />} />
+          <Route path="/admin/criteria" element={<AdminCriteriaPage />} />
+          <Route path="/admin/personnel" element={<AdminMentorsJudgesPage />} />
+          <Route path="/admin/results" element={<AdminResultsPage />} />
+          <Route path="/admin/announcements" element={<AdminAnnouncementsPage />} />
+          <Route path="/admin/config" element={<AdminConfigPage />} />
+
+          {/* Judge Routes */}
+          <Route path="/judge" element={<JudgeDashboardPage />} />
+          <Route path="/judge/dashboard" element={<JudgeDashboardPage />} />
+          <Route path="/judge/split-screen" element={<JudgeSplitScreenPage />} />
+          <Route path="/judge/topics" element={<JudgeTopicsPage />} />
+          <Route path="/judge/results" element={<JudgeResultsPage />} />
+
+          {/* Mentor Routes */}
+          <Route path="/mentor" element={<MentorDashboardPage />} />
+          <Route path="/mentor/dashboard" element={<MentorDashboardPage />} />
+          <Route path="/mentor/tickets" element={<MentorTicketsPage />} />
+          <Route path="/mentor/teams" element={<MentorTeamsPage />} />
+          <Route path="/mentor/checkpoints" element={<MentorCheckpointsPage />} />
         </Route>
 
-        {/* Các route dành cho candidate đã được approved */}
-        <Route
-          element={
-            <ProtectedRoute
-              allowedRoles={['candidate']}
-              requiredApprovalStatus="approved"
-            />
-          }
-        >
-          <Route path="/" element={<MainLayout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="teams" element={<TeamsPage />} />
-            <Route path="topics" element={<div className="p-6 text-xl font-bold text-slate-900">Trang Đề tài (Topics)</div>} />
-            <Route path="submissions" element={<div className="p-6 text-xl font-bold text-slate-900">Trang Bài nộp (Submissions)</div>} />
-            <Route path="projects" element={<div className="p-6 text-xl font-bold text-slate-900">Trang Quản lý Đề tài</div>} />
-            <Route path="checkpoints" element={<div className="p-6 text-xl font-bold text-slate-900">Trang Checkpoint</div>} />
-            <Route path="scoreboard" element={<div className="p-6 text-xl font-bold text-slate-900">Trang Bảng điểm</div>} />
-          </Route>
-        </Route>
-
-        {/* Phân quyền theo Role */}
-        <Route element={<ProtectedRoute allowedRoles={['admin']} requiredApprovalStatus="approved" />}>
-          <Route path="/admin/*" element={<div className="p-8 text-2xl font-bold text-red-600">Khu vực Quản trị hệ thống (Admin Area)</div>} />
-        </Route>
-
-        <Route element={<ProtectedRoute allowedRoles={['judge']} requiredApprovalStatus="approved" />}>
-          <Route path="/judge/*" element={<div className="p-8 text-2xl font-bold text-blue-600">Khu vực Giám khảo chấm thi (Judge Area)</div>} />
-        </Route>
-
-        <Route element={<ProtectedRoute allowedRoles={['mentor']} requiredApprovalStatus="approved" />}>
-          <Route path="/mentor/*" element={<div className="p-8 text-2xl font-bold text-green-600">Khu vực Mentor hỗ trợ (Mentor Area)</div>} />
-        </Route>
-
-        {/* Trang 404 / Điều hướng mặc định */}
+        {/* Fallback */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

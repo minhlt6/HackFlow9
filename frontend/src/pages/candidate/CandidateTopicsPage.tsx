@@ -169,9 +169,11 @@ export const CandidateTopicsPage: React.FC = () => {
             {/* SubTopics Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {major.subTopics.map((sub) => {
-                const isSelectedByMyTeam = myTeam?.subTopicId === sub.id;
-                const isFull = sub.registeredTeamsCount >= sub.quota;
-                const percentage = Math.round((sub.registeredTeamsCount / sub.quota) * 100);
+                const isSelectedByMyTeam = myTeam?.subTopicId === sub.id || myTeam?.topicId === sub.id;
+                const registeredCount = sub.registeredTeamsCount ?? sub.currentTeams ?? 0;
+                const quotaCount = sub.quota ?? sub.maxTeamsQuota ?? 3;
+                const isFull = registeredCount >= quotaCount;
+                const percentage = Math.round((registeredCount / quotaCount) * 100);
 
                 return (
                   <div
@@ -218,7 +220,7 @@ export const CandidateTopicsPage: React.FC = () => {
                             isFull ? 'text-rose-400' : 'text-slate-200'
                           }`}
                         >
-                          {sub.registeredTeamsCount} / {sub.quota} đội {isFull && '(ĐÃ ĐẦY)'}
+                          {registeredCount} / {quotaCount} đội {isFull && '(ĐÃ ĐẦY)'}
                         </span>
                       </div>
 

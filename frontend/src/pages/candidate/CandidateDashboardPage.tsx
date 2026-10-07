@@ -34,7 +34,7 @@ export const CandidateDashboardPage: React.FC = () => {
       const sub = mt.subTopics.find((s) => s.id === myTeam.subTopicId);
       if (sub) {
         selectedTopicTitle = sub.title;
-        majorTopicName = mt.name;
+        majorTopicName = mt.name || mt.title || 'Chưa chọn';
         break;
       }
     }
@@ -139,7 +139,7 @@ export const CandidateDashboardPage: React.FC = () => {
         <StatCard
           title="Tiến độ Checkpoints"
           value={`${teamSubmissions.length}/${checkpoints.length}`}
-          subtitle={`Kế tiếp: ${nextCheckpoint?.title.slice(0, 24)}...`}
+          subtitle={`Kế tiếp: ${(nextCheckpoint?.title || nextCheckpoint?.name || 'Checkpoint').slice(0, 24)}...`}
           icon={<CheckSquare size={24} />}
           iconColor="amber"
           onClick={() => navigate('/checkpoints')}

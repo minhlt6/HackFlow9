@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Eye, EyeOff, UserRound, Sparkles, Github, ShieldAlert } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, UserRound, Sparkles, ShieldAlert } from 'lucide-react';
+import { GithubIcon } from '../components/common/Icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMockStore } from '../store/useMockStore';
 import { Button } from '../components/Button';
@@ -155,7 +156,7 @@ export const LoginPage: React.FC = () => {
                       }}
                       className="!min-h-[68px] !w-full !rounded-full !bg-[#16A34A] px-6 py-[10px] font-['Roboto'] text-[18px] font-bold text-white hover:!bg-[#12823b] sm:text-[22px] shadow-lg shadow-emerald-600/20"
                     >
-                      <Github size={24} />
+                      <GithubIcon size={24} />
                       <span>Thí sinh đăng nhập (GitHub)</span>
                     </Button>
                   </div>
@@ -314,7 +315,7 @@ export const LoginPage: React.FC = () => {
                     onClick={handleGithubLogin}
                     className="mt-8 !min-h-[68px] !w-full !rounded-full !bg-[#16A34A] px-6 py-[10px] font-['Roboto'] text-[18px] font-bold text-white hover:!bg-[#12823b] sm:text-[22px] shadow-lg shadow-emerald-600/20"
                   >
-                    <Github size={24} />
+                    <GithubIcon size={24} />
                     <span>Xác thực qua GitHub OAuth</span>
                   </Button>
                 </div>

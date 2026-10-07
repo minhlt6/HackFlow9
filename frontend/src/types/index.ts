@@ -8,26 +8,34 @@ export interface User {
   fullName: string;
   role: UserRole;
   approvalStatus: ApprovalStatus;
+  githubUsername?: string;
   avatarUrl?: string;
-  studentId?: string;
+  university?: string;
   school?: string;
+  studentId?: string;
   phone?: string;
   skills?: string[];
+  specialization?: string;
   specialty?: string;
   teamId?: string;
+  teamRole?: 'leader' | 'member';
   roleInTeam?: 'leader' | 'member';
   rejectionReason?: string;
-  organization?: string; // for mentor/judge
-  position?: string;     // for mentor/judge
+  organization?: string;
+  position?: string;
   bio?: string;
 }
 
 export interface TeamMember {
-  userId: string;
+  id?: string;
+  userId?: string;
   fullName: string;
   email: string;
-  roleInTeam: 'leader' | 'member';
+  role?: 'leader' | 'member';
+  roleInTeam?: 'leader' | 'member';
+  githubUsername?: string;
   studentId?: string;
+  university?: string;
   school?: string;
   skills?: string[];
   joinedAt: string;
@@ -39,35 +47,40 @@ export interface Team {
   description: string;
   inviteCode: string;
   leaderId: string;
-  topicId: string | null;
-  status: 'INCOMPLETE' | 'VALID' | 'APPROVED' | 'REJECTED' | 'pending';
-  memberCount: number;
+  leaderName?: string;
+  subTopicId?: string;
+  topicId?: string | null;
+  status: 'approved' | 'pending' | 'rejected' | 'INCOMPLETE' | 'VALID' | 'APPROVED' | 'REJECTED';
   members: TeamMember[];
+  memberCount?: number;
   rejectionReason?: string;
   createdAt: string;
 }
 
 export interface SubTopic {
   id: string;
-  majorTopicId: string;
+  majorTopicId?: string;
   title: string;
   description: string;
   requirements?: string;
   sampleDataUrl?: string;
   referenceDocsUrl?: string;
-  maxTeamsQuota: number;
-  currentTeams: number;
-  mentorId?: string;
+  quota?: number;
+  maxTeamsQuota?: number;
+  registeredTeamsCount?: number;
+  currentTeams?: number;
   mentorName?: string;
-  status: 'OPEN' | 'CLOSED' | 'ARCHIVED';
+  mentorId?: string;
+  status?: 'OPEN' | 'CLOSED' | 'ARCHIVED';
 }
 
 export interface MajorTopic {
   id: string;
-  title: string;
+  name?: string;
+  title?: string;
   description: string;
-  domain: string;
-  mentorIds: string[];
+  domain?: string;
+  mentorIds?: string[];
   subTopics: SubTopic[];
 }
 
@@ -84,19 +97,21 @@ export interface CheckpointSubmission {
   isAfterDeadline?: boolean;
   score?: number;
   penaltyApplied?: number;
-  status: 'submitted' | 'late' | 'reviewed';
+  status?: 'submitted' | 'late' | 'reviewed';
 }
 
 export interface Checkpoint {
   id: string;
-  name: string;
+  title?: string;
+  name?: string;
   description: string;
-  requirements: string[];
-  startTime: string;
+  requirements?: string[];
+  startTime?: string;
   deadline: string;
-  points: number;
+  weight?: number;
+  points?: number;
   penaltyPerDay?: number;
-  status: 'upcoming' | 'open' | 'closed';
+  status?: 'upcoming' | 'open' | 'closed';
   blockConsecutiveMissing?: boolean;
 }
 
@@ -108,8 +123,8 @@ export interface FinalSubmission {
   summary: string;
   commitSha: string;
   submittedAt: string;
-  isLate: boolean;
-  status: 'submitted' | 'scored';
+  isLate?: boolean;
+  status?: 'submitted' | 'scored';
 }
 
 export interface RubricCriteria {
@@ -117,8 +132,8 @@ export interface RubricCriteria {
   name: string;
   description: string;
   maxScore: number;
-  weight: number; // Percentage, sum of all weights must be 100
-  displayOrder: number;
+  weight: number;
+  displayOrder?: number;
 }
 
 export interface EvaluationDetail {
@@ -132,11 +147,20 @@ export interface TeamEvaluation {
   teamId: string;
   judgeId: string;
   judgeName: string;
-  totalScore: number; // weighted sum
+  totalScore: number;
+  scores?: Record<string, number>;
   generalComment: string;
   isDraft: boolean;
   confirmedAt?: string;
-  details: EvaluationDetail[];
+  details?: EvaluationDetail[];
+}
+
+export interface TicketReply {
+  id: string;
+  authorName: string;
+  authorRole: string;
+  content: string;
+  createdAt: string;
 }
 
 export interface TicketMessage {
@@ -150,61 +174,74 @@ export interface TicketMessage {
 
 export interface SupportTicket {
   id: string;
-  ticketCode: string; // e.g. TK-01
+  ticketCode?: string;
   teamId: string;
   teamName: string;
-  senderId: string;
-  senderName: string;
+  creatorId?: string;
+  creatorName?: string;
+  senderId?: string;
+  senderName?: string;
   title: string;
   description: string;
   priority: 'high' | 'medium' | 'low';
-  status: 'open' | 'in_progress' | 'resolved';
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  assignedMentorId?: string;
+  assignedMentorName?: string;
   mentorId?: string;
   mentorName?: string;
   createdAt: string;
-  updatedAt: string;
-  messages: TicketMessage[];
+  updatedAt?: string;
+  replies?: TicketReply[];
+  messages?: TicketMessage[];
 }
 
 export interface WhitelistEntry {
   id: string;
   email: string;
-  note: string;
+  note?: string;
   isActive: boolean;
-  createdAt: string;
+  addedAt?: string;
+  createdAt?: string;
 }
 
 export interface Announcement {
   id: string;
   title: string;
   content: string;
-  author: string;
-  publishedAt: string;
-  isPinned: boolean;
+  sender?: string;
+  author?: string;
+  targetRole?: 'all' | 'candidates' | 'judges' | 'mentors';
+  createdAt?: string;
+  publishedAt?: string;
+  isPinned?: boolean;
 }
 
 export interface HackathonConfig {
   name: string;
-  description: string;
-  logoUrl: string;
-  bannerUrl: string;
-  rules: string;
-  prizes: Array<{ rank: string; reward: string; description?: string }>;
-  channels: {
+  currentPhase: string;
+  finalSubmissionDeadline: string;
+  maxTeamMembers: number;
+  blindJudgingMode?: boolean;
+  blindJudging?: boolean;
+  resultsPublished: boolean;
+  description?: string;
+  logoUrl?: string;
+  bannerUrl?: string;
+  rules?: string;
+  prizes?: Array<{ rank: string; reward: string; description?: string }>;
+  channels?: {
     fanpage?: string;
     discord?: string;
     email?: string;
   };
-  minTeamSize: number;
-  maxTeamSize: number;
-  blindJudging: boolean;
-  resultsPublished: boolean;
-  ticketsEnabled: boolean;
-  registrationStart: string;
-  registrationEnd: string;
-  contestStart: string;
-  contestEnd: string;
-  topicSelectionDeadline: string;
+  minTeamSize?: number;
+  maxTeamSize?: number;
+  ticketsEnabled?: boolean;
+  registrationStart?: string;
+  registrationEnd?: string;
+  contestStart?: string;
+  contestEnd?: string;
+  topicSelectionDeadline?: string;
 }
 
 export interface ApiResponse<T> {

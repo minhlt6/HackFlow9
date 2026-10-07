@@ -268,14 +268,20 @@ export const CandidateTeamsPage: React.FC = () => {
                             {isLeader && !isLeaderOfTeam && (
                               <div className="flex items-center justify-end gap-2">
                                 <button
-                                  onClick={() => handleTransfer(m.id)}
+                                  onClick={() => {
+                                    const memberId = m.id || m.userId;
+                                    if (memberId) handleTransfer(memberId);
+                                  }}
                                   className="p-1.5 rounded-md hover:bg-[#334155] text-amber-300 hover:text-amber-200 transition-colors"
                                   title="Chuyển giao quyền Đội Trưởng"
                                 >
                                   <Crown size={15} />
                                 </button>
                                 <button
-                                  onClick={() => handleRemove(m.id)}
+                                  onClick={() => {
+                                    const memberId = m.id || m.userId;
+                                    if (memberId) handleRemove(memberId);
+                                  }}
                                   className="p-1.5 rounded-md hover:bg-[#334155] text-rose-400 hover:text-rose-300 transition-colors"
                                   title="Xóa thành viên"
                                 >

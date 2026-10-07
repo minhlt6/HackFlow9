@@ -102,6 +102,7 @@ interface MockStoreState {
   // Announcements
   announcements: Announcement[];
   addAnnouncement: (title: string, content: string, isPinned?: boolean) => void;
+  broadcastAnnouncement: (title: string, content: string, targetRole?: any) => void;
 
   // Reset
   resetAllMockData: () => void;
@@ -166,6 +167,7 @@ export const useMockStore = create<MockStoreState>()(
           email: cleaned,
           note,
           isActive: true,
+          addedAt: new Date().toISOString().split('T')[0],
           createdAt: new Date().toISOString().split('T')[0],
         };
 
@@ -188,6 +190,7 @@ export const useMockStore = create<MockStoreState>()(
               email,
               note,
               isActive: true,
+              addedAt: dateStr,
               createdAt: dateStr,
             });
           }
@@ -263,9 +266,11 @@ export const useMockStore = create<MockStoreState>()(
           createdAt: new Date().toISOString().split('T')[0],
           members: [
             {
+              id: user.id,
               userId: user.id,
               fullName: user.fullName,
               email: user.email,
+              role: 'leader',
               roleInTeam: 'leader',
               studentId: user.studentId,
               school: user.school,
@@ -307,9 +312,11 @@ export const useMockStore = create<MockStoreState>()(
         const updatedMembers = [
           ...team.members,
           {
+            id: user.id,
             userId: user.id,
             fullName: user.fullName,
             email: user.email,
+            role: 'member' as const,
             roleInTeam: 'member' as const,
             studentId: user.studentId,
             school: user.school,
@@ -458,19 +465,25 @@ export const useMockStore = create<MockStoreState>()(
         const updatedMajors = get().majorTopics.map((major) => ({
           ...major,
           subTopics: major.subTopics.map((sub) => {
+            const curTeams = sub.currentTeams ?? sub.registeredTeamsCount ?? 0;
+            const maxQuota = sub.maxTeamsQuota ?? sub.quota ?? 3;
+
             if (sub.id === oldTopicId && oldTopicId !== subTopicId) {
-              return {
-                ...sub,
-                currentTeams: Math.max(0, sub.currentTeams - 1),
-                status: (sub.currentTeams - 1 < sub.maxTeamsQuota ? 'OPEN' : 'CLOSED') as any,
-              };
-            }
-            if (sub.id === subTopicId) {
-              const newCount = sub.currentTeams + 1;
+              const newCount = Math.max(0, curTeams - 1);
               return {
                 ...sub,
                 currentTeams: newCount,
-                status: (newCount >= sub.maxTeamsQuota ? 'CLOSED' : 'OPEN') as any,
+                registeredTeamsCount: newCount,
+                status: (newCount < maxQuota ? 'OPEN' : 'CLOSED') as any,
+              };
+            }
+            if (sub.id === subTopicId) {
+              const newCount = curTeams + 1;
+              return {
+                ...sub,
+                currentTeams: newCount,
+                registeredTeamsCount: newCount,
+                status: (newCount >= maxQuota ? 'CLOSED' : 'OPEN') as any,
               };
             }
             return sub;
@@ -494,10 +507,12 @@ export const useMockStore = create<MockStoreState>()(
           ...major,
           subTopics: major.subTopics.map((sub) => {
             if (sub.id === oldTopicId) {
-              const newCount = Math.max(0, sub.currentTeams - 1);
+              const curTeams = sub.currentTeams ?? sub.registeredTeamsCount ?? 0;
+              const newCount = Math.max(0, curTeams - 1);
               return {
                 ...sub,
                 currentTeams: newCount,
+                registeredTeamsCount: newCount,
                 status: 'OPEN' as any,
               };
             }
@@ -529,6 +544,8 @@ export const useMockStore = create<MockStoreState>()(
                       description: newSub.description,
                       maxTeamsQuota: newSub.quota,
                       currentTeams: 0,
+                      quota: newSub.quota,
+                      registeredTeamsCount: 0,
                       mentorName: newSub.mentorName || 'TS. Ban Cố Vấn',
                       status: 'OPEN',
                     },
@@ -543,15 +560,18 @@ export const useMockStore = create<MockStoreState>()(
         set((state) => ({
           majorTopics: state.majorTopics.map((m) => ({
             ...m,
-            subTopics: m.subTopics.map((s) =>
-              s.id === subTopicId
-                ? {
-                    ...s,
-                    maxTeamsQuota: newQuota,
-                    status: s.currentTeams >= newQuota ? 'CLOSED' : 'OPEN',
-                  }
-                : s
-            ),
+            subTopics: m.subTopics.map((s) => {
+              if (s.id === subTopicId) {
+                const cur = s.currentTeams ?? s.registeredTeamsCount ?? 0;
+                return {
+                  ...s,
+                  maxTeamsQuota: newQuota,
+                  quota: newQuota,
+                  status: (cur >= newQuota ? 'CLOSED' : 'OPEN') as any,
+                };
+              }
+              return s;
+            }),
           })),
         }));
       },
@@ -670,6 +690,7 @@ export const useMockStore = create<MockStoreState>()(
           judgeId,
           judgeName,
           totalScore,
+          scores: scoresMap,
           generalComment,
           isDraft,
           confirmedAt: isDraft ? undefined : new Date().toISOString(),
@@ -697,6 +718,8 @@ export const useMockStore = create<MockStoreState>()(
           ticketCode,
           teamId: team.id,
           teamName: team.name,
+          creatorId: user.id,
+          creatorName: user.fullName,
           senderId: user.id,
           senderName: user.fullName,
           title,
@@ -705,6 +728,7 @@ export const useMockStore = create<MockStoreState>()(
           status: 'open',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
+          replies: [],
           messages: [
             {
               id: `msg-${Date.now()}`,
@@ -731,6 +755,8 @@ export const useMockStore = create<MockStoreState>()(
                   status: 'in_progress',
                   mentorId: mentor.id,
                   mentorName: mentor.fullName,
+                  assignedMentorId: mentor.id,
+                  assignedMentorName: mentor.fullName,
                   updatedAt: new Date().toISOString(),
                 }
               : t
@@ -748,6 +774,13 @@ export const useMockStore = create<MockStoreState>()(
           content,
           sentAt: new Date().toISOString(),
         };
+        const newReply = {
+          id: `rep-${Date.now()}`,
+          authorName: user.fullName,
+          authorRole: user.role,
+          content,
+          createdAt: new Date().toLocaleTimeString('vi-VN'),
+        };
 
         set((state) => ({
           tickets: state.tickets.map((t) =>
@@ -755,7 +788,8 @@ export const useMockStore = create<MockStoreState>()(
               ? {
                   ...t,
                   updatedAt: new Date().toISOString(),
-                  messages: [...t.messages, newMsg],
+                  messages: [...(t.messages || []), newMsg],
+                  replies: [...(t.replies || []), newReply],
                 }
               : t
           ),
@@ -785,9 +819,26 @@ export const useMockStore = create<MockStoreState>()(
           id: `ann-${Date.now()}`,
           title,
           content,
+          sender: get().currentUser.fullName,
           author: get().currentUser.fullName,
+          createdAt: new Date().toLocaleTimeString('vi-VN') + ' - ' + new Date().toLocaleDateString('vi-VN'),
           publishedAt: new Date().toISOString(),
           isPinned,
+        };
+        set((state) => ({ announcements: [newAnn, ...state.announcements] }));
+      },
+
+      broadcastAnnouncement: (title, content, targetRole = 'all') => {
+        const newAnn: Announcement = {
+          id: `ann-${Date.now()}`,
+          title,
+          content,
+          sender: get().currentUser.fullName,
+          author: get().currentUser.fullName,
+          targetRole,
+          createdAt: new Date().toLocaleTimeString('vi-VN') + ' - ' + new Date().toLocaleDateString('vi-VN'),
+          publishedAt: new Date().toISOString(),
+          isPinned: false,
         };
         set((state) => ({ announcements: [newAnn, ...state.announcements] }));
       },
