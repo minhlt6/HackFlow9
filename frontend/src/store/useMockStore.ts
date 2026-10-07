@@ -1064,7 +1064,7 @@ export const useMockStore = create<MockStoreState>()(
       },
     }),
     {
-      name: 'hackflow-clean-config-v1', // Ground zero clean state for admin configuration
+      name: 'hackflow-full-setup-v2', // Full contest setup mock data
     }
   )
 );

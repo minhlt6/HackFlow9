@@ -31,7 +31,32 @@ export const AdminMentorsJudgesPage: React.FC = () => {
     specialization: string;
     assignedCount: number;
     avatar: string;
-  }>>([]);
+  }>>([
+    {
+      id: 'judge-1',
+      name: 'PGS. TS. Trần Giám Khảo',
+      email: 'judge.tech@hackathon.org',
+      specialization: 'AI Architecture & Production Readiness (Trưởng ban)',
+      assignedCount: 3,
+      avatar: 'T',
+    },
+    {
+      id: 'judge-2',
+      name: 'GS. TS. Alan Vance',
+      email: 'alan.vance@techuniv.edu.vn',
+      specialization: 'Trí tuệ nhân tạo & Khoa học dữ liệu',
+      assignedCount: 3,
+      avatar: 'A',
+    },
+    {
+      id: 'judge-3',
+      name: 'Dr. Sarah Connor',
+      email: 'sarah.connor@mit.edu',
+      specialization: 'Cybersecurity & Ethical AI',
+      assignedCount: 3,
+      avatar: 'S',
+    },
+  ]);
 
   const [mentors, setMentors] = useState<Array<{
     id: string;
@@ -40,7 +65,40 @@ export const AdminMentorsJudgesPage: React.FC = () => {
     topic: string;
     openTickets: number;
     avatar: string;
-  }>>([]);
+  }>>([
+    {
+      id: 'mentor-1',
+      name: 'TS. Nguyễn Văn Hướng Dẫn',
+      email: 'mentor.ai@ailab.org.vn',
+      topic: 'AI trong Y tế & LLM RAG',
+      openTickets: 1,
+      avatar: 'N',
+    },
+    {
+      id: 'mentor-2',
+      name: 'ThS. Trần Thị Thông Minh',
+      email: 'thongminh.tran@iotlab.org',
+      topic: 'Đô thị Thông minh & IoT Xanh',
+      openTickets: 1,
+      avatar: 'T',
+    },
+    {
+      id: 'mentor-3',
+      name: 'Kỹ sư Lê Bảo Mật',
+      email: 'baomat.le@fintech.io',
+      topic: 'Công nghệ Tài chính & Blockchain',
+      openTickets: 0,
+      avatar: 'L',
+    },
+    {
+      id: 'mentor-4',
+      name: 'Bác sĩ Vũ Trí Tuệ',
+      email: 'tritue.vu@medtech.vn',
+      topic: 'Y tế & Chăm sóc Sức khỏe',
+      openTickets: 0,
+      avatar: 'V',
+    },
+  ]);
 
   const handleDeleteJudge = (id: string, judgeName: string) => {
     if (window.confirm(`Xác nhận xóa giám khảo "${judgeName}"?`)) {
