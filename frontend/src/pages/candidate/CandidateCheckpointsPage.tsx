@@ -499,7 +499,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
         isOpen={Boolean(selectedCpId)}
         onClose={() => setSelectedCpId(null)}
         title={`Nộp Bài: ${selectedCheckpoint?.title || ''}`}
-        maxWidth="2xl"
+        maxWidth="3xl"
       >
         {submitResult ? (
           <div className="space-y-4 text-center py-4">
@@ -691,7 +691,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
               </span>
             </label>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-[#334155]">
+            <div className="sticky bottom-0 bg-[#1E293B]/95 backdrop-blur-sm -mx-6 -mb-6 px-6 py-4 border-t border-[#334155] flex justify-end gap-3 z-10 rounded-b-[16px]">
               <Button variant="ghost" type="button" onClick={() => setSelectedCpId(null)}>
                 Hủy
               </Button>
