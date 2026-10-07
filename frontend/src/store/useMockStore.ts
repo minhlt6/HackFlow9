@@ -86,7 +86,14 @@ interface MockStoreState {
   // Rubrics & Evaluations
   rubricCriteria: RubricCriteria[];
   evaluations: TeamEvaluation[];
-  addRubricCriterion: (name: string, description: string, maxScore: number, weight: number) => void;
+  addRubricCriterion: (
+    name: string,
+    description: string,
+    maxScore: number,
+    weight: number,
+    rebalanceMode?: 'none' | 'proportional' | 'equal'
+  ) => void;
+  rebalanceRubricWeights: (mode: 'equal' | 'proportional') => void;
   updateRubricCriterion: (id: string, updates: Partial<RubricCriteria>) => void;
   deleteRubricCriterion: (id: string) => void;
   saveEvaluation: (teamId: string, judgeId: string, judgeName: string, scores: Record<string, number>, generalComment: string, isDraft: boolean) => void;
@@ -647,16 +654,114 @@ export const useMockStore = create<MockStoreState>()(
       rubricCriteria: initialRubricCriteria,
       evaluations: initialEvaluations,
 
-      addRubricCriterion: (name, description, maxScore, weight) => {
+      addRubricCriterion: (name, description, maxScore, weight, rebalanceMode = 'none') => {
+        const existing = get().rubricCriteria;
         const newCrit: RubricCriteria = {
           id: `crit-${Date.now()}`,
           name,
           description,
           maxScore,
           weight,
-          displayOrder: get().rubricCriteria.length + 1,
+          displayOrder: existing.length + 1,
         };
+
+        if (rebalanceMode === 'equal') {
+          const all = [...existing, newCrit];
+          const n = all.length;
+          const base = Math.floor(100 / n);
+          const remainder = 100 - base * n;
+          const updated = all.map((c, idx) => ({
+            ...c,
+            weight: idx < remainder ? base + 1 : base,
+          }));
+          set({ rubricCriteria: updated });
+          return;
+        }
+
+        if (rebalanceMode === 'proportional' && existing.length > 0) {
+          const clampedWeight = Math.min(100, Math.max(1, weight));
+          newCrit.weight = clampedWeight;
+          const remainingTarget = Math.max(0, 100 - clampedWeight);
+          const currentSum = existing.reduce((sum, c) => sum + c.weight, 0);
+
+          let updatedExisting: RubricCriteria[] = [];
+          if (currentSum === 0 || remainingTarget === 0) {
+            updatedExisting = existing.map((c) => ({ ...c, weight: 0 }));
+          } else {
+            const rawWeights = existing.map((c) => (c.weight / currentSum) * remainingTarget);
+            const floored = rawWeights.map((w) => Math.floor(w));
+            const allocated = floored.reduce((a, b) => a + b, 0);
+            const remainder = remainingTarget - allocated;
+
+            const fractions = rawWeights.map((w, idx) => ({
+              idx,
+              fraction: w - floored[idx],
+            }));
+            fractions.sort((a, b) => b.fraction - a.fraction);
+
+            const finalWeights = [...floored];
+            for (let i = 0; i < remainder; i++) {
+              finalWeights[fractions[i].idx] += 1;
+            }
+
+            updatedExisting = existing.map((c, idx) => ({
+              ...c,
+              weight: Math.max(1, finalWeights[idx]),
+            }));
+          }
+
+          set({ rubricCriteria: [...updatedExisting, newCrit] });
+          return;
+        }
+
+        // Default 'none': append directly
         set((state) => ({ rubricCriteria: [...state.rubricCriteria, newCrit] }));
+      },
+
+      rebalanceRubricWeights: (mode: 'equal' | 'proportional') => {
+        const criteria = get().rubricCriteria;
+        const n = criteria.length;
+        if (n === 0) return;
+
+        if (mode === 'equal') {
+          const base = Math.floor(100 / n);
+          const remainder = 100 - base * n;
+          const updated = criteria.map((c, idx) => ({
+            ...c,
+            weight: idx < remainder ? base + 1 : base,
+          }));
+          set({ rubricCriteria: updated });
+          return;
+        }
+
+        // Proportional normalization to exactly 100%
+        const currentSum = criteria.reduce((sum, c) => sum + c.weight, 0);
+        if (currentSum === 0) {
+          get().rebalanceRubricWeights('equal');
+          return;
+        }
+
+        const rawWeights = criteria.map((c) => (c.weight / currentSum) * 100);
+        const floored = rawWeights.map((w) => Math.floor(w));
+        const allocated = floored.reduce((a, b) => a + b, 0);
+        const remainder = 100 - allocated;
+
+        const fractions = rawWeights.map((w, idx) => ({
+          idx,
+          fraction: w - floored[idx],
+        }));
+        fractions.sort((a, b) => b.fraction - a.fraction);
+
+        const finalWeights = [...floored];
+        for (let i = 0; i < remainder; i++) {
+          finalWeights[fractions[i].idx] += 1;
+        }
+
+        const updated = criteria.map((c, idx) => ({
+          ...c,
+          weight: Math.max(1, finalWeights[idx]),
+        }));
+        set({ rubricCriteria: updated });
       },
 
       updateRubricCriterion: (id, updates) => {
