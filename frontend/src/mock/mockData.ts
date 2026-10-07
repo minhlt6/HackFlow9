@@ -17,7 +17,7 @@ export const mockUsers: Record<string, User> = {
   admin: {
     id: 'user-admin-1',
     email: 'admin@hackflow.dev',
-    fullName: 'Lê Hoàng Admin',
+    fullName: 'Quản trị viên (Admin)',
     role: 'admin',
     approvalStatus: 'approved',
     avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150',
@@ -26,7 +26,7 @@ export const mockUsers: Record<string, User> = {
   leader: {
     id: 'user-leader-1',
     email: 'leader@cybersamurai.team',
-    fullName: 'Nguyễn Văn Minh',
+    fullName: 'Thí sinh (Đội trưởng)',
     role: 'candidate',
     approvalStatus: 'approved',
     studentId: '20210001',
@@ -40,7 +40,7 @@ export const mockUsers: Record<string, User> = {
   member: {
     id: 'user-member-2',
     email: 'member@cybersamurai.team',
-    fullName: 'Trần Thị Thảo',
+    fullName: 'Thí sinh (Thành viên)',
     role: 'candidate',
     approvalStatus: 'approved',
     studentId: '20210002',
@@ -54,7 +54,7 @@ export const mockUsers: Record<string, User> = {
   pending: {
     id: 'user-pending-1',
     email: 'newbie.candidate@hust.edu.vn',
-    fullName: 'Đặng Tuấn Anh (Chờ duyệt)',
+    fullName: 'Thí sinh (Chờ duyệt)',
     role: 'candidate',
     approvalStatus: 'pending',
     studentId: '20224567',
@@ -66,30 +66,30 @@ export const mockUsers: Record<string, User> = {
   rejected: {
     id: 'user-rejected-1',
     email: 'spammer@random.com',
-    fullName: 'Vũ Hoàng Nam (Bị từ chối)',
+    fullName: 'Thí sinh (Bị từ chối)',
     role: 'candidate',
     approvalStatus: 'rejected',
     studentId: '99999999',
     school: 'Không xác định',
-    rejectionReason: 'Email không thuộc danh sách sinh viên hợp lệ và thông tin MSSV không tồn tại trong hệ thống đào tạo.',
+    rejectionReason: 'Email không thuộc danh sách sinh viên hợp lệ.',
     avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150',
   },
   mentor: {
     id: 'user-mentor-1',
     email: 'mentor.ai@ailab.org.vn',
-    fullName: 'TS. Nguyễn Văn Hướng Dẫn',
+    fullName: 'Cố vấn chuyên môn',
     role: 'mentor',
     approvalStatus: 'approved',
-    organization: 'Viện Nghiên cứu Trí tuệ Nhân tạo Quốc Gia (AILab)',
-    position: 'Senior AI Research Scientist',
+    organization: 'Viện Nghiên cứu Trí tuệ Nhân tạo Quốc Gia',
+    position: 'Senior Research Scientist',
     specialty: 'Computer Vision, Generative AI, LLM & RAG',
-    bio: 'Tiến sĩ Khoa học Máy tính tại NUS, hơn 8 năm nghiên cứu và triển khai các hệ thống Deep Learning quy mô lớn.',
+    bio: 'Tiến sĩ Khoa học Máy tính, cố vấn kỹ thuật giải đấu.',
     avatarUrl: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150',
   },
   judge: {
     id: 'user-judge-1',
     email: 'judge.tech@hackathon.org',
-    fullName: 'PGS. TS. Trần Giám Khảo',
+    fullName: 'Giám khảo Hội đồng',
     role: 'judge',
     approvalStatus: 'approved',
     organization: 'Đại học Bách Khoa Hà Nội & Viện Công nghệ Tiên tiến',
@@ -100,348 +100,43 @@ export const mockUsers: Record<string, User> = {
 };
 
 export const initialHackathonConfig: HackathonConfig = {
-  name: 'HackFlow AI & DeepTech Hackathon 2026',
-  description: 'Sân chơi sáng tạo công nghệ trí tuệ nhân tạo và hệ thống thông minh đột phá dành cho sinh viên xuất sắc toàn quốc.',
+  name: 'HackFlow Hackathon 2026',
+  description: 'Cuộc thi lập trình và sáng tạo công nghệ.',
   logoUrl: '/hackflow-logo.svg',
   bannerUrl: '/login-background.png',
-  rules: '1. Mỗi đội thi có từ 3 đến 5 thành viên.\n2. Mỗi đề tài con có giới hạn số lượng đội tối đa.\n3. Mã commit SHA được hệ thống đóng băng tự động tại thời điểm kết thúc hạn nộp.\n4. Đội không nộp 2 chặng liên tiếp sẽ bị truất quyền thi đấu.',
-  prizes: [
-    { rank: 'Giải Nhất', reward: '100,000,000 VNĐ', description: 'Cúp vàng + Chuyến tham quan Trung tâm Đổi mới Sáng tạo Quốc gia (NIC)' },
-    { rank: 'Giải Nhì', reward: '50,000,000 VNĐ', description: 'Cúp bạc + Học bổng chuyên sâu Deep Learning' },
-    { rank: 'Giải Ba', reward: '25,000,000 VNĐ', description: 'Cúp đồng + Giấy chứng nhận xuất sắc từ BTC' },
-    { rank: 'Giải Khuyến khích', reward: '10,000,000 VNĐ', description: 'Giấy chứng nhận + Quà lưu niệm độc quyền' },
-  ],
+  rules: '',
+  prizes: [],
   channels: {
-    fanpage: 'https://facebook.com/hackflow.national',
-    discord: 'https://discord.gg/hackflow-hackathon-2026',
-    email: 'btc@hackflow.dev',
+    fanpage: '',
+    discord: '',
+    email: '',
   },
   minTeamSize: 3,
   maxTeamSize: 5,
   maxTeamMembers: 4,
-  currentPhase: 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi',
-  finalSubmissionDeadline: '2026-11-15T23:59:59Z',
+  currentPhase: 'Giai đoạn 1: Mở đăng ký & Lập đội',
+  finalSubmissionDeadline: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   blindJudging: true,
   blindJudgingMode: false,
   resultsPublished: false,
   ticketsEnabled: true,
-  registrationStart: '2026-10-01T00:00:00Z',
-  registrationEnd: '2026-10-25T23:59:59Z',
-  topicSelectionDeadline: '2026-10-28T23:59:59Z',
-  contestStart: '2026-11-01T08:00:00Z',
-  contestEnd: '2026-11-20T23:59:59Z',
+  registrationStart: new Date().toISOString(),
+  registrationEnd: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+  topicSelectionDeadline: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+  contestStart: new Date().toISOString(),
+  contestEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
   isContestStarted: false,
 };
 
-export const initialWhitelist: WhitelistEntry[] = [
-  { id: 'wl-1', email: 'leader@cybersamurai.team', note: 'Sinh viên HUST - Top 1 Vòng hồ sơ', isActive: true, createdAt: '2026-10-02' },
-  { id: 'wl-2', email: 'member@cybersamurai.team', note: 'Sinh viên HUST - Thành viên CyberSamurai', isActive: true, createdAt: '2026-10-02' },
-  { id: 'wl-3', email: 'member3@cybersamurai.team', note: 'Sinh viên HUST - Thành viên CyberSamurai', isActive: true, createdAt: '2026-10-02' },
-  { id: 'wl-4', email: 'neural.leader@uet.vnu.edu.vn', note: 'Sinh viên ĐH Công Nghệ - Nhóm NeuralCrafters', isActive: true, createdAt: '2026-10-03' },
-  { id: 'wl-5', email: 'vision.lead@uit.edu.vn', note: 'Sinh viên UIT - Nhóm VisionX', isActive: true, createdAt: '2026-10-04' },
-  { id: 'wl-6', email: 'fintech.lead@ftu.edu.vn', note: 'Sinh viên FTU - Nhóm QuantumEdge', isActive: true, createdAt: '2026-10-05' },
-];
-
-export const initialPendingCandidates: User[] = [
-  {
-    id: 'user-pending-1',
-    email: 'newbie.candidate@hust.edu.vn',
-    fullName: 'Đặng Tuấn Anh (Chờ duyệt)',
-    role: 'candidate',
-    approvalStatus: 'pending',
-    studentId: '20224567',
-    school: 'ĐH Bách Khoa Hà Nội (HUST)',
-    phone: '0934567890',
-    skills: ['Python', 'PyTorch', 'Data Analysis'],
-  },
-  {
-    id: 'user-pending-2',
-    email: 'le.thi.mai@vnu.edu.vn',
-    fullName: 'Lê Thị Mai',
-    role: 'candidate',
-    approvalStatus: 'pending',
-    studentId: '21020456',
-    school: 'ĐH Công nghệ - ĐHQGHN (UET)',
-    phone: '0978123456',
-    skills: ['Golang', 'Docker', 'Kubernetes'],
-  },
-  {
-    id: 'user-pending-3',
-    email: 'tran.minh.tri@fpt.edu.vn',
-    fullName: 'Trần Minh Trí',
-    role: 'candidate',
-    approvalStatus: 'pending',
-    studentId: 'SE160982',
-    school: 'Đại học FPT Cần Thơ',
-    phone: '0966789012',
-    skills: ['React Native', 'Flutter', 'FastAPI'],
-  },
-];
-
-export const initialMajorTopics: MajorTopic[] = [
-  {
-    id: 'major-ai',
-    title: 'Trí tuệ nhân tạo (AI & Data Science)',
-    domain: 'Trí tuệ nhân tạo (AI & Data Science)',
-    description: 'Nghiên cứu ứng dụng thị giác máy tính, xử lý ngôn ngữ tự nhiên và mô hình tạo sinh trong cuộc sống.',
-    mentorIds: ['user-mentor-1'],
-    subTopics: [
-      {
-        id: 'sub-ai-01',
-        majorTopicId: 'major-ai',
-        title: 'Tối ưu hóa LLM & RAG cho Y tế và Tra cứu Hồ sơ Bệnh án',
-        description: 'Xây dựng pipeline RAG độ trễ thấp trích xuất thông tin bệnh án từ dữ liệu phi cấu trúc kết hợp xác thực nguồn trích dẫn y khoa.',
-        requirements: 'Độ chính xác RAG > 85%, độ trễ < 1.5s, hỗ trợ trích dẫn nguồn văn bản y khoa chính xác.',
-        sampleDataUrl: 'https://dataset.hackflow.dev/medical-rag-sample.zip',
-        referenceDocsUrl: 'https://docs.hackflow.dev/specs/topic-ai-01.pdf',
-        maxTeamsQuota: 3,
-        currentTeams: 0,
-        mentorId: 'user-mentor-1',
-        mentorName: 'TS. Nguyễn Văn Hướng Dẫn',
-        status: 'OPEN',
-      },
-      {
-        id: 'sub-ai-02',
-        majorTopicId: 'major-ai',
-        title: 'Hệ thống Vision AI Phát hiện Sự cố Giao thông Thời gian thực trên Edge',
-        description: 'Phát hiện tai nạn, tắc nghẽn và vi phạm tốc độ từ luồng video camera giao thông chạy trên thiết bị biên nhúng (Nvidia Jetson).',
-        requirements: 'Tốc độ xử lý tối thiểu 25 FPS trên Jetson Orin Nano, độ chính xác phát hiện > 90%.',
-        sampleDataUrl: 'https://dataset.hackflow.dev/traffic-vision-edge.zip',
-        referenceDocsUrl: 'https://docs.hackflow.dev/specs/topic-ai-02.pdf',
-        maxTeamsQuota: 2,
-        currentTeams: 0,
-        mentorId: 'user-mentor-1',
-        mentorName: 'TS. Nguyễn Văn Hướng Dẫn',
-        status: 'OPEN',
-      },
-      {
-        id: 'sub-ai-03',
-        majorTopicId: 'major-ai',
-        title: 'Trợ lý Ảo Đa phương thức Hỗ trợ Người cao tuổi',
-        description: 'Trợ lý tương tác bằng giọng nói tiếng Việt kết hợp nhận diện cảm xúc khuôn mặt để nhắc nhở uống thuốc và kết nối khẩn cấp.',
-        requirements: 'Độ trễ Speech-to-Speech < 800ms, hỗ trợ nhận dạng ngữ âm tiếng Việt đa vùng miền.',
-        maxTeamsQuota: 2,
-        currentTeams: 0,
-        mentorId: 'user-mentor-1',
-        mentorName: 'TS. Nguyễn Văn Hướng Dẫn',
-        status: 'OPEN',
-      },
-    ],
-  },
-  {
-    id: 'major-iot',
-    title: 'Đô thị Thông minh & IoT',
-    domain: 'Đô thị Thông minh & IoT',
-    description: 'Hệ thống kết nối vạn vật, cảm biến thông minh và giải pháp đô thị xanh phát thải ròng bằng 0.',
-    mentorIds: ['user-mentor-2'],
-    subTopics: [
-      {
-        id: 'sub-iot-01',
-        majorTopicId: 'major-iot',
-        title: 'Quản lý Năng lượng Đô thị và Trạm sạc Xe điện thông minh bằng IoT Edge',
-        description: 'Tối ưu hóa tải điện lưới đô thị khi hàng loạt xe điện sạc đồng thời vào giờ cao điểm bằng thuật toán phân bổ tải thông minh.',
-        requirements: 'Thu thập telemetry từ 500 trạm sạc với chu kỳ 1s, cân bằng tải tự động giảm quá tải lưới.',
-        maxTeamsQuota: 3,
-        currentTeams: 0,
-        mentorName: 'ThS. Trần Thị Thông Minh',
-        status: 'OPEN',
-      },
-      {
-        id: 'sub-iot-02',
-        majorTopicId: 'major-iot',
-        title: 'Mạng lưới Cảm biến LoRaWAN Giám sát Chất lượng Không khí và Cảnh báo Lũ',
-        description: 'Mạng cảm biến tiêu thụ năng lượng cực thấp truyền tin xa cảnh báo ngập lụt sớm tại các đô thị trũng.',
-        requirements: 'Thời lượng pin node cảm biến > 12 tháng, cự ly truyền > 5km trong điều kiện đô thị.',
-        maxTeamsQuota: 2,
-        currentTeams: 0,
-        mentorName: 'ThS. Trần Thị Thông Minh',
-        status: 'OPEN',
-      },
-    ],
-  },
-  {
-    id: 'major-fintech',
-    title: 'Công nghệ Tài chính & Blockchain',
-    domain: 'Công nghệ Tài chính & Blockchain',
-    description: 'Thanh toán bảo mật cao, định danh số phi tập trung và hợp đồng thông minh.',
-    mentorIds: ['user-mentor-3'],
-    subTopics: [
-      {
-        id: 'sub-fin-01',
-        majorTopicId: 'major-fintech',
-        title: 'Hệ thống Thanh toán Vi mô Xuyên biên giới trên Layer 2',
-        description: 'Xử lý thanh toán tức thì với chi phí giao dịch siêu thấp cho thương mại điện tử quốc tế.',
-        requirements: 'Thông lượng TPS > 2000 giao dịch/giây, chi phí mỗi giao dịch < 0.001 USD.',
-        maxTeamsQuota: 2,
-        currentTeams: 0,
-        mentorName: 'Kỹ sư Lê Bảo Mật',
-        status: 'OPEN',
-      },
-    ],
-  },
-  {
-    id: 'major-health',
-    title: 'Y tế & Chăm sóc Sức khỏe',
-    domain: 'Y tế & Chăm sóc Sức khỏe',
-    description: 'Ứng dụng công nghệ xử lý tín hiệu sinh học, chẩn đoán từ xa và hồ sơ bệnh án điện tử.',
-    mentorIds: ['user-mentor-4'],
-    subTopics: [
-      {
-        id: 'sub-hlt-01',
-        majorTopicId: 'major-health',
-        title: 'Phân tích Điện tâm đồ (ECG) Tự động Cảnh báo Rung nhĩ Bằng Wearable Device',
-        description: 'Thuật toán AI phát hiện sớm các bất thường nhịp tim nguy hiểm tính mạng từ dữ liệu đồng hồ thông minh.',
-        requirements: 'Độ nhạy > 95%, độ đặc hiệu > 98%.',
-        maxTeamsQuota: 3,
-        currentTeams: 0,
-        mentorName: 'Bác sĩ Vũ Trí Tuệ',
-        status: 'OPEN',
-      },
-    ],
-  },
-];
-
-export const initialTeams: Team[] = [
-  {
-    id: 'team-demo',
-    name: 'TechTitans',
-    description: 'Đội thi mẫu ứng dụng AI trong đô thị thông minh. Đang tuyển thành viên chuyên Frontend và AI.',
-    inviteCode: 'HF2026',
-    leaderId: 'user-sample-leader',
-    topicId: undefined,
-    status: 'INCOMPLETE',
-    memberCount: 2,
-    createdAt: '2026-10-01',
-    members: [
-      {
-        userId: 'user-sample-leader',
-        fullName: 'Ngô Quốc Anh',
-        email: 'quocanh.ngo@hust.edu.vn',
-        roleInTeam: 'leader',
-        studentId: '20215501',
-        school: 'Đại học Bách Khoa Hà Nội',
-        skills: ['Python', 'PyTorch', 'Docker'],
-        joinedAt: '2026-10-01',
-      },
-      {
-        userId: 'user-sample-m1',
-        fullName: 'Đỗ Hải Đăng',
-        email: 'haidang.do@hust.edu.vn',
-        roleInTeam: 'member',
-        studentId: '20215502',
-        school: 'Đại học Bách Khoa Hà Nội',
-        skills: ['FastAPI', 'PostgreSQL'],
-        joinedAt: '2026-10-02',
-      },
-    ],
-  },
-];
-
-export const initialCheckpoints: Checkpoint[] = [
-  {
-    id: 'cp-01',
-    name: 'Chặng 01: Thiết kế Kiến trúc & Báo cáo Khởi động',
-    description: 'Nộp sơ đồ kiến trúc tổng thể, mô tả cơ sở dữ liệu và kế hoạch phát triển.',
-    requirements: ['Sơ đồ kiến trúc hệ thống', 'Đặc tả giao diện API', 'Khởi tạo kho mã nguồn'],
-    startTime: '2026-11-01T08:00:00Z',
-    deadline: '2026-11-05T23:59:59Z',
-    points: 20,
-    penaltyPerDay: 5,
-    status: 'open',
-    blockConsecutiveMissing: true,
-  },
-  {
-    id: 'cp-02',
-    name: 'Chặng 02: Hoàn thiện Mô hình Cốt lõi & Bản thử nghiệm',
-    description: 'Triển khai mô hình thuật toán cốt lõi, chạy thử nghiệm trên tập dữ liệu mẫu và cung cấp demo URL nội bộ.',
-    requirements: ['Môi trường vận hành Docker', 'Báo cáo độ chính xác thuật toán', 'Tài liệu hướng dẫn gọi API'],
-    startTime: '2026-11-06T00:00:00Z',
-    deadline: '2026-11-12T23:59:59Z',
-    points: 30,
-    penaltyPerDay: 5,
-    status: 'upcoming',
-    blockConsecutiveMissing: true,
-  },
-  {
-    id: 'cp-03',
-    name: 'Chặng 03: Tích hợp Hệ thống & Đóng gói Hoàn thiện',
-    description: 'Hoàn thiện giao diện người dùng, tích hợp luồng hoàn chỉnh và nộp mã Commit SHA đóng băng.',
-    requirements: ['Bản chạy thử trực tiếp ổn định', 'Tối ưu hóa độ trễ xử lý', 'Bộ kiểm thử tự động'],
-    startTime: '2026-11-13T00:00:00Z',
-    deadline: '2026-11-18T23:59:59Z',
-    points: 50,
-    penaltyPerDay: 10,
-    status: 'upcoming',
-    blockConsecutiveMissing: true,
-  },
-];
-
+// Dữ liệu trống hoàn toàn để Quản trị viên tự thiết lập từ đầu
+export const initialWhitelist: WhitelistEntry[] = [];
+export const initialPendingCandidates: User[] = [];
+export const initialMajorTopics: MajorTopic[] = [];
+export const initialTeams: Team[] = [];
+export const initialCheckpoints: Checkpoint[] = [];
 export const initialSubmissions: CheckpointSubmission[] = [];
-
 export const initialFinalSubmissions: FinalSubmission[] = [];
-
-export const initialRubricCriteria: RubricCriteria[] = [
-  {
-    id: 'crit-innovation',
-    name: 'Tính Sáng tạo & Đột Phá',
-    description: 'Ý tưởng đột phá, tiếp cận bài toán bằng giải pháp kỹ thuật mới, không sao chép.',
-    maxScore: 10,
-    weight: 25, // 25%
-    displayOrder: 1,
-  },
-  {
-    id: 'crit-tech',
-    name: 'Kiến trúc Kỹ thuật & Hiệu năng',
-    description: 'Mô hình thuật toán tối ưu, xử lý dữ liệu phức tạp, độ trễ thấp, clean code và tuân thủ git.',
-    maxScore: 10,
-    weight: 35, // 35%
-    displayOrder: 2,
-  },
-  {
-    id: 'crit-feasibility',
-    name: 'Khả thi & Giá trị Thực tiễn',
-    description: 'Khả năng ứng dụng thực tế trong môi trường doanh nghiệp và công nghệ số, giải quyết đúng nỗi đau người dùng.',
-    maxScore: 10,
-    weight: 25, // 25%
-    displayOrder: 3,
-  },
-  {
-    id: 'crit-presentation',
-    name: 'Trình bày & Trải nghiệm Người dùng',
-    description: 'Giao diện trực quan, demo mượt mà, thuyết trình rõ ràng và trả lời phản biện xuất sắc.',
-    maxScore: 10,
-    weight: 15, // 15% (Tổng 100%)
-    displayOrder: 4,
-  },
-];
-
+export const initialRubricCriteria: RubricCriteria[] = [];
 export const initialEvaluations: TeamEvaluation[] = [];
-
 export const initialSupportTickets: SupportTicket[] = [];
-
-export const initialAnnouncements: Announcement[] = [
-  {
-    id: 'ann-1',
-    title: '🔥 Chào mừng các thí sinh đến với HackFlow AI Hackathon 2026!',
-    content: 'Ban Tổ Chức chào đón tất cả các bạn thí sinh, cố vấn và ban giám khảo đã tham gia hệ thống HackFlow. Hãy hoàn thành các bước thiết lập tài khoản, ghép đội và đăng ký đề tài thi đấu.',
-    author: 'Ban Tổ Chức HackFlow',
-    publishedAt: '2026-10-01T08:00:00Z',
-    isPinned: true,
-  },
-  {
-    id: 'ann-2',
-    title: '📋 Hướng dẫn thành lập đội thi và đăng ký đề tài',
-    content: 'Mỗi đội thi cần có từ 3 đến 5 thành viên. Trưởng nhóm có thể tạo đội và gửi mã mời (hoặc dùng mã mẫu HF2026 để ghép đội thử nghiệm). Hãy nhanh chóng khóa đề tài trước hạn chót!',
-    author: 'Ban Thư ký Kỹ thuật',
-    publishedAt: '2026-10-02T09:00:00Z',
-    isPinned: true,
-  },
-  {
-    id: 'ann-3',
-    title: '🛡️ Quy chế bảo mật và chế độ chấm ẩn danh',
-    content: 'Hệ thống đã kích hoạt cơ chế bảo vệ danh tính thí sinh và giám khảo. Mọi thông tin trường học và mã định danh sẽ được bảo mật tuyệt đối trong quá trình chấm điểm chuyên môn.',
-    author: 'Hội đồng Chuyên môn',
-    publishedAt: '2026-10-03T10:00:00Z',
-    isPinned: false,
-  },
-];
+export const initialAnnouncements: Announcement[] = [];

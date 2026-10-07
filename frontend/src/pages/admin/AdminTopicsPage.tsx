@@ -8,6 +8,7 @@ import {
   Lightbulb,
   Plus,
   Edit2,
+  Trash2,
   Users,
   GraduationCap,
   CheckCircle2,
@@ -15,21 +16,51 @@ import {
 } from 'lucide-react';
 
 export const AdminTopicsPage: React.FC = () => {
-  const { majorTopics, addSubTopic, updateSubTopicQuota } = useMockStore();
+  const { majorTopics, addMajorTopic, deleteMajorTopic, addSubTopic, updateSubTopicQuota } =
+    useMockStore();
 
+  // Major Topic Modal
+  const [isAddMajorOpen, setIsAddMajorOpen] = useState(false);
+  const [majorTitle, setMajorTitle] = useState('');
+  const [majorDescription, setMajorDescription] = useState('');
+
+  // Subtopic Modal
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [selectedMajorId, setSelectedMajorId] = useState(majorTopics[0]?.id || '');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [quota, setQuota] = useState(3);
   const [mentorName, setMentorName] = useState('Dr. Lê Quang');
+
+  // Edit Quota Modal
   const [editingSubTopic, setEditingSubTopic] = useState<{ id: string; title: string; quota: number } | null>(null);
   const [newQuotaValue, setNewQuotaValue] = useState(3);
   const [alert, setAlert] = useState<string | null>(null);
 
+  const handleAddMajor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!majorTitle.trim()) return;
+
+    addMajorTopic(majorTitle.trim(), majorDescription.trim());
+    setIsAddMajorOpen(false);
+    setMajorTitle('');
+    setMajorDescription('');
+    setAlert(`Đã thêm lĩnh vực đề tài lớn "${majorTitle}" thành công!`);
+    setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleDeleteMajor = (id: string, name?: string) => {
+    const displayName = name || 'lĩnh vực này';
+    if (window.confirm(`Bạn có chắc muốn xóa lĩnh vực "${displayName}" cùng toàn bộ đề tài nhánh?`)) {
+      deleteMajorTopic(id);
+      setAlert(`Đã xóa lĩnh vực "${displayName}".`);
+      setTimeout(() => setAlert(null), 3000);
+    }
+  };
+
   const handleAddSubTopic = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (!title.trim() || !selectedMajorId) return;
 
     addSubTopic(selectedMajorId, {
       title: title.trim(),
@@ -71,14 +102,31 @@ export const AdminTopicsPage: React.FC = () => {
             Quản Lý Đề Tài & Hạn Ngạch Đội
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Thiết lập danh mục đề tài lớn, đề tài nhánh và giới hạn số lượng đội thi đăng ký tối đa.
+            Thiết lập danh mục lĩnh vực đề tài lớn, đề tài nhánh và giới hạn số lượng đội thi đăng ký tối đa.
           </p>
         </div>
 
-        <Button variant="primary" onClick={() => setIsAddOpen(true)} className="gap-2">
-          <Plus size={16} />
-          <span>Thêm Đề Tài Nhánh</span>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Button variant="secondary" onClick={() => setIsAddMajorOpen(true)} className="gap-2">
+            <Plus size={16} />
+            <span>Thêm Lĩnh Vực Lớn</span>
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              if (majorTopics.length === 0) {
+                setIsAddMajorOpen(true);
+              } else {
+                setSelectedMajorId(majorTopics[0]?.id || '');
+                setIsAddOpen(true);
+              }
+            }}
+            className="gap-2"
+          >
+            <Plus size={16} />
+            <span>Thêm Đề Tài Nhánh</span>
+          </Button>
+        </div>
       </div>
 
       {alert && (
@@ -90,107 +138,178 @@ export const AdminTopicsPage: React.FC = () => {
 
       {/* Major Topics List */}
       <div className="space-y-6">
-        {majorTopics.map((major) => (
-          <div
-            key={major.id}
-            className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4"
-          >
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#334155]">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6366F1]/20 text-[#818CF8]">
-                  <Lightbulb size={22} />
+        {majorTopics.length === 0 ? (
+          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-10 text-center space-y-3">
+            <Lightbulb size={36} className="mx-auto text-slate-500" />
+            <h3 className="font-bold text-white text-base">Chưa có đề tài nào</h3>
+            <p className="text-xs text-slate-400 max-w-md mx-auto">
+              Hệ thống hiện đang trống. Hãy bấm nút "Thêm Lĩnh Vực Lớn" để tạo chủ đề và đề tài thi đấu từ đầu.
+            </p>
+            <Button variant="primary" onClick={() => setIsAddMajorOpen(true)} className="gap-2 mt-2">
+              <Plus size={16} />
+              <span>Tạo Lĩnh Vực Đề Tài Đầu Tiên</span>
+            </Button>
+          </div>
+        ) : (
+          majorTopics.map((major) => (
+            <div
+              key={major.id}
+              className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#334155]">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6366F1]/20 text-[#818CF8]">
+                    <Lightbulb size={20} />
+                  </div>
+                  <div>
+                    <h2 className="font-['Righteous'] text-xl text-white">{major.title}</h2>
+                    <p className="text-xs text-slate-400">{major.description}</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-['Righteous'] text-xl text-white">{major.name}</h3>
-                  <p className="text-xs text-slate-400">{major.description}</p>
+
+                <div className="flex items-center gap-2">
+                  <Badge variant="indigo">{major.subTopics.length} đề tài con</Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedMajorId(major.id);
+                      setIsAddOpen(true);
+                    }}
+                    className="text-[#818CF8] hover:text-white"
+                  >
+                    + Thêm đề tài con
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => handleDeleteMajor(major.id, major.title)}
+                    title="Xóa lĩnh vực này"
+                  >
+                    <Trash2 size={14} />
+                  </Button>
                 </div>
               </div>
 
-              <Badge variant="indigo">{major.subTopics.length} đề tài nhánh</Badge>
-            </div>
+              {/* SubTopics Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {major.subTopics.length === 0 ? (
+                  <div className="col-span-full py-6 text-center text-xs text-slate-400 italic">
+                    Chưa có đề tài con nào trong lĩnh vực này.
+                  </div>
+                ) : (
+                  major.subTopics.map((sub) => {
+                    const currentTeams = sub.currentTeams ?? sub.registeredTeamsCount ?? 0;
+                    const maxQuota = sub.maxTeamsQuota ?? sub.quota ?? 10;
+                    const isFull = currentTeams >= maxQuota;
 
-            {/* Subtopics Table */}
-            <div className="overflow-x-auto rounded-[12px] border border-[#334155] bg-[#0F172A]">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-[#1E293B]/70 border-b border-[#334155] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-                  <tr>
-                    <th className="py-3 px-4">Tên Đề Tài Nhánh</th>
-                    <th className="py-3 px-4">Cố Vấn Chuyên Môn</th>
-                    <th className="py-3 px-4 text-center">Đã Đăng Ký / Quota</th>
-                    <th className="py-3 px-4 text-center">Trạng Thái</th>
-                    <th className="py-3 px-4 text-right">Chỉnh Sửa</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#334155]/60 text-slate-200">
-                  {major.subTopics.map((sub) => {
-                    const registeredCount = sub.registeredTeamsCount ?? sub.currentTeams ?? 0;
-                    const quotaCount = sub.quota ?? sub.maxTeamsQuota ?? 3;
-                    const isFull = registeredCount >= quotaCount;
                     return (
-                      <tr key={sub.id} className="hover:bg-[#1E293B]/40 transition-colors">
-                        <td className="py-3.5 px-4 font-semibold text-white max-w-sm">
-                          <div>{sub.title}</div>
-                          <div className="text-[11px] text-slate-400 font-normal line-clamp-1">
-                            {sub.description}
+                      <div
+                        key={sub.id}
+                        className="rounded-[12px] bg-[#0F172A] border border-[#334155] p-4 flex flex-col justify-between space-y-3"
+                      >
+                        <div className="space-y-1.5">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="font-bold text-white text-sm">{sub.title}</span>
+                            <Badge variant={isFull ? 'danger' : 'success'}>
+                              {isFull ? 'Đã Hết Chỗ' : 'Đang Mở'}
+                            </Badge>
                           </div>
-                        </td>
+                          <p className="text-xs text-slate-400 leading-relaxed">
+                            {sub.description}
+                          </p>
+                        </div>
 
-                        <td className="py-3.5 px-4 text-slate-300">
-                          <span className="flex items-center gap-1.5">
-                            <GraduationCap size={13} className="text-[#818CF8]" />
-                            <span>{sub.mentorName || 'Chưa phân công'}</span>
-                          </span>
-                        </td>
+                        <div className="pt-2 border-t border-[#334155]/60 flex items-center justify-between text-xs text-slate-400">
+                          <div className="flex items-center gap-1.5">
+                            <Users size={13} className="text-[#818CF8]" />
+                            <span>
+                              Đã đăng ký: <strong className="text-white font-mono">{currentTeams}/{maxQuota}</strong> đội
+                            </span>
+                          </div>
 
-                        <td className="py-3.5 px-4 text-center font-bold font-mono">
-                          <span className={isFull ? 'text-rose-400' : 'text-emerald-400'}>
-                            {registeredCount}
-                          </span>
-                          <span className="text-slate-500"> / </span>
-                          <span className="text-slate-300">{quotaCount} đội</span>
-                        </td>
-
-                        <td className="py-3.5 px-4 text-center">
-                          <Badge variant={isFull ? 'danger' : 'success'}>
-                            {isFull ? 'Đã Hết Suất' : 'Còn Suất'}
-                          </Badge>
-                        </td>
-
-                        <td className="py-3.5 px-4 text-right">
-                          <button
+                          <Button
+                            variant="secondary"
+                            size="sm"
                             onClick={() => {
-                              setEditingSubTopic({ id: sub.id, title: sub.title, quota: quotaCount });
-                              setNewQuotaValue(quotaCount);
+                              setEditingSubTopic({
+                                id: sub.id,
+                                title: sub.title,
+                                quota: maxQuota,
+                              });
+                              setNewQuotaValue(maxQuota);
                             }}
-                            className="p-1.5 rounded-md hover:bg-[#334155] text-[#818CF8] hover:text-white transition-colors"
-                            title="Điều chỉnh Quota"
+                            className="!py-1 !px-2.5 text-xs gap-1"
                           >
-                            <Edit2 size={15} />
-                          </button>
-                        </td>
-                      </tr>
+                            <Edit2 size={12} />
+                            <span>Quota</span>
+                          </Button>
+                        </div>
+                      </div>
                     );
-                  })}
-                </tbody>
-              </table>
+                  })
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
 
+      {/* Modal: Add Major Topic */}
+      <Modal
+        isOpen={isAddMajorOpen}
+        onClose={() => setIsAddMajorOpen(false)}
+        title="Thêm Lĩnh Vực / Đề Tài Lớn"
+      >
+        <form onSubmit={handleAddMajor} className="space-y-4">
+          <Input
+            label="Tên lĩnh vực / Chủ đề lớn *"
+            placeholder="Ví dụ: Trí tuệ Nhân tạo & Khoa học Dữ liệu"
+            value={majorTitle}
+            onChange={(e) => setMajorTitle(e.target.value)}
+            required
+          />
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-slate-300 font-medium text-xs">Mô tả lĩnh vực</label>
+            <textarea
+              rows={3}
+              value={majorDescription}
+              onChange={(e) => setMajorDescription(e.target.value)}
+              className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+              placeholder="Định hướng nghiên cứu, công nghệ trọng tâm..."
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3">
+            <Button variant="ghost" type="button" onClick={() => setIsAddMajorOpen(false)}>
+              Hủy
+            </Button>
+            <Button variant="primary" type="submit">
+              Tạo Lĩnh Vực
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Modal: Add SubTopic */}
-      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Thêm Đề Tài Nhánh Mới">
+      <Modal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        title="Thêm Đề Tài Nhánh Mới"
+      >
         <form onSubmit={handleAddSubTopic} className="space-y-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-xs">Thuộc Đề Tài Lớn *</label>
+            <label className="text-slate-300 font-medium text-xs">Lĩnh vực lớn *</label>
             <select
               value={selectedMajorId}
               onChange={(e) => setSelectedMajorId(e.target.value)}
               className="p-2.5 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+              required
             >
               {majorTopics.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.name}
+                  {m.title}
                 </option>
               ))}
             </select>

@@ -70,6 +70,8 @@ interface MockStoreState {
 
   // Topics
   majorTopics: MajorTopic[];
+  addMajorTopic: (title: string, description: string) => void;
+  deleteMajorTopic: (id: string) => void;
   selectTopicForTeam: (teamId: string, subTopicId: string) => { success: boolean; message: string };
   cancelTopicForTeam: (teamId: string) => { success: boolean; message: string };
   addSubTopic: (majorTopicId: string, subTopic: { title: string; description: string; quota: number; mentorName?: string }) => void;
@@ -81,6 +83,7 @@ interface MockStoreState {
   finalSubmissions: FinalSubmission[];
   addCheckpoint: (cp: Omit<Checkpoint, 'id'>) => void;
   updateCheckpoint: (id: string, updates: Partial<Checkpoint>) => void;
+  deleteCheckpoint: (id: string) => void;
   submitCheckpoint: (checkpointId: string, teamId: string, repoUrl: string, demoUrl?: string) => { success: boolean; commitSha: string };
   submitFinalProject: (teamId: string, repoUrl: string, demoVideoUrl: string, slideUrl: string, summary: string) => { success: boolean; commitSha: string };
 
@@ -111,6 +114,7 @@ interface MockStoreState {
   announcements: Announcement[];
   addAnnouncement: (title: string, content: string, isPinned?: boolean) => void;
   broadcastAnnouncement: (title: string, content: string, targetRole?: any) => void;
+  deleteAnnouncement: (id: string) => void;
 
   // Reset
   resetAllMockData: () => void;
@@ -501,6 +505,24 @@ export const useMockStore = create<MockStoreState>()(
       // Topics Selection with Atomic Quota Tracking
       majorTopics: initialMajorTopics,
 
+      addMajorTopic: (title, description) => {
+        const newMajor: MajorTopic = {
+          id: `major-${Date.now()}`,
+          title,
+          domain: title,
+          description,
+          mentorIds: [],
+          subTopics: [],
+        };
+        set((state) => ({ majorTopics: [...state.majorTopics, newMajor] }));
+      },
+
+      deleteMajorTopic: (id) => {
+        set((state) => ({
+          majorTopics: state.majorTopics.filter((m) => m.id !== id),
+        }));
+      },
+
       selectTopicForTeam: (teamId, subTopicId) => {
         const team = get().teams.find((t) => t.id === teamId);
         if (!team) return { success: false, message: 'Đội thi không tồn tại.' };
@@ -657,6 +679,12 @@ export const useMockStore = create<MockStoreState>()(
       updateCheckpoint: (id, updates) => {
         set((state) => ({
           checkpoints: state.checkpoints.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+        }));
+      },
+
+      deleteCheckpoint: (id) => {
+        set((state) => ({
+          checkpoints: state.checkpoints.filter((c) => c.id !== id),
         }));
       },
 
@@ -1006,6 +1034,10 @@ export const useMockStore = create<MockStoreState>()(
         set((state) => ({ announcements: [newAnn, ...state.announcements] }));
       },
 
+      deleteAnnouncement: (id) => {
+        set((state) => ({ announcements: state.announcements.filter((a) => a.id !== id) }));
+      },
+
       // Reset
       resetAllMockData: () => {
         set({
@@ -1032,7 +1064,7 @@ export const useMockStore = create<MockStoreState>()(
       },
     }),
     {
-      name: 'hackflow-mock-state-v4', // v4 to guarantee clean ground zero state
+      name: 'hackflow-clean-config-v1', // Ground zero clean state for admin configuration
     }
   )
 );

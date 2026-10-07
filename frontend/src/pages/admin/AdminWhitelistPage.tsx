@@ -143,7 +143,14 @@ export const AdminWhitelistPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#334155]/60 text-slate-200">
-              {filtered.map((item) => (
+              {filtered.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-slate-400 text-xs italic">
+                    Chưa có email nào trong danh sách hợp lệ. Bấm "Thêm Email" hoặc "Nhập Danh Sách Hàng Loạt" để cấu hình.
+                  </td>
+                </tr>
+              ) : (
+                filtered.map((item) => (
                 <tr key={item.id} className="hover:bg-[#1E293B]/40 transition-colors">
                   <td className="py-3.5 px-4 font-mono font-medium text-white">{item.email}</td>
                   <td className="py-3.5 px-4 text-slate-300">{item.note || '—'}</td>
@@ -170,7 +177,7 @@ export const AdminWhitelistPage: React.FC = () => {
                     </button>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

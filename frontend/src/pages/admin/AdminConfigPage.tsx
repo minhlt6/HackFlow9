@@ -12,10 +12,18 @@ import {
   Calendar,
   Users,
   Trophy,
+  RotateCcw,
 } from 'lucide-react';
 
 export const AdminConfigPage: React.FC = () => {
-  const { config, updateConfig, toggleBlindJudging, toggleResultsPublished, toggleContestStarted } = useMockStore();
+  const {
+    config,
+    updateConfig,
+    toggleBlindJudging,
+    toggleResultsPublished,
+    toggleContestStarted,
+    resetAllMockData,
+  } = useMockStore();
 
   const [name, setName] = useState(config.name);
   const [currentPhase, setCurrentPhase] = useState(config.currentPhase);
@@ -35,6 +43,15 @@ export const AdminConfigPage: React.FC = () => {
     });
     setAlert('Đã cập nhật cấu hình hệ thống Hackathon thành công!');
     setTimeout(() => setAlert(null), 3000);
+  };
+
+  const handleResetAll = () => {
+    if (window.confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu để tự cấu hình lại từ đầu? Mọi dữ liệu thí sinh, đề tài, chặng nộp và rubric sẽ được đưa về trống.')) {
+      resetAllMockData();
+      localStorage.removeItem('hackflow-clean-config-v1');
+      localStorage.removeItem('hackflow-mock-state-v4');
+      window.location.reload();
+    }
   };
 
   return (
@@ -180,7 +197,15 @@ export const AdminConfigPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex justify-end pt-4 border-t border-[#334155]">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#334155]">
+          <button
+            type="button"
+            onClick={handleResetAll}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-[10px] border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20 text-xs font-semibold transition-all cursor-pointer"
+          >
+            <RotateCcw size={15} />
+            <span>Xóa Sạch Dữ Liệu Cũ (Đặt Lại Từ Đầu)</span>
+          </button>
           <Button variant="primary" type="submit" size="lg" className="gap-2 px-8">
             <Save size={18} />
             <span>Lưu Cấu Hình Hackathon</span>

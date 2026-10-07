@@ -142,7 +142,15 @@ export const AdminResultsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#334155]/60 text-slate-200">
-              {teamScoreRows.map((row, idx) => (
+              {teamScoreRows.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
+                    <Trophy className="mx-auto mb-2 opacity-30 text-slate-400" size={32} />
+                    Chưa có kết quả hoặc đội thi nào được chấm điểm trong hệ thống.
+                  </td>
+                </tr>
+              ) : (
+                teamScoreRows.map((row, idx) => (
                 <tr key={row.team.id} className="hover:bg-[#1E293B]/40 transition-colors">
                   <td className="py-3.5 px-4 text-center font-bold">
                     {idx === 0 ? (
@@ -188,7 +196,7 @@ export const AdminResultsPage: React.FC = () => {
                     </span>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

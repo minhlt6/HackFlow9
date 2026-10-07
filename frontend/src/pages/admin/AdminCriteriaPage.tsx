@@ -399,7 +399,15 @@ export const AdminCriteriaPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#334155]/60 text-slate-200">
-              {rubricCriteria.map((c, idx) => {
+              {rubricCriteria.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
+                    <Scale className="mx-auto mb-2 opacity-30 text-slate-400" size={32} />
+                    Chưa có tiêu chí Rubric nào. Bấm "Thêm Tiêu Chí" để bắt đầu thiết lập ma trận chấm điểm.
+                  </td>
+                </tr>
+              ) : (
+                rubricCriteria.map((c, idx) => {
                 const color = CRITERIA_COLORS[idx % CRITERIA_COLORS.length];
                 return (
                   <tr key={c.id} className="hover:bg-[#1E293B]/40 transition-colors">
@@ -444,7 +452,7 @@ export const AdminCriteriaPage: React.FC = () => {
                     </td>
                   </tr>
                 );
-              })}
+              }))}
             </tbody>
           </table>
         </div>

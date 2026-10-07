@@ -114,7 +114,15 @@ export const AdminTeamsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-[#334155]/60 text-slate-200">
-              {filteredTeams.map((t) => (
+              {filteredTeams.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
+                    <Users className="mx-auto mb-2 opacity-30 text-slate-400" size={32} />
+                    Chưa có đội thi nào trong danh sách.
+                  </td>
+                </tr>
+              ) : (
+                filteredTeams.map((t) => (
                 <tr key={t.id} className="hover:bg-[#1E293B]/40 transition-colors">
                   <td className="py-3.5 px-4">
                     <span className="font-bold text-white block">{t.name}</span>
@@ -190,7 +198,7 @@ export const AdminTeamsPage: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>

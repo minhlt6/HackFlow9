@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, UserRound, Lock, AlertCircle, LogIn, Mail, GraduationCap, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, UserRound, Lock, AlertCircle, LogIn } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMockStore } from '../store/useMockStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -7,23 +7,14 @@ import { mockUsers } from '../mock/mockData';
 import { Button } from '../components/Button';
 import { GithubIcon } from '../components/common/Icons';
 
-type LoginTab = 'candidate' | 'others';
-
 export const LoginPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { switchPersona } = useMockStore();
 
-  const [activeTab, setActiveTab] = useState<LoginTab>('candidate');
-
-  // Candidate form states (clean, not pre-filled)
-  const [candidateEmail, setCandidateEmail] = useState('');
-  const [candidatePassword, setCandidatePassword] = useState('');
-
-  // Other roles form states (clean, not pre-filled)
-  const [otherUsername, setOtherUsername] = useState('');
-  const [otherPassword, setOtherPassword] = useState('');
-
+  // Unified login form states
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGithub, setIsLoadingGithub] = useState(false);
@@ -35,118 +26,22 @@ export const LoginPage: React.FC = () => {
       : null,
   );
 
-  // Handle Candidate login (Email + Password)
-  const handleCandidateLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  // Unified Login Handler
+  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(null);
 
-    const emailClean = candidateEmail.trim().toLowerCase();
-    const passClean = candidatePassword.trim();
-
-    if (!emailClean || !passClean) {
-      setErrorMessage('Vui lòng nhập đầy đủ email và mật khẩu.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    setTimeout(() => {
-      // If entered admin / judge / mentor by mistake
-      if (emailClean === 'admin' || emailClean === 'judge' || emailClean === 'mentor') {
-        setIsLoading(false);
-        setErrorMessage('Tài khoản này thuộc vai trò quản lý. Vui lòng chuyển sang tab "Vai trò khác" để đăng nhập.');
-        return;
-      }
-
-      // 1. Leader
-      if (
-        (emailClean === 'leader@cybersamurai.team' || emailClean === 'leader' || emailClean === 'user' || emailClean === 'candidate') &&
-        (passClean === '123456' || passClean === '123')
-      ) {
-        switchPersona('leader');
-        useAuthStore.getState().login(mockUsers.leader, 'mock-jwt-leader-token');
-        setIsLoading(false);
-        navigate('/dashboard');
-        return;
-      }
-
-      // 2. Member
-      if (
-        (emailClean === 'member@cybersamurai.team' || emailClean === 'member') &&
-        (passClean === '123456' || passClean === '123')
-      ) {
-        switchPersona('member');
-        useAuthStore.getState().login(mockUsers.member, 'mock-jwt-member-token');
-        setIsLoading(false);
-        navigate('/dashboard');
-        return;
-      }
-
-      // 3. Pending
-      if (
-        (emailClean === 'pending@hust.edu.vn' || emailClean === 'pending') &&
-        (passClean === '123456' || passClean === '123')
-      ) {
-        switchPersona('pending');
-        useAuthStore.getState().login(mockUsers.pending, 'mock-jwt-pending-token');
-        setIsLoading(false);
-        navigate('/onboarding');
-        return;
-      }
-
-      // 4. Rejected
-      if (
-        (emailClean === 'rejected@fpt.edu.vn' || emailClean === 'rejected') &&
-        (passClean === '123456' || passClean === '123')
-      ) {
-        switchPersona('rejected');
-        useAuthStore.getState().login(mockUsers.rejected, 'mock-jwt-rejected-token');
-        setIsLoading(false);
-        navigate('/rejected');
-        return;
-      }
-
-      setIsLoading(false);
-      setErrorMessage('Email hoặc mật khẩu thí sinh không chính xác. Vui lòng kiểm tra lại.');
-    }, 500);
-  };
-
-  // Handle GitHub OAuth login for Candidate
-  const handleGithubLogin = () => {
-    setErrorMessage(null);
-    setIsLoadingGithub(true);
-
-    setTimeout(() => {
-      switchPersona('leader');
-      useAuthStore.getState().login(mockUsers.leader, 'mock-jwt-github-token');
-      setIsLoadingGithub(false);
-      navigate('/dashboard');
-    }, 600);
-  };
-
-  // Handle Other roles login (Username/Email + Password only)
-  const handleOthersLogin = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setErrorMessage(null);
-
-    const userClean = otherUsername.trim().toLowerCase();
-    const passClean = otherPassword.trim();
+    const userClean = identifier.trim().toLowerCase();
+    const passClean = password.trim();
 
     if (!userClean || !passClean) {
-      setErrorMessage('Vui lòng nhập đầy đủ tên tài khoản và mật khẩu.');
+      setErrorMessage('Vui lòng nhập đầy đủ tài khoản/email và mật khẩu.');
       return;
     }
 
     setIsLoading(true);
 
     setTimeout(() => {
-      // If entered candidate email by mistake
-      if (userClean === 'leader@cybersamurai.team' || userClean === 'member@cybersamurai.team' || userClean === 'candidate' || userClean === 'user') {
-        setIsLoading(false);
-        setErrorMessage('Tài khoản này là thí sinh. Vui lòng chuyển sang tab "Thí sinh" để đăng nhập.');
-        return;
-      }
-
       // 1. Quản trị viên (Admin)
       if (
         (userClean === 'admin' || userClean === 'admin@hackflow.dev' || userClean === 'admin@hackflow.io') &&
@@ -183,9 +78,70 @@ export const LoginPage: React.FC = () => {
         return;
       }
 
+      // 4. Thí sinh - Trưởng nhóm (Leader)
+      if (
+        (userClean === 'leader@cybersamurai.team' || userClean === 'leader' || userClean === 'user' || userClean === 'candidate') &&
+        (passClean === '123456' || passClean === '123')
+      ) {
+        switchPersona('leader');
+        useAuthStore.getState().login(mockUsers.leader, 'mock-jwt-leader-token');
+        setIsLoading(false);
+        navigate('/dashboard');
+        return;
+      }
+
+      // 5. Thí sinh - Thành viên (Member)
+      if (
+        (userClean === 'member@cybersamurai.team' || userClean === 'member') &&
+        (passClean === '123456' || passClean === '123')
+      ) {
+        switchPersona('member');
+        useAuthStore.getState().login(mockUsers.member, 'mock-jwt-member-token');
+        setIsLoading(false);
+        navigate('/dashboard');
+        return;
+      }
+
+      // 6. Thí sinh chờ duyệt (Pending)
+      if (
+        (userClean === 'pending@hust.edu.vn' || userClean === 'pending') &&
+        (passClean === '123456' || passClean === '123')
+      ) {
+        switchPersona('pending');
+        useAuthStore.getState().login(mockUsers.pending, 'mock-jwt-pending-token');
+        setIsLoading(false);
+        navigate('/onboarding');
+        return;
+      }
+
+      // 7. Thí sinh bị từ chối (Rejected)
+      if (
+        (userClean === 'rejected@fpt.edu.vn' || userClean === 'rejected') &&
+        (passClean === '123456' || passClean === '123')
+      ) {
+        switchPersona('rejected');
+        useAuthStore.getState().login(mockUsers.rejected, 'mock-jwt-rejected-token');
+        setIsLoading(false);
+        navigate('/rejected');
+        return;
+      }
+
       setIsLoading(false);
-      setErrorMessage('Tên tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.');
-    }, 500);
+      setErrorMessage('Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.');
+    }, 450);
+  };
+
+  // Handle GitHub OAuth login (Quick developer login)
+  const handleGithubLogin = () => {
+    setErrorMessage(null);
+    setIsLoadingGithub(true);
+
+    setTimeout(() => {
+      switchPersona('leader');
+      useAuthStore.getState().login(mockUsers.leader, 'mock-jwt-github-token');
+      setIsLoadingGithub(false);
+      navigate('/dashboard');
+    }, 550);
   };
 
   return (
@@ -217,7 +173,7 @@ export const LoginPage: React.FC = () => {
           </section>
 
           {/* Right Login Card */}
-          <section className="w-full max-w-[500px] mx-auto rounded-[20px] border border-[#334155] bg-[#1E293B]/95 p-6 shadow-2xl backdrop-blur-md sm:p-9">
+          <section className="w-full max-w-[480px] mx-auto rounded-[20px] border border-[#334155] bg-[#1E293B]/95 p-6 shadow-2xl backdrop-blur-md sm:p-9">
             <div className="flex flex-col items-center">
               <h1
                 className="text-center font-['Righteous'] text-[38px] font-normal leading-none sm:text-[48px]"
@@ -241,49 +197,10 @@ export const LoginPage: React.FC = () => {
                 >
                   Cổng đăng nhập hệ thống
                 </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Dành cho Thí sinh, Cố vấn, Giám khảo và Ban Quản Trị
+                </p>
               </div>
-
-              {/* Two Tabs Selector */}
-              <div className="mt-5 grid grid-cols-2 gap-2 w-full rounded-[14px] bg-[#0F172A] p-1.5 border border-[#334155]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('candidate');
-                    setErrorMessage(null);
-                  }}
-                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[10px] text-xs sm:text-sm font-semibold transition-all ${
-                    activeTab === 'candidate'
-                      ? 'bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/30'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/60'
-                  }`}
-                >
-                  <GraduationCap size={18} />
-                  <span>Thí sinh</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('others');
-                    setErrorMessage(null);
-                  }}
-                  className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-[10px] text-xs sm:text-sm font-semibold transition-all ${
-                    activeTab === 'others'
-                      ? 'bg-[#6366F1] text-white shadow-md shadow-[#6366F1]/30'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-[#1E293B]/60'
-                  }`}
-                >
-                  <ShieldCheck size={18} />
-                  <span>Vai trò khác</span>
-                </button>
-              </div>
-
-              {/* Subtitle depending on active tab */}
-              <p className="mt-2.5 text-xs text-slate-400 text-center">
-                {activeTab === 'candidate'
-                  ? 'Dành cho Thí sinh & Đội thi tham dự'
-                  : 'Dành cho Cố vấn, Ban Giám khảo & Quản trị viên'}
-              </p>
 
               {errorMessage && (
                 <div
@@ -295,146 +212,86 @@ export const LoginPage: React.FC = () => {
                 </div>
               )}
 
-              {/* TAB 1: THÍ SINH */}
-              {activeTab === 'candidate' && (
-                <div className="w-full mt-5 space-y-4">
-                  <form onSubmit={handleCandidateLogin} className="flex w-full flex-col gap-3.5">
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Email thí sinh
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={candidateEmail}
-                          onChange={(e) => setCandidateEmail(e.target.value)}
-                          placeholder="Nhập email thí sinh..."
-                          required
-                          className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
-                        />
-                        <Mail size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Mật khẩu
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={candidatePassword}
-                          onChange={(e) => setCandidatePassword(e.target.value)}
-                          placeholder="••••••••"
-                          required
-                          className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
-                        />
-                        <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <button
-                          type="button"
-                          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                          onClick={() => setShowPassword((prev) => !prev)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      isLoading={isLoading}
-                      className="mt-1 !min-h-[48px] !w-full !rounded-[12px] !bg-[#6366F1] px-6 py-2.5 font-['Roboto'] text-[15px] font-bold text-white hover:!bg-[#5558d9] shadow-lg shadow-[#6366F1]/25 transition-all"
-                    >
-                      <LogIn size={18} className="mr-2" />
-                      <span>Đăng nhập</span>
-                    </Button>
-                  </form>
-
-                  {/* Divider */}
-                  <div className="relative my-2">
-                    <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-[#334155]" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-[#1E293B] px-3 text-slate-400 font-medium">Hoặc tiếp tục với</span>
+              {/* Single Unified Login Form */}
+              <div className="w-full mt-6 space-y-4">
+                <form onSubmit={handleLogin} className="flex w-full flex-col gap-4">
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Email hoặc Tên tài khoản
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={identifier}
+                        onChange={(e) => setIdentifier(e.target.value)}
+                        placeholder="Nhập email hoặc tên tài khoản..."
+                        required
+                        className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-3 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
+                      />
+                      <UserRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
                   </div>
 
-                  {/* GitHub OAuth Button */}
-                  <button
-                    type="button"
-                    onClick={handleGithubLogin}
-                    disabled={isLoadingGithub}
-                    className="flex items-center justify-center gap-3 w-full rounded-[12px] border border-[#334155] bg-[#0F172A] hover:bg-[#152033] hover:border-slate-400 px-4 py-3 text-sm font-semibold text-white transition-all duration-200 shadow-md disabled:opacity-50"
+                  <div>
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
+                      Mật khẩu
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        required
+                        className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-3 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
+                      />
+                      <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <button
+                        type="button"
+                        aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="submit"
+                    isLoading={isLoading}
+                    className="mt-1 !min-h-[48px] !w-full !rounded-[12px] !bg-[#6366F1] px-6 py-3 font-['Roboto'] text-[15px] font-bold text-white hover:!bg-[#5558d9] shadow-lg shadow-[#6366F1]/25 transition-all"
                   >
-                    {isLoadingGithub ? (
-                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                    ) : (
-                      <GithubIcon size={20} className="text-white" />
-                    )}
-                    <span>{isLoadingGithub ? 'Đang kết nối GitHub...' : 'Đăng nhập bằng GitHub'}</span>
-                  </button>
+                    <LogIn size={18} className="mr-2" />
+                    <span>Đăng nhập hệ thống</span>
+                  </Button>
+                </form>
+
+                {/* Divider */}
+                <div className="relative my-3">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-[#334155]" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-[#1E293B] px-3 text-slate-400 font-medium">Hoặc tiếp tục với</span>
+                  </div>
                 </div>
-              )}
 
-              {/* TAB 2: VAI TRÒ KHÁC (MENTOR, ADMIN, BAN GIÁM KHẢO) - USER & PASS ONLY */}
-              {activeTab === 'others' && (
-                <div className="w-full mt-5 space-y-4">
-                  <form onSubmit={handleOthersLogin} className="flex w-full flex-col gap-3.5">
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Tên tài khoản hoặc Email
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={otherUsername}
-                          onChange={(e) => setOtherUsername(e.target.value)}
-                          placeholder="Nhập tài khoản quản lý..."
-                          required
-                          className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
-                        />
-                        <UserRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-1.5">
-                        Mật khẩu
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          value={otherPassword}
-                          onChange={(e) => setOtherPassword(e.target.value)}
-                          placeholder="••••••••"
-                          required
-                          className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
-                        />
-                        <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <button
-                          type="button"
-                          aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                          onClick={() => setShowPassword((prev) => !prev)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
-                        >
-                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <Button
-                      type="submit"
-                      isLoading={isLoading}
-                      className="mt-1 !min-h-[48px] !w-full !rounded-[12px] !bg-[#6366F1] px-6 py-2.5 font-['Roboto'] text-[15px] font-bold text-white hover:!bg-[#5558d9] shadow-lg shadow-[#6366F1]/25 transition-all"
-                    >
-                      <LogIn size={18} className="mr-2" />
-                      <span>Đăng nhập hệ thống</span>
-                    </Button>
-                  </form>
-                </div>
-              )}
+                {/* GitHub OAuth Button */}
+                <button
+                  type="button"
+                  onClick={handleGithubLogin}
+                  disabled={isLoadingGithub}
+                  className="flex items-center justify-center gap-3 w-full rounded-[12px] border border-[#334155] bg-[#0F172A] hover:bg-[#152033] hover:border-slate-400 px-4 py-3 text-sm font-semibold text-white transition-all duration-200 shadow-md disabled:opacity-50 cursor-pointer"
+                >
+                  {isLoadingGithub ? (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  ) : (
+                    <GithubIcon size={20} className="text-white" />
+                  )}
+                  <span>{isLoadingGithub ? 'Đang kết nối GitHub...' : 'Đăng nhập bằng GitHub'}</span>
+                </button>
+              </div>
             </div>
           </section>
         </div>
