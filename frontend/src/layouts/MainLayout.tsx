@@ -239,6 +239,18 @@ export const MainLayout: React.FC = () => {
               </div>
             )}
 
+            {/* Real-time Live Sync Indicator */}
+            <div
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-[11px] font-mono select-none"
+              title="Hệ thống tự động đồng bộ thời gian thực giữa các trang và các tab không cần tải lại"
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span>Live Sync</span>
+            </div>
+
             {/* Announcements Dropdown */}
             <div className="relative">
               <button

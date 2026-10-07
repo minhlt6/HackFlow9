@@ -21,8 +21,6 @@ import {
   Presentation,
   FileText,
   Palette,
-  Paperclip,
-  UploadCloud,
   File,
   X,
   ListChecks,
@@ -66,15 +64,6 @@ const DEFAULT_SUBMISSION_FIELDS: SubmissionFieldConfig[] = [
     required: true,
     description: 'Giải trình tóm tắt các tính năng và công nghệ',
   },
-  {
-    id: 'f-file',
-    type: 'file',
-    label: 'Tệp Báo Cáo / Tài Liệu Đính Kèm (PDF / ZIP)',
-    placeholder: 'Chọn file PDF hoặc kéo thả tại đây',
-    required: false,
-    description: 'Tài liệu kỹ thuật định dạng PDF hoặc mã nguồn đóng gói (tối đa 50MB)',
-    fileAccept: '.pdf,.zip,.docx',
-  },
 ];
 
 const PRESET_TEMPLATES: {
@@ -84,7 +73,6 @@ const PRESET_TEMPLATES: {
   placeholder: string;
   description: string;
   icon: any;
-  fileAccept?: string;
 }[] = [
   {
     type: 'repoUrl',
@@ -127,15 +115,6 @@ const PRESET_TEMPLATES: {
     icon: Palette,
   },
   {
-    type: 'file',
-    label: 'Tệp đính kèm',
-    defaultLabel: 'Tệp Báo Cáo / Tài Liệu Đính Kèm (PDF / ZIP)',
-    placeholder: 'Chọn file PDF hoặc kéo thả tại đây',
-    description: 'Tài liệu kỹ thuật định dạng PDF hoặc mã nguồn đóng gói (tối đa 50MB)',
-    icon: Paperclip,
-    fileAccept: '.pdf,.zip,.docx',
-  },
-  {
     type: 'description',
     label: 'Báo cáo Text',
     defaultLabel: 'Báo Cáo Tóm Tắt Kỹ Thuật & Giải Pháp',
@@ -146,9 +125,9 @@ const PRESET_TEMPLATES: {
   {
     type: 'custom',
     label: 'Trường tùy chỉnh',
-    defaultLabel: 'Thông tin bổ sung',
+    defaultLabel: 'Thông tin bổ sung (Link / Text)',
     placeholder: 'Nhập thông tin theo yêu cầu...',
-    description: 'Trường thông tin đặc thù do BTC quy định',
+    description: 'Trường thông tin hoặc liên kết tài liệu trực tuyến do BTC quy định',
     icon: Plus,
   },
 ];
@@ -165,8 +144,6 @@ const getFieldIcon = (type: SubmissionFieldType) => {
       return <Presentation size={13} className="text-amber-400" />;
     case 'figmaUrl':
       return <Palette size={13} className="text-purple-400" />;
-    case 'file':
-      return <Paperclip size={13} className="text-cyan-400" />;
     case 'description':
       return <FileText size={13} className="text-blue-400" />;
     default:
@@ -201,7 +178,6 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
       placeholder: preset.placeholder,
       required: preset.type === 'repoUrl' || preset.type === 'description',
       description: preset.description,
-      fileAccept: preset.fileAccept,
     };
     onChangeFields([...fields, newField]);
   };
@@ -228,7 +204,7 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
           </h4>
         </div>
         <p className="text-[11px] text-slate-400">
-          Quy định các liên kết, tệp tin hoặc trường thông tin mà thí sinh bắt buộc / khuyến nghị nộp tại chặng này.
+          Quy định các liên kết (URL) và trường thông tin mà thí sinh bắt buộc / khuyến nghị nộp tại chặng này.
         </p>
       </div>
 
@@ -338,22 +314,6 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
                     className="p-2 rounded-[8px] bg-[#1E293B] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
                   />
                 </div>
-
-                {field.type === 'file' && (
-                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                    <Paperclip size={12} className="text-cyan-400" />
-                    <span>Định dạng tệp cho phép:</span>
-                    <input
-                      type="text"
-                      value={field.fileAccept || '.pdf,.zip,.docx'}
-                      onChange={(e) =>
-                        handleUpdateField(field.id, { fileAccept: e.target.value })
-                      }
-                      placeholder=".pdf,.zip,.docx"
-                      className="px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-slate-200 text-[11px] font-mono focus:border-[#6366F1] focus:outline-none"
-                    />
-                  </div>
-                )}
               </div>
             ))}
           </div>

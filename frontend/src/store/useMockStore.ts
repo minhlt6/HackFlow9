@@ -174,16 +174,61 @@ interface MockStoreState {
   setUserPledge: (userId: string, pledged: boolean) => void;
 }
 
+const getInitialTabSession = () => {
+  if (typeof window === 'undefined') {
+    return {
+      currentUser: mockUsers.admin,
+      activeRolePersona: 'admin' as const,
+      isAuthenticated: false,
+    };
+  }
+  try {
+    const sessionPersona = sessionStorage.getItem('hackflow_session_persona');
+    const sessionAuth = sessionStorage.getItem('hackflow_session_auth');
+    if (sessionPersona && mockUsers[sessionPersona]) {
+      return {
+        currentUser: mockUsers[sessionPersona],
+        activeRolePersona: sessionPersona as any,
+        isAuthenticated: sessionAuth === 'true',
+      };
+    }
+    const localPersona = localStorage.getItem('hackflow_session_persona');
+    const localAuth = localStorage.getItem('hackflow_session_auth');
+    if (localPersona && mockUsers[localPersona]) {
+      return {
+        currentUser: mockUsers[localPersona],
+        activeRolePersona: localPersona as any,
+        isAuthenticated: localAuth === 'true',
+      };
+    }
+  } catch (e) {
+    // ignore
+  }
+  return {
+    currentUser: mockUsers.admin,
+    activeRolePersona: 'admin' as const,
+    isAuthenticated: false,
+  };
+};
+
+const initialSession = getInitialTabSession();
+
 export const useMockStore = create<MockStoreState>()(
   persist(
     (set, get) => ({
-      currentUser: mockUsers.admin,
-      activeRolePersona: 'admin',
-      isAuthenticated: false,
+      currentUser: initialSession.currentUser,
+      activeRolePersona: initialSession.activeRolePersona,
+      isAuthenticated: initialSession.isAuthenticated,
 
       switchPersona: (persona) => {
         const targetUser = mockUsers[persona] || mockUsers.admin;
         const isDone = !!get().onboardingCompletedUsers[targetUser.id];
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('hackflow_session_persona', persona);
+          sessionStorage.setItem('hackflow_session_auth', 'true');
+          localStorage.setItem('hackflow_session_persona', persona);
+          localStorage.setItem('hackflow_session_auth', 'true');
+        }
         set({
           currentUser: targetUser,
           activeRolePersona: persona,
@@ -194,6 +239,12 @@ export const useMockStore = create<MockStoreState>()(
       },
 
       logout: () => {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('hackflow_session_persona');
+          sessionStorage.removeItem('hackflow_session_auth');
+          localStorage.removeItem('hackflow_session_persona');
+          localStorage.removeItem('hackflow_session_auth');
+        }
         set({
           isAuthenticated: false,
           isWizardOpen: false,
@@ -1180,6 +1231,17 @@ export const useMockStore = create<MockStoreState>()(
     }),
     {
       name: 'hackflow-full-setup-v3', // Full contest setup mock data
+      onRehydrateStorage: () => (state) => {
+        if (typeof window !== 'undefined' && state) {
+          const tabPersona = sessionStorage.getItem('hackflow_session_persona');
+          const tabAuth = sessionStorage.getItem('hackflow_session_auth');
+          if (tabPersona && mockUsers[tabPersona]) {
+            state.activeRolePersona = tabPersona as any;
+            state.currentUser = mockUsers[tabPersona];
+            state.isAuthenticated = tabAuth === 'true';
+          }
+        }
+      },
     }
   )
 );

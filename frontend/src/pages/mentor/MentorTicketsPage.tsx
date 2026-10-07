@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
@@ -16,6 +16,7 @@ export const MentorTicketsPage: React.FC = () => {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(tickets[0]?.id || null);
   const [replyText, setReplyText] = useState('');
   const [alert, setAlert] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const filteredTickets = tickets.filter((t) => {
     if (filter === 'unassigned') return !t.assignedMentorId && t.status !== 'resolved';
@@ -24,7 +25,19 @@ export const MentorTicketsPage: React.FC = () => {
     return true;
   });
 
+  // Auto select first ticket if none selected or if selected ticket is no longer available
+  useEffect(() => {
+    if ((!selectedTicketId || !tickets.some((t) => t.id === selectedTicketId)) && filteredTickets.length > 0) {
+      setSelectedTicketId(filteredTickets[0].id);
+    }
+  }, [filteredTickets.length, selectedTicketId, tickets]);
+
   const activeTicket = tickets.find((t) => t.id === selectedTicketId);
+
+  // Auto scroll smoothly to bottom when new reply/message arrives in real time
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeTicket?.replies?.length, activeTicket?.messages?.length]);
 
   const handleClaim = () => {
     if (!activeTicket) return;
@@ -231,6 +244,7 @@ export const MentorTicketsPage: React.FC = () => {
                     </div>
                   );
                 })}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Reply Form */}

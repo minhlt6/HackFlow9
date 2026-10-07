@@ -18,7 +18,6 @@ import {
   CheckCircle2,
   Globe,
   Palette,
-  Paperclip,
 } from 'lucide-react';
 
 export const JudgeSplitScreenPage: React.FC = () => {
@@ -459,17 +458,6 @@ export const JudgeSplitScreenPage: React.FC = () => {
                         </a>
                       )}
                     </div>
-
-                    {/* Attached File */}
-                    {sub.fileName && (
-                      <div className="flex items-center gap-1.5 p-1.5 rounded bg-[#1E293B] border border-[#334155] text-[10px] text-cyan-300">
-                        <Paperclip size={11} className="shrink-0" />
-                        <span className="truncate font-mono">{sub.fileName}</span>
-                        {sub.fileSize && (
-                          <span className="text-slate-400 shrink-0">({sub.fileSize})</span>
-                        )}
-                      </div>
-                    )}
 
                     {/* Description text */}
                     {sub.description && (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
@@ -14,6 +14,7 @@ import {
   UserCheck,
   AlertCircle,
   Tag,
+  Radio,
 } from 'lucide-react';
 
 export const CandidateTicketsPage: React.FC = () => {
@@ -35,8 +36,21 @@ export const CandidateTicketsPage: React.FC = () => {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
   const [replyText, setReplyText] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Auto select first ticket if none selected
+  useEffect(() => {
+    if (!selectedTicketId && myTeamTickets.length > 0) {
+      setSelectedTicketId(myTeamTickets[0].id);
+    }
+  }, [myTeamTickets.length, selectedTicketId]);
 
   const activeTicket = tickets.find((t) => t.id === selectedTicketId);
+
+  // Auto scroll smoothly to bottom when new reply/message arrives in real time
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [activeTicket?.replies?.length, activeTicket?.messages?.length]);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,6 +260,7 @@ export const CandidateTicketsPage: React.FC = () => {
                     </div>
                   );
                 })}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Reply Form */}

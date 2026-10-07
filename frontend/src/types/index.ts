@@ -91,7 +91,6 @@ export type SubmissionFieldType =
   | 'slideUrl'
   | 'figmaUrl'
   | 'description'
-  | 'file'
   | 'custom';
 
 export interface SubmissionFieldConfig {
@@ -101,7 +100,6 @@ export interface SubmissionFieldConfig {
   placeholder?: string;
   required: boolean;
   description?: string;
-  fileAccept?: string;
 }
 
 export interface CheckpointSubmission {
@@ -114,9 +112,6 @@ export interface CheckpointSubmission {
   slideUrl?: string;
   figmaUrl?: string;
   description?: string;
-  fileName?: string;
-  fileSize?: string;
-  fileUrl?: string;
   customFields?: Record<string, string>;
   commitSha: string;
   submittedAt: string;

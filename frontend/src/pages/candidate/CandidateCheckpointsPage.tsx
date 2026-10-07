@@ -19,9 +19,7 @@ import {
   Presentation,
   FileText,
   Palette,
-  Paperclip,
   File,
-  X,
   ListChecks,
   RefreshCw,
 } from 'lucide-react';
@@ -60,15 +58,6 @@ const DEFAULT_SUBMISSION_FIELDS: SubmissionFieldConfig[] = [
     required: true,
     description: 'Giải trình tóm tắt các tính năng và công nghệ',
   },
-  {
-    id: 'f-file',
-    type: 'file',
-    label: 'Tệp Báo Cáo / Tài Liệu Đính Kèm (PDF / ZIP)',
-    placeholder: 'Chọn file PDF hoặc kéo thả tại đây',
-    required: false,
-    description: 'Tài liệu kỹ thuật định dạng PDF hoặc mã nguồn đóng gói (tối đa 50MB)',
-    fileAccept: '.pdf,.zip,.docx',
-  },
 ];
 
 const getFieldIcon = (type: SubmissionFieldType) => {
@@ -83,8 +72,6 @@ const getFieldIcon = (type: SubmissionFieldType) => {
       return <Presentation size={13} className="text-amber-400" />;
     case 'figmaUrl':
       return <Palette size={13} className="text-purple-400" />;
-    case 'file':
-      return <Paperclip size={13} className="text-cyan-400" />;
     case 'description':
       return <FileText size={13} className="text-blue-400" />;
     default:
@@ -122,8 +109,6 @@ export const CandidateCheckpointsPage: React.FC = () => {
   const [formSlideUrl, setFormSlideUrl] = useState('');
   const [formFigmaUrl, setFormFigmaUrl] = useState('');
   const [formDescription, setFormDescription] = useState('');
-  const [formFileName, setFormFileName] = useState('');
-  const [formFileSize, setFormFileSize] = useState('');
   const [formCustomFields, setFormCustomFields] = useState<Record<string, string>>({});
   const [confirmLock, setConfirmLock] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ sha: string } | null>(null);
@@ -145,8 +130,6 @@ export const CandidateCheckpointsPage: React.FC = () => {
       setFormSlideUrl(existing.slideUrl || '');
       setFormFigmaUrl(existing.figmaUrl || '');
       setFormDescription(existing.description || '');
-      setFormFileName(existing.fileName || '');
-      setFormFileSize(existing.fileSize || '');
       setFormCustomFields(existing.customFields || {});
     } else {
       setFormRepoUrl('https://github.com/cybersamurai-team/medical-rag-core');
@@ -155,24 +138,8 @@ export const CandidateCheckpointsPage: React.FC = () => {
       setFormSlideUrl('https://docs.google.com/presentation/d/pitch-deck-2026');
       setFormFigmaUrl('');
       setFormDescription('Hoàn thành các tiêu chuẩn kỹ thuật chặng theo đúng thể lệ của Ban Tổ Chức.');
-      setFormFileName('Bao_cao_Kien_truc_RAG_CyberSamurai.pdf');
-      setFormFileSize('3.4 MB');
       setFormCustomFields({});
     }
-  };
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const f = e.target.files[0];
-      const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
-      setFormFileName(f.name);
-      setFormFileSize(`${sizeMb} MB`);
-    }
-  };
-
-  const handleRemoveFile = () => {
-    setFormFileName('');
-    setFormFileSize('');
   };
 
   const selectedCheckpoint = checkpoints.find((c) => c.id === selectedCpId);
@@ -213,10 +180,6 @@ export const CandidateCheckpointsPage: React.FC = () => {
           setValidationError(`Vui lòng nhập nội dung ${field.label}.`);
           return;
         }
-        if (field.type === 'file' && !formFileName) {
-          setValidationError(`Vui lòng đính kèm tệp tin: ${field.label}.`);
-          return;
-        }
         if (field.type === 'custom' && !formCustomFields[field.id]?.trim()) {
           setValidationError(`Vui lòng điền thông tin: ${field.label}.`);
           return;
@@ -231,8 +194,6 @@ export const CandidateCheckpointsPage: React.FC = () => {
       slideUrl: formSlideUrl.trim(),
       figmaUrl: formFigmaUrl.trim(),
       description: formDescription.trim(),
-      fileName: formFileName,
-      fileSize: formFileSize,
       customFields: formCustomFields,
     };
 
@@ -257,7 +218,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
           Tiến Độ Các Chặng Nộp Bài
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Các mốc kiểm tra tiến độ bắt buộc. Bạn cần nộp đầy đủ các hạng mục được BTC yêu cầu (mã nguồn, tệp tin, slide, liên kết demo).
+          Các mốc kiểm tra tiến độ bắt buộc. Bạn cần nộp đầy đủ các hạng mục được BTC yêu cầu (mã nguồn GitHub, slide, liên kết demo và tài liệu trực tuyến).
         </p>
       </div>
 
@@ -482,17 +443,6 @@ export const CandidateCheckpointsPage: React.FC = () => {
                         )}
                       </div>
 
-                      {/* Attached File */}
-                      {submission.fileName && (
-                        <div className="flex items-center gap-1.5 p-2 rounded-[8px] bg-[#1E293B] border border-[#334155] text-[11px] text-cyan-300">
-                          <Paperclip size={12} className="shrink-0" />
-                          <span className="truncate font-mono">{submission.fileName}</span>
-                          {submission.fileSize && (
-                            <span className="text-slate-400 shrink-0">({submission.fileSize})</span>
-                          )}
-                        </div>
-                      )}
-
                       {/* Description Text */}
                       {submission.description && (
                         <p className="text-[11px] text-slate-300 italic line-clamp-2 bg-[#1E293B]/60 p-2 rounded border border-[#334155]/40">
@@ -704,64 +654,6 @@ export const CandidateCheckpointsPage: React.FC = () => {
                   );
                 }
 
-                if (field.type === 'file') {
-                  return (
-                    <div key={field.id} className="space-y-1.5">
-                      <label className="text-slate-300 font-medium text-xs flex items-center justify-between">
-                        <span>
-                          {field.label} {field.required ? '*' : '(Tùy chọn)'}
-                        </span>
-                        {field.fileAccept && (
-                          <span className="text-[10px] text-slate-400 font-mono">
-                            Định dạng: {field.fileAccept}
-                          </span>
-                        )}
-                      </label>
-
-                      {formFileName ? (
-                        <div className="flex items-center justify-between p-3 rounded-[10px] bg-[#0F172A] border border-cyan-500/40 text-xs">
-                          <div className="flex items-center gap-2 text-cyan-300 min-w-0">
-                            <Paperclip size={15} className="shrink-0" />
-                            <span className="truncate font-mono">{formFileName}</span>
-                            <span className="text-slate-400 shrink-0">({formFileSize || '2.5 MB'})</span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={handleRemoveFile}
-                            className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-[#1E293B] transition-colors cursor-pointer"
-                            title="Xóa tệp đính kèm này"
-                          >
-                            <X size={14} />
-                          </button>
-                        </div>
-                      ) : (
-                        <label className="flex flex-col items-center justify-center p-4 rounded-[10px] bg-[#0F172A] border border-dashed border-[#334155] hover:border-[#6366F1] transition-all cursor-pointer group">
-                          <UploadCloud
-                            size={24}
-                            className="text-slate-400 group-hover:text-[#818CF8] transition-colors mb-1"
-                          />
-                          <span className="text-xs text-slate-300 font-medium group-hover:text-white">
-                            Nhấn để chọn tệp hoặc kéo thả file vào đây
-                          </span>
-                          <span className="text-[10px] text-slate-500 mt-0.5">
-                            {field.fileAccept || 'PDF, ZIP, DOCX'} (Tối đa 50MB)
-                          </span>
-                          <input
-                            type="file"
-                            accept={field.fileAccept || '.pdf,.zip,.docx'}
-                            onChange={handleFileSelect}
-                            className="hidden"
-                          />
-                        </label>
-                      )}
-
-                      {field.description && (
-                        <p className="text-[11px] text-slate-400">{field.description}</p>
-                      )}
-                    </div>
-                  );
-                }
-
                 // Custom Field
                 return (
                   <div key={field.id} className="space-y-1">
@@ -794,7 +686,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                 required
               />
               <span>
-                Tôi xác nhận thông tin và các tài liệu đính kèm này đại diện cho toàn bộ đội thi{' '}
+                Tôi xác nhận thông tin và các liên kết nộp bài này đại diện cho toàn bộ đội thi{' '}
                 <strong className="text-white">{myTeam?.name}</strong>.
               </span>
             </label>
