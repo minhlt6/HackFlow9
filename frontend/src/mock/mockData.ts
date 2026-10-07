@@ -130,6 +130,7 @@ export const initialHackathonConfig: HackathonConfig = {
   topicSelectionDeadline: '2026-10-28T23:59:59Z',
   contestStart: '2026-11-01T08:00:00Z',
   contestEnd: '2026-11-20T23:59:59Z',
+  isContestStarted: false,
 };
 
 export const initialWhitelist: WhitelistEntry[] = [

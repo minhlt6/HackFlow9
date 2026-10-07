@@ -44,6 +44,7 @@ interface MockStoreState {
   updateConfig: (newConfig: Partial<HackathonConfig>) => void;
   toggleBlindJudging: () => void;
   toggleResultsPublished: () => void;
+  toggleContestStarted: () => void;
 
   // Whitelist
   whitelist: WhitelistEntry[];
@@ -190,14 +191,32 @@ export const useMockStore = create<MockStoreState>()(
         }));
       },
       toggleBlindJudging: () => {
-        set((state) => ({
-          config: { ...state.config, blindJudging: !state.config.blindJudging },
-        }));
+        set((state) => {
+          const next = !state.config.blindJudgingMode;
+          return {
+            config: { ...state.config, blindJudging: next, blindJudgingMode: next },
+          };
+        });
       },
       toggleResultsPublished: () => {
         set((state) => ({
           config: { ...state.config, resultsPublished: !state.config.resultsPublished },
         }));
+      },
+      toggleContestStarted: () => {
+        set((state) => {
+          const nextStarted = !state.config.isContestStarted;
+          return {
+            config: {
+              ...state.config,
+              isContestStarted: nextStarted,
+              contestStartedAt: nextStarted ? new Date().toISOString() : undefined,
+              currentPhase: nextStarted
+                ? 'Giai đoạn 2: Lập trình tập trung & Chạy nước rút'
+                : 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi',
+            },
+          };
+        });
       },
 
       // Whitelist

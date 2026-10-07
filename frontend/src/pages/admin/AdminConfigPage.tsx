@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const AdminConfigPage: React.FC = () => {
-  const { config, updateConfig, toggleBlindJudging, toggleResultsPublished } = useMockStore();
+  const { config, updateConfig, toggleBlindJudging, toggleResultsPublished, toggleContestStarted } = useMockStore();
 
   const [name, setName] = useState(config.name);
   const [currentPhase, setCurrentPhase] = useState(config.currentPhase);
@@ -153,6 +153,28 @@ export const AdminConfigPage: React.FC = () => {
                 }`}
               >
                 {config.resultsPublished ? 'CÔNG BỐ' : 'ẨN'}
+              </button>
+            </div>
+
+            <div className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] flex items-center justify-between sm:col-span-2">
+              <div className="space-y-1">
+                <span className="font-bold text-white text-xs block">Thời Gian Cuộc Thi & Đồng Hồ Đếm Ngược</span>
+                <span className="text-[11px] text-slate-400">
+                  {config.isContestStarted
+                    ? 'Cuộc thi đang diễn ra. Đồng hồ đếm ngược đến hạn chót đang chạy trực tiếp trên giao diện thí sinh.'
+                    : 'Cuộc thi chưa bắt đầu. Thí sinh sẽ nhìn thấy thông báo chờ Ban Quản Trị phát lệnh bắt đầu.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleContestStarted}
+                className={`px-4 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                  config.isContestStarted
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-slate-700 text-slate-400 border-slate-600'
+                }`}
+              >
+                {config.isContestStarted ? 'ĐANG CHẠY (BẬT)' : 'CHƯA BẮT ĐẦU (TẮT)'}
               </button>
             </div>
           </div>

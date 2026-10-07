@@ -69,12 +69,11 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
     title = 'Lộ Trình Nhiệm Vụ Bắt Buộc Cho Thí Sinh';
     roleBadge = 'Bắt buộc hoàn thành';
     roleIcon = <GraduationCap size={20} className="text-[#818CF8]" />;
-    subtitle = 'Vui lòng hoàn thành lần lượt 4 bước thiết lập để kích hoạt toàn bộ quyền thi đấu';
+    subtitle = 'Vui lòng hoàn thành 3 bước thiết lập ban đầu để kích hoạt toàn bộ quyền thi đấu';
 
     const isStep1Done = Boolean(currentUser.studentId && currentUser.school && currentUser.phone);
     const isStep2Done = Boolean(myTeam);
-    const isStep3Done = Boolean(myTeam?.topicId || myTeam?.subTopicId);
-    const isStep4Done = Boolean(pledgedUsers[currentUser.id]);
+    const isStep3Done = Boolean(pledgedUsers[currentUser.id]);
 
     items = [
       {
@@ -96,21 +95,12 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         icon: <Users size={16} className="text-indigo-400" />,
       },
       {
-        id: 'cand-topic',
-        stepNum: 3,
-        title: 'Bước 3: Đăng ký đề tài (Có thể chọn sau)',
-        description: 'Khảo sát các đề tài nhánh và đăng ký khóa đề tài. Đội có thể thảo luận và đăng ký sau tại trang Đề tài.',
-        isCompleted: isStep3Done,
-        actionLabel: isStep3Done ? 'Đã khóa đề tài' : 'Chọn đề tài (hoặc để sau)',
-        icon: <Lightbulb size={16} className="text-amber-400" />,
-      },
-      {
         id: 'cand-pledge',
-        stepNum: 4,
-        title: 'Bước 4: Quy chế & Ký cam kết liêm chính',
+        stepNum: 3,
+        title: 'Bước 3: Quy chế & Ký cam kết liêm chính',
         description: 'Đọc thể lệ cuộc thi, cam kết bản quyền mã nguồn và chấp thuận chấm ẩn danh.',
-        isCompleted: isStep4Done,
-        actionLabel: isStep4Done ? 'Đã ký cam kết' : 'Ký cam kết ngay',
+        isCompleted: isStep3Done,
+        actionLabel: isStep3Done ? 'Đã ký cam kết' : 'Ký cam kết ngay',
         icon: <FileCheck size={16} className="text-emerald-400" />,
       },
     ];
@@ -220,22 +210,12 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
   const completedCount = items.filter((i) => i.isCompleted).length;
   const progressPercent = Math.round((completedCount / items.length) * 100);
 
-  const isAllMandatoryDone =
-    role === 'candidate'
-      ? Boolean(
-          items.find((i) => i.stepNum === 1)?.isCompleted &&
-          items.find((i) => i.stepNum === 2)?.isCompleted &&
-          items.find((i) => i.stepNum === 4)?.isCompleted
-        )
-      : completedCount === items.length;
+  const isAllMandatoryDone = completedCount === items.length;
 
   const isAllDone = !!onboardingCompletedUsers[currentUser.id] || isAllMandatoryDone;
 
   // Find first unfinished mandatory step
-  const firstUnfinished =
-    items.find((i) => !i.isCompleted && (role !== 'candidate' || i.stepNum !== 3)) ||
-    items.find((i) => !i.isCompleted) ||
-    items[0];
+  const firstUnfinished = items.find((i) => !i.isCompleted) || items[0];
 
   return (
     <div className="rounded-[16px] border border-[#6366F1]/40 bg-gradient-to-br from-[#1E293B] via-[#1E293B]/95 to-[#162033] p-5 lg:p-6 shadow-xl relative overflow-hidden transition-all duration-300">
@@ -350,6 +330,24 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
               </div>
             );
           })}
+        </div>
+      )}
+
+      {role === 'candidate' && (
+        <div className="mt-3.5 p-3 rounded-[10px] bg-[#0F172A]/70 border border-[#334155]/60 flex items-center justify-between text-xs text-slate-300">
+          <div className="flex items-center gap-2">
+            <Lightbulb size={16} className="text-amber-400 shrink-0" />
+            <span>
+              <strong>Đăng ký đề tài thi đấu:</strong> Đội của bạn có thể thảo luận và đăng ký đề tài bất cứ lúc nào tại mục{' '}
+              <button
+                onClick={() => navigate('/topics')}
+                className="text-[#818CF8] hover:text-white font-semibold underline cursor-pointer"
+              >
+                Chọn đề tài
+              </button>{' '}
+              trước hạn chót.
+            </span>
+          </div>
         </div>
       )}
     </div>

@@ -18,6 +18,8 @@ import {
   Settings,
   Scale,
   ListOrdered,
+  Play,
+  Pause,
 } from 'lucide-react';
 
 export const AdminDashboardPage: React.FC = () => {
@@ -31,6 +33,7 @@ export const AdminDashboardPage: React.FC = () => {
     config,
     toggleBlindJudging,
     toggleResultsPublished,
+    toggleContestStarted,
     announcements,
   } = useMockStore();
 
@@ -71,6 +74,24 @@ export const AdminDashboardPage: React.FC = () => {
 
           {/* Quick Actions */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Start / Pause Contest Timer */}
+            <Button
+              variant={config.isContestStarted ? 'secondary' : 'primary'}
+              onClick={toggleContestStarted}
+              className={`gap-2 ${
+                config.isContestStarted
+                  ? 'border-emerald-500/50 text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25'
+                  : '!bg-emerald-600 hover:!bg-emerald-500 text-white shadow-lg shadow-emerald-600/30'
+              }`}
+            >
+              {config.isContestStarted ? <Pause size={16} /> : <Play size={16} />}
+              <span>
+                {config.isContestStarted
+                  ? 'Cuộc Thi: ĐANG CHẠY ĐẾM NGƯỢC (Tạm dừng)'
+                  : 'Bắt Đầu Cuộc Thi (Kích Hoạt Đếm Ngược)'}
+              </span>
+            </Button>
+
             <Button
               variant="secondary"
               onClick={toggleBlindJudging}

@@ -242,6 +242,8 @@ export interface HackathonConfig {
   contestStart?: string;
   contestEnd?: string;
   topicSelectionDeadline?: string;
+  isContestStarted?: boolean;
+  contestStartedAt?: string;
 }
 
 export interface ApiResponse<T> {
