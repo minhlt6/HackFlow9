@@ -24,10 +24,20 @@ import {
   Bell,
   Menu,
   X,
+  ArrowRight,
 } from 'lucide-react';
+import { MandatoryOnboardingWizard } from '../components/common/MandatoryOnboardingWizard';
 
 export const MainLayout: React.FC = () => {
-  const { currentUser, isAuthenticated, logout, config, announcements } = useMockStore();
+  const {
+    currentUser,
+    isAuthenticated,
+    logout,
+    config,
+    announcements,
+    openWizardAtStep,
+    onboardingCompletedUsers,
+  } = useMockStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showAnnouncements, setShowAnnouncements] = useState(false);
   const navigate = useNavigate();
@@ -286,11 +296,33 @@ export const MainLayout: React.FC = () => {
           </div>
         </header>
 
+        {/* Sticky Mandatory Onboarding Guidance Bar */}
+        {!onboardingCompletedUsers[currentUser.id] && (
+          <div className="bg-gradient-to-r from-amber-500/15 via-[#6366F1]/15 to-purple-500/15 border-b border-amber-500/30 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs shrink-0">
+            <div className="flex items-center gap-2 text-amber-200">
+              <span className="flex h-2 w-2 rounded-full bg-amber-400 animate-ping" />
+              <span>
+                <strong>Nhiệm vụ bắt buộc chưa hoàn thành:</strong> Bạn cần hoàn tất các bước thiết lập ban đầu để kích hoạt toàn bộ quyền thi đấu.
+              </span>
+            </div>
+            <button
+              onClick={() => openWizardAtStep(1)}
+              className="px-3 py-1 rounded-[6px] bg-[#6366F1] hover:bg-[#4F46E5] text-white font-bold flex items-center gap-1.5 shadow-md shadow-[#6366F1]/20 transition-all cursor-pointer"
+            >
+              <span>Mở trình hướng dẫn bắt buộc</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        )}
+
         {/* Content Outlet */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-[#080D18] overflow-y-auto">
           <Outlet />
         </main>
       </div>
+
+      {/* Mandatory Onboarding Modal Wizard */}
+      <MandatoryOnboardingWizard />
 
     </div>
   );

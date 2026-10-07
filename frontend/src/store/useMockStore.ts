@@ -113,6 +113,17 @@ interface MockStoreState {
 
   // Reset
   resetAllMockData: () => void;
+
+  // Onboarding Wizard & Guided Setup
+  isWizardOpen: boolean;
+  setWizardOpen: (open: boolean) => void;
+  wizardStep: number;
+  openWizardAtStep: (step: number) => void;
+  onboardingCompletedUsers: Record<string, boolean>;
+  pledgedUsers: Record<string, boolean>;
+  finishUserOnboarding: (userId: string) => void;
+  resetUserOnboarding: (userId: string) => void;
+  setUserPledge: (userId: string, pledged: boolean) => void;
 }
 
 export const useMockStore = create<MockStoreState>()(
@@ -124,16 +135,20 @@ export const useMockStore = create<MockStoreState>()(
 
       switchPersona: (persona) => {
         const targetUser = mockUsers[persona] || mockUsers.admin;
+        const isDone = !!get().onboardingCompletedUsers[targetUser.id];
         set({
           currentUser: targetUser,
           activeRolePersona: persona,
           isAuthenticated: true,
+          isWizardOpen: !isDone,
+          wizardStep: 1,
         });
       },
 
       logout: () => {
         set({
           isAuthenticated: false,
+          isWizardOpen: false,
         });
       },
 
@@ -142,6 +157,30 @@ export const useMockStore = create<MockStoreState>()(
           currentUser: { ...state.currentUser, ...profile },
         }));
       },
+
+      // Onboarding Wizard & Guided Setup
+      isWizardOpen: false,
+      setWizardOpen: (open) => set({ isWizardOpen: open }),
+      wizardStep: 1,
+      openWizardAtStep: (step) => set({ isWizardOpen: true, wizardStep: step }),
+      onboardingCompletedUsers: {},
+      pledgedUsers: {},
+      finishUserOnboarding: (userId) =>
+        set((state) => ({
+          onboardingCompletedUsers: { ...state.onboardingCompletedUsers, [userId]: true },
+          isWizardOpen: false,
+        })),
+      resetUserOnboarding: (userId) =>
+        set((state) => ({
+          onboardingCompletedUsers: { ...state.onboardingCompletedUsers, [userId]: false },
+          pledgedUsers: { ...state.pledgedUsers, [userId]: false },
+          isWizardOpen: true,
+          wizardStep: 1,
+        })),
+      setUserPledge: (userId, pledged) =>
+        set((state) => ({
+          pledgedUsers: { ...state.pledgedUsers, [userId]: pledged },
+        })),
 
       // Config
       config: initialHackathonConfig,
@@ -966,6 +1005,10 @@ export const useMockStore = create<MockStoreState>()(
           evaluations: initialEvaluations,
           tickets: initialSupportTickets,
           announcements: initialAnnouncements,
+          isWizardOpen: false,
+          wizardStep: 1,
+          onboardingCompletedUsers: {},
+          pledgedUsers: {},
         });
       },
     }),

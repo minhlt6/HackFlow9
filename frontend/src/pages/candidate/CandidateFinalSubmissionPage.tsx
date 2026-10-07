@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 
 export const CandidateFinalSubmissionPage: React.FC = () => {
-  const { currentUser, teams, finalSubmissions, submitFinalProject, config } = useMockStore();
+  const { currentUser, teams, finalSubmissions, submitFinalProject, config, openWizardAtStep } = useMockStore();
 
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
   const isLeader = currentUser.teamRole === 'leader' || myTeam?.leaderId === currentUser.id;
@@ -73,6 +73,28 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
           Hồ sơ dự thi chung cuộc bao gồm Kho mã nguồn, Video thực nghiệm và Slide thuyết trình trước Hội đồng Giám khảo.
         </p>
       </div>
+
+      {/* Warning when candidate has no team */}
+      {!myTeam && (
+        <div className="rounded-[14px] border border-amber-500/40 bg-amber-500/10 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <AlertCircle size={24} className="text-amber-400 shrink-0" />
+            <div>
+              <h4 className="font-bold text-sm text-white">Bạn chưa gia nhập đội thi</h4>
+              <p className="text-xs text-slate-300">
+                Để nộp bài chung cuộc, bạn bắt buộc phải có đội thi và đề tài nghiên cứu chính thức.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => openWizardAtStep(2)}
+            className="px-4 py-2 rounded-[8px] bg-[#6366F1] hover:bg-[#4F46E5] text-white text-xs font-bold transition-all shadow-md shrink-0 cursor-pointer"
+          >
+            Ghép đội thi ngay
+          </button>
+        </div>
+      )}
 
       {existingFinal || successSha ? (
         /* Submitted View with Frozen SHA */

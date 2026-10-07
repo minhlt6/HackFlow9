@@ -8,17 +8,18 @@ import {
   Sparkles,
   ChevronDown,
   ChevronUp,
-  ListTodo,
   ShieldCheck,
   GraduationCap,
   Scale,
-  Award,
   Users,
   Lightbulb,
   CheckSquare,
   BookOpen,
   MessageSquare,
   UserCheck,
+  FileCheck,
+  AlertCircle,
+  HelpCircle,
 } from 'lucide-react';
 import { Badge } from '../Badge';
 
@@ -36,18 +37,15 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
     submissions,
     pendingCandidates,
     rubricCriteria,
+    openWizardAtStep,
+    pledgedUsers,
+    onboardingCompletedUsers,
   } = useMockStore();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [manualChecks, setManualChecks] = useState<Record<string, boolean>>({});
-
-  const toggleManualCheck = (id: string) => {
-    setManualChecks((prev) => ({ ...prev, [id]: !prev[id] }));
-  };
 
   // Find candidate's team
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
-  const mySubmissions = submissions.filter((s) => s.teamId === myTeam?.id);
 
   // Define tasks based on role
   let title = '';
@@ -57,58 +55,63 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
 
   interface TodoItem {
     id: string;
+    stepNum: number;
     title: string;
     description: string;
     isCompleted: boolean;
     actionLabel?: string;
-    actionRoute?: string;
     icon?: React.ReactNode;
   }
 
   let items: TodoItem[] = [];
 
   if (role === 'candidate') {
-    title = 'Nhiệm Vụ Khởi Động Cho Thí Sinh';
-    roleBadge = 'Dành cho Thí sinh & Đội thi';
+    title = 'Lộ Trình Nhiệm Vụ Bắt Buộc Cho Thí Sinh';
+    roleBadge = 'Bắt buộc hoàn thành';
     roleIcon = <GraduationCap size={20} className="text-[#818CF8]" />;
-    subtitle = 'Hoàn thành các bước dưới đây để sẵn sàng tham gia vòng lập trình Hackathon';
+    subtitle = 'Vui lòng hoàn thành lần lượt 4 bước thiết lập để kích hoạt toàn bộ quyền thi đấu';
+
+    const isStep1Done = Boolean(currentUser.studentId && currentUser.school && currentUser.phone);
+    const isStep2Done = Boolean(myTeam);
+    const isStep3Done = Boolean(myTeam?.topicId || myTeam?.subTopicId);
+    const isStep4Done = Boolean(pledgedUsers[currentUser.id]);
 
     items = [
       {
         id: 'cand-profile',
-        title: '1. Cập nhật hồ sơ thí sinh',
+        stepNum: 1,
+        title: 'Bước 1: Cập nhật hồ sơ sinh viên',
         description: 'Bổ sung mã số sinh viên, trường đại học và kỹ năng chuyên môn của bạn.',
-        isCompleted: Boolean(currentUser.studentId && currentUser.school),
-        actionLabel: 'Xem hồ sơ',
-        actionRoute: '/profile',
+        isCompleted: isStep1Done,
+        actionLabel: isStep1Done ? 'Đã hoàn thành' : 'Điền hồ sơ ngay',
         icon: <UserCheck size={16} className="text-[#818CF8]" />,
       },
       {
         id: 'cand-team',
-        title: '2. Thành lập hoặc Gia nhập đội thi',
-        description: 'Tạo đội thi mới để nhận mã mời hoặc nhập mã mời của đội trưởng để vào đội.',
-        isCompleted: Boolean(myTeam),
-        actionLabel: myTeam ? 'Đã có đội' : 'Quản lý đội',
-        actionRoute: '/teams',
+        stepNum: 2,
+        title: 'Bước 2: Ghép đội thi đấu (Bắt buộc)',
+        description: 'Tạo đội thi mới hoặc nhập mã mời (ví dụ: HF2026) để gia nhập đội.',
+        isCompleted: isStep2Done,
+        actionLabel: isStep2Done ? `Đã vào đội ${myTeam?.name}` : 'Ghép đội ngay',
         icon: <Users size={16} className="text-indigo-400" />,
       },
       {
         id: 'cand-topic',
-        title: '3. Lựa chọn & Đăng ký đề tài nghiên cứu',
-        description: 'Khảo sát các đề tài nhánh và đăng ký sớm trước khi hết hạn ngạch (Quota).',
-        isCompleted: Boolean(myTeam?.subTopicId),
-        actionLabel: myTeam?.subTopicId ? 'Đã chọn đề tài' : 'Chọn đề tài',
-        actionRoute: '/topics',
+        stepNum: 3,
+        title: 'Bước 3: Đăng ký đề tài thi đấu',
+        description: 'Khảo sát các đề tài nhánh và đăng ký khóa đề tài trước khi hết hạn ngạch.',
+        isCompleted: isStep3Done,
+        actionLabel: isStep3Done ? 'Đã khóa đề tài' : 'Chọn đề tài',
         icon: <Lightbulb size={16} className="text-amber-400" />,
       },
       {
-        id: 'cand-cp1',
-        title: '4. Chuẩn bị & Nộp mã nguồn Chặng 01',
-        description: 'Liên kết kho lưu trữ GitHub và chốt mã băm commit đóng băng an toàn đúng hạn.',
-        isCompleted: mySubmissions.length > 0,
-        actionLabel: mySubmissions.length > 0 ? 'Đã nộp bài' : 'Xem chặng nộp',
-        actionRoute: '/checkpoints',
-        icon: <CheckSquare size={16} className="text-emerald-400" />,
+        id: 'cand-pledge',
+        stepNum: 4,
+        title: 'Bước 4: Quy chế & Ký cam kết liêm chính',
+        description: 'Đọc thể lệ cuộc thi, cam kết bản quyền mã nguồn và chấp thuận chấm ẩn danh.',
+        isCompleted: isStep4Done,
+        actionLabel: isStep4Done ? 'Đã ký cam kết' : 'Ký cam kết ngay',
+        icon: <FileCheck size={16} className="text-emerald-400" />,
       },
     ];
   } else if (role === 'admin') {
@@ -122,49 +125,31 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
 
     items = [
       {
-        id: 'adm-approvals',
-        title: '1. Xét duyệt tài khoản thí sinh chờ duyệt',
-        description: `Đối soát danh sách sinh viên đăng ký (${pendingCandidates.length} tài khoản đang chờ duyệt).`,
-        isCompleted: pendingCandidates.length === 0,
-        actionLabel: pendingCandidates.length > 0 ? 'Duyệt hồ sơ ngay' : 'Đã duyệt xong',
-        actionRoute: '/admin/approvals',
-        icon: <UserCheck size={16} className="text-amber-400" />,
-      },
-      {
-        id: 'adm-topics',
-        title: '2. Kiểm tra danh mục đề tài & Hạn ngạch (Quota)',
-        description: `Kiểm tra ${majorTopics.length} lĩnh vực lớn và chỉ tiêu số lượng đội tối đa cho từng nhánh.`,
-        isCompleted: majorTopics.length > 0,
-        actionLabel: 'Cấu hình đề tài',
-        actionRoute: '/admin/topics',
-        icon: <Lightbulb size={16} className="text-indigo-400" />,
-      },
-      {
-        id: 'adm-cps',
-        title: '3. Cấu hình mốc thời gian các chặng thi',
-        description: `Thiết lập thời hạn đóng cổng (Deadline) và tỷ trọng điểm cho ${checkpoints.length} chặng thi.`,
-        isCompleted: checkpoints.length > 0,
-        actionLabel: 'Cấu hình chặng',
-        actionRoute: '/admin/checkpoints',
-        icon: <CheckSquare size={16} className="text-cyan-400" />,
+        id: 'adm-config',
+        stepNum: 1,
+        title: 'Bước 1: Cấu hình thông tin cuộc thi & Mốc thời gian',
+        description: 'Kiểm tra tên cuộc thi, quy chế và các hạn chót đóng cổng bài nộp.',
+        isCompleted: true,
+        actionLabel: 'Xem cấu hình',
+        icon: <ShieldCheck size={16} className="text-amber-400" />,
       },
       {
         id: 'adm-rubric',
-        title: '4. Cân bằng trọng số tiêu chí chấm điểm (Rubric)',
+        stepNum: 2,
+        title: 'Bước 2: Cân bằng trọng số tiêu chí chấm điểm (Rubric)',
         description: `Đảm bảo tổng trọng số đạt chính xác 100% (Hiện tại: ${totalWeight.toFixed(1)}%).`,
         isCompleted: isWeightBalanced,
-        actionLabel: 'Tiêu chí chấm',
-        actionRoute: '/admin/criteria',
+        actionLabel: isWeightBalanced ? 'Đã cân bằng 100%' : 'Cân bằng ngay',
         icon: <Scale size={16} className="text-emerald-400" />,
       },
       {
-        id: 'adm-personnel',
-        title: '5. Mời Hội đồng Giám khảo & Cố vấn chuyên môn',
-        description: 'Kiểm tra phân công chuyên gia vào hệ thống và ghép cặp hướng dẫn các lĩnh vực.',
-        isCompleted: Boolean(manualChecks['adm-personnel']),
-        actionLabel: 'Quản lý nhân sự',
-        actionRoute: '/admin/personnel',
-        icon: <Users size={16} className="text-purple-400" />,
+        id: 'adm-security',
+        stepNum: 3,
+        title: 'Bước 3: Thiết lập Chính sách Bảo mật & Chấm ẩn danh',
+        description: 'Kích hoạt chế độ mã hóa danh tính thí sinh khi Ban Giám khảo chấm thi.',
+        isCompleted: true,
+        actionLabel: 'Kiểm tra bảo mật',
+        icon: <ShieldCheck size={16} className="text-indigo-400" />,
       },
     ];
   } else if (role === 'judge') {
@@ -173,40 +158,35 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
     roleIcon = <Scale size={20} className="text-emerald-400" />;
     subtitle = 'Chuẩn bị quy trình đánh giá công tâm, chính xác theo khung tiêu chí Rubric';
 
+    const isJudgePledged = Boolean(pledgedUsers[currentUser.id]);
+
     items = [
       {
-        id: 'jdg-blind',
-        title: '1. Nắm vững quy chế chấm ẩn danh',
-        description: 'Hệ thống tự động mã hóa danh tính và trường học thành mã định danh đội để đảm bảo khách quan tuyệt đối.',
-        isCompleted: Boolean(manualChecks['jdg-blind'] ?? true),
-        icon: <ShieldCheck size={16} className="text-emerald-400" />,
+        id: 'jdg-credentials',
+        stepNum: 1,
+        title: 'Bước 1: Xác nhận hồ sơ chuyên gia & Đơn vị công tác',
+        description: 'Kiểm tra thông tin học hàm, học vị và đơn vị công tác của chuyên gia.',
+        isCompleted: true,
+        actionLabel: 'Xem hồ sơ',
+        icon: <GraduationCap size={16} className="text-cyan-400" />,
+      },
+      {
+        id: 'jdg-nda',
+        stepNum: 2,
+        title: 'Bước 2: Ký cam kết liêm chính & Tránh xung đột lợi ích',
+        description: 'Bảo mật ý tưởng dự án và cam kết từ chối chấm đội có học viên quen biết.',
+        isCompleted: isJudgePledged,
+        actionLabel: isJudgePledged ? 'Đã ký cam kết' : 'Ký cam kết ngay',
+        icon: <FileCheck size={16} className="text-emerald-400" />,
       },
       {
         id: 'jdg-rubric',
-        title: '2. Nghiên cứu bộ tiêu chí chấm điểm (Rubric)',
-        description: 'Nắm vững 4 tiêu chuẩn chấm điểm cốt lõi và thang điểm tối đa cho từng hạng mục.',
-        isCompleted: Boolean(manualChecks['jdg-rubric']),
-        actionLabel: 'Xem tiêu chí',
-        actionRoute: '/judge/topics',
-        icon: <BookOpen size={16} className="text-indigo-400" />,
-      },
-      {
-        id: 'jdg-assigned',
-        title: '3. Kiểm tra danh sách đội thi được phân công',
-        description: 'Theo dõi tiến độ nộp bài của các đội thi thuộc lĩnh vực chuyên môn bạn phụ trách.',
-        isCompleted: Boolean(manualChecks['jdg-assigned']),
-        actionLabel: 'Danh sách đội',
-        actionRoute: '/judge/dashboard',
-        icon: <Users size={16} className="text-cyan-400" />,
-      },
-      {
-        id: 'jdg-split',
-        title: '4. Làm quen với giao diện Chấm song song',
-        description: 'Trải nghiệm màn hình chia đôi vừa tra cứu commit code / slide vừa nhập điểm trực tiếp.',
-        isCompleted: Boolean(manualChecks['jdg-split']),
-        actionLabel: 'Thử chấm song song',
-        actionRoute: '/judge/split-screen',
-        icon: <Award size={16} className="text-purple-400" />,
+        stepNum: 3,
+        title: 'Bước 3: Nắm vững Rubric & Giao diện chấm 2 màn hình',
+        description: 'Làm quen màn hình đối chiếu mã nguồn GitHub, video demo và bảng điểm.',
+        isCompleted: true,
+        actionLabel: 'Xem hướng dẫn',
+        icon: <BookOpen size={16} className="text-purple-400" />,
       },
     ];
   } else if (role === 'mentor') {
@@ -218,43 +198,31 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
     items = [
       {
         id: 'men-scope',
-        title: '1. Kiểm tra thông tin & Lĩnh vực phụ trách',
-        description: 'Xác nhận thông tin chuyên môn và các đề tài thuộc lĩnh vực bạn đảm nhiệm.',
-        isCompleted: Boolean(manualChecks['men-scope'] ?? true),
+        stepNum: 1,
+        title: 'Bước 1: Xác nhận lĩnh vực công nghệ cố vấn',
+        description: 'Kiểm tra lĩnh vực chuyên môn hỗ trợ và các đề tài thuộc lĩnh vực phụ trách.',
+        isCompleted: true,
+        actionLabel: 'Xem lĩnh vực',
         icon: <UserCheck size={16} className="text-cyan-400" />,
       },
       {
-        id: 'men-topics',
-        title: '2. Xem danh sách các đề tài & yêu cầu kỹ thuật',
-        description: 'Nắm bắt các bài toán mẫu, tập dữ liệu đầu vào và các tiêu chí kỹ thuật cần đạt.',
-        isCompleted: Boolean(manualChecks['men-topics']),
-        actionLabel: 'Xem đề tài',
-        actionRoute: '/mentor/dashboard',
-        icon: <Lightbulb size={16} className="text-amber-400" />,
-      },
-      {
-        id: 'men-tickets',
-        title: '3. Sẵn sàng tiếp nhận yêu cầu hỗ trợ (Tickets)',
-        description: 'Trực tiếp tiếp nhận và giải đáp thắc mắc về API, dữ liệu hoặc mô hình từ thí sinh.',
-        isCompleted: Boolean(manualChecks['men-tickets']),
-        actionLabel: 'Tiếp nhận hỗ trợ',
-        actionRoute: '/mentor/tickets',
-        icon: <MessageSquare size={16} className="text-indigo-400" />,
-      },
-      {
-        id: 'men-progress',
-        title: '4. Theo dõi tiến độ nộp bài các chặng',
-        description: 'Đôn đốc các đội nộp đúng hạn chót (tuân thủ quy định RBAC không can thiệp mã nguồn nộp).',
-        isCompleted: Boolean(manualChecks['men-progress']),
-        actionLabel: 'Xem tiến độ chặng',
-        actionRoute: '/mentor/checkpoints',
-        icon: <CheckSquare size={16} className="text-emerald-400" />,
+        id: 'men-sla',
+        stepNum: 2,
+        title: 'Bước 2: Quy tắc ứng xử & Cam kết thời gian phản hồi',
+        description: 'Tiếp nhận vé hỗ trợ trong 30 phút và tuân thủ nguyên tắc định hướng kỹ thuật.',
+        isCompleted: true,
+        actionLabel: 'Xem quy chế',
+        icon: <HelpCircle size={16} className="text-indigo-400" />,
       },
     ];
   }
 
   const completedCount = items.filter((i) => i.isCompleted).length;
   const progressPercent = Math.round((completedCount / items.length) * 100);
+  const isAllDone = completedCount === items.length;
+
+  // Find first unfinished step
+  const firstUnfinished = items.find((i) => !i.isCompleted) || items[0];
 
   return (
     <div className="rounded-[16px] border border-[#6366F1]/40 bg-gradient-to-br from-[#1E293B] via-[#1E293B]/95 to-[#162033] p-5 lg:p-6 shadow-xl relative overflow-hidden transition-all duration-300">
@@ -272,7 +240,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
               <h3 className="font-['Righteous'] text-lg sm:text-xl text-white tracking-wide">
                 {title}
               </h3>
-              <Badge variant="indigo" className="text-[10px]">
+              <Badge variant={isAllDone ? 'success' : 'warning'} className="text-[10px]">
                 {roleBadge}
               </Badge>
             </div>
@@ -292,6 +260,19 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
               />
             </div>
           </div>
+
+          {/* Primary Action Button to Open Wizard */}
+          <button
+            onClick={() => openWizardAtStep(firstUnfinished.stepNum)}
+            className={`px-3 py-1.5 rounded-[8px] text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer ${
+              isAllDone
+                ? 'bg-[#1E293B] hover:bg-[#334155] text-emerald-400 border border-emerald-500/40'
+                : 'bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-[#6366F1]/25 ring-2 ring-[#6366F1]/30 animate-pulse'
+            }`}
+          >
+            <span>{isAllDone ? 'Xem lại thiết lập' : `Làm Bước ${firstUnfinished.stepNum}`}</span>
+            <ArrowRight size={14} />
+          </button>
 
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -314,28 +295,23 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
                 key={item.id}
                 className={`p-3.5 rounded-[12px] border transition-all flex flex-col justify-between gap-3 ${
                   isDone
-                    ? 'bg-[#0F172A]/40 border-emerald-500/40 text-slate-300'
+                    ? 'bg-[#0F172A]/40 border-emerald-500/30 text-slate-300'
                     : 'bg-[#0F172A]/80 border-[#334155] hover:border-[#6366F1]/50 text-white'
                 }`}
               >
                 <div className="flex items-start gap-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleManualCheck(item.id)}
-                    className="mt-0.5 shrink-0 transition-transform hover:scale-110"
-                    title={isDone ? 'Đã hoàn thành' : 'Đánh dấu hoàn thành'}
-                  >
+                  <div className="mt-0.5 shrink-0">
                     {isDone ? (
                       <CheckCircle2 size={18} className="text-emerald-400" />
                     ) : (
-                      <Circle size={18} className="text-slate-500 hover:text-[#818CF8]" />
+                      <Circle size={18} className="text-amber-400 animate-pulse" />
                     )}
-                  </button>
+                  </div>
 
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5">
                       {item.icon}
-                      <span className={`text-xs font-bold ${isDone ? 'text-emerald-300 line-through' : 'text-white'}`}>
+                      <span className={`text-xs font-bold ${isDone ? 'text-emerald-300' : 'text-white'}`}>
                         {item.title}
                       </span>
                     </div>
@@ -345,21 +321,19 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
                   </div>
                 </div>
 
-                {item.actionRoute && (
-                  <div className="self-end pt-1">
-                    <button
-                      onClick={() => navigate(item.actionRoute!)}
-                      className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-[8px] transition-all ${
-                        isDone
-                          ? 'text-slate-400 hover:text-white bg-[#1E293B] border border-[#334155]'
-                          : 'text-[#818CF8] hover:text-white bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/40'
-                      }`}
-                    >
-                      <span>{item.actionLabel || 'Xem ngay'}</span>
-                      <ArrowRight size={12} />
-                    </button>
-                  </div>
-                )}
+                <div className="self-end pt-1">
+                  <button
+                    onClick={() => openWizardAtStep(item.stepNum)}
+                    className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-[8px] transition-all cursor-pointer ${
+                      isDone
+                        ? 'text-slate-400 hover:text-white bg-[#1E293B] border border-[#334155]'
+                        : 'text-white bg-[#6366F1] hover:bg-[#4F46E5] shadow-sm shadow-[#6366F1]/30'
+                    }`}
+                  >
+                    <span>{item.actionLabel || 'Thực hiện bước này'}</span>
+                    <ArrowRight size={12} />
+                  </button>
+                </div>
               </div>
             );
           })}
