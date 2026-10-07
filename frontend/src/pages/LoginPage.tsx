@@ -16,13 +16,13 @@ export const LoginPage: React.FC = () => {
 
   const [activeTab, setActiveTab] = useState<LoginTab>('candidate');
 
-  // Candidate form states
-  const [candidateEmail, setCandidateEmail] = useState('leader@cybersamurai.team');
-  const [candidatePassword, setCandidatePassword] = useState('123456');
+  // Candidate form states (clean, not pre-filled)
+  const [candidateEmail, setCandidateEmail] = useState('');
+  const [candidatePassword, setCandidatePassword] = useState('');
 
-  // Other roles form states
-  const [otherUsername, setOtherUsername] = useState('admin');
-  const [otherPassword, setOtherPassword] = useState('123456');
+  // Other roles form states (clean, not pre-filled)
+  const [otherUsername, setOtherUsername] = useState('');
+  const [otherPassword, setOtherPassword] = useState('');
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -308,7 +308,7 @@ export const LoginPage: React.FC = () => {
                           type="text"
                           value={candidateEmail}
                           onChange={(e) => setCandidateEmail(e.target.value)}
-                          placeholder="leader@cybersamurai.team"
+                          placeholder="Nhập email thí sinh..."
                           required
                           className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
                         />
@@ -325,7 +325,7 @@ export const LoginPage: React.FC = () => {
                           type={showPassword ? 'text' : 'password'}
                           value={candidatePassword}
                           onChange={(e) => setCandidatePassword(e.target.value)}
-                          placeholder="••••••"
+                          placeholder="••••••••"
                           required
                           className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
                         />
@@ -375,27 +375,6 @@ export const LoginPage: React.FC = () => {
                     )}
                     <span>{isLoadingGithub ? 'Đang kết nối GitHub...' : 'Đăng nhập bằng GitHub'}</span>
                   </button>
-
-                  {/* Candidate Account Hint */}
-                  <div className="rounded-[12px] border border-[#334155]/80 bg-[#0F172A]/70 p-3 text-xs text-slate-300 space-y-1.5">
-                    <div className="font-medium text-[#818CF8]">💡 Tài khoản thí sinh thử nghiệm:</div>
-                    <div className="space-y-1 text-[11px] text-slate-300">
-                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
-                        <div>
-                          <span className="font-semibold text-white">Đội trưởng: </span>
-                          <span className="font-mono text-slate-400">leader@cybersamurai.team</span>
-                        </div>
-                        <span className="font-mono text-indigo-300">123456</span>
-                      </div>
-                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
-                        <div>
-                          <span className="font-semibold text-white">Thành viên: </span>
-                          <span className="font-mono text-slate-400">member@cybersamurai.team</span>
-                        </div>
-                        <span className="font-mono text-indigo-300">123456</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
@@ -412,7 +391,7 @@ export const LoginPage: React.FC = () => {
                           type="text"
                           value={otherUsername}
                           onChange={(e) => setOtherUsername(e.target.value)}
-                          placeholder="admin, judge hoặc mentor"
+                          placeholder="Nhập tài khoản quản lý..."
                           required
                           className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
                         />
@@ -429,7 +408,7 @@ export const LoginPage: React.FC = () => {
                           type={showPassword ? 'text' : 'password'}
                           value={otherPassword}
                           onChange={(e) => setOtherPassword(e.target.value)}
-                          placeholder="••••••"
+                          placeholder="••••••••"
                           required
                           className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-2.5 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
                         />
@@ -454,34 +433,6 @@ export const LoginPage: React.FC = () => {
                       <span>Đăng nhập hệ thống</span>
                     </Button>
                   </form>
-
-                  {/* Others Account Hint */}
-                  <div className="rounded-[12px] border border-[#334155]/80 bg-[#0F172A]/70 p-3 text-xs text-slate-300 space-y-1.5">
-                    <div className="font-medium text-[#818CF8]">💡 Tài khoản điều hành & chuyên môn:</div>
-                    <div className="space-y-1 text-[11px] text-slate-300">
-                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
-                        <div>
-                          <span className="font-semibold text-white">Quản trị viên: </span>
-                          <span className="font-mono text-slate-400">admin</span>
-                        </div>
-                        <span className="font-mono text-indigo-300">123456</span>
-                      </div>
-                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
-                        <div>
-                          <span className="font-semibold text-white">Ban Giám khảo: </span>
-                          <span className="font-mono text-slate-400">judge</span>
-                        </div>
-                        <span className="font-mono text-indigo-300">123456</span>
-                      </div>
-                      <div className="flex justify-between items-center rounded-lg bg-[#1E293B] p-2 border border-[#334155]/60">
-                        <div>
-                          <span className="font-semibold text-white">Cố vấn chuyên môn: </span>
-                          <span className="font-mono text-slate-400">mentor</span>
-                        </div>
-                        <span className="font-mono text-indigo-300">123456</span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
             </div>
