@@ -4,6 +4,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { useNavigate } from 'react-router-dom';
+import { InitialRoleTodoBanner } from '../../components/common/InitialRoleTodoBanner';
 import {
   Users,
   ShieldCheck,
@@ -98,6 +99,9 @@ export const AdminDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Checklist nhiệm vụ thiết lập ban đầu cho Ban Quản Trị */}
+      <InitialRoleTodoBanner role="admin" />
 
       {/* 4 Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

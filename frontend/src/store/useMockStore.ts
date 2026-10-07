@@ -970,7 +970,7 @@ export const useMockStore = create<MockStoreState>()(
       },
     }),
     {
-      name: 'hackflow-mock-state-v2', // v2 to avoid stale localStorage issues
+      name: 'hackflow-mock-state-v4', // v4 to guarantee clean ground zero state
     }
   )
 );

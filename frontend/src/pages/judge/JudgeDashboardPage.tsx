@@ -3,6 +3,7 @@ import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { useNavigate } from 'react-router-dom';
+import { InitialRoleTodoBanner } from '../../components/common/InitialRoleTodoBanner';
 import {
   Columns,
   EyeOff,
@@ -75,6 +76,9 @@ export const JudgeDashboardPage: React.FC = () => {
           </span>
         </div>
       )}
+
+      {/* Checklist nhiệm vụ ban đầu cho Ban Giám Khảo */}
+      <InitialRoleTodoBanner role="judge" />
 
       {/* Teams Assigned to Judge Table */}
       <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">

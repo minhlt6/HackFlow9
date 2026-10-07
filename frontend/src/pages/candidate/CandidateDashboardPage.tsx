@@ -5,6 +5,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { useNavigate } from 'react-router-dom';
+import { InitialRoleTodoBanner } from '../../components/common/InitialRoleTodoBanner';
 import {
   Users,
   Lightbulb,
@@ -104,6 +105,9 @@ export const CandidateDashboardPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Checklist nhiệm vụ ban đầu cho Thí sinh */}
+      <InitialRoleTodoBanner role="candidate" />
 
       {/* Countdown Timer Component */}
       <CountdownTimer

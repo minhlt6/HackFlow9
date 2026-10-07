@@ -4,6 +4,7 @@ import { StatCard } from '../../components/common/StatCard';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { useNavigate } from 'react-router-dom';
+import { InitialRoleTodoBanner } from '../../components/common/InitialRoleTodoBanner';
 import {
   HelpCircle,
   Users,
@@ -59,6 +60,9 @@ export const MentorDashboardPage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Checklist nhiệm vụ ban đầu cho Cố vấn */}
+      <InitialRoleTodoBanner role="mentor" />
 
       {/* 3 Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

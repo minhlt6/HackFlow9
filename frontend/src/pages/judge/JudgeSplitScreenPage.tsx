@@ -140,6 +140,20 @@ export const JudgeSplitScreenPage: React.FC = () => {
     ? `Đội thi #${(currentTeamIndex + 1).toString().padStart(2, '0')}`
     : selectedTeam?.name;
 
+  if (teams.length === 0 || !selectedTeam) {
+    return (
+      <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-12 text-center font-['Roboto']">
+        <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4">
+          <CheckSquare size={32} />
+        </div>
+        <h3 className="text-xl font-bold font-['Righteous'] text-white tracking-wide mb-2">Chưa có đội thi sẵn sàng chấm điểm</h3>
+        <p className="text-slate-400 text-sm max-w-md mx-auto">
+          Hiện tại hệ thống đang ở giai đoạn đầu của cuộc thi. Danh sách sản phẩm chung kết sẽ hiển thị tại đây ngay khi các đội hoàn thành bài nộp.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 font-['Roboto'] h-[calc(100vh-100px)] flex flex-col">
       {/* Top Bar: Team Switcher & Header */}
