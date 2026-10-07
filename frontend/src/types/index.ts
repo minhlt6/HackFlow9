@@ -108,6 +108,7 @@ export interface Checkpoint {
   requirements?: string[];
   startTime?: string;
   deadline: string;
+  durationMinutes?: number;
   weight?: number;
   points?: number;
   penaltyPerDay?: number;

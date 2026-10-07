@@ -17,7 +17,15 @@ import {
 } from 'lucide-react';
 
 export const CandidateCheckpointsPage: React.FC = () => {
-  const { currentUser, teams, checkpoints, submissions, submitCheckpoint, openWizardAtStep } = useMockStore();
+  const { currentUser, teams, checkpoints, submissions, submitCheckpoint, openWizardAtStep, config } = useMockStore();
+
+  const formatDuration = (mins: number) => {
+    if (!mins || mins <= 0) return '0 phút';
+    if (mins < 60) return `${mins} phút`;
+    const hours = Math.floor(mins / 60);
+    const rem = mins % 60;
+    return rem > 0 ? `${hours} giờ ${rem} phút` : `${hours} giờ`;
+  };
 
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
   const isLeader = currentUser.teamRole === 'leader' || myTeam?.leaderId === currentUser.id;
@@ -121,19 +129,37 @@ export const CandidateCheckpointsPage: React.FC = () => {
                         ? 'Đã quá hạn'
                         : 'Đang mở nộp bài'}
                     </Badge>
-                    <Badge variant="indigo">Trọng số {cp.weight}%</Badge>
+                    <Badge variant="indigo">
+                      Thời lượng: {cp.durationMinutes || 180} phút ({formatDuration(cp.durationMinutes || 180)})
+                    </Badge>
+                    <Badge variant="indigo">Trọng số {cp.weight || 20}%</Badge>
                   </div>
 
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
                     {cp.description}
                   </p>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-400">
-                    <Clock size={14} className="text-[#818CF8]" />
-                    <span>Hạn nộp chính thức:</span>
-                    <span className="font-semibold text-white">
-                      {new Date(cp.deadline).toLocaleString('vi-VN')}
-                    </span>
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                    <div className="flex items-center gap-1.5">
+                      <Clock size={14} className="text-[#818CF8]" />
+                      <span>Thời lượng làm bài:</span>
+                      <span className="font-semibold text-white">
+                        {cp.durationMinutes || 180} phút ({formatDuration(cp.durationMinutes || 180)})
+                      </span>
+                    </div>
+
+                    <span>•</span>
+
+                    {config.isContestStarted ? (
+                      <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Hạn nộp chính thức: {new Date(cp.deadline).toLocaleString('vi-VN')}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1.5 text-amber-300">
+                        <span>Cuộc thi chưa bắt đầu (Thời hạn sẽ bắt đầu tính khi BTC phát lệnh)</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

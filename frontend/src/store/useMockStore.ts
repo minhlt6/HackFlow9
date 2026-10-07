@@ -81,9 +81,11 @@ interface MockStoreState {
   checkpoints: Checkpoint[];
   submissions: CheckpointSubmission[];
   finalSubmissions: FinalSubmission[];
-  addCheckpoint: (cp: Omit<Checkpoint, 'id'>) => void;
+  addCheckpoint: (cp: Omit<Checkpoint, 'id'>, insertIndex?: number) => void;
   updateCheckpoint: (id: string, updates: Partial<Checkpoint>) => void;
   deleteCheckpoint: (id: string) => void;
+  reorderCheckpoints: (fromIndex: number, toIndex: number) => void;
+  sortCheckpointsByDeadline: () => void;
   submitCheckpoint: (checkpointId: string, teamId: string, repoUrl: string, demoUrl?: string) => { success: boolean; commitSha: string };
   submitFinalProject: (teamId: string, repoUrl: string, demoVideoUrl: string, slideUrl: string, summary: string) => { success: boolean; commitSha: string };
 
@@ -210,15 +212,28 @@ export const useMockStore = create<MockStoreState>()(
       toggleContestStarted: () => {
         set((state) => {
           const nextStarted = !state.config.isContestStarted;
+          const now = Date.now();
+          const updatedCheckpoints = nextStarted
+            ? state.checkpoints.map((cp) => {
+                const duration = cp.durationMinutes || 180;
+                return {
+                  ...cp,
+                  deadline: new Date(now + duration * 60 * 1000).toISOString(),
+                  status: 'open' as const,
+                };
+              })
+            : state.checkpoints;
+
           return {
             config: {
               ...state.config,
               isContestStarted: nextStarted,
-              contestStartedAt: nextStarted ? new Date().toISOString() : undefined,
+              contestStartedAt: nextStarted ? new Date(now).toISOString() : undefined,
               currentPhase: nextStarted
                 ? 'Giai đoạn 2: Lập trình tập trung & Chạy nước rút'
                 : 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi',
             },
+            checkpoints: updatedCheckpoints,
           };
         });
       },
@@ -669,16 +684,66 @@ export const useMockStore = create<MockStoreState>()(
       finalSubmissions: initialFinalSubmissions,
 
       addCheckpoint: (cp) => {
+        const duration = cp.durationMinutes || 180;
+        const startedAt = get().config.contestStartedAt;
+        const baseTime = startedAt ? new Date(startedAt).getTime() : Date.now();
+        const calculatedDeadline = cp.deadline || new Date(baseTime + duration * 60 * 1000).toISOString();
+
         const newCp: Checkpoint = {
           ...cp,
+          durationMinutes: duration,
+          deadline: calculatedDeadline,
           id: `cp-${Date.now()}`,
         };
         set((state) => ({ checkpoints: [...state.checkpoints, newCp] }));
       },
 
+      reorderCheckpoints: (fromIndex, toIndex) => {
+        set((state) => {
+          if (
+            fromIndex < 0 ||
+            fromIndex >= state.checkpoints.length ||
+            toIndex < 0 ||
+            toIndex >= state.checkpoints.length
+          ) {
+            return state;
+          }
+          const updated = [...state.checkpoints];
+          const [moved] = updated.splice(fromIndex, 1);
+          updated.splice(toIndex, 0, moved);
+          return { checkpoints: updated };
+        });
+      },
+
+      sortCheckpointsByDeadline: () => {
+        set((state) => ({
+          checkpoints: [...state.checkpoints].sort(
+            (a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()
+          ),
+        }));
+      },
+
       updateCheckpoint: (id, updates) => {
         set((state) => ({
-          checkpoints: state.checkpoints.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+          checkpoints: state.checkpoints.map((c) => {
+            if (c.id !== id) return c;
+            const newDuration =
+              updates.durationMinutes !== undefined ? updates.durationMinutes : c.durationMinutes || 180;
+            const startedAt = state.config.contestStartedAt;
+            const baseTime = startedAt ? new Date(startedAt).getTime() : Date.now();
+            const calculatedDeadline =
+              updates.deadline ||
+              (updates.durationMinutes !== undefined
+                ? new Date(baseTime + newDuration * 60 * 1000).toISOString()
+                : c.deadline);
+
+            return {
+              ...c,
+              ...updates,
+              durationMinutes: newDuration,
+              deadline: calculatedDeadline,
+            };
+          }),
         }));
       },
 

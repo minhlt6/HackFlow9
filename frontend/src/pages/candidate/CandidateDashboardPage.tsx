@@ -234,7 +234,7 @@ export const CandidateDashboardPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-semibold text-white">{cp.title}</p>
                         <p className="text-xs text-slate-400">
-                          Hạn chót: {new Date(cp.deadline).toLocaleDateString('vi-VN')} • Trọng số: {cp.weight}%
+                          Thời lượng: {cp.durationMinutes || 180} phút • Trọng số: {cp.weight || 20}%
                         </p>
                       </div>
                     </div>
