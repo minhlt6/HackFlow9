@@ -245,7 +245,7 @@ export const AdminTeamsPage: React.FC = () => {
 
                     <div className="text-right">
                       <span className="font-mono text-[#818CF8] block">@{m.githubUsername || 'user'}</span>
-                      <span className="text-[11px] text-slate-400">{m.university || 'VinUni'}</span>
+                      <span className="text-[11px] text-slate-400">{m.university || 'ĐH Bách Khoa'}</span>
                     </div>
                   </div>
                 ))}

@@ -261,7 +261,7 @@ export const CandidateTeamsPage: React.FC = () => {
                           </td>
 
                           <td className="py-3.5 px-4 hidden md:table-cell text-slate-300">
-                            {m.university || 'VinUniversity'}
+                            {m.university || 'Đại học Bách Khoa Hà Nội'}
                           </td>
 
                           <td className="py-3.5 px-4 text-right">

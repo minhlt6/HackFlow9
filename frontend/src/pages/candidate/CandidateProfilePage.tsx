@@ -20,7 +20,7 @@ export const CandidateProfilePage: React.FC = () => {
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
 
   const [fullName, setFullName] = useState(currentUser.fullName);
-  const [university, setUniversity] = useState(currentUser.university || 'VinUniversity');
+  const [university, setUniversity] = useState(currentUser.university || 'Đại học Bách Khoa Hà Nội');
   const [studentId, setStudentId] = useState(currentUser.studentId || '2023-CS-0842');
   const [bio, setBio] = useState(
     'Sinh viên năm 4 đam mê Computer Vision và Generative AI. Đã có kinh nghiệm tham gia 2 kỳ Hackathon.',

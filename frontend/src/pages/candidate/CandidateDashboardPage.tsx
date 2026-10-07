@@ -181,7 +181,7 @@ export const CandidateDashboardPage: React.FC = () => {
             <div className="flex flex-wrap items-center justify-between pt-2 text-xs text-slate-400 border-t border-[#334155]/60 gap-3">
               <div className="flex items-center gap-2">
                 <span>Cố vấn phụ trách lĩnh vực:</span>
-                <span className="font-semibold text-white">Dr. Lê Quang (VinUni AI Lab)</span>
+                <span className="font-semibold text-white">Dr. Lê Quang (AI Research Lab)</span>
               </div>
               <button
                 onClick={() => navigate('/topics')}

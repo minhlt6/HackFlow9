@@ -28,9 +28,9 @@ export const AdminWhitelistPage: React.FC = () => {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [singleEmail, setSingleEmail] = useState('');
-  const [singleNote, setSingleNote] = useState('Sinh viên VinUni K20');
+  const [singleNote, setSingleNote] = useState('Sinh viên Khóa K20');
   const [bulkText, setBulkText] = useState(
-    'candidate1@vinuni.edu.vn\ncandidate2@vinuni.edu.vn\ncandidate3@hust.edu.vn',
+    'candidate1@uet.vnu.edu.vn\ncandidate2@fpt.edu.vn\ncandidate3@hust.edu.vn',
   );
   const [alert, setAlert] = useState<string | null>(null);
 
@@ -182,7 +182,7 @@ export const AdminWhitelistPage: React.FC = () => {
           <Input
             label="Địa chỉ Email *"
             type="email"
-            placeholder="student@vinuni.edu.vn"
+            placeholder="student@university.edu.vn"
             value={singleEmail}
             onChange={(e) => setSingleEmail(e.target.value)}
             required
@@ -190,7 +190,7 @@ export const AdminWhitelistPage: React.FC = () => {
 
           <Input
             label="Ghi chú (Trường, Khóa học...)"
-            placeholder="Ví dụ: Sinh viên VinUni Khoa CNTT"
+            placeholder="Ví dụ: Sinh viên Bách Khoa Khoa CNTT"
             value={singleNote}
             onChange={(e) => setSingleNote(e.target.value)}
           />

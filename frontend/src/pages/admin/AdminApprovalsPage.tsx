@@ -128,7 +128,7 @@ export const AdminApprovalsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 hidden md:table-cell text-slate-300">
-                      {cand.university || 'VinUniversity'}
+                      {cand.university || 'Đại học Bách Khoa'}
                     </td>
 
                     <td className="py-3.5 px-4 text-center">

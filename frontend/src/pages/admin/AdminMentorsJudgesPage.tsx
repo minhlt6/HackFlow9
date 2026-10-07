@@ -27,7 +27,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
     {
       id: 'judge-1',
       name: 'Dr. Alan Vance',
-      email: 'alan.vance@vinuni.edu.vn',
+      email: 'alan.vance@techuniv.edu.vn',
       specialization: 'AI & Data Science (Head Judge)',
       assignedCount: 6,
       avatar: 'A',
@@ -54,7 +54,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
     {
       id: 'mentor-1',
       name: 'Dr. Lê Quang',
-      email: 'le.quang@vinuni.edu.vn',
+      email: 'le.quang@techuniv.edu.vn',
       topic: 'AI trong Y tế & Chẩn đoán bệnh án',
       openTickets: 2,
       avatar: 'L',
