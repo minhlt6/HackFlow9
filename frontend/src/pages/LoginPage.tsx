@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, UserRound } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff, UserRound } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { axiosClient } from '../api/axiosClient';
 import { useAuthStore } from '../store/useAuthStore';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 
-type LoginMode = 'selection' | 'admin';
+type LoginMode = 'selection' | 'admin' | 'candidate';
 
 export const LoginPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -99,7 +99,7 @@ export const LoginPage: React.FC = () => {
             </p>
           </section>
 
-          <section className="min-h-[min(851px,calc(100vh-48px))] w-full rounded-[12px] border border-[#334155] bg-[#1E293B] p-8 shadow-none sm:p-12 lg:mt-[25px] lg:h-[851px] lg:min-h-0 lg:px-[45px] lg:pb-[64px] lg:pt-[80px]">
+          <section className="relative min-h-[min(851px,calc(100vh-48px))] w-full rounded-[12px] border border-[#334155] bg-[#1E293B] p-8 shadow-none sm:p-12 lg:mt-[25px] lg:h-[851px] lg:min-h-0 lg:px-[45px] lg:pb-[64px] lg:pt-[80px]">
             <div className="flex min-h-full flex-col items-center">
               <h1
                 className="text-center font-['Righteous'] text-[42px] font-normal leading-none sm:text-[52px] lg:text-[64px]"
@@ -112,7 +112,7 @@ export const LoginPage: React.FC = () => {
                 HACKFLOW
               </h1>
 
-              {loginMode === 'admin' && (
+              {(loginMode === 'admin' || loginMode === 'candidate') && (
                 <div className="mt-4 text-center font-['Roboto']">
                   <p
                     className="text-[24px] font-medium leading-normal"
@@ -125,7 +125,7 @@ export const LoginPage: React.FC = () => {
                     Cổng đăng nhập hệ thống
                   </p>
                   <p className="mt-8 text-[24px] font-medium leading-normal text-white">
-                    Dành cho quản trị
+                    {loginMode === 'admin' ? 'Dành cho quản trị' : 'Dành cho thí sinh'}
                   </p>
                 </div>
               )}
@@ -152,8 +152,10 @@ export const LoginPage: React.FC = () => {
 
                   <Button
                     type="button"
-                    isLoading={isLoadingGithub}
-                    onClick={handleGithubLogin}
+                    onClick={() => {
+                      setErrorMessage(null);
+                      setLoginMode('candidate');
+                    }}
                     className="!min-h-[79px] !w-full !rounded-full !bg-[#16A34A] px-6 py-[10px] font-['Roboto'] text-[18px] font-bold text-white hover:!bg-[#12823b] sm:text-[24px]"
                   >
                     <svg className="h-6 w-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
@@ -162,14 +164,44 @@ export const LoginPage: React.FC = () => {
                     <span>Thí sinh đăng nhập</span>
                   </Button>
                 </div>
+              ) : loginMode === 'candidate' ? (
+                <div className="mt-12 flex w-full flex-1 flex-col font-['Roboto'] sm:mt-16 lg:mt-[72px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErrorMessage(null);
+                      setLoginMode('selection');
+                    }}
+                    aria-label="Quay lại chọn loại tài khoản"
+                    className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-md text-[#8B5CF6] transition-colors hover:bg-[#8B5CF6]/10 hover:text-[#A78BFA] sm:left-6 sm:top-6"
+                  >
+                    <ArrowLeft size={28} strokeWidth={2.5} aria-hidden="true" />
+                  </button>
+
+                  <Button
+                    type="button"
+                    isLoading={isLoadingGithub}
+                    onClick={handleGithubLogin}
+                    className="mt-16 !min-h-[68px] !w-full !rounded-full !bg-[#16A34A] px-6 py-[10px] font-['Roboto'] text-[18px] font-bold text-white hover:!bg-[#12823b] sm:mt-20 sm:!min-h-[79px] sm:text-[24px]"
+                  >
+                    <svg className="h-6 w-6 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    </svg>
+                    <span>Đăng nhập bằng GitHub</span>
+                  </Button>
+                </div>
               ) : (
                 <form onSubmit={handleAdminLogin} className="mt-16 flex w-full flex-col gap-5">
                   <button
                     type="button"
-                    onClick={() => setLoginMode('selection')}
-                    className="self-start text-sm text-slate-300 underline underline-offset-4 hover:text-white"
+                    onClick={() => {
+                      setErrorMessage(null);
+                      setLoginMode('selection');
+                    }}
+                    aria-label="Quay lại chọn loại tài khoản"
+                    className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-md text-[#8B5CF6] transition-colors hover:bg-[#8B5CF6]/10 hover:text-[#A78BFA] sm:left-6 sm:top-6"
                   >
-                    Quay lại chọn loại tài khoản
+                    <ArrowLeft size={28} strokeWidth={2.5} aria-hidden="true" />
                   </button>
                   <Input
                     label="Tài khoản"
@@ -196,7 +228,7 @@ export const LoginPage: React.FC = () => {
                       type="button"
                       aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       onClick={() => setShowPassword((isVisible) => !isVisible)}
-                      className="absolute right-3 top-[34px] text-[#6366F1]"
+                      className="absolute right-3 top-[58px] -translate-y-1/2 text-[#6366F1]"
                     >
                       {showPassword ? <EyeOff size={24} /> : <Eye size={24} />}
                     </button>
