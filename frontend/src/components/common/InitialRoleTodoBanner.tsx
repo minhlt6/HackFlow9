@@ -20,6 +20,7 @@ import {
   FileCheck,
   AlertCircle,
   HelpCircle,
+  X,
 } from 'lucide-react';
 import { Badge } from '../Badge';
 
@@ -43,6 +44,8 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
   } = useMockStore();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [isDismissed, setIsDismissed] = useState(false);
 
   // Find candidate's team
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
@@ -217,6 +220,52 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
   // Find first unfinished mandatory step
   const firstUnfinished = items.find((i) => !i.isCompleted) || items[0];
 
+  // Khi đã hoàn thành toàn bộ lộ trình nhiệm vụ, mặc định ẩn đi (hiển thị thanh trạng thái thu gọn)
+  if (isAllDone && !isExpanded) {
+    if (isDismissed) return null;
+
+    return (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-[14px] bg-[#1E293B]/70 border border-emerald-500/25 shadow-lg backdrop-blur-sm transition-all duration-300">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+            <CheckCircle2 size={16} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-white">
+                {title}
+              </span>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                <CheckCircle2 size={10} />
+                Đã hoàn tất ({completedCount}/{items.length})
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Bạn đã hoàn thành các bước thiết lập ban đầu. Lộ trình được mặc định thu gọn để tối ưu không gian làm việc.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="px-3 py-1.5 rounded-[8px] text-xs font-semibold text-[#818CF8] hover:text-white bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/30 flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <span>Xem chi tiết lộ trình</span>
+            <ChevronDown size={14} />
+          </button>
+          <button
+            onClick={() => setIsDismissed(true)}
+            className="p-1.5 rounded-[8px] text-slate-400 hover:text-white hover:bg-[#334155] transition-colors cursor-pointer"
+            title="Ẩn thông báo này"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-[16px] border border-[#6366F1]/40 bg-gradient-to-br from-[#1E293B] via-[#1E293B]/95 to-[#162033] p-5 lg:p-6 shadow-xl relative overflow-hidden transition-all duration-300">
       {/* Decorative Glow */}
@@ -267,13 +316,24 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
             <ArrowRight size={14} />
           </button>
 
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#334155]/60 transition-colors"
-            title={isCollapsed ? 'Mở rộng danh sách' : 'Thu gọn'}
-          >
-            {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-          </button>
+          {isAllDone ? (
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-[#0F172A] border border-[#334155] hover:border-slate-500 flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Thu gọn và ẩn lộ trình"
+            >
+              <span>Thu gọn</span>
+              <ChevronUp size={14} />
+            </button>
+          ) : (
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#334155]/60 transition-colors"
+              title={isCollapsed ? 'Mở rộng danh sách' : 'Thu gọn'}
+            >
+              {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
+            </button>
+          )}
         </div>
       </div>
 
