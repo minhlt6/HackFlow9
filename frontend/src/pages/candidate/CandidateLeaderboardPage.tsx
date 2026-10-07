@@ -90,7 +90,7 @@ export const CandidateLeaderboardPage: React.FC = () => {
               Kết Quả Đang Được Bảo Mật
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Hội đồng Giám khảo đang trong giai đoạn chấm thi độc lập theo Chế độ ẩn danh (Blind Judging). Điểm số sẽ chính thức được công bố tại Lễ bế mạc cuộc thi.
+              Hội đồng Giám khảo đang trong giai đoạn chấm thi độc lập theo Chế độ chấm ẩn danh. Điểm số sẽ chính thức được công bố tại Lễ bế mạc cuộc thi.
             </p>
           </div>
 
@@ -107,17 +107,17 @@ export const CandidateLeaderboardPage: React.FC = () => {
             {teamsWithScores.slice(0, 3).map((team, idx) => {
               const medals = [
                 {
-                  label: 'QUÁN QUÂN (GOLD)',
+                  label: 'QUÁN QUÂN',
                   color: 'border-amber-400 bg-amber-500/10 text-amber-300',
                   icon: Trophy,
                 },
                 {
-                  label: 'Á QUÂN 1 (SILVER)',
+                  label: 'Á QUÂN 1',
                   color: 'border-slate-300 bg-slate-400/10 text-slate-200',
                   icon: Medal,
                 },
                 {
-                  label: 'Á QUÂN 2 (BRONZE)',
+                  label: 'Á QUÂN 2',
                   color: 'border-amber-600 bg-amber-700/10 text-amber-500',
                   icon: Award,
                 },

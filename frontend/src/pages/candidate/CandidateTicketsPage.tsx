@@ -77,10 +77,10 @@ export const CandidateTicketsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Hỗ Trợ Kỹ Thuật (Helpdesk Tickets)
+            Hỗ Trợ Kỹ Thuật Trực Tuyến
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Quy trình hỗ trợ 3 bước: Thí sinh mở Ticket → Cố vấn (Mentor) tiếp nhận → Trao đổi trực tiếp và giải quyết vướng mắc.
+            Quy trình hỗ trợ 3 bước: Thí sinh gửi yêu cầu → Cố vấn chuyên môn tiếp nhận → Trao đổi trực tiếp và giải quyết vướng mắc.
           </p>
         </div>
 
@@ -276,7 +276,7 @@ export const CandidateTicketsPage: React.FC = () => {
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title="Gửi Yêu Cầu Hỗ Trợ Mới (New Ticket)"
+        title="Gửi Yêu Cầu Hỗ Trợ Mới"
       >
         <form onSubmit={handleCreate} className="space-y-4">
           <Input

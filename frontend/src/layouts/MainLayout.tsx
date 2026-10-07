@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate, Navigate } from 'react-router-dom';
 import { useMockStore } from '../store/useMockStore';
-import { QuickRoleSwitcher } from '../components/common/QuickRoleSwitcher';
 import { Badge } from '../components/Badge';
 import {
   LayoutDashboard,
@@ -47,40 +46,40 @@ export const MainLayout: React.FC = () => {
   const candidateNav = [
     { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
     { to: '/teams', label: 'Đội thi của tôi', icon: Users },
-    { to: '/topics', label: 'Chọn đề tài & Quota', icon: Lightbulb },
-    { to: '/checkpoints', label: 'Checkpoints tiến độ', icon: CheckSquare },
+    { to: '/topics', label: 'Chọn đề tài', icon: Lightbulb },
+    { to: '/checkpoints', label: 'Tiến độ các chặng', icon: CheckSquare },
     { to: '/final-submission', label: 'Nộp bài chung cuộc', icon: Send },
     { to: '/scoreboard', label: 'Bảng xếp hạng', icon: Award },
-    { to: '/tickets', label: 'Hỗ trợ Helpdesk', icon: HelpCircle },
+    { to: '/tickets', label: 'Hỗ trợ trực tuyến', icon: HelpCircle },
     { to: '/profile', label: 'Hồ sơ cá nhân', icon: User },
   ];
 
   const adminNav = [
     { to: '/admin/dashboard', label: 'Tổng quan Quản trị', icon: LayoutDashboard },
-    { to: '/admin/approvals', label: 'Duyệt tài khoản GitHub', icon: ShieldCheck },
-    { to: '/admin/whitelist', label: 'Quản lý Whitelist', icon: ListOrdered },
+    { to: '/admin/approvals', label: 'Phê duyệt tài khoản', icon: ShieldCheck },
+    { to: '/admin/whitelist', label: 'Danh sách hợp lệ', icon: ListOrdered },
     { to: '/admin/teams', label: 'Quản lý Đội thi', icon: Users },
-    { to: '/admin/topics', label: 'Đề tài & Quota Lock', icon: Lightbulb },
-    { to: '/admin/checkpoints', label: 'Cấu hình Checkpoints', icon: CheckSquare },
-    { to: '/admin/criteria', label: 'Tiêu chí Rubric Chấm', icon: Scale },
+    { to: '/admin/topics', label: 'Quản lý Đề tài', icon: Lightbulb },
+    { to: '/admin/checkpoints', label: 'Cấu hình chặng nộp', icon: CheckSquare },
+    { to: '/admin/criteria', label: 'Tiêu chí chấm điểm', icon: Scale },
     { to: '/admin/personnel', label: 'Giám khảo & Cố vấn', icon: GraduationCap },
     { to: '/admin/results', label: 'Kết quả & Công bố', icon: Award },
     { to: '/admin/announcements', label: 'Phát thông báo', icon: Megaphone },
-    { to: '/admin/config', label: 'Cấu hình Hackathon', icon: Settings },
+    { to: '/admin/config', label: 'Cấu hình cuộc thi', icon: Settings },
   ];
 
   const judgeNav = [
     { to: '/judge/dashboard', label: 'Tổng quan Chấm thi', icon: LayoutDashboard },
-    { to: '/judge/split-screen', label: 'Chấm 2 Màn hình', icon: Columns },
+    { to: '/judge/split-screen', label: 'Chấm song song', icon: Columns },
     { to: '/judge/topics', label: 'Đề tài & Đội thi', icon: Lightbulb },
     { to: '/judge/results', label: 'Bảng tổng hợp điểm', icon: Award },
   ];
 
   const mentorNav = [
     { to: '/mentor/dashboard', label: 'Tổng quan Cố vấn', icon: LayoutDashboard },
-    { to: '/mentor/tickets', label: 'Tickets Yêu cầu hỗ trợ', icon: HelpCircle },
+    { to: '/mentor/tickets', label: 'Yêu cầu hỗ trợ', icon: HelpCircle },
     { to: '/mentor/teams', label: 'Đội thi phụ trách', icon: Users },
-    { to: '/mentor/checkpoints', label: 'Tiến độ Checkpoints', icon: CheckSquare },
+    { to: '/mentor/checkpoints', label: 'Tiến độ các chặng', icon: CheckSquare },
   ];
 
   const navLinks =
@@ -226,7 +225,7 @@ export const MainLayout: React.FC = () => {
             {config.blindJudgingMode && (
               <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium">
                 <EyeOff size={14} />
-                <span>Chế độ chấm mù (Blind Judging) BẬT</span>
+                <span>Chế độ chấm ẩn danh: BẬT</span>
               </div>
             )}
 
@@ -293,8 +292,6 @@ export const MainLayout: React.FC = () => {
         </main>
       </div>
 
-      {/* Floating Demo Role Switcher Dock */}
-      <QuickRoleSwitcher />
     </div>
   );
 };

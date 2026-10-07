@@ -85,17 +85,17 @@ export const AdminWhitelistPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Quản Lý Danh Sách Whitelist
+            Quản Lý Danh Sách Hợp Lệ
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Chỉ những email nằm trong Whitelist mới được kích hoạt tài khoản chính thức sau khi đăng nhập qua GitHub.
+            Chỉ những email nằm trong danh sách hợp lệ mới được kích hoạt tài khoản chính thức sau khi đăng nhập qua GitHub.
           </p>
         </div>
 
         <div className="flex items-center gap-3">
           <Button variant="secondary" onClick={() => setIsBulkOpen(true)} className="gap-2">
             <Upload size={16} />
-            <span>Import Hàng Loạt (CSV)</span>
+            <span>Nhập Danh Sách Hàng Loạt</span>
           </Button>
           <Button variant="primary" onClick={() => setIsAddOpen(true)} className="gap-2">
             <Plus size={16} />
@@ -177,7 +177,7 @@ export const AdminWhitelistPage: React.FC = () => {
       </div>
 
       {/* Modal: Add Single Email */}
-      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Thêm Email Vào Whitelist">
+      <Modal isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Thêm Email Hợp Lệ">
         <form onSubmit={handleAddSingle} className="space-y-4">
           <Input
             label="Địa chỉ Email *"
@@ -200,7 +200,7 @@ export const AdminWhitelistPage: React.FC = () => {
               Hủy
             </Button>
             <Button variant="primary" type="submit">
-              Lưu vào Whitelist
+              Lưu vào danh sách
             </Button>
           </div>
         </form>
@@ -210,7 +210,7 @@ export const AdminWhitelistPage: React.FC = () => {
       <Modal
         isOpen={isBulkOpen}
         onClose={() => setIsBulkOpen(false)}
-        title="Import Whitelist Hàng Loạt"
+        title="Nhập Danh Sách Hàng Loạt"
         maxWidth="lg"
       >
         <form onSubmit={handleBulkImport} className="space-y-4">

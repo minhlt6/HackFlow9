@@ -51,7 +51,7 @@ export const JudgeDashboardPage: React.FC = () => {
               Khu Vực Chấm Thi: {currentUser.fullName}
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Thực hiện chấm điểm hồ sơ dự thi của các đội thông qua giao diện chuyên dụng 2 màn hình (Split-Screen) đối chiếu trực tiếp mã nguồn và tiêu chí Rubric.
+              Thực hiện chấm điểm hồ sơ dự thi của các đội thông qua giao diện chấm thi song song đối chiếu trực tiếp mã nguồn và tiêu chí đánh giá.
             </p>
           </div>
 
@@ -71,7 +71,7 @@ export const JudgeDashboardPage: React.FC = () => {
         <div className="rounded-[14px] border border-amber-500/40 bg-amber-950/20 p-4 text-xs text-amber-300 flex items-center gap-3">
           <EyeOff size={20} className="shrink-0 text-amber-400" />
           <span>
-            <strong>Chế độ chấm mù (Blind Judging) đang được kích hoạt:</strong> Thông tin về trường đại học và tên thật của thí sinh đã được ẩn danh thành các mã định danh đội để đảm bảo tính khách quan tuyệt đối.
+            <strong>Chế độ chấm ẩn danh đang được kích hoạt:</strong> Thông tin về trường đại học và tên thật của thí sinh đã được ẩn danh thành các mã định danh đội để đảm bảo tính khách quan tuyệt đối.
           </span>
         </div>
       )}

@@ -49,7 +49,7 @@ export const AdminConfigPage: React.FC = () => {
             WebkitTextFillColor: 'transparent',
           }}
         >
-          Cấu Hình Hệ Thống Hackathon (Hackathon Settings)
+          Cấu Hình Hệ Thống Cuộc Thi
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
           Thiết lập thông số vận hành toàn diện: tên cuộc thi, số lượng thành viên, các mốc thời gian và chế độ chấm thi.
@@ -84,9 +84,9 @@ export const AdminConfigPage: React.FC = () => {
                 className="p-2.5 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
               >
                 <option value="Đăng ký tài khoản & Lập đội">Giai đoạn 1: Đăng ký & Lập đội</option>
-                <option value="Lựa chọn đề tài & Khóa Quota">Giai đoạn 2: Chọn đề tài & Quota</option>
-                <option value="Thực thi dự án & Nộp Checkpoints">Giai đoạn 3: Thực thi & Nộp Checkpoints</option>
-                <option value="Hội đồng chấm thi độc lập (Blind Judging)">Giai đoạn 4: Chấm thi (Blind Judging)</option>
+                <option value="Lựa chọn đề tài & Giới hạn số lượng">Giai đoạn 2: Chọn đề tài & Khóa số lượng</option>
+                <option value="Thực thi dự án & Nộp bài các chặng">Giai đoạn 3: Thực thi & Nộp bài các chặng</option>
+                <option value="Hội đồng chấm thi độc lập">Giai đoạn 4: Hội đồng chấm thi độc lập</option>
                 <option value="Bế mạc & Công bố kết quả">Giai đoạn 5: Bế mạc & Bảng xếp hạng</option>
               </select>
             </div>
@@ -103,7 +103,7 @@ export const AdminConfigPage: React.FC = () => {
           </div>
 
           <Input
-            label="Hạn chót Nộp Bài Chung Cuộc (Final Submission Deadline) *"
+            label="Hạn chót Nộp Bài Chung Cuộc *"
             type="datetime-local"
             value={finalDeadline}
             onChange={(e) => setFinalDeadline(e.target.value)}
@@ -118,7 +118,7 @@ export const AdminConfigPage: React.FC = () => {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] flex items-center justify-between">
               <div className="space-y-1">
-                <span className="font-bold text-white text-xs block">Chế Độ Chấm Mù (Blind Mode)</span>
+                <span className="font-bold text-white text-xs block">Chế Độ Chấm Ẩn Danh</span>
                 <span className="text-[11px] text-slate-400">
                   Ẩn tên đội và trường học khỏi Giám khảo
                 </span>

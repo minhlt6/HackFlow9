@@ -88,7 +88,7 @@ export const RaceConditionModal: React.FC<RaceConditionModalProps> = ({
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Mô phỏng Xử lý Tranh chấp Đề tài (Race Condition Lock)"
+      title="Mô phỏng Xử lý Tranh chấp Đề tài"
       maxWidth="2xl"
     >
       <div className="space-y-4">
@@ -110,7 +110,7 @@ export const RaceConditionModal: React.FC<RaceConditionModalProps> = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-              Nhật ký Transaction thời gian thực (Microsecond Trace)
+              Nhật ký giao dịch thời gian thực
             </span>
             {logs.length > 0 && (
               <Badge variant={simulated ? 'success' : 'warning'}>

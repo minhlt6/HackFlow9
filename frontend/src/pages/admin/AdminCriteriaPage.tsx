@@ -203,10 +203,10 @@ export const AdminCriteriaPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Ma Trận Tiêu Chí Chấm Điểm (Rubric Criteria)
+            Ma Trận Tiêu Chí Chấm Điểm
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Quy định thang điểm và trọng số cho Hội đồng Giám khảo đánh giá trong giao diện 2 màn hình (Split-Screen).
+            Quy định thang điểm và trọng số cho Hội đồng Giám khảo đánh giá trong giao diện chấm thi song song.
           </p>
         </div>
 
@@ -454,7 +454,7 @@ export const AdminCriteriaPage: React.FC = () => {
       <Modal
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
-        title="Thêm Tiêu Chí Rubric & Cân Bằng Trọng Số"
+        title="Thêm Tiêu Chí & Cân Bằng Trọng Số"
         maxWidth="lg"
       >
         <form onSubmit={handleAdd} className="space-y-5">
@@ -648,7 +648,7 @@ export const AdminCriteriaPage: React.FC = () => {
       <Modal
         isOpen={Boolean(editingItem)}
         onClose={() => setEditingItem(null)}
-        title="Chỉnh Sửa Tiêu Chí Rubric"
+        title="Chỉnh Sửa Tiêu Chí Chấm Điểm"
       >
         {editingItem && (
           <form onSubmit={handleUpdate} className="space-y-4">

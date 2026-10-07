@@ -64,7 +64,7 @@ export const AdminDashboardPage: React.FC = () => {
               Tổng Quan Cuộc Thi: {config.name}
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
-              Theo dõi tình trạng xác thực OAuth GitHub, tiến độ nộp Checkpoint, xử lý Helpdesk và vận hành Chế độ chấm mù (Blind Judging).
+              Theo dõi tình trạng xác thực tài khoản, tiến độ nộp bài các chặng, xử lý hỗ trợ trực tuyến và vận hành Chế độ chấm ẩn danh.
             </p>
           </div>
 
@@ -81,7 +81,7 @@ export const AdminDashboardPage: React.FC = () => {
             >
               {config.blindJudgingMode ? <EyeOff size={16} /> : <Eye size={16} />}
               <span>
-                {config.blindJudgingMode ? 'Chấm Mù: ĐANG BẬT' : 'Bật Chấm Mù (Blind)'}
+                {config.blindJudgingMode ? 'Chấm Ẩn Danh: ĐANG BẬT' : 'Bật Chế Độ Chấm Ẩn Danh'}
               </span>
             </Button>
 
@@ -102,9 +102,9 @@ export const AdminDashboardPage: React.FC = () => {
       {/* 4 Stat Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Tài khoản chờ duyệt (Pending)"
+          title="Tài khoản chờ xét duyệt"
           value={pendingCandidates.length}
-          subtitle="Sinh viên đăng nhập qua GitHub"
+          subtitle="Sinh viên đăng ký cần phê duyệt"
           icon={<ShieldCheck size={24} />}
           iconColor="amber"
           onClick={() => navigate('/admin/approvals')}
@@ -120,7 +120,7 @@ export const AdminDashboardPage: React.FC = () => {
         />
 
         <StatCard
-          title="Bài nộp Checkpoints"
+          title="Bài nộp các chặng"
           value={submissions.length}
           subtitle={`Tổng số commit SHA đã chốt`}
           icon={<CheckSquare size={24} />}
@@ -129,9 +129,9 @@ export const AdminDashboardPage: React.FC = () => {
         />
 
         <StatCard
-          title="Tickets Helpdesk mở"
+          title="Yêu cầu hỗ trợ đang mở"
           value={openTicketsCount}
-          subtitle="Cần Cố vấn (Mentor) hỗ trợ"
+          subtitle="Cần Cố vấn chuyên môn hỗ trợ"
           icon={<HelpCircle size={24} />}
           iconColor="rose"
           onClick={() => navigate('/mentor/tickets')}
@@ -144,7 +144,7 @@ export const AdminDashboardPage: React.FC = () => {
         <div className="lg:col-span-8 space-y-6">
           <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
             <h3 className="font-['Righteous'] text-lg text-white">
-              Lối Tắt Vận Hành Trọng Tâm (Core Workflows)
+              Lối Tắt Vận Hành Trọng Tâm
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">

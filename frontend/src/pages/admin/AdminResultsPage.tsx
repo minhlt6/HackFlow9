@@ -56,7 +56,7 @@ export const AdminResultsPage: React.FC = () => {
             Tổng Hợp Điểm & Công Bố Kết Quả
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Tổng hợp dữ liệu chấm thi từ Hội đồng Giám khảo theo công thức tính điểm trọng số Rubric và điều khiển công bố bảng xếp hạng.
+            Tổng hợp dữ liệu chấm thi từ Hội đồng Giám khảo theo công thức tính điểm trọng số và điều khiển công bố bảng xếp hạng.
           </p>
         </div>
 

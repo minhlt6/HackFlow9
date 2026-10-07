@@ -46,10 +46,10 @@ export const CandidateProfilePage: React.FC = () => {
             WebkitTextFillColor: 'transparent',
           }}
         >
-          Hồ Sơ Cá Nhân (Candidate Profile)
+          Hồ Sơ Cá Nhân
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Thông tin thí sinh được đồng bộ hóa từ tài khoản GitHub OAuth và danh mục xác thực Whitelist.
+          Thông tin thí sinh được đồng bộ hóa từ tài khoản đã xác thực của cuộc thi.
         </p>
       </div>
 
@@ -71,7 +71,7 @@ export const CandidateProfilePage: React.FC = () => {
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
               <h2 className="text-xl font-bold text-white">{currentUser.fullName}</h2>
               <Badge variant="indigo">
-                {currentUser.teamRole === 'leader' ? 'Đội Trưởng (Leader)' : 'Thành Viên (Member)'}
+                {currentUser.teamRole === 'leader' ? 'Đội Trưởng' : 'Thành Viên'}
               </Badge>
               <Badge variant="success">Tài Khoản Đã Xác Thực</Badge>
             </div>
@@ -100,7 +100,7 @@ export const CandidateProfilePage: React.FC = () => {
             />
 
             <Input
-              label="Mã số sinh viên (Student ID)"
+              label="Mã số sinh viên"
               value={studentId}
               onChange={(e) => setStudentId(e.target.value)}
             />

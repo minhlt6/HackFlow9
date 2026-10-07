@@ -56,14 +56,14 @@ export const AdminCheckpointsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Cấu Hình Checkpoints & Thời Hạn Nộp
+            Cấu Hình Chặng Nộp & Thời Hạn
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Quản lý các mốc nộp bài bắt buộc, trọng số đóng góp vào điểm chung cuộc và thời điểm đóng cổng nộp.
           </p>
         </div>
 
-        <Badge variant="indigo">{checkpoints.length} Checkpoints</Badge>
+        <Badge variant="indigo">{checkpoints.length} Chặng nộp</Badge>
       </div>
 
       {alert && (
@@ -136,11 +136,11 @@ export const AdminCheckpointsPage: React.FC = () => {
       <Modal
         isOpen={Boolean(editingCp)}
         onClose={() => setEditingCp(null)}
-        title={`Chỉnh Sửa Checkpoint: ${editingCp?.title || ''}`}
+        title={`Chỉnh Sửa Chặng: ${editingCp?.title || ''}`}
       >
         <form onSubmit={handleSave} className="space-y-4">
           <Input
-            label="Thời hạn nộp (Deadline) *"
+            label="Thời hạn nộp bài *"
             type="datetime-local"
             value={deadline}
             onChange={(e) => setDeadline(e.target.value)}

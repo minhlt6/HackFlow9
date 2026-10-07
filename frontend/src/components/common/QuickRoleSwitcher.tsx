@@ -30,50 +30,50 @@ export const QuickRoleSwitcher: React.FC = () => {
   const personas = [
     {
       id: 'admin' as const,
-      name: '👑 Quản trị viên (Admin)',
-      desc: 'Quản trị hệ thống, duyệt đội, cài đặt',
+      name: '👑 Ban Tổ Chức',
+      desc: 'Quản trị hệ thống, duyệt đội, cài đặt cuộc thi',
       route: '/admin/dashboard',
       color: 'border-[#6366F1] text-[#818CF8]',
     },
     {
       id: 'leader' as const,
-      name: '🚀 Đội trưởng (Candidate Leader)',
+      name: '🚀 Đội trưởng',
       desc: 'CyberSentinels - Nộp bài, chọn đề tài, quản lý đội',
       route: '/dashboard',
       color: 'border-emerald-500 text-emerald-400',
     },
     {
       id: 'member' as const,
-      name: '💻 Thành viên (Candidate Member)',
+      name: '💻 Thành viên đội thi',
       desc: 'EcoPulse - Xem đề tài, theo dõi bài nộp',
       route: '/dashboard',
       color: 'border-cyan-500 text-cyan-400',
     },
     {
       id: 'pending' as const,
-      name: '⏳ Đang chờ duyệt (Pending Candidate)',
-      desc: 'Tài khoản GitHub vừa đăng ký chờ duyệt',
+      name: '⏳ Tài khoản chờ duyệt',
+      desc: 'Tài khoản vừa đăng ký đang chờ phê duyệt',
       route: '/onboarding',
       color: 'border-amber-500 text-amber-300',
     },
     {
       id: 'rejected' as const,
-      name: '❌ Bị từ chối (Rejected Account)',
+      name: '❌ Hồ sơ bị từ chối',
       desc: 'Tài khoản không đạt điều kiện tham gia',
       route: '/rejected',
       color: 'border-rose-500 text-rose-400',
     },
     {
       id: 'mentor' as const,
-      name: '🎓 Cố vấn (Mentor)',
-      desc: 'Dr. Le Quang - Nhận ticket, hỗ trợ kỹ thuật',
+      name: '🎓 Cố vấn chuyên môn',
+      desc: 'Dr. Lê Quang - Tiếp nhận hỗ trợ kỹ thuật',
       route: '/mentor/dashboard',
       color: 'border-purple-500 text-purple-300',
     },
     {
       id: 'judge' as const,
-      name: '⚖️ Giám khảo (Judge)',
-      desc: 'Dr. Alan Vance - Chấm điểm 2 màn hình, rubric',
+      name: '⚖️ Hội đồng Giám khảo',
+      desc: 'Dr. Alan Vance - Đánh giá bài thi song song, chấm điểm',
       route: '/judge/dashboard',
       color: 'border-blue-400 text-blue-300',
     },
@@ -117,7 +117,7 @@ export const QuickRoleSwitcher: React.FC = () => {
           <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
             <div className="flex items-center gap-2 text-white font-['Righteous'] text-base tracking-wide">
               <Sparkles size={18} className="text-[#6366F1]" />
-              <span>Chuyển Vai Trò Trải Nghiệm (Demo)</span>
+              <span>Chuyển Đổi Vai Trò Trải Nghiệm</span>
             </div>
             <button
               onClick={() => setIsOpen(false)}
@@ -149,7 +149,7 @@ export const QuickRoleSwitcher: React.FC = () => {
                     <span className={`text-xs font-bold ${p.color}`}>{p.name}</span>
                     {isSelected && (
                       <span className="text-[10px] bg-[#6366F1] text-white px-1.5 py-0.2 rounded font-mono">
-                        Active
+                        Đang chọn
                       </span>
                     )}
                   </div>
@@ -172,7 +172,7 @@ export const QuickRoleSwitcher: React.FC = () => {
                 ) : (
                   <Eye size={14} className="text-slate-400" />
                 )}
-                <span>Chế độ chấm mù (Blind)</span>
+                <span>Chế độ chấm ẩn danh</span>
               </div>
               <button
                 onClick={toggleBlindJudging}
@@ -189,7 +189,7 @@ export const QuickRoleSwitcher: React.FC = () => {
             <div className="flex items-center justify-between rounded-[8px] bg-[#0F172A] p-2 border border-[#334155]">
               <div className="flex items-center gap-1.5 text-xs text-slate-300">
                 <Trophy size={14} className={config.resultsPublished ? 'text-emerald-400' : 'text-slate-400'} />
-                <span>Công bố kết quả (Leaderboard)</span>
+                <span>Công bố bảng xếp hạng kết quả</span>
               </div>
               <button
                 onClick={toggleResultsPublished}

@@ -47,7 +47,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Phát Thông Báo Cuộc Thi (Broadcast Announcements)
+            Phát Thông Báo Cuộc Thi
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Gửi thông điệp khẩn cấp hoặc cập nhật thời hạn tới tất cả thí sinh, giám khảo và cố vấn.
@@ -119,10 +119,10 @@ export const AdminAnnouncementsPage: React.FC = () => {
               onChange={(e) => setTargetRole(e.target.value as any)}
               className="p-2.5 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
             >
-              <option value="all">Tất cả mọi người (Toàn bộ cuộc thi)</option>
-              <option value="candidates">Chỉ Thí sinh (Candidates)</option>
-              <option value="judges">Chỉ Ban Giám Khảo (Judges)</option>
-              <option value="mentors">Chỉ Cố Vấn (Mentors)</option>
+              <option value="all">Toàn bộ cuộc thi (Tất cả vai trò)</option>
+              <option value="candidates">Chỉ Thí sinh</option>
+              <option value="judges">Chỉ Ban Giám Khảo</option>
+              <option value="mentors">Chỉ Cố Vấn</option>
             </select>
           </div>
 

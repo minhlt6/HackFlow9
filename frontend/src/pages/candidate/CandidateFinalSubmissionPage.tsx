@@ -67,10 +67,10 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
             WebkitTextFillColor: 'transparent',
           }}
         >
-          Nộp Bài Dự Thi Chung Cuộc (Final Submission)
+          Nộp Bài Dự Thi Chung Cuộc
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Hồ sơ dự thi chung cuộc bao gồm Kho mã nguồn GitHub, Video Demo thực nghiệm và Slide thuyết trình trước Hội đồng Giám khảo.
+          Hồ sơ dự thi chung cuộc bao gồm Kho mã nguồn, Video thực nghiệm và Slide thuyết trình trước Hội đồng Giám khảo.
         </p>
       </div>
 
@@ -102,7 +102,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase font-semibold tracking-wider text-slate-400 flex items-center gap-1.5">
                 <GitCommit size={15} className="text-[#818CF8]" />
-                <span>Bằng chứng mã băm an toàn (Frozen Commit SHA)</span>
+                <span>Mã băm commit đóng băng an toàn</span>
               </span>
               <span className="text-[11px] text-emerald-400 font-medium">Bảo vệ tính toàn vẹn</span>
             </div>
@@ -168,7 +168,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
           {/* Abstract */}
           <div className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-2">
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block">
-              Tóm tắt dự án (Abstract)
+              Tóm tắt dự án
             </span>
             <p className="text-xs sm:text-sm text-slate-200 leading-relaxed">
               {existingFinal?.summary || summary}

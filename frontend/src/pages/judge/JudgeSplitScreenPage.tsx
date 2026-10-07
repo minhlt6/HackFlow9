@@ -187,7 +187,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
           {config.blindJudgingMode && (
             <Badge variant="warning">
               <EyeOff size={12} />
-              <span>Chế độ ẩn danh (Blind)</span>
+              <span>Chế độ ẩn danh</span>
             </Badge>
           )}
         </div>
@@ -278,7 +278,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-slate-400 flex items-center gap-1">
                       <GitBranch size={13} className="text-[#818CF8]" />
-                      <span>Commit SHA Đã Khóa (Frozen):</span>
+                      <span>Mã Commit Đã Khóa:</span>
                     </span>
                     <span className="font-mono text-emerald-400 font-bold">
                       {finalSub?.commitSha || 'd7b1a459e8f2038c'}
@@ -344,7 +344,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
               <div className="space-y-3">
                 <div className="aspect-video w-full rounded-[12px] bg-[#0F172A] border border-[#334155] flex flex-col items-center justify-center p-6 text-center">
                   <Presentation size={48} className="text-amber-400 mb-2 opacity-80" />
-                  <p className="text-sm font-semibold text-white">Slide Trình Chiếu (Pitch Deck)</p>
+                  <p className="text-sm font-semibold text-white">Slide Báo Cáo Dự Án</p>
                   <p className="text-xs text-slate-400 mt-1 max-w-sm">
                     {finalSub?.slideUrl || 'https://docs.google.com/presentation/d/demo-pitch-deck'}
                   </p>

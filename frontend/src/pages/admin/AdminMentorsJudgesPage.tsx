@@ -28,7 +28,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       id: 'judge-1',
       name: 'Dr. Alan Vance',
       email: 'alan.vance@techuniv.edu.vn',
-      specialization: 'AI & Data Science (Head Judge)',
+      specialization: 'Trí tuệ nhân tạo & Khoa học dữ liệu (Trưởng ban)',
       assignedCount: 6,
       avatar: 'A',
     },
@@ -106,7 +106,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           avatar: name.charAt(0).toUpperCase(),
         },
       ]);
-      setAlert(`Đã gửi thư mời Cố vấn (Mentor) tới ${email}!`);
+      setAlert(`Đã gửi thư mời Cố vấn chuyên môn tới ${email}!`);
     }
 
     setIsInviteOpen(false);
@@ -131,7 +131,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
             Quản Lý Hội Đồng Giám Khảo & Cố Vấn
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Phân bổ chuyên gia chấm thi độc lập (Judges) và cố vấn chuyên môn hỗ trợ giải đáp kỹ thuật (Mentors).
+            Phân bổ chuyên gia chấm thi độc lập và cố vấn chuyên môn hỗ trợ giải đáp kỹ thuật.
           </p>
         </div>
 
@@ -244,7 +244,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       <Modal
         isOpen={isInviteOpen}
         onClose={() => setIsInviteOpen(false)}
-        title={activeTab === 'judges' ? 'Mời Giám Khảo Mới' : 'Mời Cố Vấn (Mentor) Mới'}
+        title={activeTab === 'judges' ? 'Mời Giám Khảo Mới' : 'Mời Cố Vấn Chuyên Môn Mới'}
       >
         <form onSubmit={handleInvite} className="space-y-4">
           <Input

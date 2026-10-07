@@ -182,7 +182,7 @@ export const CandidateTeamsPage: React.FC = () => {
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-3 rounded-[12px] bg-[#0F172A] border border-[#334155]">
                 <div>
                   <span className="text-[11px] uppercase tracking-wider text-slate-400 block">
-                    Mã mời tham gia đội (Invite Code)
+                    Mã mời tham gia đội
                   </span>
                   <span className="font-mono text-xl font-bold tracking-widest text-[#818CF8]">
                     {myTeam.inviteCode}
@@ -377,7 +377,7 @@ export const CandidateTeamsPage: React.FC = () => {
           <div className="rounded-[10px] bg-[#0F172A] p-3 text-xs text-slate-400 flex items-start gap-2">
             <Info size={14} className="text-[#818CF8] shrink-0 mt-0.5" />
             <span>
-              Người tạo đội sẽ tự động trở thành <strong>Đội Trưởng (Leader)</strong> và nhận mã mời 6 ký tự để gửi cho các thành viên còn lại.
+              Người tạo đội sẽ tự động trở thành <strong>Đội Trưởng</strong> và nhận mã mời 6 ký tự để gửi cho các thành viên còn lại.
             </span>
           </div>
 
@@ -400,7 +400,7 @@ export const CandidateTeamsPage: React.FC = () => {
       >
         <form onSubmit={handleJoinTeam} className="space-y-4">
           <Input
-            label="Mã mời (Invite Code)"
+            label="Mã mời tham gia đội"
             placeholder="Nhập 6 ký tự (ví dụ: CS8821)"
             value={joinCode}
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}

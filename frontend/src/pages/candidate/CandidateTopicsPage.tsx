@@ -74,7 +74,7 @@ export const CandidateTopicsPage: React.FC = () => {
             Đăng Ký & Lựa Chọn Đề Tài
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Mỗi đề tài nhánh (Subtopic) có giới hạn suất đăng ký (Quota). Hệ thống áp dụng cơ chế khóa phân tán bảo vệ suất đăng ký theo thời gian thực.
+            Mỗi đề tài nhánh có giới hạn số lượng đăng ký tối đa. Hệ thống áp dụng cơ chế khóa phân tán bảo vệ suất đăng ký theo thời gian thực.
           </p>
         </div>
 
@@ -84,7 +84,7 @@ export const CandidateTopicsPage: React.FC = () => {
           className="gap-2 border-[#6366F1]/50 text-[#818CF8] hover:bg-[#6366F1]/10"
         >
           <Zap size={16} />
-          <span>Mô phỏng Tranh chấp Đề tài (Race Condition)</span>
+          <span>Mô phỏng Tranh chấp Đề tài</span>
         </Button>
       </div>
 
@@ -213,7 +213,7 @@ export const CandidateTopicsPage: React.FC = () => {
                       <div className="flex items-center justify-between text-xs">
                         <span className="text-slate-400 flex items-center gap-1">
                           <Users size={13} />
-                          <span>Suất đăng ký (Quota)</span>
+                          <span>Số lượng đội đã đăng ký</span>
                         </span>
                         <span
                           className={`font-semibold ${

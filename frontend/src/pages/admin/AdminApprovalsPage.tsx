@@ -57,7 +57,7 @@ export const AdminApprovalsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Phê Duyệt Tài Khoản Thí Sinh (OAuth Approvals)
+            Phê Duyệt Tài Khoản Thí Sinh
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Xác thực danh sách sinh viên đăng nhập lần đầu qua GitHub OAuth trước khi cấp quyền truy cập hệ thống.

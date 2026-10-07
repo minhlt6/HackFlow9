@@ -26,7 +26,7 @@ export const mockUsers: Record<string, User> = {
   leader: {
     id: 'user-leader-1',
     email: 'leader@cybersamurai.team',
-    fullName: 'Nguyễn Văn Minh (Leader)',
+    fullName: 'Nguyễn Văn Minh',
     role: 'candidate',
     approvalStatus: 'approved',
     studentId: '20210001',
@@ -40,7 +40,7 @@ export const mockUsers: Record<string, User> = {
   member: {
     id: 'user-member-2',
     email: 'member@cybersamurai.team',
-    fullName: 'Trần Thị Thảo (Member)',
+    fullName: 'Trần Thị Thảo',
     role: 'candidate',
     approvalStatus: 'approved',
     studentId: '20210002',
@@ -104,7 +104,7 @@ export const initialHackathonConfig: HackathonConfig = {
   description: 'Sân chơi sáng tạo công nghệ trí tuệ nhân tạo và hệ thống thông minh đột phá dành cho sinh viên xuất sắc toàn quốc.',
   logoUrl: '/hackflow-logo.svg',
   bannerUrl: '/login-background.png',
-  rules: '1. Mỗi đội thi có từ 3 đến 5 thành viên.\n2. Mỗi đề tài con (Subtopic) có giới hạn số lượng đội (Quota) tối đa.\n3. Mã commit SHA được hệ thống đóng băng tự động tại thời điểm kết thúc hạn nộp.\n4. Đội không nộp 2 checkpoint liên tiếp sẽ bị truất quyền thi đấu.',
+  rules: '1. Mỗi đội thi có từ 3 đến 5 thành viên.\n2. Mỗi đề tài con có giới hạn số lượng đội tối đa.\n3. Mã commit SHA được hệ thống đóng băng tự động tại thời điểm kết thúc hạn nộp.\n4. Đội không nộp 2 chặng liên tiếp sẽ bị truất quyền thi đấu.',
   prizes: [
     { rank: 'Giải Nhất', reward: '100,000,000 VNĐ', description: 'Cúp vàng + Chuyến tham quan Trung tâm Đổi mới Sáng tạo Quốc gia (NIC)' },
     { rank: 'Giải Nhì', reward: '50,000,000 VNĐ', description: 'Cúp bạc + Học bổng chuyên sâu Deep Learning' },
@@ -216,7 +216,7 @@ export const initialMajorTopics: MajorTopic[] = [
       {
         id: 'sub-ai-03',
         majorTopicId: 'major-ai',
-        title: 'Trợ lý Ảo Đa phương thức (Multimodal Voice Agent) Hỗ trợ Người cao tuổi',
+        title: 'Trợ lý Ảo Đa phương thức Hỗ trợ Người cao tuổi',
         description: 'Trợ lý tương tác bằng giọng nói tiếng Việt kết hợp nhận diện cảm xúc khuôn mặt để nhắc nhở uống thuốc và kết nối khẩn cấp.',
         requirements: 'Độ trễ Speech-to-Speech < 800ms, hỗ trợ nhận dạng ngữ âm tiếng Việt đa vùng miền.',
         maxTeamsQuota: 2,
@@ -229,8 +229,8 @@ export const initialMajorTopics: MajorTopic[] = [
   },
   {
     id: 'major-iot',
-    title: 'Đô thị Thông minh (Smart City & IoT)',
-    domain: 'Đô thị Thông minh (Smart City & IoT)',
+    title: 'Đô thị Thông minh & IoT',
+    domain: 'Đô thị Thông minh & IoT',
     description: 'Hệ thống kết nối vạn vật, cảm biến thông minh và giải pháp đô thị xanh phát thải ròng bằng 0.',
     mentorIds: ['user-mentor-2'],
     subTopics: [
@@ -260,15 +260,15 @@ export const initialMajorTopics: MajorTopic[] = [
   },
   {
     id: 'major-fintech',
-    title: 'Công nghệ Tài chính (Fintech & Blockchain)',
-    domain: 'Công nghệ Tài chính (Fintech & Blockchain)',
+    title: 'Công nghệ Tài chính & Blockchain',
+    domain: 'Công nghệ Tài chính & Blockchain',
     description: 'Thanh toán bảo mật cao, định danh số phi tập trung và hợp đồng thông minh.',
     mentorIds: ['user-mentor-3'],
     subTopics: [
       {
         id: 'sub-fin-01',
         majorTopicId: 'major-fintech',
-        title: 'Hệ thống Thanh toán Vi mô (Micropayments) Xuyên biên giới trên Layer 2',
+        title: 'Hệ thống Thanh toán Vi mô Xuyên biên giới trên Layer 2',
         description: 'Xử lý thanh toán tức thì với chi phí giao dịch siêu thấp cho thương mại điện tử quốc tế.',
         requirements: 'Thông lượng TPS > 2000 giao dịch/giây, chi phí mỗi giao dịch < 0.001 USD.',
         maxTeamsQuota: 2,
@@ -280,8 +280,8 @@ export const initialMajorTopics: MajorTopic[] = [
   },
   {
     id: 'major-health',
-    title: 'Y tế & Chăm sóc Sức khỏe (Healthcare Tech)',
-    domain: 'Y tế & Chăm sóc Sức khỏe (Healthcare Tech)',
+    title: 'Y tế & Chăm sóc Sức khỏe',
+    domain: 'Y tế & Chăm sóc Sức khỏe',
     description: 'Ứng dụng công nghệ xử lý tín hiệu sinh học, chẩn đoán từ xa và hồ sơ bệnh án điện tử.',
     mentorIds: ['user-mentor-4'],
     subTopics: [
@@ -290,7 +290,7 @@ export const initialMajorTopics: MajorTopic[] = [
         majorTopicId: 'major-health',
         title: 'Phân tích Điện tâm đồ (ECG) Tự động Cảnh báo Rung nhĩ Bằng Wearable Device',
         description: 'Thuật toán AI phát hiện sớm các bất thường nhịp tim nguy hiểm tính mạng từ dữ liệu đồng hồ thông minh.',
-        requirements: 'Độ nhạy (Sensitivity) > 95%, độ đặc hiệu (Specificity) > 98%.',
+        requirements: 'Độ nhạy > 95%, độ đặc hiệu > 98%.',
         maxTeamsQuota: 3,
         currentTeams: 1,
         mentorName: 'Bác sĩ Vũ Trí Tuệ',
@@ -314,7 +314,7 @@ export const initialTeams: Team[] = [
     members: [
       {
         userId: 'user-leader-1',
-        fullName: 'Nguyễn Văn Minh (Leader)',
+        fullName: 'Nguyễn Văn Minh',
         email: 'leader@cybersamurai.team',
         roleInTeam: 'leader',
         studentId: '20210001',
@@ -324,7 +324,7 @@ export const initialTeams: Team[] = [
       },
       {
         userId: 'user-member-2',
-        fullName: 'Trần Thị Thảo (Member)',
+        fullName: 'Trần Thị Thảo',
         email: 'member@cybersamurai.team',
         roleInTeam: 'member',
         studentId: '20210002',
@@ -594,9 +594,9 @@ export const initialTeams: Team[] = [
 export const initialCheckpoints: Checkpoint[] = [
   {
     id: 'cp-01',
-    name: 'Checkpoint 01: Thiết kế Kiến trúc & Báo cáo Khởi động',
+    name: 'Chặng 01: Thiết kế Kiến trúc & Báo cáo Khởi động',
     description: 'Nộp sơ đồ kiến trúc tổng thể, mô tả cơ sở dữ liệu và kế hoạch phát triển.',
-    requirements: ['Architecture Diagram (PDF/PNG)', 'API Specifications (OpenAPI)', 'GitHub Repository Init'],
+    requirements: ['Sơ đồ kiến trúc hệ thống', 'Đặc tả giao diện API', 'Khởi tạo kho mã nguồn'],
     startTime: '2026-11-01T08:00:00Z',
     deadline: '2026-11-05T23:59:59Z',
     points: 20,
@@ -606,9 +606,9 @@ export const initialCheckpoints: Checkpoint[] = [
   },
   {
     id: 'cp-02',
-    name: 'Checkpoint 02: Hoàn thiện Core Engine & MVP',
+    name: 'Chặng 02: Hoàn thiện Mô hình Cốt lõi & Bản thử nghiệm',
     description: 'Triển khai mô hình thuật toán cốt lõi, chạy thử nghiệm trên tập dữ liệu mẫu và cung cấp demo URL nội bộ.',
-    requirements: ['Docker Container run được', 'Core Algorithm Accuracy Report', 'Swagger API Documentation'],
+    requirements: ['Môi trường vận hành Docker', 'Báo cáo độ chính xác thuật toán', 'Tài liệu hướng dẫn gọi API'],
     startTime: '2026-11-06T00:00:00Z',
     deadline: '2026-11-12T23:59:59Z',
     points: 30,
@@ -618,9 +618,9 @@ export const initialCheckpoints: Checkpoint[] = [
   },
   {
     id: 'cp-03',
-    name: 'Checkpoint 03: Tích hợp Hệ thống & Đóng gói Production',
+    name: 'Chặng 03: Tích hợp Hệ thống & Đóng gói Hoàn thiện',
     description: 'Hoàn thiện giao diện người dùng, tích hợp luồng hoàn chỉnh và nộp mã Commit SHA đóng băng.',
-    requirements: ['Live Demo URL hoạt động ổn định', 'Tối ưu hóa độ trễ xử lý', 'Bộ test case kiểm thử tự động'],
+    requirements: ['Bản chạy thử trực tiếp ổn định', 'Tối ưu hóa độ trễ xử lý', 'Bộ kiểm thử tự động'],
     startTime: '2026-11-13T00:00:00Z',
     deadline: '2026-11-18T23:59:59Z',
     points: 50,
@@ -715,7 +715,7 @@ export const initialFinalSubmissions: FinalSubmission[] = [
 export const initialRubricCriteria: RubricCriteria[] = [
   {
     id: 'crit-innovation',
-    name: 'Tính Sáng tạo & Độ Mới (Innovation)',
+    name: 'Tính Sáng tạo & Đột Phá',
     description: 'Ý tưởng đột phá, tiếp cận bài toán bằng giải pháp kỹ thuật mới, không sao chép.',
     maxScore: 10,
     weight: 25, // 25%
@@ -723,7 +723,7 @@ export const initialRubricCriteria: RubricCriteria[] = [
   },
   {
     id: 'crit-tech',
-    name: 'Kiến trúc Kỹ thuật & Hiệu năng (Technical Depth)',
+    name: 'Kiến trúc Kỹ thuật & Hiệu năng',
     description: 'Mô hình thuật toán tối ưu, xử lý dữ liệu phức tạp, độ trễ thấp, clean code và tuân thủ git.',
     maxScore: 10,
     weight: 35, // 35%
@@ -731,7 +731,7 @@ export const initialRubricCriteria: RubricCriteria[] = [
   },
   {
     id: 'crit-feasibility',
-    name: 'Khả thi & Giá trị Thực tiễn (Practical Value)',
+    name: 'Khả thi & Giá trị Thực tiễn',
     description: 'Khả năng ứng dụng thực tế trong môi trường doanh nghiệp và công nghệ số, giải quyết đúng nỗi đau người dùng.',
     maxScore: 10,
     weight: 25, // 25%
@@ -739,7 +739,7 @@ export const initialRubricCriteria: RubricCriteria[] = [
   },
   {
     id: 'crit-presentation',
-    name: 'Trình bày & Trải nghiệm Người dùng (UI/UX & Pitching)',
+    name: 'Trình bày & Trải nghiệm Người dùng',
     description: 'Giao diện trực quan, demo mượt mà, thuyết trình rõ ràng và trả lời phản biện xuất sắc.',
     maxScore: 10,
     weight: 15, // 15% (Tổng 100%)
@@ -805,7 +805,7 @@ export const initialSupportTickets: SupportTicket[] = [
     teamId: 'team-1',
     teamName: 'CyberSamurai',
     senderId: 'user-leader-1',
-    senderName: 'Nguyễn Văn Minh (Leader)',
+    senderName: 'Nguyễn Văn Minh',
     title: 'Hỏi về chuẩn định dạng đầu vào tập dữ liệu hồ sơ bệnh án y khoa',
     description: 'Thầy cho em hỏi tập dữ liệu mẫu của ban tổ chức cung cấp có các trường ẩn danh không và tụi em có được dùng thư viện LangChain bản v0.2 không ạ?',
     priority: 'high',
@@ -818,7 +818,7 @@ export const initialSupportTickets: SupportTicket[] = [
       {
         id: 'msg-1',
         senderId: 'user-leader-1',
-        senderName: 'Nguyễn Văn Minh (Leader)',
+        senderName: 'Nguyễn Văn Minh',
         senderRole: 'candidate',
         content: 'Thầy cho em hỏi tập dữ liệu mẫu của ban tổ chức cung cấp có các trường ẩn danh không và tụi em có được dùng thư viện LangChain bản v0.2 không ạ?',
         sentAt: '2026-11-03T09:15:00Z',
@@ -904,7 +904,7 @@ export const initialAnnouncements: Announcement[] = [
   },
   {
     id: 'ann-2',
-    title: '⏰ Nhắc nhở hạn nộp Checkpoint 03 (Hard Deadline)',
+    title: '⏰ Nhắc nhở hạn chót nộp bài Chặng 03',
     content: 'Đúng 23h59 ngày 18/11/2026, cổng nộp bài sẽ tự động đóng và đóng băng toàn bộ Commit SHA. Các đội vui lòng kiểm tra kỹ link repository công khai trước thời điểm trên.',
     author: 'Ban Thư ký Kỹ thuật',
     publishedAt: '2026-11-15T09:00:00Z',
@@ -913,7 +913,7 @@ export const initialAnnouncements: Announcement[] = [
   {
     id: 'ann-3',
     title: '🛡️ Quy chế bảo mật và chống xung đột lợi ích Ban Giám Khảo',
-    content: 'Hệ thống đã kích hoạt chế độ Blind Judging (Ẩn danh thí sinh). Mọi thông tin trường học và tên đội sẽ được mã hóa trước khi hiển thị cho Ban giám khảo chấm thi.',
+    content: 'Hệ thống đã kích hoạt chế độ Chấm ẩn danh. Mọi thông tin trường học và tên đội sẽ được mã hóa trước khi hiển thị cho Ban giám khảo chấm thi.',
     author: 'Hội đồng Chuyên môn',
     publishedAt: '2026-11-19T14:00:00Z',
     isPinned: false,

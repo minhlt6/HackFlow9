@@ -68,10 +68,10 @@ export const AdminTopicsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Quản Lý Đề Tài & Phân Bổ Quota
+            Quản Lý Đề Tài & Hạn Ngạch Đội
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Thiết lập danh mục đề tài lớn (Major Topics), đề tài nhánh (Subtopics) và giới hạn số lượng đội thi đăng ký tối đa.
+            Thiết lập danh mục đề tài lớn, đề tài nhánh và giới hạn số lượng đội thi đăng ký tối đa.
           </p>
         </div>
 
@@ -217,7 +217,7 @@ export const AdminTopicsPage: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Số lượng đội tối đa (Quota) *"
+              label="Số lượng đội tối đa *"
               type="number"
               min={1}
               max={10}
@@ -227,7 +227,7 @@ export const AdminTopicsPage: React.FC = () => {
             />
 
             <Input
-              label="Cố vấn phụ trách (Mentor)"
+              label="Cố vấn phụ trách"
               value={mentorName}
               onChange={(e) => setMentorName(e.target.value)}
             />
@@ -248,7 +248,7 @@ export const AdminTopicsPage: React.FC = () => {
       <Modal
         isOpen={Boolean(editingSubTopic)}
         onClose={() => setEditingSubTopic(null)}
-        title="Điều Chỉnh Quota Đề Tài"
+        title="Điều Chỉnh Hạn Ngạch Đề Tài"
       >
         <form onSubmit={handleSaveQuota} className="space-y-4">
           <p className="text-xs text-slate-300">
@@ -256,7 +256,7 @@ export const AdminTopicsPage: React.FC = () => {
           </p>
 
           <Input
-            label="Chỉ tiêu số đội tối đa (Quota)"
+            label="Chỉ tiêu số đội tối đa"
             type="number"
             min={1}
             max={20}

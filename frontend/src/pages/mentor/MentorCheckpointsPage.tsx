@@ -33,7 +33,7 @@ export const MentorCheckpointsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Theo Dõi Tiến Độ Checkpoints Của Các Đội
+            Theo Dõi Tiến Độ Nộp Bài Của Các Đội
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Cố vấn theo dõi tổng quan tỷ lệ nộp bài của các đội để có phương án hỗ trợ kịp thời.
@@ -45,13 +45,13 @@ export const MentorCheckpointsPage: React.FC = () => {
           variant="secondary"
           onClick={() =>
             handleTriggerForbidden(
-              'GET /api/v1/evaluations/judge-sheets & GET /api/v1/submissions/source-code (Quyền bị chặn đối với vai trò MENTOR)',
+              'GET /api/v1/evaluations/judge-sheets & GET /api/v1/submissions/source-code (Quyền bị chặn đối với vai trò CỐ VẤN CHUYÊN MÔN)',
             )
           }
           className="gap-2 border-rose-500/50 text-rose-400 hover:bg-rose-500/10"
         >
           <Lock size={15} />
-          <span>Mô Phỏng Kiểm Tra RBAC (HTTP 403)</span>
+          <span>Thử Nghiệm Phân Quyền Bảo Mật</span>
         </Button>
       </div>
 
@@ -59,14 +59,14 @@ export const MentorCheckpointsPage: React.FC = () => {
       <div className="rounded-[14px] border border-amber-500/30 bg-amber-950/20 p-4 text-xs text-amber-300 flex items-center gap-3">
         <ShieldAlert size={18} className="shrink-0 text-amber-400" />
         <span>
-          <strong>Chính sách bảo mật RBAC HackFlow:</strong> Cố vấn (Mentor) có thể thấy tiến độ hoàn thành các mốc Checkpoint nhưng <strong>bị hạn chế quyền truy cập mã nguồn bài nộp</strong> và <strong>không được xem trước điểm số của Giám khảo</strong> nhằm đảm bảo tính công bằng và chống lộ đề tài.
+          <strong>Chính sách bảo mật RBAC HackFlow:</strong> Cố vấn chuyên môn có thể thấy tiến độ hoàn thành các chặng nhưng <strong>bị hạn chế quyền truy cập mã nguồn bài nộp</strong> và <strong>không được xem trước điểm số của Giám khảo</strong> nhằm đảm bảo tính công bằng và chống lộ đề tài.
         </span>
       </div>
 
       {/* Progress Matrix Table */}
       <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
         <h3 className="font-['Righteous'] text-lg text-white">
-          Ma Trận Hoàn Thành Checkpoint Theo Đội Thi
+          Ma Trận Tiến Độ Các Chặng Theo Đội Thi
         </h3>
 
         <div className="overflow-x-auto rounded-[12px] border border-[#334155] bg-[#0F172A]">

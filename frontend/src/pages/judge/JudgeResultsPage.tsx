@@ -22,7 +22,7 @@ export const JudgeResultsPage: React.FC = () => {
             WebkitTextFillColor: 'transparent',
           }}
         >
-          Bảng Điểm Cá Nhân Của Bạn (My Evaluations)
+          Bảng Điểm Đã Chấm
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
           Danh sách các đội thi bạn đã cho điểm hoặc lưu bản nháp đánh giá.

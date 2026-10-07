@@ -60,10 +60,10 @@ export const MentorTicketsPage: React.FC = () => {
             WebkitTextFillColor: 'transparent',
           }}
         >
-          Hệ Thống Helpdesk Tiếp Nhận Hỗ Trợ (Mentor Queue)
+          Tiếp Nhận & Xử Lý Yêu Cầu Hỗ Trợ
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Quy trình 3 bước: Tiếp nhận yêu cầu (Claim) → Trao đổi tin nhắn trực tiếp → Đóng ticket khi vấn đề đã được giải quyết.
+          Quy trình 3 bước: Tiếp nhận yêu cầu → Trao đổi trực tiếp → Đóng yêu cầu khi vấn đề đã được giải quyết.
         </p>
       </div>
 

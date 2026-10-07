@@ -28,7 +28,7 @@ export const MentorDashboardPage: React.FC = () => {
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold uppercase tracking-wider text-[#818CF8]">
-                Cố Vấn Chuyên Môn Kỹ Thuật (Mentor)
+                Cố Vấn Chuyên Môn Kỹ Thuật
               </span>
               <span className="text-slate-500">•</span>
               <Badge variant="purple">Hỗ Trợ Kỹ Thuật 24/7</Badge>
@@ -45,7 +45,7 @@ export const MentorDashboardPage: React.FC = () => {
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
               Bạn đang phụ trách cố vấn kỹ thuật cho lĩnh vực{' '}
-              <strong className="text-white">Trí Tuệ Nhân Tạo & Y Tế Số</strong>. Tiếp nhận các Ticket yêu cầu hỗ trợ và đồng hành cùng các đội thi.
+              <strong className="text-white">Trí Tuệ Nhân Tạo & Y Tế Số</strong>. Tiếp nhận các yêu cầu hỗ trợ và đồng hành cùng các đội thi.
             </p>
           </div>
 
@@ -55,7 +55,7 @@ export const MentorDashboardPage: React.FC = () => {
             className="gap-2 shadow-lg shadow-purple-600/20 px-6 !bg-purple-600 hover:!bg-purple-500"
           >
             <HelpCircle size={18} />
-            <span>Mở Hàng Đợi Tickets ({openTickets.length})</span>
+            <span>Mở Hàng Đợi Hỗ Trợ ({openTickets.length})</span>
           </Button>
         </div>
       </div>

@@ -48,7 +48,7 @@ export const RbacForbiddenModal: React.FC<RbacForbiddenModalProps> = ({
           <div className="pt-2 border-t border-[#334155]/60 flex items-start gap-2 text-amber-400">
             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
             <p className="text-[11px] text-slate-300 leading-relaxed">
-              Theo quy chế cuộc thi Hackathon: Cố vấn (Mentor) có trách nhiệm hướng dẫn kỹ thuật nhưng <strong>tuyệt đối không được can thiệp vào kho lưu trữ mã nguồn thí sinh</strong> hoặc <strong>xem trước bảng điểm chấm thi của Hội đồng Giám khảo</strong> nhằm đảm bảo tính bảo mật và công bằng.
+              Theo quy chế cuộc thi Hackathon: Cố vấn chuyên môn có trách nhiệm hướng dẫn kỹ thuật nhưng <strong>tuyệt đối không được can thiệp vào kho lưu trữ mã nguồn thí sinh</strong> hoặc <strong>xem trước bảng điểm chấm thi của Hội đồng Giám khảo</strong> nhằm đảm bảo tính bảo mật và công bằng.
             </p>
           </div>
         </div>

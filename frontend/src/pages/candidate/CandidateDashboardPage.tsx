@@ -63,7 +63,7 @@ export const CandidateDashboardPage: React.FC = () => {
               </span>
               <span className="text-slate-500">•</span>
               <Badge variant="indigo">
-                {currentUser.teamRole === 'leader' ? 'Đội Trưởng (Leader)' : 'Thành Viên (Member)'}
+                {currentUser.teamRole === 'leader' ? 'Đội Trưởng' : 'Thành Viên'}
               </Badge>
             </div>
             <h1
@@ -91,7 +91,7 @@ export const CandidateDashboardPage: React.FC = () => {
               className="gap-2 shadow-lg shadow-[#6366F1]/25"
             >
               <CheckSquare size={16} />
-              <span>Nộp Checkpoint</span>
+              <span>Nộp Bài Chặng</span>
             </Button>
             <Button
               variant="secondary"
@@ -99,7 +99,7 @@ export const CandidateDashboardPage: React.FC = () => {
               className="gap-2"
             >
               <HelpCircle size={16} />
-              <span>Yêu cầu Mentor</span>
+              <span>Yêu Cầu Cố Vấn</span>
             </Button>
           </div>
         </div>
@@ -137,7 +137,7 @@ export const CandidateDashboardPage: React.FC = () => {
         />
 
         <StatCard
-          title="Tiến độ Checkpoints"
+          title="Tiến độ các chặng nộp"
           value={`${teamSubmissions.length}/${checkpoints.length}`}
           subtitle={`Kế tiếp: ${(nextCheckpoint?.title || nextCheckpoint?.name || 'Checkpoint').slice(0, 24)}...`}
           icon={<CheckSquare size={24} />}
@@ -174,14 +174,14 @@ export const CandidateDashboardPage: React.FC = () => {
             <div className="space-y-2">
               <h4 className="text-base font-bold text-white">{selectedTopicTitle}</h4>
               <p className="text-xs text-slate-300 leading-relaxed">
-                Đề tài áp dụng các thuật toán Deep Learning / Generative AI để giải quyết bài toán thực tế. Đội thi cần nộp mã nguồn và tài liệu qua từng Checkpoint.
+                Đề tài áp dụng các thuật toán Trí tuệ nhân tạo để giải quyết bài toán thực tế. Đội thi cần nộp mã nguồn và tài liệu qua từng chặng thi.
               </p>
             </div>
 
             <div className="flex flex-wrap items-center justify-between pt-2 text-xs text-slate-400 border-t border-[#334155]/60 gap-3">
               <div className="flex items-center gap-2">
                 <span>Cố vấn phụ trách lĩnh vực:</span>
-                <span className="font-semibold text-white">Dr. Lê Quang (AI Research Lab)</span>
+                <span className="font-semibold text-white">TS. Lê Quang (Phòng Nghiên Cứu AI)</span>
               </div>
               <button
                 onClick={() => navigate('/topics')}
@@ -289,14 +289,14 @@ export const CandidateDashboardPage: React.FC = () => {
           <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-6 space-y-3">
             <h4 className="font-['Righteous'] text-base text-white">Cần Hỗ Trợ Kỹ Thuật?</h4>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Bạn có thể tạo Ticket gửi trực tiếp tới các Cố vấn (Mentor) thuộc lĩnh vực của bạn để được hỗ trợ giải đáp thắc mắc về dữ liệu, API hoặc tiêu chí.
+              Bạn có thể tạo yêu cầu gửi trực tiếp tới các Cố vấn chuyên môn thuộc lĩnh vực của bạn để được hỗ trợ giải đáp thắc mắc về dữ liệu, API hoặc tiêu chí.
             </p>
             <Button
               variant="outline"
               onClick={() => navigate('/tickets')}
               className="w-full text-xs justify-center"
             >
-              Gửi Ticket Yêu Cầu Hỗ Trợ
+              Gửi Yêu Cầu Hỗ Trợ
             </Button>
           </div>
         </div>
