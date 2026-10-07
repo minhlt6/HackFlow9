@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMockStore } from '../../store/useMockStore';
+import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import {
@@ -14,14 +14,17 @@ import {
 } from 'lucide-react';
 
 export const CandidateLeaderboardPage: React.FC = () => {
-  const { config, teams, majorTopics, evaluations, toggleResultsPublished } = useMockStore();
+  const { config, teams, majorTopics, evaluations, toggleResultsPublished, rubricCriteria } = useMockStore();
 
   // Compute team scores from evaluations
   const teamsWithScores = teams.map((team) => {
     const teamEvals = evaluations.filter((e) => e.teamId === team.id && !e.isDraft);
     const avgScore =
       teamEvals.length > 0
-        ? teamEvals.reduce((acc, curr) => acc + curr.totalScore, 0) / teamEvals.length
+        ? teamEvals.reduce(
+            (acc, curr) => acc + normalizeScoreTo100(curr.totalScore, curr.scores, rubricCriteria),
+            0
+          ) / teamEvals.length
         : 0;
 
     let subTopicTitle = 'Chưa chọn';
@@ -168,7 +171,7 @@ export const CandidateLeaderboardPage: React.FC = () => {
                     <th className="py-3.5 px-4">Tên Đội Thi</th>
                     <th className="py-3.5 px-4 hidden md:table-cell">Đề Tài Đăng Ký</th>
                     <th className="py-3.5 px-4 text-center">Số Lượt Chấm</th>
-                    <th className="py-3.5 px-4 text-right">Tổng Điểm</th>
+                    <th className="py-3.5 px-4 text-right">Tổng Điểm (Thang 100)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#334155]/60 text-slate-200">
@@ -205,7 +208,7 @@ export const CandidateLeaderboardPage: React.FC = () => {
 
                       <td className="py-3.5 px-4 text-right">
                         <span className="font-['Righteous'] text-lg text-emerald-400 font-mono">
-                          {t.avgScore}
+                          {t.avgScore} / 100
                         </span>
                       </td>
                     </tr>

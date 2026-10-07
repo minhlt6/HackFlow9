@@ -84,14 +84,40 @@ export interface MajorTopic {
   subTopics: SubTopic[];
 }
 
+export type SubmissionFieldType =
+  | 'repoUrl'
+  | 'demoUrl'
+  | 'videoUrl'
+  | 'slideUrl'
+  | 'figmaUrl'
+  | 'description'
+  | 'file'
+  | 'custom';
+
+export interface SubmissionFieldConfig {
+  id: string;
+  type: SubmissionFieldType;
+  label: string;
+  placeholder?: string;
+  required: boolean;
+  description?: string;
+  fileAccept?: string;
+}
+
 export interface CheckpointSubmission {
   id: string;
   checkpointId: string;
   teamId: string;
-  repoUrl: string;
+  repoUrl?: string;
   demoUrl?: string;
+  videoUrl?: string;
   slideUrl?: string;
+  figmaUrl?: string;
   description?: string;
+  fileName?: string;
+  fileSize?: string;
+  fileUrl?: string;
+  customFields?: Record<string, string>;
   commitSha: string;
   submittedAt: string;
   isAfterDeadline?: boolean;
@@ -106,6 +132,7 @@ export interface Checkpoint {
   name?: string;
   description: string;
   requirements?: string[];
+  submissionFields?: SubmissionFieldConfig[];
   startTime?: string;
   deadline: string;
   durationMinutes?: number;

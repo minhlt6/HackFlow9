@@ -1,5 +1,5 @@
 import React from 'react';
-import { useMockStore } from '../../store/useMockStore';
+import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { useNavigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 export const JudgeDashboardPage: React.FC = () => {
-  const { currentUser, teams, evaluations, config, majorTopics } = useMockStore();
+  const { currentUser, teams, evaluations, config, majorTopics, rubricCriteria } = useMockStore();
   const navigate = useNavigate();
 
   // Find evaluations by this judge
@@ -98,7 +98,7 @@ export const JudgeDashboardPage: React.FC = () => {
                 <th className="py-3.5 px-4">Tên Đội / Mã Định Danh</th>
                 <th className="py-3.5 px-4">Đề Tài Dự Thi</th>
                 <th className="py-3.5 px-4 text-center">Trạng Thái Chấm</th>
-                <th className="py-3.5 px-4 text-center">Điểm Đã Chấm</th>
+                <th className="py-3.5 px-4 text-center">Điểm Đã Chấm (Thang 100)</th>
                 <th className="py-3.5 px-4 text-right">Thao Tác</th>
               </tr>
             </thead>
@@ -107,6 +107,9 @@ export const JudgeDashboardPage: React.FC = () => {
                 const evalItem = judgeEvals.find((e) => e.teamId === team.id);
                 const isEvaluated = Boolean(evalItem && !evalItem.isDraft);
                 const isDraft = Boolean(evalItem?.isDraft);
+                const normalizedScore = evalItem
+                  ? normalizeScoreTo100(evalItem.totalScore, evalItem.scores, rubricCriteria)
+                  : 0;
 
                 const displayName = config.blindJudgingMode
                   ? `Đội thi ẩn danh #${(idx + 1).toString().padStart(2, '0')}`
@@ -137,9 +140,9 @@ export const JudgeDashboardPage: React.FC = () => {
 
                     <td className="py-3.5 px-4 text-center font-mono font-bold">
                       {isEvaluated ? (
-                        <span className="text-emerald-400 text-base">{evalItem?.totalScore}đ</span>
+                        <span className="text-emerald-400 text-base">{normalizedScore}đ</span>
                       ) : isDraft ? (
-                        <span className="text-cyan-400 text-sm">{evalItem?.totalScore}đ (nháp)</span>
+                        <span className="text-cyan-400 text-sm">{normalizedScore}đ (nháp)</span>
                       ) : (
                         <span className="text-slate-500">—</span>
                       )}

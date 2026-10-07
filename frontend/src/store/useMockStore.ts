@@ -30,6 +30,36 @@ import {
   initialAnnouncements,
 } from '../mock/mockData';
 
+/**
+ * Standard utility to ensure any score is strictly normalized to the 100-point rubric scale.
+ * If scores map and criteria are present, computes: sum((clampedScore / maxScore) * weight) / totalWeight * 100.
+ * Also defensively catches legacy cached values > 100 (e.g. 229.5) and restores them to 100-point scale.
+ */
+export const normalizeScoreTo100 = (
+  totalScore?: number,
+  scores?: Record<string, number>,
+  criteria?: RubricCriteria[]
+): number => {
+  if (scores && criteria && criteria.length > 0) {
+    const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0) || 100;
+    let weightedSum = 0;
+    for (const c of criteria) {
+      const raw = scores[c.id] ?? 0;
+      const max = c.maxScore > 0 ? c.maxScore : 10;
+      const clamped = Math.max(0, Math.min(raw, max));
+      weightedSum += (clamped / max) * (c.weight || 0);
+    }
+    return Math.round(((weightedSum / totalWeight) * 100) * 10) / 10;
+  }
+  if (totalScore !== undefined && totalScore >= 0 && totalScore <= 100) {
+    return Math.round(totalScore * 10) / 10;
+  }
+  if (totalScore !== undefined && totalScore > 100) {
+    return Math.min(100, Math.round((totalScore / 10) * 10) / 10);
+  }
+  return totalScore ?? 0;
+};
+
 interface MockStoreState {
   // Current user & authentication
   currentUser: User;
@@ -86,8 +116,19 @@ interface MockStoreState {
   deleteCheckpoint: (id: string) => void;
   reorderCheckpoints: (fromIndex: number, toIndex: number) => void;
   sortCheckpointsByDeadline: () => void;
-  submitCheckpoint: (checkpointId: string, teamId: string, repoUrl: string, demoUrl?: string) => { success: boolean; commitSha: string };
-  submitFinalProject: (teamId: string, repoUrl: string, demoVideoUrl: string, slideUrl: string, summary: string) => { success: boolean; commitSha: string };
+  submitCheckpoint: (
+    checkpointId: string,
+    teamId: string,
+    dataOrRepoUrl: string | Partial<CheckpointSubmission>,
+    demoUrl?: string
+  ) => { success: boolean; commitSha: string };
+  submitFinalProject: (
+    teamId: string,
+    repoUrl: string,
+    demoVideoUrl: string,
+    slideUrl: string,
+    summary: string
+  ) => { success: boolean; commitSha: string };
 
   // Rubrics & Evaluations
   rubricCriteria: RubricCriteria[];
@@ -753,18 +794,22 @@ export const useMockStore = create<MockStoreState>()(
         }));
       },
 
-      submitCheckpoint: (checkpointId, teamId, repoUrl, demoUrl) => {
+      submitCheckpoint: (checkpointId, teamId, dataOrRepoUrl, demoUrl) => {
         const commitSha = Math.random().toString(16).substring(2, 9);
+        const dataObj: Partial<CheckpointSubmission> =
+          typeof dataOrRepoUrl === 'string'
+            ? { repoUrl: dataOrRepoUrl, demoUrl }
+            : dataOrRepoUrl;
+
         const newSubm: CheckpointSubmission = {
           id: `subm-${Date.now()}`,
           checkpointId,
           teamId,
-          repoUrl,
-          demoUrl,
           commitSha,
           submittedAt: new Date().toISOString(),
           isAfterDeadline: false,
           status: 'submitted',
+          ...dataObj,
         };
 
         set((state) => ({
@@ -929,16 +974,21 @@ export const useMockStore = create<MockStoreState>()(
 
       saveEvaluation: (teamId, judgeId, judgeName, scoresMap, generalComment, isDraft) => {
         const criteria = get().rubricCriteria;
+        const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0) || 100;
         let weightedSum = 0;
 
         const details = criteria.map((c) => {
-          const score = scoresMap[c.id] || 0;
-          weightedSum += (score * c.weight) / 100;
-          return { criteriaId: c.id, score };
+          const rawScore = scoresMap[c.id] !== undefined ? scoresMap[c.id] : 0;
+          const max = c.maxScore > 0 ? c.maxScore : 10;
+          const clamped = Math.max(0, Math.min(rawScore, max));
+          // Normalized weighted contribution: (clamped / max) * weight
+          const weightedContrib = (clamped / max) * c.weight;
+          weightedSum += weightedContrib;
+          return { criteriaId: c.id, score: clamped };
         });
 
-        // Scale to 100 points
-        const totalScore = Math.round(weightedSum * 10 * 10) / 10;
+        // Exact 100-point scale: (weightedSum / totalWeight) * 100
+        const totalScore = Math.round(((weightedSum / totalWeight) * 100) * 10) / 10;
 
         const evalRecord: TeamEvaluation = {
           id: `eval-${teamId}`,
@@ -1129,7 +1179,7 @@ export const useMockStore = create<MockStoreState>()(
       },
     }),
     {
-      name: 'hackflow-full-setup-v2', // Full contest setup mock data
+      name: 'hackflow-full-setup-v3', // Full contest setup mock data
     }
   )
 );

@@ -16,6 +16,9 @@ import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
+  Globe,
+  Palette,
+  Paperclip,
 } from 'lucide-react';
 
 export const JudgeSplitScreenPage: React.FC = () => {
@@ -84,13 +87,14 @@ export const JudgeSplitScreenPage: React.FC = () => {
   };
 
   // Compute weighted total score (out of 100)
-  const totalWeightedScore = Math.round(
-    rubricCriteria.reduce((sum, c) => {
-      const score = scores[c.id] || 0;
-      const normalized = (score / c.maxScore) * c.weight;
-      return sum + normalized;
-    }, 0) * 10,
-  ) / 10;
+  const totalWeight = rubricCriteria.reduce((sum, c) => sum + (c.weight || 0), 0) || 100;
+  const rawWeightedSum = rubricCriteria.reduce((sum, c) => {
+    const score = scores[c.id] !== undefined ? scores[c.id] : 0;
+    const max = c.maxScore > 0 ? c.maxScore : 10;
+    const normalized = (Math.max(0, Math.min(score, max)) / max) * c.weight;
+    return sum + normalized;
+  }, 0);
+  const totalWeightedScore = Math.round(((rawWeightedSum / totalWeight) * 100) * 10) / 10;
 
   const handleSaveDraft = () => {
     if (!selectedTeam) return;
@@ -380,7 +384,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
                 {teamCheckpoints.map((sub, idx) => (
                   <div
                     key={sub.id}
-                    className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] text-xs space-y-1.5"
+                    className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] text-xs space-y-2"
                   >
                     <div className="flex items-center justify-between font-bold text-white">
                       <span>Checkpoint #{idx + 1}</span>
@@ -391,15 +395,88 @@ export const JudgeSplitScreenPage: React.FC = () => {
                     <div className="text-slate-400 text-[11px]">
                       Nộp lúc: {new Date(sub.submittedAt).toLocaleString('vi-VN')}
                     </div>
-                    <a
-                      href={sub.repoUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[#818CF8] hover:underline flex items-center gap-1 font-mono text-[11px]"
-                    >
-                      <span>{sub.repoUrl}</span>
-                      <ExternalLink size={11} />
-                    </a>
+
+                    {/* Deliverables Links */}
+                    <div className="flex flex-wrap gap-1.5 pt-0.5">
+                      {sub.repoUrl && (
+                        <a
+                          href={sub.repoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-[#818CF8] hover:text-white text-[11px] font-mono hover:border-[#6366F1]"
+                        >
+                          <GitBranch size={10} />
+                          <span>Repo</span>
+                          <ExternalLink size={9} />
+                        </a>
+                      )}
+                      {sub.demoUrl && (
+                        <a
+                          href={sub.demoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-emerald-400 hover:text-white text-[11px] font-mono hover:border-emerald-500"
+                        >
+                          <Globe size={10} />
+                          <span>Demo</span>
+                          <ExternalLink size={9} />
+                        </a>
+                      )}
+                      {sub.slideUrl && (
+                        <a
+                          href={sub.slideUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-amber-300 hover:text-white text-[11px] font-mono hover:border-amber-500"
+                        >
+                          <Presentation size={10} />
+                          <span>Slide</span>
+                          <ExternalLink size={9} />
+                        </a>
+                      )}
+                      {sub.videoUrl && (
+                        <a
+                          href={sub.videoUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-rose-300 hover:text-white text-[11px] font-mono hover:border-rose-500"
+                        >
+                          <Video size={10} />
+                          <span>Video</span>
+                          <ExternalLink size={9} />
+                        </a>
+                      )}
+                      {sub.figmaUrl && (
+                        <a
+                          href={sub.figmaUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-purple-300 hover:text-white text-[11px] font-mono hover:border-purple-500"
+                        >
+                          <Palette size={10} />
+                          <span>Figma</span>
+                          <ExternalLink size={9} />
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Attached File */}
+                    {sub.fileName && (
+                      <div className="flex items-center gap-1.5 p-1.5 rounded bg-[#1E293B] border border-[#334155] text-[10px] text-cyan-300">
+                        <Paperclip size={11} className="shrink-0" />
+                        <span className="truncate font-mono">{sub.fileName}</span>
+                        {sub.fileSize && (
+                          <span className="text-slate-400 shrink-0">({sub.fileSize})</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Description text */}
+                    {sub.description && (
+                      <p className="text-[11px] text-slate-300 italic line-clamp-2 bg-[#1E293B]/60 p-1.5 rounded border border-[#334155]/40">
+                        "{sub.description}"
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

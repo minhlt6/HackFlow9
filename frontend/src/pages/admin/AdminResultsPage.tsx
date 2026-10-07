@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useMockStore } from '../../store/useMockStore';
+import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import {
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const AdminResultsPage: React.FC = () => {
-  const { teams, evaluations, config, toggleResultsPublished } = useMockStore();
+  const { teams, evaluations, config, toggleResultsPublished, rubricCriteria } = useMockStore();
 
   const [alert, setAlert] = useState<string | null>(null);
 
@@ -21,7 +21,10 @@ export const AdminResultsPage: React.FC = () => {
     const teamEvals = evaluations.filter((e) => e.teamId === team.id && !e.isDraft);
     const avgScore =
       teamEvals.length > 0
-        ? teamEvals.reduce((sum, e) => sum + e.totalScore, 0) / teamEvals.length
+        ? teamEvals.reduce(
+            (sum, e) => sum + normalizeScoreTo100(e.totalScore, e.scores, rubricCriteria),
+            0
+          ) / teamEvals.length
         : 0;
 
     return {
@@ -137,7 +140,7 @@ export const AdminResultsPage: React.FC = () => {
                 <th className="py-3.5 px-4">Đội Thi</th>
                 <th className="py-3.5 px-4">Đội Trưởng</th>
                 <th className="py-3.5 px-4 text-center">Số Lượt Chấm</th>
-                <th className="py-3.5 px-4 text-right">Điểm TB Giám Khảo</th>
+                <th className="py-3.5 px-4 text-right">Điểm TB Giám Khảo (Thang 100)</th>
                 <th className="py-3.5 px-4 text-center">Xếp Loại</th>
               </tr>
             </thead>

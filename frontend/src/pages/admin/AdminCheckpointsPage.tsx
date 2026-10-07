@@ -16,10 +16,403 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Globe,
+  Video,
+  Presentation,
+  FileText,
+  Palette,
+  Paperclip,
+  UploadCloud,
+  File,
+  X,
+  ListChecks,
+  Sliders,
+  AlertTriangle,
 } from 'lucide-react';
-import type { Checkpoint } from '../../types';
+import type { Checkpoint, SubmissionFieldConfig, SubmissionFieldType } from '../../types';
 import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
+
+const DEFAULT_SUBMISSION_FIELDS: SubmissionFieldConfig[] = [
+  {
+    id: 'f-repo',
+    type: 'repoUrl',
+    label: 'GitHub Repository URL',
+    placeholder: 'https://github.com/organization/project-repo',
+    required: true,
+    description: 'Kho mã nguồn dự án (Public hoặc cấp quyền cho BTC)',
+  },
+  {
+    id: 'f-demo',
+    type: 'demoUrl',
+    label: 'Live Demo URL / Trang chạy thử nghiệm',
+    placeholder: 'https://app.yourproject.com',
+    required: false,
+    description: 'Đường dẫn sản phẩm chạy trực tiếp',
+  },
+  {
+    id: 'f-slide',
+    type: 'slideUrl',
+    label: 'Slide Thuyết Trình / Pitch Deck',
+    placeholder: 'https://docs.google.com/presentation/d/...',
+    required: false,
+    description: 'Slide trình bày (Canva/Google Slides)',
+  },
+  {
+    id: 'f-desc',
+    type: 'description',
+    label: 'Báo Cáo Tóm Tắt Kỹ Thuật & Giải Pháp',
+    placeholder: 'Mô tả ngắn gọn nội dung đã làm được trong chặng này...',
+    required: true,
+    description: 'Giải trình tóm tắt các tính năng và công nghệ',
+  },
+  {
+    id: 'f-file',
+    type: 'file',
+    label: 'Tệp Báo Cáo / Tài Liệu Đính Kèm (PDF / ZIP)',
+    placeholder: 'Chọn file PDF hoặc kéo thả tại đây',
+    required: false,
+    description: 'Tài liệu kỹ thuật định dạng PDF hoặc mã nguồn đóng gói (tối đa 50MB)',
+    fileAccept: '.pdf,.zip,.docx',
+  },
+];
+
+const PRESET_TEMPLATES: {
+  type: SubmissionFieldType;
+  label: string;
+  defaultLabel: string;
+  placeholder: string;
+  description: string;
+  icon: any;
+  fileAccept?: string;
+}[] = [
+  {
+    type: 'repoUrl',
+    label: 'Kho GitHub',
+    defaultLabel: 'GitHub Repository URL',
+    placeholder: 'https://github.com/organization/project-repo',
+    description: 'Kho mã nguồn dự án (Public hoặc cấp quyền cho BTC)',
+    icon: GitBranch,
+  },
+  {
+    type: 'demoUrl',
+    label: 'Live Demo URL',
+    defaultLabel: 'Đường dẫn Live Demo Sản phẩm',
+    placeholder: 'https://app.yourproject.com',
+    description: 'Đường dẫn web hoặc môi trường chạy thực tế',
+    icon: Globe,
+  },
+  {
+    type: 'videoUrl',
+    label: 'Video Demo',
+    defaultLabel: 'Video Demo Thuyết Trình (YouTube / Drive)',
+    placeholder: 'https://youtube.com/watch?v=... hoặc link Drive',
+    description: 'Video quay màn hình hoạt động sản phẩm (< 5 phút)',
+    icon: Video,
+  },
+  {
+    type: 'slideUrl',
+    label: 'Slide Pitch Deck',
+    defaultLabel: 'Slide Thuyết Trình / Pitch Deck',
+    placeholder: 'https://docs.google.com/presentation/d/...',
+    description: 'Slide trình bày giải pháp và kiến trúc (Canva / Slides)',
+    icon: Presentation,
+  },
+  {
+    type: 'figmaUrl',
+    label: 'Link Figma',
+    defaultLabel: 'Link Thiết kế Figma / Sơ đồ Kiến trúc',
+    placeholder: 'https://www.figma.com/design/...',
+    description: 'Bản thiết kế giao diện UI/UX hoặc sơ đồ luồng',
+    icon: Palette,
+  },
+  {
+    type: 'file',
+    label: 'Tệp đính kèm',
+    defaultLabel: 'Tệp Báo Cáo / Tài Liệu Đính Kèm (PDF / ZIP)',
+    placeholder: 'Chọn file PDF hoặc kéo thả tại đây',
+    description: 'Tài liệu kỹ thuật định dạng PDF hoặc mã nguồn đóng gói (tối đa 50MB)',
+    icon: Paperclip,
+    fileAccept: '.pdf,.zip,.docx',
+  },
+  {
+    type: 'description',
+    label: 'Báo cáo Text',
+    defaultLabel: 'Báo Cáo Tóm Tắt Kỹ Thuật & Giải Pháp',
+    placeholder: 'Mô tả giải pháp, kiến trúc công nghệ và tiến độ...',
+    description: 'Thí sinh nhập giải trình trực tiếp vào form',
+    icon: FileText,
+  },
+  {
+    type: 'custom',
+    label: 'Trường tùy chỉnh',
+    defaultLabel: 'Thông tin bổ sung',
+    placeholder: 'Nhập thông tin theo yêu cầu...',
+    description: 'Trường thông tin đặc thù do BTC quy định',
+    icon: Plus,
+  },
+];
+
+const getFieldIcon = (type: SubmissionFieldType) => {
+  switch (type) {
+    case 'repoUrl':
+      return <GitBranch size={13} className="text-indigo-400" />;
+    case 'demoUrl':
+      return <Globe size={13} className="text-emerald-400" />;
+    case 'videoUrl':
+      return <Video size={13} className="text-rose-400" />;
+    case 'slideUrl':
+      return <Presentation size={13} className="text-amber-400" />;
+    case 'figmaUrl':
+      return <Palette size={13} className="text-purple-400" />;
+    case 'file':
+      return <Paperclip size={13} className="text-cyan-400" />;
+    case 'description':
+      return <FileText size={13} className="text-blue-400" />;
+    default:
+      return <File size={13} className="text-slate-400" />;
+  }
+};
+
+interface SubmissionFieldsEditorProps {
+  fields: SubmissionFieldConfig[];
+  onChangeFields: (fields: SubmissionFieldConfig[]) => void;
+  requirements: string[];
+  onChangeRequirements: (reqs: string[]) => void;
+  reqInput: string;
+  onChangeReqInput: (val: string) => void;
+  onAddReq: () => void;
+}
+
+const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
+  fields,
+  onChangeFields,
+  requirements,
+  onChangeRequirements,
+  reqInput,
+  onChangeReqInput,
+  onAddReq,
+}) => {
+  const handleAddField = (preset: typeof PRESET_TEMPLATES[0]) => {
+    const newField: SubmissionFieldConfig = {
+      id: `f-${preset.type}-${Date.now()}`,
+      type: preset.type,
+      label: preset.defaultLabel,
+      placeholder: preset.placeholder,
+      required: preset.type === 'repoUrl' || preset.type === 'description',
+      description: preset.description,
+      fileAccept: preset.fileAccept,
+    };
+    onChangeFields([...fields, newField]);
+  };
+
+  const handleUpdateField = (id: string, updates: Partial<SubmissionFieldConfig>) => {
+    onChangeFields(fields.map((f) => (f.id === id ? { ...f, ...updates } : f)));
+  };
+
+  const handleRemoveField = (id: string) => {
+    onChangeFields(fields.filter((f) => f.id !== id));
+  };
+
+  const handleRemoveReq = (idx: number) => {
+    onChangeRequirements(requirements.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-4 pt-3 border-t border-[#334155]/80">
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <ListChecks size={16} className="text-[#818CF8]" />
+          <h4 className="font-['Righteous'] text-sm text-white tracking-wide">
+            Cấu Hình Yêu Cầu Nộp Bài Cho Thí Sinh
+          </h4>
+        </div>
+        <p className="text-[11px] text-slate-400">
+          Quy định các liên kết, tệp tin hoặc trường thông tin mà thí sinh bắt buộc / khuyến nghị nộp tại chặng này.
+        </p>
+      </div>
+
+      {/* Quick Add Buttons */}
+      <div className="space-y-1.5 p-3 rounded-[12px] bg-[#0F172A] border border-[#334155]">
+        <span className="text-[11px] font-semibold text-slate-300">
+          Thêm nhanh hạng mục nộp bài:
+        </span>
+        <div className="flex flex-wrap gap-1.5">
+          {PRESET_TEMPLATES.map((tmpl) => {
+            const Icon = tmpl.icon;
+            return (
+              <button
+                key={tmpl.type}
+                type="button"
+                onClick={() => handleAddField(tmpl)}
+                className="px-2.5 py-1 rounded-[6px] text-[11px] font-medium bg-[#1E293B] hover:bg-[#334155] text-slate-200 hover:text-white border border-[#334155] hover:border-[#6366F1]/50 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Icon size={12} className="text-[#818CF8]" />
+                <span>+ {tmpl.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* List of Configured Fields */}
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between text-[11px] text-slate-400">
+          <span className="font-semibold text-slate-300">
+            Danh sách hạng mục bài nộp ({fields.length}):
+          </span>
+          <span>Thí sinh sẽ điền theo form này khi nộp bài</span>
+        </div>
+
+        {fields.length === 0 ? (
+          <div className="p-4 rounded-[10px] bg-[#0F172A]/50 border border-dashed border-[#334155] text-center text-xs text-slate-400">
+            Chưa có hạng mục nào. Bấm nút phía trên để thêm trường nộp bài.
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+            {fields.map((field, idx) => (
+              <div
+                key={field.id}
+                className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] space-y-2 text-xs"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1E293B] text-[10px] font-mono text-slate-400">
+                      #{idx + 1}
+                    </span>
+                    <div className="flex items-center gap-1.5 font-medium text-slate-200">
+                      {getFieldIcon(field.type)}
+                      <span className="text-slate-400 text-[11px]">[{field.type}]</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5">
+                    <label className="flex items-center gap-1.5 cursor-pointer text-[11px]">
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(e) =>
+                          handleUpdateField(field.id, { required: e.target.checked })
+                        }
+                        className="rounded border-[#334155] bg-[#1E293B] text-amber-500 focus:ring-amber-500"
+                      />
+                      <span
+                        className={
+                          field.required
+                            ? 'text-amber-300 font-bold'
+                            : 'text-slate-400'
+                        }
+                      >
+                        {field.required ? 'Bắt buộc nộp' : 'Tùy chọn'}
+                      </span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveField(field.id)}
+                      className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-[#1E293B] transition-colors"
+                      title="Xóa trường này"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    value={field.label}
+                    onChange={(e) =>
+                      handleUpdateField(field.id, { label: e.target.value })
+                    }
+                    placeholder="Tên nhãn hiển thị"
+                    className="p-2 rounded-[8px] bg-[#1E293B] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    value={field.description || ''}
+                    onChange={(e) =>
+                      handleUpdateField(field.id, { description: e.target.value })
+                    }
+                    placeholder="Hướng dẫn / Gợi ý điền cho thí sinh"
+                    className="p-2 rounded-[8px] bg-[#1E293B] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+                  />
+                </div>
+
+                {field.type === 'file' && (
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                    <Paperclip size={12} className="text-cyan-400" />
+                    <span>Định dạng tệp cho phép:</span>
+                    <input
+                      type="text"
+                      value={field.fileAccept || '.pdf,.zip,.docx'}
+                      onChange={(e) =>
+                        handleUpdateField(field.id, { fileAccept: e.target.value })
+                      }
+                      placeholder=".pdf,.zip,.docx"
+                      className="px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-slate-200 text-[11px] font-mono focus:border-[#6366F1] focus:outline-none"
+                    />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Checklist / Criteria Section */}
+      <div className="space-y-2 pt-2 border-t border-[#334155]/60">
+        <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+          <CheckCircle2 size={14} className="text-emerald-400" />
+          <span>Tiêu chí kiểm duyệt & Checklist bài nộp:</span>
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={reqInput}
+            onChange={(e) => onChangeReqInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onAddReq();
+              }
+            }}
+            placeholder="Ví dụ: Báo cáo định dạng PDF tối đa 15 trang..."
+            className="flex-1 p-2 rounded-[8px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={onAddReq}
+            className="px-3 py-1.5 rounded-[8px] bg-[#6366F1] hover:bg-[#4F46E5] text-white text-xs font-semibold shrink-0 cursor-pointer"
+          >
+            + Thêm
+          </button>
+        </div>
+
+        {requirements.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {requirements.map((req, rIdx) => (
+              <span
+                key={rIdx}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs bg-[#0F172A] border border-[#334155] text-slate-200"
+              >
+                <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
+                <span>{req}</span>
+                <button
+                  type="button"
+                  onClick={() => handleRemoveReq(rIdx)}
+                  className="text-slate-400 hover:text-rose-400 ml-0.5 cursor-pointer"
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 export const AdminCheckpointsPage: React.FC = () => {
   const {
@@ -39,6 +432,9 @@ export const AdminCheckpointsPage: React.FC = () => {
   const [editDescription, setEditDescription] = useState('');
   const [editDurationMinutes, setEditDurationMinutes] = useState(180);
   const [editWeight, setEditWeight] = useState(25);
+  const [editRequirements, setEditRequirements] = useState<string[]>([]);
+  const [editSubmissionFields, setEditSubmissionFields] = useState<SubmissionFieldConfig[]>([]);
+  const [editReqInput, setEditReqInput] = useState('');
   const [alert, setAlert] = useState<string | null>(null);
 
   // New Checkpoint modal state
@@ -47,18 +443,43 @@ export const AdminCheckpointsPage: React.FC = () => {
   const [newDescription, setNewDescription] = useState('');
   const [newDurationMinutes, setNewDurationMinutes] = useState(180);
   const [newWeight, setNewWeight] = useState(25);
+  const [newRequirements, setNewRequirements] = useState<string[]>([]);
+  const [newSubmissionFields, setNewSubmissionFields] = useState<SubmissionFieldConfig[]>([]);
+  const [newReqInput, setNewReqInput] = useState('');
   const [insertPosition, setInsertPosition] = useState<string>('end');
 
-  const isAddDirty = isAddOpen && (newTitle.trim() !== '' || newDescription.trim() !== '');
+  const isAddDirty = isAddOpen && (
+    newTitle.trim() !== '' ||
+    newDescription.trim() !== '' ||
+    newRequirements.length > 0 ||
+    newSubmissionFields.length > 0
+  );
   const isEditDirty = Boolean(editingCp) && (
     editTitle !== (editingCp?.title || editingCp?.name || '') ||
     editDescription !== (editingCp?.description || '') ||
     editDurationMinutes !== (editingCp?.durationMinutes || 180) ||
-    editWeight !== (editingCp?.weight || 25)
+    editWeight !== (editingCp?.weight || 25) ||
+    JSON.stringify(editRequirements) !== JSON.stringify(editingCp?.requirements || []) ||
+    JSON.stringify(editSubmissionFields) !== JSON.stringify(editingCp?.submissionFields || [])
   );
   const isDirty = isAddDirty || isEditDirty;
 
   const blocker = useUnsavedChangesWarning(isDirty);
+
+  const handleOpenAdd = () => {
+    setIsAddOpen(true);
+    setNewTitle('');
+    setNewDescription('');
+    setNewDurationMinutes(180);
+    setNewWeight(25);
+    setInsertPosition('end');
+    setNewRequirements([
+      'Sơ đồ kiến trúc & đặc tả kỹ thuật',
+      'Kho mã nguồn cập nhật trên GitHub',
+    ]);
+    setNewSubmissionFields([...DEFAULT_SUBMISSION_FIELDS]);
+    setNewReqInput('');
+  };
 
   const handleCloseAdd = () => {
     if (isAddDirty && !window.confirm('Bạn có nội dung chặng nộp chưa lưu. Bạn có chắc muốn đóng và hủy bỏ?')) {
@@ -69,6 +490,8 @@ export const AdminCheckpointsPage: React.FC = () => {
     setNewDescription('');
     setNewDurationMinutes(180);
     setNewWeight(25);
+    setNewRequirements([]);
+    setNewSubmissionFields([]);
   };
 
   const handleCloseEdit = () => {
@@ -102,6 +525,17 @@ export const AdminCheckpointsPage: React.FC = () => {
     setEditDescription(cp.description || '');
     setEditDurationMinutes(cp.durationMinutes || 180);
     setEditWeight(cp.weight || 25);
+    setEditRequirements(
+      cp.requirements && cp.requirements.length > 0
+        ? [...cp.requirements]
+        : ['Sơ đồ kiến trúc & đặc tả kỹ thuật', 'Kho mã nguồn cập nhật trên GitHub']
+    );
+    setEditSubmissionFields(
+      cp.submissionFields && cp.submissionFields.length > 0
+        ? cp.submissionFields.map((f) => ({ ...f }))
+        : DEFAULT_SUBMISSION_FIELDS.map((f) => ({ ...f }))
+    );
+    setEditReqInput('');
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -113,10 +547,12 @@ export const AdminCheckpointsPage: React.FC = () => {
       description: editDescription.trim(),
       durationMinutes: Number(editDurationMinutes),
       weight: Number(editWeight),
+      requirements: editRequirements,
+      submissionFields: editSubmissionFields,
     });
 
     setEditingCp(null);
-    setAlert(`Đã cập nhật chặng nộp với thời lượng ${editDurationMinutes} phút thành công!`);
+    setAlert(`Đã cập nhật chặng nộp "${editTitle}" thành công!`);
     setTimeout(() => setAlert(null), 3000);
   };
 
@@ -132,6 +568,8 @@ export const AdminCheckpointsPage: React.FC = () => {
         description: newDescription.trim(),
         durationMinutes: Number(newDurationMinutes),
         weight: Number(newWeight),
+        requirements: newRequirements,
+        submissionFields: newSubmissionFields,
         deadline: new Date(Date.now() + Number(newDurationMinutes) * 60 * 1000).toISOString(),
       },
       insertIndex,
@@ -142,6 +580,8 @@ export const AdminCheckpointsPage: React.FC = () => {
     setNewDescription('');
     setNewDurationMinutes(180);
     setNewWeight(25);
+    setNewRequirements([]);
+    setNewSubmissionFields([]);
     setInsertPosition('end');
     setAlert(`Đã thêm chặng nộp "${newTitle}" vào đúng vị trí thứ tự thành công!`);
     setTimeout(() => setAlert(null), 3000);
@@ -209,7 +649,7 @@ export const AdminCheckpointsPage: React.FC = () => {
             </Button>
           )}
 
-          <Button variant="primary" onClick={() => setIsAddOpen(true)} className="gap-2">
+          <Button variant="primary" onClick={handleOpenAdd} className="gap-2">
             <Plus size={16} />
             <span>Thêm Chặng Nộp Mới</span>
           </Button>
@@ -326,6 +766,56 @@ export const AdminCheckpointsPage: React.FC = () => {
                   {cp.description}
                 </p>
 
+                {/* Hạng mục yêu cầu nộp bài của thí sinh */}
+                <div className="p-3.5 rounded-[12px] bg-[#0F172A]/70 border border-[#334155]/60 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                      <ListChecks size={14} className="text-[#818CF8]" />
+                      <span>Hạng mục nộp bài yêu cầu cho Thí sinh:</span>
+                      <span className="text-slate-400 font-normal">
+                        ({(cp.submissionFields && cp.submissionFields.length > 0 ? cp.submissionFields : DEFAULT_SUBMISSION_FIELDS).length} hạng mục)
+                      </span>
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {(cp.submissionFields && cp.submissionFields.length > 0 ? cp.submissionFields : DEFAULT_SUBMISSION_FIELDS).map((field) => (
+                      <div
+                        key={field.id}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-xs border ${
+                          field.required
+                            ? 'bg-[#1E293B] border-amber-500/40 text-amber-200 shadow-sm'
+                            : 'bg-[#1E293B]/60 border-[#334155] text-slate-300'
+                        }`}
+                      >
+                        {getFieldIcon(field.type)}
+                        <span className="font-medium">{field.label}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                            field.required
+                              ? 'bg-amber-500/20 text-amber-300'
+                              : 'bg-slate-700/60 text-slate-400'
+                          }`}
+                        >
+                          {field.required ? 'Bắt buộc' : 'Tùy chọn'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {cp.requirements && cp.requirements.length > 0 && (
+                    <div className="pt-2 border-t border-[#334155]/40 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                      <span className="font-medium text-slate-300">Tiêu chí kiểm duyệt:</span>
+                      {cp.requirements.map((req, rIdx) => (
+                        <span key={rIdx} className="flex items-center gap-1">
+                          <CheckCircle2 size={11} className="text-emerald-400" />
+                          <span>{req}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex flex-col md:flex-row md:items-center justify-between pt-3 border-t border-[#334155]/60 text-xs text-slate-400 gap-3">
                   <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
@@ -371,7 +861,8 @@ export const AdminCheckpointsPage: React.FC = () => {
       <Modal
         isOpen={isAddOpen}
         onClose={handleCloseAdd}
-        title="Thêm Chặng Nộp Mới (Cấu Hình Theo Số Phút)"
+        title="Thêm Chặng Nộp Mới & Cấu Hình Yêu Cầu Bài Nộp"
+        maxWidth="2xl"
       >
         <form onSubmit={handleAdd} className="space-y-4 font-['Roboto']">
           <Input
@@ -478,6 +969,21 @@ export const AdminCheckpointsPage: React.FC = () => {
             </p>
           </div>
 
+          {/* Submission Requirements Editor */}
+          <SubmissionFieldsEditor
+            fields={newSubmissionFields}
+            onChangeFields={setNewSubmissionFields}
+            requirements={newRequirements}
+            onChangeRequirements={setNewRequirements}
+            reqInput={newReqInput}
+            onChangeReqInput={setNewReqInput}
+            onAddReq={() => {
+              if (!newReqInput.trim()) return;
+              setNewRequirements([...newRequirements, newReqInput.trim()]);
+              setNewReqInput('');
+            }}
+          />
+
           <div className="flex justify-end gap-3 pt-3 border-t border-[#334155]">
             <Button variant="ghost" type="button" onClick={handleCloseAdd}>
               Hủy
@@ -493,7 +999,8 @@ export const AdminCheckpointsPage: React.FC = () => {
       <Modal
         isOpen={Boolean(editingCp)}
         onClose={handleCloseEdit}
-        title={`Chỉnh Sửa Chặng: ${editingCp?.title || ''}`}
+        title={`Chỉnh Sửa Chặng & Cấu Hình Yêu Cầu: ${editingCp?.title || ''}`}
+        maxWidth="2xl"
       >
         <form onSubmit={handleSave} className="space-y-4 font-['Roboto']">
           <Input
@@ -570,6 +1077,21 @@ export const AdminCheckpointsPage: React.FC = () => {
             value={editWeight}
             onChange={(e) => setEditWeight(Number(e.target.value))}
             required
+          />
+
+          {/* Submission Requirements Editor */}
+          <SubmissionFieldsEditor
+            fields={editSubmissionFields}
+            onChangeFields={setEditSubmissionFields}
+            requirements={editRequirements}
+            onChangeRequirements={setEditRequirements}
+            reqInput={editReqInput}
+            onChangeReqInput={setEditReqInput}
+            onAddReq={() => {
+              if (!editReqInput.trim()) return;
+              setEditRequirements([...editRequirements, editReqInput.trim()]);
+              setEditReqInput('');
+            }}
           />
 
           <div className="flex justify-end gap-3 pt-3 border-t border-[#334155]">

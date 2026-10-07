@@ -14,10 +14,94 @@ import {
   UploadCloud,
   FileCode,
   ShieldCheck,
+  Globe,
+  Video,
+  Presentation,
+  FileText,
+  Palette,
+  Paperclip,
+  File,
+  X,
+  ListChecks,
+  RefreshCw,
 } from 'lucide-react';
+import type { Checkpoint, SubmissionFieldConfig, SubmissionFieldType } from '../../types';
+
+const DEFAULT_SUBMISSION_FIELDS: SubmissionFieldConfig[] = [
+  {
+    id: 'f-repo',
+    type: 'repoUrl',
+    label: 'GitHub Repository URL',
+    placeholder: 'https://github.com/organization/project-repo',
+    required: true,
+    description: 'Kho mã nguồn dự án (Public hoặc cấp quyền cho BTC)',
+  },
+  {
+    id: 'f-demo',
+    type: 'demoUrl',
+    label: 'Live Demo URL / Trang chạy thử nghiệm',
+    placeholder: 'https://app.yourproject.com',
+    required: false,
+    description: 'Đường dẫn sản phẩm chạy trực tiếp',
+  },
+  {
+    id: 'f-slide',
+    type: 'slideUrl',
+    label: 'Slide Thuyết Trình / Pitch Deck',
+    placeholder: 'https://docs.google.com/presentation/d/...',
+    required: false,
+    description: 'Slide trình bày (Canva/Google Slides)',
+  },
+  {
+    id: 'f-desc',
+    type: 'description',
+    label: 'Báo Cáo Tóm Tắt Kỹ Thuật & Giải Pháp',
+    placeholder: 'Mô tả ngắn gọn nội dung đã làm được trong chặng này...',
+    required: true,
+    description: 'Giải trình tóm tắt các tính năng và công nghệ',
+  },
+  {
+    id: 'f-file',
+    type: 'file',
+    label: 'Tệp Báo Cáo / Tài Liệu Đính Kèm (PDF / ZIP)',
+    placeholder: 'Chọn file PDF hoặc kéo thả tại đây',
+    required: false,
+    description: 'Tài liệu kỹ thuật định dạng PDF hoặc mã nguồn đóng gói (tối đa 50MB)',
+    fileAccept: '.pdf,.zip,.docx',
+  },
+];
+
+const getFieldIcon = (type: SubmissionFieldType) => {
+  switch (type) {
+    case 'repoUrl':
+      return <GitBranch size={13} className="text-indigo-400" />;
+    case 'demoUrl':
+      return <Globe size={13} className="text-emerald-400" />;
+    case 'videoUrl':
+      return <Video size={13} className="text-rose-400" />;
+    case 'slideUrl':
+      return <Presentation size={13} className="text-amber-400" />;
+    case 'figmaUrl':
+      return <Palette size={13} className="text-purple-400" />;
+    case 'file':
+      return <Paperclip size={13} className="text-cyan-400" />;
+    case 'description':
+      return <FileText size={13} className="text-blue-400" />;
+    default:
+      return <File size={13} className="text-slate-400" />;
+  }
+};
 
 export const CandidateCheckpointsPage: React.FC = () => {
-  const { currentUser, teams, checkpoints, submissions, submitCheckpoint, openWizardAtStep, config } = useMockStore();
+  const {
+    currentUser,
+    teams,
+    checkpoints,
+    submissions,
+    submitCheckpoint,
+    openWizardAtStep,
+    config,
+  } = useMockStore();
 
   const formatDuration = (mins: number) => {
     if (!mins || mins <= 0) return '0 phút';
@@ -28,13 +112,22 @@ export const CandidateCheckpointsPage: React.FC = () => {
   };
 
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
-  const isLeader = currentUser.teamRole === 'leader' || myTeam?.leaderId === currentUser.id;
 
   const [selectedCpId, setSelectedCpId] = useState<string | null>(null);
-  const [repoUrl, setRepoUrl] = useState('https://github.com/cybersentinels/ai-health-core');
-  const [demoUrl, setDemoUrl] = useState('https://ai-health.demo.io');
+
+  // Form states
+  const [formRepoUrl, setFormRepoUrl] = useState('');
+  const [formDemoUrl, setFormDemoUrl] = useState('');
+  const [formVideoUrl, setFormVideoUrl] = useState('');
+  const [formSlideUrl, setFormSlideUrl] = useState('');
+  const [formFigmaUrl, setFormFigmaUrl] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formFileName, setFormFileName] = useState('');
+  const [formFileSize, setFormFileSize] = useState('');
+  const [formCustomFields, setFormCustomFields] = useState<Record<string, string>>({});
   const [confirmLock, setConfirmLock] = useState(false);
   const [submitResult, setSubmitResult] = useState<{ sha: string } | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   const teamSubmissions = submissions.filter((s) => s.teamId === myTeam?.id);
 
@@ -42,19 +135,112 @@ export const CandidateCheckpointsPage: React.FC = () => {
     setSelectedCpId(cpId);
     setSubmitResult(null);
     setConfirmLock(false);
+    setValidationError(null);
+
+    const existing = teamSubmissions.find((s) => s.checkpointId === cpId);
+    if (existing) {
+      setFormRepoUrl(existing.repoUrl || '');
+      setFormDemoUrl(existing.demoUrl || '');
+      setFormVideoUrl(existing.videoUrl || '');
+      setFormSlideUrl(existing.slideUrl || '');
+      setFormFigmaUrl(existing.figmaUrl || '');
+      setFormDescription(existing.description || '');
+      setFormFileName(existing.fileName || '');
+      setFormFileSize(existing.fileSize || '');
+      setFormCustomFields(existing.customFields || {});
+    } else {
+      setFormRepoUrl('https://github.com/cybersamurai-team/medical-rag-core');
+      setFormDemoUrl('https://rag-demo.cybersamurai.team');
+      setFormVideoUrl('https://youtube.com/watch?v=demo-hackflow-2026');
+      setFormSlideUrl('https://docs.google.com/presentation/d/pitch-deck-2026');
+      setFormFigmaUrl('');
+      setFormDescription('Hoàn thành các tiêu chuẩn kỹ thuật chặng theo đúng thể lệ của Ban Tổ Chức.');
+      setFormFileName('Bao_cao_Kien_truc_RAG_CyberSamurai.pdf');
+      setFormFileSize('3.4 MB');
+      setFormCustomFields({});
+    }
   };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const f = e.target.files[0];
+      const sizeMb = (f.size / (1024 * 1024)).toFixed(1);
+      setFormFileName(f.name);
+      setFormFileSize(`${sizeMb} MB`);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setFormFileName('');
+    setFormFileSize('');
+  };
+
+  const selectedCheckpoint = checkpoints.find((c) => c.id === selectedCpId);
+  const activeFields =
+    selectedCheckpoint?.submissionFields && selectedCheckpoint.submissionFields.length > 0
+      ? selectedCheckpoint.submissionFields
+      : DEFAULT_SUBMISSION_FIELDS;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!myTeam || !selectedCpId) return;
+    setValidationError(null);
 
-    const res = submitCheckpoint(selectedCpId, myTeam.id, repoUrl, demoUrl);
+    // Validate required fields
+    for (const field of activeFields) {
+      if (field.required) {
+        if (field.type === 'repoUrl' && !formRepoUrl.trim()) {
+          setValidationError(`Vui lòng điền link ${field.label}.`);
+          return;
+        }
+        if (field.type === 'demoUrl' && !formDemoUrl.trim()) {
+          setValidationError(`Vui lòng điền link ${field.label}.`);
+          return;
+        }
+        if (field.type === 'videoUrl' && !formVideoUrl.trim()) {
+          setValidationError(`Vui lòng điền link ${field.label}.`);
+          return;
+        }
+        if (field.type === 'slideUrl' && !formSlideUrl.trim()) {
+          setValidationError(`Vui lòng điền link ${field.label}.`);
+          return;
+        }
+        if (field.type === 'figmaUrl' && !formFigmaUrl.trim()) {
+          setValidationError(`Vui lòng điền link ${field.label}.`);
+          return;
+        }
+        if (field.type === 'description' && !formDescription.trim()) {
+          setValidationError(`Vui lòng nhập nội dung ${field.label}.`);
+          return;
+        }
+        if (field.type === 'file' && !formFileName) {
+          setValidationError(`Vui lòng đính kèm tệp tin: ${field.label}.`);
+          return;
+        }
+        if (field.type === 'custom' && !formCustomFields[field.id]?.trim()) {
+          setValidationError(`Vui lòng điền thông tin: ${field.label}.`);
+          return;
+        }
+      }
+    }
+
+    const payload = {
+      repoUrl: formRepoUrl.trim(),
+      demoUrl: formDemoUrl.trim(),
+      videoUrl: formVideoUrl.trim(),
+      slideUrl: formSlideUrl.trim(),
+      figmaUrl: formFigmaUrl.trim(),
+      description: formDescription.trim(),
+      fileName: formFileName,
+      fileSize: formFileSize,
+      customFields: formCustomFields,
+    };
+
+    const res = submitCheckpoint(selectedCpId, myTeam.id, payload);
     if (res.success) {
       setSubmitResult({ sha: res.commitSha });
     }
   };
-
-  const selectedCheckpoint = checkpoints.find((c) => c.id === selectedCpId);
 
   return (
     <div className="space-y-6 font-['Roboto']">
@@ -71,7 +257,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
           Tiến Độ Các Chặng Nộp Bài
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
-          Các mốc kiểm tra tiến độ bắt buộc. Mỗi bài nộp sẽ ghi nhận lại chính xác mã commit tại thời điểm nộp để giám khảo đánh giá.
+          Các mốc kiểm tra tiến độ bắt buộc. Bạn cần nộp đầy đủ các hạng mục được BTC yêu cầu (mã nguồn, tệp tin, slide, liên kết demo).
         </p>
       </div>
 
@@ -102,6 +288,10 @@ export const CandidateCheckpointsPage: React.FC = () => {
           const submission = teamSubmissions.find((s) => s.checkpointId === cp.id);
           const isSubmitted = Boolean(submission);
           const isOverdue = new Date(cp.deadline).getTime() < new Date().getTime() && !isSubmitted;
+          const subFields =
+            cp.submissionFields && cp.submissionFields.length > 0
+              ? cp.submissionFields
+              : DEFAULT_SUBMISSION_FIELDS;
 
           return (
             <div
@@ -112,9 +302,9 @@ export const CandidateCheckpointsPage: React.FC = () => {
                   : 'bg-[#1E293B] border-[#334155]'
               }`}
             >
-              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+              <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
                 {/* Left CP Info */}
-                <div className="space-y-3 flex-1">
+                <div className="space-y-3.5 flex-1">
                   <div className="flex flex-wrap items-center gap-2.5">
                     <div className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6366F1]/20 text-[#818CF8] font-bold text-xs">
                       #{idx + 1}
@@ -138,6 +328,53 @@ export const CandidateCheckpointsPage: React.FC = () => {
                   <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-3xl">
                     {cp.description}
                   </p>
+
+                  {/* Hạng mục yêu cầu nộp bài của chặng này */}
+                  <div className="p-3.5 rounded-[12px] bg-[#0F172A]/70 border border-[#334155]/60 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-200 font-semibold">
+                      <span className="flex items-center gap-1.5">
+                        <ListChecks size={14} className="text-[#818CF8]" />
+                        <span>Hạng mục BTC yêu cầu nộp ({subFields.length}):</span>
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      {subFields.map((field) => (
+                        <div
+                          key={field.id}
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-xs border ${
+                            field.required
+                              ? 'bg-[#1E293B] border-amber-500/40 text-amber-200'
+                              : 'bg-[#1E293B]/60 border-[#334155] text-slate-300'
+                          }`}
+                        >
+                          {getFieldIcon(field.type)}
+                          <span className="font-medium">{field.label}</span>
+                          <span
+                            className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                              field.required
+                                ? 'bg-amber-500/20 text-amber-300'
+                                : 'bg-slate-700/60 text-slate-400'
+                            }`}
+                          >
+                            {field.required ? 'Bắt buộc' : 'Tùy chọn'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {cp.requirements && cp.requirements.length > 0 && (
+                      <div className="pt-2 border-t border-[#334155]/40 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                        <span className="font-medium text-slate-300">Tiêu chí kiểm duyệt:</span>
+                        {cp.requirements.map((req, rIdx) => (
+                          <span key={rIdx} className="flex items-center gap-1">
+                            <CheckCircle2 size={11} className="text-emerald-400" />
+                            <span>{req}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
                     <div className="flex items-center gap-1.5">
@@ -163,44 +400,119 @@ export const CandidateCheckpointsPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Right Action / Submission Data */}
-                <div className="flex flex-col sm:items-end justify-center gap-3 shrink-0">
+                {/* Right Action / Submitted Card */}
+                <div className="flex flex-col sm:items-end justify-center gap-3 shrink-0 w-full lg:w-auto">
                   {isSubmitted && submission ? (
-                    <div className="p-3.5 rounded-[12px] bg-[#0F172A] border border-emerald-500/30 text-xs space-y-2 min-w-[260px]">
-                      <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                        <CheckCircle2 size={15} />
-                        <span>Đã ghi nhận bài nộp thành công</span>
+                    <div className="p-4 rounded-[12px] bg-[#0F172A] border border-emerald-500/30 text-xs space-y-2.5 w-full sm:min-w-[280px] lg:max-w-sm">
+                      <div className="flex items-center justify-between pb-2 border-b border-[#334155]">
+                        <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                          <CheckCircle2 size={15} />
+                          <span>Đã nộp bài chặng này</span>
+                        </div>
+                        <span className="font-mono text-[11px] text-[#818CF8] bg-[#6366F1]/15 px-2 py-0.5 rounded border border-[#6366F1]/30">
+                          SHA: {submission.commitSha.slice(0, 8)}
+                        </span>
                       </div>
-                      <div className="flex items-center justify-between font-mono text-[11px] text-slate-300">
-                        <span className="text-slate-400">Commit SHA:</span>
-                        <span className="text-[#818CF8] font-bold">{submission.commitSha.slice(0, 10)}...</span>
-                      </div>
+
                       <div className="text-[11px] text-slate-400">
-                        Thời gian nộp: {new Date(submission.submittedAt).toLocaleTimeString('vi-VN')}
+                        Thời gian nộp: {new Date(submission.submittedAt).toLocaleTimeString('vi-VN')} ngày {new Date(submission.submittedAt).toLocaleDateString('vi-VN')}
                       </div>
-                      <div className="flex items-center gap-2 pt-1 border-t border-[#334155]">
-                        <a
-                          href={submission.repoUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center gap-1 text-[#818CF8] hover:underline"
-                        >
-                          <FileCode size={12} />
-                          <span>Repo GitHub</span>
-                          <ExternalLink size={10} />
-                        </a>
+
+                      {/* Display Submitted Deliverables */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {submission.repoUrl && (
+                          <a
+                            href={submission.repoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-[6px] bg-[#1E293B] border border-[#334155] text-[#818CF8] hover:text-white text-xs hover:border-[#6366F1] transition-colors"
+                          >
+                            <GitBranch size={11} />
+                            <span>GitHub Repo</span>
+                            <ExternalLink size={10} />
+                          </a>
+                        )}
                         {submission.demoUrl && (
                           <a
                             href={submission.demoUrl}
                             target="_blank"
                             rel="noreferrer"
-                            className="flex items-center gap-1 text-emerald-400 hover:underline ml-auto"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-[6px] bg-[#1E293B] border border-[#334155] text-emerald-400 hover:text-white text-xs hover:border-emerald-500 transition-colors"
                           >
+                            <Globe size={11} />
                             <span>Live Demo</span>
                             <ExternalLink size={10} />
                           </a>
                         )}
+                        {submission.slideUrl && (
+                          <a
+                            href={submission.slideUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-[6px] bg-[#1E293B] border border-[#334155] text-amber-300 hover:text-white text-xs hover:border-amber-500 transition-colors"
+                          >
+                            <Presentation size={11} />
+                            <span>Slide Deck</span>
+                            <ExternalLink size={10} />
+                          </a>
+                        )}
+                        {submission.videoUrl && (
+                          <a
+                            href={submission.videoUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-[6px] bg-[#1E293B] border border-[#334155] text-rose-300 hover:text-white text-xs hover:border-rose-500 transition-colors"
+                          >
+                            <Video size={11} />
+                            <span>Video Demo</span>
+                            <ExternalLink size={10} />
+                          </a>
+                        )}
+                        {submission.figmaUrl && (
+                          <a
+                            href={submission.figmaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-[6px] bg-[#1E293B] border border-[#334155] text-purple-300 hover:text-white text-xs hover:border-purple-500 transition-colors"
+                          >
+                            <Palette size={11} />
+                            <span>Figma</span>
+                            <ExternalLink size={10} />
+                          </a>
+                        )}
                       </div>
+
+                      {/* Attached File */}
+                      {submission.fileName && (
+                        <div className="flex items-center gap-1.5 p-2 rounded-[8px] bg-[#1E293B] border border-[#334155] text-[11px] text-cyan-300">
+                          <Paperclip size={12} className="shrink-0" />
+                          <span className="truncate font-mono">{submission.fileName}</span>
+                          {submission.fileSize && (
+                            <span className="text-slate-400 shrink-0">({submission.fileSize})</span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Description Text */}
+                      {submission.description && (
+                        <p className="text-[11px] text-slate-300 italic line-clamp-2 bg-[#1E293B]/60 p-2 rounded border border-[#334155]/40">
+                          "{submission.description}"
+                        </p>
+                      )}
+
+                      {/* Re-submit Button */}
+                      {!isOverdue && (
+                        <div className="pt-1 border-t border-[#334155]/60 flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSubmit(cp.id)}
+                            className="text-xs text-[#818CF8] hover:text-white font-medium flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <RefreshCw size={12} />
+                            <span>Cập nhật / Nộp lại bài</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <Button
@@ -237,7 +549,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
         isOpen={Boolean(selectedCpId)}
         onClose={() => setSelectedCpId(null)}
         title={`Nộp Bài: ${selectedCheckpoint?.title || ''}`}
-        maxWidth="lg"
+        maxWidth="2xl"
       >
         {submitResult ? (
           <div className="space-y-4 text-center py-4">
@@ -248,12 +560,12 @@ export const CandidateCheckpointsPage: React.FC = () => {
             <div className="space-y-1">
               <h4 className="font-['Righteous'] text-xl text-white">Nộp Bài Thành Công!</h4>
               <p className="text-xs text-slate-300">
-                Hệ thống đã khóa liên kết mã nguồn và ghi nhận mã Commit SHA bảo mật.
+                Hệ thống đã khóa các hạng mục bài nộp và ghi nhận mã Commit SHA bảo mật cho đội <strong>{myTeam?.name}</strong>.
               </p>
             </div>
 
             <div className="p-3 rounded-[10px] bg-[#0F172A] border border-emerald-500/40 font-mono text-xs text-emerald-300">
-              SHA: {submitResult.sha}
+              Mã Commit SHA: {submitResult.sha}
             </div>
 
             <Button
@@ -265,33 +577,215 @@ export const CandidateCheckpointsPage: React.FC = () => {
             </Button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="GitHub Repository URL *"
-              placeholder="https://github.com/organization/project-repo"
-              value={repoUrl}
-              onChange={(e) => setRepoUrl(e.target.value)}
-              required
-            />
+          <form onSubmit={handleSubmit} className="space-y-4 font-['Roboto']">
+            {validationError && (
+              <div className="p-3 rounded-[10px] bg-rose-500/15 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{validationError}</span>
+              </div>
+            )}
 
-            <Input
-              label="Đường dẫn Demo Trực Tuyến (Nếu có)"
-              placeholder="https://your-demo-app.vercel.app"
-              value={demoUrl}
-              onChange={(e) => setDemoUrl(e.target.value)}
-            />
-
-            <div className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-xs text-slate-300 space-y-1.5">
+            <div className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-1.5 text-xs text-slate-300">
               <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
                 <AlertTriangle size={14} />
-                <span>Quy định nộp mã nguồn:</span>
+                <span>Quy định nộp bài chặng:</span>
               </div>
-              <p>
-                Kho mã nguồn phải để ở chế độ Public hoặc cấp quyền truy cập cho GitHub của Ban Giám Khảo. Hệ thống sẽ tự động chốt Commit SHA mới nhất tại thời điểm bạn nhấn nút nộp.
+              <p className="leading-relaxed">
+                Vui lòng điền đúng và đủ các thông tin theo yêu cầu của BTC. Đối với kho mã nguồn, hãy đảm bảo repository đã để Public hoặc cấp quyền truy cập cho GitHub của BGK.
               </p>
             </div>
 
-            <label className="flex items-start gap-2.5 pt-2 text-xs text-slate-300 cursor-pointer select-none">
+            {/* Dynamic Input Fields based on Checkpoint Configuration */}
+            <div className="space-y-3.5 max-h-[50vh] overflow-y-auto pr-1">
+              {activeFields.map((field) => {
+                if (field.type === 'repoUrl') {
+                  return (
+                    <div key={field.id} className="space-y-1">
+                      <Input
+                        label={`${field.label} ${field.required ? '*' : '(Tùy chọn)'}`}
+                        placeholder={field.placeholder || 'https://github.com/organization/project-repo'}
+                        value={formRepoUrl}
+                        onChange={(e) => setFormRepoUrl(e.target.value)}
+                        required={field.required}
+                      />
+                      {field.description && (
+                        <p className="text-[11px] text-slate-400">{field.description}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (field.type === 'demoUrl') {
+                  return (
+                    <div key={field.id} className="space-y-1">
+                      <Input
+                        label={`${field.label} ${field.required ? '*' : '(Tùy chọn)'}`}
+                        placeholder={field.placeholder || 'https://your-demo-app.vercel.app'}
+                        value={formDemoUrl}
+                        onChange={(e) => setFormDemoUrl(e.target.value)}
+                        required={field.required}
+                      />
+                      {field.description && (
+                        <p className="text-[11px] text-slate-400">{field.description}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (field.type === 'videoUrl') {
+                  return (
+                    <div key={field.id} className="space-y-1">
+                      <Input
+                        label={`${field.label} ${field.required ? '*' : '(Tùy chọn)'}`}
+                        placeholder={field.placeholder || 'https://youtube.com/watch?v=... hoặc link Google Drive'}
+                        value={formVideoUrl}
+                        onChange={(e) => setFormVideoUrl(e.target.value)}
+                        required={field.required}
+                      />
+                      {field.description && (
+                        <p className="text-[11px] text-slate-400">{field.description}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (field.type === 'slideUrl') {
+                  return (
+                    <div key={field.id} className="space-y-1">
+                      <Input
+                        label={`${field.label} ${field.required ? '*' : '(Tùy chọn)'}`}
+                        placeholder={field.placeholder || 'https://docs.google.com/presentation/d/...'}
+                        value={formSlideUrl}
+                        onChange={(e) => setFormSlideUrl(e.target.value)}
+                        required={field.required}
+                      />
+                      {field.description && (
+                        <p className="text-[11px] text-slate-400">{field.description}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (field.type === 'figmaUrl') {
+                  return (
+                    <div key={field.id} className="space-y-1">
+                      <Input
+                        label={`${field.label} ${field.required ? '*' : '(Tùy chọn)'}`}
+                        placeholder={field.placeholder || 'https://www.figma.com/design/...'}
+                        value={formFigmaUrl}
+                        onChange={(e) => setFormFigmaUrl(e.target.value)}
+                        required={field.required}
+                      />
+                      {field.description && (
+                        <p className="text-[11px] text-slate-400">{field.description}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (field.type === 'description') {
+                  return (
+                    <div key={field.id} className="flex flex-col gap-1.5">
+                      <label className="text-slate-300 font-medium text-xs">
+                        {field.label} {field.required ? '*' : '(Tùy chọn)'}
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder={field.placeholder || 'Mô tả nội dung thực hiện trong chặng này...'}
+                        value={formDescription}
+                        onChange={(e) => setFormDescription(e.target.value)}
+                        className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+                        required={field.required}
+                      />
+                      {field.description && (
+                        <p className="text-[11px] text-slate-400">{field.description}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                if (field.type === 'file') {
+                  return (
+                    <div key={field.id} className="space-y-1.5">
+                      <label className="text-slate-300 font-medium text-xs flex items-center justify-between">
+                        <span>
+                          {field.label} {field.required ? '*' : '(Tùy chọn)'}
+                        </span>
+                        {field.fileAccept && (
+                          <span className="text-[10px] text-slate-400 font-mono">
+                            Định dạng: {field.fileAccept}
+                          </span>
+                        )}
+                      </label>
+
+                      {formFileName ? (
+                        <div className="flex items-center justify-between p-3 rounded-[10px] bg-[#0F172A] border border-cyan-500/40 text-xs">
+                          <div className="flex items-center gap-2 text-cyan-300 min-w-0">
+                            <Paperclip size={15} className="shrink-0" />
+                            <span className="truncate font-mono">{formFileName}</span>
+                            <span className="text-slate-400 shrink-0">({formFileSize || '2.5 MB'})</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleRemoveFile}
+                            className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-[#1E293B] transition-colors cursor-pointer"
+                            title="Xóa tệp đính kèm này"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center p-4 rounded-[10px] bg-[#0F172A] border border-dashed border-[#334155] hover:border-[#6366F1] transition-all cursor-pointer group">
+                          <UploadCloud
+                            size={24}
+                            className="text-slate-400 group-hover:text-[#818CF8] transition-colors mb-1"
+                          />
+                          <span className="text-xs text-slate-300 font-medium group-hover:text-white">
+                            Nhấn để chọn tệp hoặc kéo thả file vào đây
+                          </span>
+                          <span className="text-[10px] text-slate-500 mt-0.5">
+                            {field.fileAccept || 'PDF, ZIP, DOCX'} (Tối đa 50MB)
+                          </span>
+                          <input
+                            type="file"
+                            accept={field.fileAccept || '.pdf,.zip,.docx'}
+                            onChange={handleFileSelect}
+                            className="hidden"
+                          />
+                        </label>
+                      )}
+
+                      {field.description && (
+                        <p className="text-[11px] text-slate-400">{field.description}</p>
+                      )}
+                    </div>
+                  );
+                }
+
+                // Custom Field
+                return (
+                  <div key={field.id} className="space-y-1">
+                    <Input
+                      label={`${field.label} ${field.required ? '*' : '(Tùy chọn)'}`}
+                      placeholder={field.placeholder || 'Nhập thông tin theo yêu cầu...'}
+                      value={formCustomFields[field.id] || ''}
+                      onChange={(e) =>
+                        setFormCustomFields({
+                          ...formCustomFields,
+                          [field.id]: e.target.value,
+                        })
+                      }
+                      required={field.required}
+                    />
+                    {field.description && (
+                      <p className="text-[11px] text-slate-400">{field.description}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <label className="flex items-start gap-2.5 pt-2 text-xs text-slate-300 cursor-pointer select-none border-t border-[#334155]/60">
               <input
                 type="checkbox"
                 checked={confirmLock}
@@ -300,12 +794,12 @@ export const CandidateCheckpointsPage: React.FC = () => {
                 required
               />
               <span>
-                Tôi xác nhận thông tin bài nộp này đại diện cho toàn bộ đội thi{' '}
-                <strong>{myTeam?.name}</strong>.
+                Tôi xác nhận thông tin và các tài liệu đính kèm này đại diện cho toàn bộ đội thi{' '}
+                <strong className="text-white">{myTeam?.name}</strong>.
               </span>
             </label>
 
-            <div className="flex justify-end gap-3 pt-3">
+            <div className="flex justify-end gap-3 pt-3 border-t border-[#334155]">
               <Button variant="ghost" type="button" onClick={() => setSelectedCpId(null)}>
                 Hủy
               </Button>

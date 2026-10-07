@@ -1,12 +1,12 @@
 import React from 'react';
-import { useMockStore } from '../../store/useMockStore';
+import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { useNavigate } from 'react-router-dom';
 import { Columns } from 'lucide-react';
 
 export const JudgeResultsPage: React.FC = () => {
-  const { currentUser, teams, evaluations } = useMockStore();
+  const { currentUser, teams, evaluations, rubricCriteria } = useMockStore();
   const navigate = useNavigate();
 
   const myEvaluations = evaluations.filter((e) => e.judgeId === currentUser.id);
@@ -36,7 +36,7 @@ export const JudgeResultsPage: React.FC = () => {
               <tr>
                 <th className="py-3.5 px-4">Đội Thi</th>
                 <th className="py-3.5 px-4 text-center">Trạng Thái</th>
-                <th className="py-3.5 px-4 text-center">Điểm Đã Chấm</th>
+                <th className="py-3.5 px-4 text-center">Điểm Đã Chấm (Thang 100)</th>
                 <th className="py-3.5 px-4">Nhận Xét Chuyên Môn</th>
                 <th className="py-3.5 px-4 text-right">Thao Tác</th>
               </tr>
@@ -45,6 +45,9 @@ export const JudgeResultsPage: React.FC = () => {
               {teams.map((t) => {
                 const evalItem = myEvaluations.find((e) => e.teamId === t.id);
                 const hasScore = Boolean(evalItem);
+                const normalizedScore = evalItem
+                  ? normalizeScoreTo100(evalItem.totalScore, evalItem.scores, rubricCriteria)
+                  : 0;
 
                 return (
                   <tr key={t.id} className="hover:bg-[#1E293B]/40 transition-colors">
@@ -65,7 +68,7 @@ export const JudgeResultsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-400">
-                      {hasScore ? `${evalItem?.totalScore}đ` : '—'}
+                      {hasScore ? `${normalizedScore}đ` : '—'}
                     </td>
 
                     <td className="py-3.5 px-4 text-slate-300 max-w-sm truncate text-xs">

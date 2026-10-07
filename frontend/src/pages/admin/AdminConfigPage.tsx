@@ -96,6 +96,7 @@ export const AdminConfigPage: React.FC = () => {
       )
     ) {
       resetAllMockData();
+      localStorage.removeItem('hackflow-full-setup-v3');
       localStorage.removeItem('hackflow-full-setup-v2');
       localStorage.removeItem('hackflow-clean-config-v1');
       localStorage.removeItem('hackflow-mock-state-v4');
