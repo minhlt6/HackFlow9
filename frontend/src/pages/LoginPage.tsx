@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { Eye, EyeOff, UserRound, Lock, AlertCircle, LogIn } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { axiosClient } from '../api/axiosClient';
 import { useAuthStore } from '../store/useAuthStore';
 import { Button } from '../components/Button';
-import type { ApprovalStatus, ApiResponse, User, UserRole } from '../types';
+import type { ApprovalStatus, User, UserRole } from '../types';
 
 interface BackendUser {
   id?: string;
@@ -18,56 +17,41 @@ interface BackendUser {
   approval_status?: string;
 }
 
-interface AuthPayload {
-  access_token?: string;
+interface AuthResponse {
   token?: string;
+  access_token?: string;
   user?: BackendUser;
+  data?: AuthResponse;
 }
 
-const userRoles: UserRole[] = ['admin', 'judge', 'mentor', 'candidate'];
-const approvalStatuses: ApprovalStatus[] = ['pending', 'approved', 'rejected'];
+const roles: UserRole[] = ['admin', 'judge', 'mentor', 'candidate'];
+const statuses: ApprovalStatus[] = ['pending', 'approved', 'rejected'];
 
-const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
-  const fullName = backendUser?.fullName || backendUser?.full_name || backendUser?.name;
+const normalizeAuthResponse = (response: AuthResponse): { user: User; token: string } | null => {
+  const payload = response.data || response;
+  const backendUser = payload.user;
+  const role = backendUser?.role;
   const approvalStatus = backendUser?.approvalStatus || backendUser?.approval_status;
-
-  if (
-    !backendUser?.id ||
-    !backendUser.email ||
-    !fullName ||
-    !backendUser.role ||
-    !userRoles.includes(backendUser.role as UserRole) ||
-    !approvalStatus ||
-    !approvalStatuses.includes(approvalStatus as ApprovalStatus)
-  ) {
+  const fullName = backendUser?.fullName || backendUser?.full_name || backendUser?.name;
+  const token = payload.token || payload.access_token;
+  if (!backendUser?.id || !backendUser.email || !fullName || !token || !role || !roles.includes(role as UserRole) || !approvalStatus || !statuses.includes(approvalStatus as ApprovalStatus)) {
     return null;
   }
-
   return {
-    id: backendUser.id,
-    email: backendUser.email,
-    fullName,
-    role: backendUser.role as UserRole,
-    approvalStatus: approvalStatus as ApprovalStatus,
+    token,
+    user: { id: backendUser.id, email: backendUser.email, fullName, role: role as UserRole, approvalStatus: approvalStatus as ApprovalStatus },
   };
 };
 
-const getRedirectPath = (user: User): string => {
+const redirectForUser = (user: User): string => {
   if (user.approvalStatus === 'pending') return '/onboarding';
-  if (user.approvalStatus === 'rejected') return '/login?error=auth_rejected';
-
-  return {
-    admin: '/admin/dashboard',
-    judge: '/judge',
-    mentor: '/mentor',
-    candidate: '/dashboard',
-  }[user.role];
+  if (user.approvalStatus === 'rejected') return '/rejected';
+  return { admin: '/admin/dashboard', judge: '/judge/dashboard', mentor: '/mentor/dashboard', candidate: '/dashboard' }[user.role];
 };
 
 export const LoginPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const login = useAuthStore((state) => state.login);
 
   // Unified login form states
   const [identifier, setIdentifier] = useState('');
@@ -97,50 +81,24 @@ export const LoginPage: React.FC = () => {
     }
 
     setIsLoading(true);
-
     try {
-      const response = await axiosClient.post<ApiResponse<AuthPayload>>('/auth/login', {
-        email: userClean,
-        password: passClean,
-      });
-      const authData = response.data.data;
-      const token = authData?.access_token || authData?.token;
-      const user = normalizeUser(authData?.user);
-
-      if (!token || !user) {
-        throw new Error('Invalid login response');
-      }
-
-      login(user, token);
-      navigate(getRedirectPath(user));
-    } catch (error) {
-      const message = axios.isAxiosError(error)
-        ? error.response?.data?.message
-        : null;
-      setErrorMessage(message || 'Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.');
+      const response = await axiosClient.post<AuthResponse>('/auth/login', { email: userClean, password: passClean });
+      const auth = normalizeAuthResponse(response.data);
+      if (!auth) throw new Error('Invalid login response');
+      useAuthStore.getState().login(auth.user, auth.token);
+      navigate(redirectForUser(auth.user), { replace: true });
+    } catch {
+      setErrorMessage('Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.');
     } finally {
       setIsLoading(false);
     }
   };
 
   // Handle GitHub OAuth login (Quick developer login)
-  const handleGithubLogin = async () => {
+  const handleGithubLogin = () => {
     setErrorMessage(null);
     setIsLoadingGithub(true);
-
-    try {
-      const response = await axiosClient.get<ApiResponse<{ url: string }> | { url: string }>('/auth/github');
-      const authUrl = 'data' in response.data ? response.data.data?.url : response.data.url;
-
-      if (!authUrl) {
-        throw new Error('GitHub OAuth URL is missing');
-      }
-
-      window.location.href = authUrl;
-    } catch {
-      setErrorMessage('Không thể kết nối đến máy chủ xác thực GitHub. Vui lòng thử lại sau.');
-      setIsLoadingGithub(false);
-    }
+    window.location.assign(`${axiosClient.defaults.baseURL}/auth/github`);
   };
 
   return (
@@ -158,7 +116,7 @@ export const LoginPage: React.FC = () => {
               className="h-auto w-[min(70vw,420px)] object-contain drop-shadow-2xl"
             />
             <p
-              className="relative top-[-180px] mt-6 max-w-[500px] text-center font-['Roboto'] text-[24px] font-bold leading-relaxed sm:top-[-180px] sm:text-[30px]"
+              className="relative top-[-160px] mt-6 max-w-[500px] text-center font-['Roboto'] text-[24px] font-bold leading-relaxed sm:top-[-160px] sm:text-[30px]"
               style={{
                 background: 'radial-gradient(circle, #FFFFFF 0%, #6366F1 100%)',
                 WebkitBackgroundClip: 'text',
@@ -286,8 +244,12 @@ export const LoginPage: React.FC = () => {
                   {isLoadingGithub ? (
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   ) : (
-                    <svg className="h-5 w-5 fill-current text-white" viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z" />
+                    <svg
+                      aria-hidden="true"
+                      className="h-5 w-5 fill-white"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.26c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.74.08-.74 1.2.09 1.84 1.23 1.84 1.23 1.07 1.84 2.8 1.31 3.49 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.23-3.22-.12-.3-.53-1.52.12-3.17 0 0 1-.32 3.3 1.23A11.5 11.5 0 0 1 12 6.2c1.02 0 2.05.14 3.01.42 2.3-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.87.12 3.17.77.84 1.23 1.91 1.23 3.22 0 4.62-2.8 5.65-5.48 5.95.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z" />
                     </svg>
                   )}
                   <span>{isLoadingGithub ? 'Đang kết nối GitHub...' : 'Đăng nhập bằng GitHub'}</span>
