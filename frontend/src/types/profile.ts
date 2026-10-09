@@ -23,9 +23,11 @@ export interface ProfileResponse {
   rejection_reason?: string;
   reason?: string;
   message?: string;
+  role?: string;
   user?: {
     approvalStatus?: ApprovalStatus;
     approval_status?: ApprovalStatus;
+    role?: string;
   };
 }
 

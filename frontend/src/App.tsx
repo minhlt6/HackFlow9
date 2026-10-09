@@ -6,6 +6,7 @@ import { AuthCallback } from './pages/AuthCallback';
 import { DashboardPage } from './pages/DashboardPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { MainLayout } from './layouts/MainLayout';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -14,11 +15,16 @@ const router = createBrowserRouter([
   { path: '/rejected', element: <RejectedAccountPage /> },
 
   {
-    element: <MainLayout />,
+    element: <ProtectedRoute requiredApprovalStatus="approved" />,
     children: [
-      { path: '/', element: <DashboardPage /> },
-      { path: '/dashboard', element: <DashboardPage /> },
-      { path: '/teams', element: <TeamsPage /> },
+      {
+        element: <MainLayout />,
+        children: [
+          { path: '/', element: <DashboardPage /> },
+          { path: '/dashboard', element: <DashboardPage /> },
+          { path: '/teams', element: <TeamsPage /> },
+        ],
+      },
     ],
   },
 

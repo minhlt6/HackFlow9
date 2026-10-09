@@ -1,8 +1,12 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { LayoutDashboard, Users, FileText, CheckSquare, Award, Bell } from 'lucide-react';
+import { LayoutDashboard, Users, FileText, CheckSquare, Award, Bell, Lock } from 'lucide-react';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const MainLayout: React.FC = () => {
+  const user = useAuthStore((state) => state.user);
+  const isPending = user?.approvalStatus === 'pending';
+
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
@@ -15,10 +19,25 @@ export const MainLayout: React.FC = () => {
             <LayoutDashboard size={20} />
             <span>Tổng quan</span>
           </Link>
-          <Link to="/teams" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-800 transition-colors">
-            <Users size={20} />
-            <span>Đội thi</span>
-          </Link>
+          {isPending ? (
+            <div
+              className="flex items-center justify-between px-4 py-2.5 rounded-lg opacity-50 cursor-not-allowed text-slate-400 select-none"
+              title="Chức năng Đội thi sẽ mở sau khi hồ sơ được duyệt"
+            >
+              <div className="flex items-center gap-3">
+                <Users size={20} />
+                <span>Đội thi</span>
+              </div>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30 flex items-center gap-1">
+                <Lock size={10} /> Khóa
+              </span>
+            </div>
+          ) : (
+            <Link to="/teams" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-800 transition-colors">
+              <Users size={20} />
+              <span>Đội thi</span>
+            </Link>
+          )}
           <Link to="/projects" className="flex items-center gap-3 px-4 py-2.5 rounded-lg hover:bg-slate-800 transition-colors">
             <FileText size={20} />
             <span>Đề tài</span>

@@ -22,6 +22,9 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     if (user.approvalStatus === 'pending') {
       return <Navigate to="/onboarding" replace />;
     }
+    if (user.approvalStatus === 'rejected') {
+      return <Navigate to="/rejected" replace />;
+    }
     return <Navigate to="/login" replace />;
   }
 
