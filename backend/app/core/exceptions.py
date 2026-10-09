@@ -12,43 +12,95 @@ logger = logging.getLogger("hackflow.exceptions")
 
 class AppException(Exception):
     """
-    Base application exception with standardized status code, message, and optional details.
+    Base application exception with standardized status code, message, error_code, and optional details.
     """
     def __init__(
         self,
         message: str = "An error occurred",
         status_code: int = status.HTTP_400_BAD_REQUEST,
         data: Optional[Any] = None,
+        error_code: Optional[str] = None,
     ):
         self.message = message
         self.status_code = status_code
         self.data = data
+        self.error_code = error_code
         super().__init__(self.message)
 
 
 class NotFoundException(AppException):
-    def __init__(self, message: str = "Resource not found", data: Optional[Any] = None):
-        super().__init__(message=message, status_code=status.HTTP_404_NOT_FOUND, data=data)
+    def __init__(
+        self,
+        message: str = "Resource not found",
+        data: Optional[Any] = None,
+        error_code: Optional[str] = None,
+    ):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_404_NOT_FOUND,
+            data=data,
+            error_code=error_code,
+        )
 
 
 class BadRequestException(AppException):
-    def __init__(self, message: str = "Bad request", data: Optional[Any] = None):
-        super().__init__(message=message, status_code=status.HTTP_400_BAD_REQUEST, data=data)
+    def __init__(
+        self,
+        message: str = "Bad request",
+        data: Optional[Any] = None,
+        error_code: Optional[str] = None,
+    ):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_400_BAD_REQUEST,
+            data=data,
+            error_code=error_code,
+        )
 
 
 class UnauthorizedException(AppException):
-    def __init__(self, message: str = "Unauthorized", data: Optional[Any] = None):
-        super().__init__(message=message, status_code=status.HTTP_401_UNAUTHORIZED, data=data)
+    def __init__(
+        self,
+        message: str = "Unauthorized",
+        data: Optional[Any] = None,
+        error_code: Optional[str] = None,
+    ):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            data=data,
+            error_code=error_code,
+        )
 
 
 class ForbiddenException(AppException):
-    def __init__(self, message: str = "Forbidden", data: Optional[Any] = None):
-        super().__init__(message=message, status_code=status.HTTP_403_FORBIDDEN, data=data)
+    def __init__(
+        self,
+        message: str = "Forbidden",
+        data: Optional[Any] = None,
+        error_code: Optional[str] = None,
+    ):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_403_FORBIDDEN,
+            data=data,
+            error_code=error_code,
+        )
 
 
 class ConflictException(AppException):
-    def __init__(self, message: str = "Resource conflict", data: Optional[Any] = None):
-        super().__init__(message=message, status_code=status.HTTP_409_CONFLICT, data=data)
+    def __init__(
+        self,
+        message: str = "Resource conflict",
+        data: Optional[Any] = None,
+        error_code: Optional[str] = None,
+    ):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_409_CONFLICT,
+            data=data,
+            error_code=error_code,
+        )
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -58,19 +110,22 @@ def register_exception_handlers(app: FastAPI) -> None:
     {
         "success": False,
         "data": ...,
-        "message": ...
+        "message": ...,
+        "error_code": ...
     }
     """
 
     @app.exception_handler(AppException)
     async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+        content = {
+            "success": False,
+            "data": exc.data,
+            "message": exc.message,
+            "error_code": exc.error_code,
+        }
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "success": False,
-                "data": exc.data,
-                "message": exc.message,
-            },
+            content=content,
         )
 
     @app.exception_handler(RequestValidationError)

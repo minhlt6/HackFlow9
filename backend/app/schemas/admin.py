@@ -30,9 +30,31 @@ class WhitelistEntryResponse(BaseModel):
     id: str
     email: str
     is_active: bool
-    note: Optional[str]
-    added_by: Optional[str]
-    created_at: str
+    note: Optional[str] = None
+    added_by: Optional[str] = None
+    created_at: Optional[str] = None
+
+    model_config = {"from_attributes": True}
+
+
+class WhitelistBulkAddResponse(BaseModel):
+    imported: int
+    emails: List[str]
+
+
+class WhitelistDeactivateResponse(BaseModel):
+    id: str
+    email: str
+    is_active: bool
+
+
+class CandidatePendingResponse(BaseModel):
+    id: str
+    email: str
+    full_name: Optional[str] = None
+    github_username: Optional[str] = None
+    avatar_url: Optional[str] = None
+    created_at: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -50,3 +72,4 @@ class CandidateApprovalRequest(BaseModel):
         if v not in ("approve", "reject"):
             raise ValueError("action must be 'approve' or 'reject'")
         return v
+
