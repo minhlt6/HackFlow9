@@ -13,6 +13,7 @@ import {
   Bell,
   Menu,
   X,
+  Lock,
 } from 'lucide-react';
 import { Badge } from '../components/Badge';
 import { useAuthStore } from '../store/useAuthStore';
@@ -31,15 +32,44 @@ export const MainLayout: React.FC = () => {
   const displayEmail = user?.email || 'leader@cybersamurai.team';
   const displayInitial = displayName.charAt(0).toUpperCase();
 
-  const navLinks = [
-    { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-    { to: '/teams', label: 'Đội thi của tôi', icon: Users },
-    { to: '/topics', label: 'Chọn đề tài', icon: Lightbulb },
-    { to: '/checkpoints', label: 'Tiến độ các chặng', icon: CheckSquare },
-    { to: '/final-submission', label: 'Nộp bài chung cuộc', icon: Send },
-    { to: '/scoreboard', label: 'Bảng xếp hạng', icon: Award },
-    { to: '/tickets', label: 'Hỗ trợ trực tuyến', icon: HelpCircle },
-    { to: '/profile', label: 'Hồ sơ cá nhân', icon: User },
+  const isApproved = user?.approvalStatus === 'approved';
+
+  const menuGroups = [
+    {
+      title: 'Dự án & Đội thi',
+      items: [
+        { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
+        {
+          to: '/teams',
+          label: 'Đội thi của tôi',
+          icon: Users,
+          locked: !isApproved,
+          lockReason: 'Mở sau khi hồ sơ được duyệt',
+        },
+        {
+          to: '/topics',
+          label: 'Chọn đề tài',
+          icon: Lightbulb,
+          locked: !isApproved,
+          lockReason: 'Mở sau khi có đội thi',
+        },
+      ],
+    },
+    {
+      title: 'Tiến trình thi đấu',
+      items: [
+        { to: '/checkpoints', label: 'Tiến độ các chặng', icon: CheckSquare },
+        { to: '/final-submission', label: 'Nộp bài chung cuộc', icon: Send },
+        { to: '/scoreboard', label: 'Bảng xếp hạng', icon: Award },
+      ],
+    },
+    {
+      title: 'Cá nhân & Trợ giúp',
+      items: [
+        { to: '/onboarding', label: 'Hồ sơ cá nhân', icon: User },
+        { to: '/tickets', label: 'Hỗ trợ trực tuyến', icon: HelpCircle },
+      ],
+    },
   ];
 
   return (
@@ -54,73 +84,95 @@ export const MainLayout: React.FC = () => {
 
       {/* Sidebar Navigation */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#0B1120] border-r border-[#1E293B] flex flex-col transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#0B1120] border-r border-[#1E293B] flex flex-col justify-between transition-transform duration-200 lg:translate-x-0 ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Brand Header */}
-        <div className="h-16 px-6 border-b border-[#1E293B] flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="h-2.5 w-2.5 rounded-full bg-[#6366F1] shadow-md shadow-[#6366F1]"></span>
-            <span
-              className="font-['Righteous'] text-2xl tracking-wider"
-              style={{
-                background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              HACKFLOW
-            </span>
-          </div>
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="lg:hidden text-slate-400 hover:text-white"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Current Role Banner */}
-        <div className="p-4 mx-3 my-3 rounded-[12px] bg-[#1E293B] border border-[#334155]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#818CF8] font-bold">
-              {displayInitial}
+        <div className="flex flex-col flex-1 min-h-0">
+          {/* Brand Header */}
+          <div className="h-16 px-6 border-b border-[#1E293B] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-2.5">
+              <span className="h-2.5 w-2.5 rounded-full bg-[#6366F1] shadow-md shadow-[#6366F1]"></span>
+              <span
+                className="font-['Righteous'] text-2xl tracking-wider"
+                style={{
+                  background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent',
+                }}
+              >
+                HACKFLOW
+              </span>
             </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-white truncate">{displayName}</p>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <Badge variant="success" size="sm">
-                  Thí sinh
-                </Badge>
+            <button
+              onClick={() => setMobileMenuOpen(false)}
+              className="lg:hidden text-slate-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Current Role Banner */}
+          <div className="p-3.5 mx-3 my-3 rounded-[12px] bg-[#1E293B] border border-[#334155] shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#818CF8] font-bold">
+                {displayInitial}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white truncate">{displayName}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Badge variant={isApproved ? 'success' : 'warning'} size="sm">
+                    {isApproved ? 'Thí sinh' : 'Chờ duyệt'}
+                  </Badge>
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Navigation Links */}
-        <nav className="flex-1 px-3 space-y-1 overflow-y-auto py-2">
-          {navLinks.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                onClick={() => setMobileMenuOpen(false)}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3.5 py-2.5 rounded-[10px] text-sm font-medium transition-all ${
-                    isActive
-                      ? 'bg-[#6366F1]/15 text-[#818CF8] border border-[#6366F1]/40 font-semibold shadow-xs'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-[#1E293B]/70'
-                  }`
-                }
-              >
-                <Icon size={18} />
-                <span>{item.label}</span>
-              </NavLink>
-            );
-          })}
-        </nav>
+          {/* Navigation Links Grouped */}
+          <nav className="flex-1 px-3 py-2 space-y-3 overflow-y-auto">
+            {menuGroups.map((group) => (
+              <div key={group.title} className="space-y-1">
+                <div className="px-3.5 pt-2 pb-1 text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  {group.title}
+                </div>
+                <div className="space-y-1">
+                  {group.items.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        onClick={() => setMobileMenuOpen(false)}
+                        title={item.locked ? item.lockReason : undefined}
+                        className={({ isActive }) =>
+                          `flex items-center justify-between px-3.5 py-2.5 rounded-[10px] text-xs sm:text-sm font-medium transition-all group ${
+                            isActive
+                              ? 'bg-[#6366F1]/15 text-[#818CF8] border border-[#6366F1]/40 font-semibold shadow-xs'
+                              : 'text-slate-400 hover:text-slate-100 hover:bg-[#1E293B]/70'
+                          }`
+                        }
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Icon size={18} className="shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </div>
+                        {item.locked && (
+                          <div
+                            className="flex items-center justify-center ml-2 p-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0"
+                            title={item.lockReason}
+                          >
+                            <Lock size={12} />
+                          </div>
+                        )}
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </nav>
+        </div>
 
         {/* Sidebar Footer */}
         <div className="p-3 border-t border-[#1E293B]">
@@ -147,10 +199,10 @@ export const MainLayout: React.FC = () => {
             </button>
             <div className="hidden sm:block">
               <span className="text-xs font-bold tracking-wider text-slate-300 font-mono">
-                HACKFLOW AI &amp; DEEP TECH HACKATHON 2026
+                HACKFLOW AI &amp; DEEPTECH HACKATHON 2026
               </span>
               <span className="text-[11px] text-slate-400 block">
-                Giai đoạn: Giai đoạn 2: Thực thi dự án &amp; Nộp bài các chặng
+                Giai đoạn: Giai đoạn 3: Thực thi dự án &amp; Nộp bài các chặng
               </span>
             </div>
           </div>

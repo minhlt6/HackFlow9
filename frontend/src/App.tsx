@@ -10,7 +10,6 @@ import { MainLayout } from './layouts/MainLayout';
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/auth/callback', element: <AuthCallback /> },
-  { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/rejected', element: <RejectedAccountPage /> },
   {
     path: '/preview-teams',
@@ -27,6 +26,8 @@ const router = createBrowserRouter([
       { path: '/', element: <DashboardPage /> },
       { path: '/dashboard', element: <DashboardPage /> },
       { path: '/teams', element: <TeamsPage /> },
+      { path: '/onboarding', element: <OnboardingPage /> },
+      { path: '/profile', element: <OnboardingPage /> },
     ],
   },
 
