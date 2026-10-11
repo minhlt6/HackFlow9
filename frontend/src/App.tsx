@@ -5,6 +5,7 @@ import { RejectedAccountPage } from './pages/RejectedAccountPage';
 import { AuthCallback } from './pages/AuthCallback';
 import { DashboardPage } from './pages/DashboardPage';
 import { TeamsPage } from './pages/TeamsPage';
+import { UIPreviewPage } from './pages/UIPreviewPage';
 import { MainLayout } from './layouts/MainLayout';
 
 const router = createBrowserRouter([
@@ -18,6 +19,10 @@ const router = createBrowserRouter([
         <TeamsPage />
       </div>
     ),
+  },
+  {
+    path: '/preview-ui',
+    element: <UIPreviewPage />,
   },
 
   {
