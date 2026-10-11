@@ -33,7 +33,7 @@ export const UIPreviewPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Countdown Timer
+            Preview UI Atoms
           </h1>
         </div>
 
