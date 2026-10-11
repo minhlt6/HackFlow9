@@ -6,25 +6,28 @@ import { AuthCallback } from './pages/AuthCallback';
 import { DashboardPage } from './pages/DashboardPage';
 import { TeamsPage } from './pages/TeamsPage';
 import { MainLayout } from './layouts/MainLayout';
-import { ProtectedRoute } from './components/ProtectedRoute';
 
 const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
   { path: '/auth/callback', element: <AuthCallback /> },
-  { path: '/onboarding', element: <OnboardingPage /> },
   { path: '/rejected', element: <RejectedAccountPage /> },
+  {
+    path: '/preview-teams',
+    element: (
+      <div className="min-h-screen bg-[#060911] text-slate-100 p-4 sm:p-6 lg:p-8">
+        <TeamsPage />
+      </div>
+    ),
+  },
 
   {
-    element: <ProtectedRoute requiredApprovalStatus="approved" />,
+    element: <MainLayout />,
     children: [
-      {
-        element: <MainLayout />,
-        children: [
-          { path: '/', element: <DashboardPage /> },
-          { path: '/dashboard', element: <DashboardPage /> },
-          { path: '/teams', element: <TeamsPage /> },
-        ],
-      },
+      { path: '/', element: <DashboardPage /> },
+      { path: '/dashboard', element: <DashboardPage /> },
+      { path: '/teams', element: <TeamsPage /> },
+      { path: '/onboarding', element: <OnboardingPage /> },
+      { path: '/profile', element: <OnboardingPage /> },
     ],
   },
 
