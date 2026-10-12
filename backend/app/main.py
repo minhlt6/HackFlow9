@@ -108,7 +108,9 @@ Toàn bộ phản hồi HTTP (cả 2xx thành công lẫn 4xx/5xx lỗi) đều 
 | `TOPIC_FULL` | 409 | Đề tài đã đạt giới hạn quota số đội đăng ký tối đa. |
 | `TOPIC_SELECTION_CLOSED` | 400 | Thời gian đăng ký đề tài đã kết thúc hoặc đề tài tạm khóa. |
 | `TOPIC_ALREADY_SELECTED` | 400 | Đội thi đã chọn một đề tài trước đó (cần hủy đề tài cũ trước). |
-| `DEADLINE_EXCEEDED` | 400 | Đã quá hạn chót cho phép thao tác (chọn đề tài hoặc nộp bài). |
+| `CHECKPOINT_NOT_OPEN` | 403 | Cổng nộp bài cho checkpoint này chưa đến giờ mở (`now < start_time`). |
+| `CHECKPOINT_INACTIVE` | 403 | Checkpoint này đang tạm khóa hoặc đã bị vô hiệu hóa bởi Ban tổ chức (`is_active=False`). |
+| `DEADLINE_EXCEEDED` | 403/400 | Đã quá hạn chót cho phép thao tác (chọn đề tài hoặc nộp bài sau Deadline + Grace Period 5s). |
 | `GITHUB_REPO_INACCESSIBLE`| 400 | Repo GitHub nộp bài không công khai hoặc không truy cập được. |
 | `NOT_FOUND` | 404 | Không tìm thấy bản ghi/tài nguyên yêu cầu. |
 | `VALIDATION_ERROR` | 422 | Dữ liệu gửi lên sai kiểu dữ liệu hoặc vi phạm validation rules. |
@@ -122,9 +124,11 @@ Toàn bộ phản hồi HTTP (cả 2xx thành công lẫn 4xx/5xx lỗi) đều 
   - `HF-20`: Quản lý Đội thi (Create, Join by 6-char code, Me, Team Detail, giới hạn 3-5 thành viên).
   - `HF-21`: Quản lý Đề tài thi (List Topics, Quota, Atomic Select `SELECT FOR UPDATE`, Cancel Topic).
   - `HF-22`: Xuất Swagger Docs & Tài liệu Bàn giao API Contract.
-- ⏳ **Sprint 2 & 3 (Roadmap sắp tới)**:
-  - Checkpoint & Milestones API (Quản lý các mốc nộp bài).
-  - Submissions & GitHub Repo Inspection API (Nộp bài thi, kiểm tra repo, nộp link demo).
+- 🚀 **Sprint 2 (Đang triển khai)**:
+  - `HF-32`: Lập trình API Checkpoint Time-gated (Mở/Khóa cổng nộp bài, ân hạn mạng 5s) — **Hoàn tất**.
+  - `HF-33`: Lập trình module tích hợp GitHub API xác thực HEAD Commit SHA.
+  - `HF-34`: Lập trình API POST /submissions (Lưu trữ bài nộp) và Audit Log.
+- ⏳ **Sprint 3 (Roadmap sắp tới)**:
   - Evaluation & Scoring Matrix API (Chấm điểm Rubric cho Giám khảo, xếp hạng tự động).
 """
 
@@ -148,6 +152,10 @@ TAGS_METADATA = [
     {
         "name": "Topics (HF-21)",
         "description": "Quản lý Đề tài thi: Xem danh sách đề tài & Quota giới hạn số đội, đăng ký đề tài bằng giao dịch nguyên tử chống tranh chấp đồng thời (SELECT FOR UPDATE) và hủy chọn đề tài.",
+    },
+    {
+        "name": "Checkpoints (HF-32)",
+        "description": "Quản lý mốc Checkpoint nộp bài & Kiểm tra Time-gated (Mở/Khóa cổng nộp bài, thời gian ân hạn mạng 5 giây).",
     },
     {
         "name": "Examples & Envelope Demo",

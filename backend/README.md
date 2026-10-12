@@ -177,7 +177,7 @@ Bộ kiểm thử được xây dựng bằng `pytest` và `httpx`, sử dụng 
 pytest -v
 ```
 
-Kết quả: **43/43 bài test vượt qua (100% Pass)**:
+Kết quả: **55/55 bài test vượt qua (100% Pass)**:
 - `tests/test_health.py` (3 tests): Liveness, Database check, CORS headers.
 - `tests/test_docs.py` (3 tests): Swagger UI (/docs), ReDoc (/redoc), OpenAPI JSON schema (/api/v1/openapi.json).
 - `tests/test_envelope.py` (4 tests): Định dạng chuẩn ApiResponse envelope (200, 400, 404, 422).
@@ -185,4 +185,6 @@ Kết quả: **43/43 bài test vượt qua (100% Pass)**:
 - `tests/test_admin_whitelist.py` (8 tests): Quản lý Whitelist, bulk import, auto-whitelist khi duyệt ứng viên.
 - `tests/test_teams.py` (7 tests): Tạo đội, gia nhập đội, sinh mã mời ngẫu nhiên 6 ký tự, kiểm tra giới hạn 3-5 thành viên.
 - `tests/test_topics.py` (9 tests): Danh sách đề tài, quota giới hạn số đội, giao dịch nguyên tử chống tranh chấp đồng thời (`SELECT FOR UPDATE`), hủy đề tài.
+- `tests/test_checkpoints.py` (12 tests): Time-gating mở/khóa cổng nộp bài, thời gian ân hạn mạng 5 giây (Grace Period), Admin CRUD, FastAPI dependency.
+
 

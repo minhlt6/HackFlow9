@@ -110,6 +110,13 @@ Toàn bộ các API trong hệ thống đều tuân thủ 100% chuẩn phản h�
 | **Topics**| `GET` | `/api/v1/topics` | Bearer Token | Xem danh sách đề tài thi & Quota |
 | **Topics**| `POST` | `/api/v1/topics/select` | Bearer Token (`approved` + Leader) | Đăng ký đề tài chống race condition (`SELECT FOR UPDATE`) |
 | **Topics**| `POST` | `/api/v1/topics/cancel` | Bearer Token (`approved` + Leader) | Hủy đăng ký chọn đề tài |
+| **Checkpoints**| `GET` | `/api/v1/checkpoints` | Không | Xem danh sách các mốc nộp bài & thời gian còn lại |
+| **Checkpoints**| `GET` | `/api/v1/checkpoints/{id}` | Không | Xem chi tiết 1 mốc Checkpoint |
+| **Checkpoints**| `GET` | `/api/v1/checkpoints/{id}/status` | Không | Kiểm tra trạng thái time-gated (upcoming/open/grace/closed) |
+| **Checkpoints**| `POST` | `/api/v1/checkpoints/{id}/validate-window` | Bearer Token | Xác thực cửa sổ nộp bài (ném 403 nếu ngoài giờ/quá hạn) |
+| **Checkpoints**| `POST` | `/api/v1/checkpoints` | Bearer Token (`admin`) | Tạo mới mốc Checkpoint |
+| **Checkpoints**| `PUT` | `/api/v1/checkpoints/{id}` | Bearer Token (`admin`) | Cập nhật mốc Checkpoint / Gia hạn deadline |
+| **Checkpoints**| `PATCH`| `/api/v1/checkpoints/{id}/toggle-active` | Bearer Token (`admin`) | Khóa hoặc mở kích hoạt mốc Checkpoint |
 
 ---
 
@@ -314,6 +321,65 @@ Toàn bộ các API trong hệ thống đều tuân thủ 100% chuẩn phản h�
 
 ---
 
+### 5.5. Module Checkpoints & Time-Gated API (HF-32)
+
+#### 🔹 `GET /api/v1/checkpoints` (Danh sách Checkpoints)
+- **Response Success (200):**
+  ```json
+  {
+    "success": true,
+    "data": [
+      {
+        "id": "cp_uuid_123",
+        "title": "Checkpoint 1 — Nộp ý tưởng & Kiến trúc",
+        "description": "Nộp tài liệu kiến trúc hệ thống và link repo GitHub khởi tạo.",
+        "start_time": "2026-10-15T00:00:00Z",
+        "deadline": "2026-10-15T23:59:59Z",
+        "requirements": "- Sơ đồ ERD\n- Kiến trúc 3 tầng\n- Repo GitHub public",
+        "is_active": true,
+        "status": "open",
+        "is_open": true,
+        "can_submit": true,
+        "grace_period_seconds": 5,
+        "time_remaining_seconds": 14400,
+        "time_until_start_seconds": 0,
+        "server_time": "2026-10-15T20:00:00Z"
+      }
+    ],
+    "message": "Lấy danh sách checkpoint thành công (1 mốc)."
+  }
+  ```
+
+#### 🔹 `GET /api/v1/checkpoints/{checkpoint_id}/status` (Kiểm tra trạng thái đóng/mở)
+- Trả về thông tin trạng thái thời gian thực của Server UTC:
+  - `status`: `"upcoming"` | `"open"` | `"grace_period"` | `"closed"`
+  - `can_submit`: `true` nếu cổng đang mở hoặc trong khoảng ân hạn 5 giây.
+  - `grace_period_applied`: `true` nếu nộp sau `deadline` nhưng trước `deadline + 5s`.
+
+#### 🔹 `POST /api/v1/checkpoints/{checkpoint_id}/validate-window` (Xác thực cửa sổ nộp bài)
+- Endpoint dùng để kiểm tra điều kiện nộp bài trước khi upload code.
+- **Quy tắc Time-Gated (Theo SRS HF-23):**
+  1. `now < start_time`: Trả HTTP 403 Forbidden kèm `error_code="CHECKPOINT_NOT_OPEN"`.
+  2. `is_active == false`: Trả HTTP 403 Forbidden kèm `error_code="CHECKPOINT_INACTIVE"`.
+  3. `now > deadline + 5s`: Trả HTTP 403 Forbidden kèm `error_code="DEADLINE_EXCEEDED"`.
+  4. `deadline < now <= deadline + 5s`: Trả HTTP 200 OK kèm `grace_period_applied=true` (Ghi nhận độ trễ mạng).
+  5. `start_time <= now <= deadline`: Trả HTTP 200 OK kèm `grace_period_applied=false`.
+
+#### 🔹 `POST /api/v1/checkpoints` (Tạo mới Checkpoint - Chỉ Admin)
+- **Request Body:**
+  ```json
+  {
+    "title": "Checkpoint 2 — Báo cáo Tiến độ MVP",
+    "description": "Nộp video demo và mã nguồn hoàn thiện 50%",
+    "start_time": "2026-10-18T08:00:00Z",
+    "deadline": "2026-10-18T22:00:00Z",
+    "requirements": "Video Loom <= 5 phút và GitHub commits",
+    "is_active": true
+  }
+  ```
+
+---
+
 ## 6. ⚠️ Danh mục Mã lỗi Nghiệp vụ (Standard Error Codes)
 
 Bảng đối chiếu dành cho Frontend (Linh) để hiển thị thông báo lỗi thân thiện trên giao diện (Toast/Notification/Dialog) và QA (Lan Anh) để viết Assertions:
@@ -332,7 +398,9 @@ Bảng đối chiếu dành cho Frontend (Linh) để hiển thị thông báo l
 | `TOPIC_FULL` | 409 | Đề tài đã hết quota (số lượng đội đạt tối đa) | Báo lỗi: "Đề tài đã hết chỉ tiêu đăng ký, vui lòng chọn đề tài khác" |
 | `TOPIC_SELECTION_CLOSED` | 400 | Hết hạn đăng ký đề tài hoặc BTC đã khóa chọn đề tài | Thông báo: "Thời gian đăng ký đề tài đã kết thúc" |
 | `TOPIC_ALREADY_SELECTED` | 400 | Đội đã chọn 1 đề tài rồi nhưng tiếp tục bấm chọn đề tài khác | Báo lỗi: "Đội đã đăng ký đề tài. Vui lòng hủy đề tài hiện tại trước khi chọn mới" |
-| `DEADLINE_EXCEEDED` | 400 | Quá thời hạn quy định của mốc thi đấu | Hiển thị cảnh báo thời gian thi đã khép lại |
+| `CHECKPOINT_NOT_OPEN` | 403 | Cổng nộp bài chưa đến giờ mở (`now < start_time`) | Hiển thị thông báo: "Cổng nộp bài cho checkpoint này chưa đến giờ mở" kèm đếm ngược |
+| `CHECKPOINT_INACTIVE` | 403 | Checkpoint bị khóa hoặc tạm dừng bởi BTC | Hiển thị thông báo: "Mốc nộp bài này đang tạm khóa bởi Ban tổ chức" |
+| `DEADLINE_EXCEEDED` | 403/400 | Quá hạn nộp bài (kể cả thời gian ân hạn mạng 5 giây) | Khóa form nộp bài, hiển thị: "Đã quá hạn chót nộp bài cho mốc này" |
 | `GITHUB_REPO_INACCESSIBLE`| 400 | Repo GitHub nộp bài bị private hoặc không tồn tại | Báo lỗi: "Không thể truy cập kho mã nguồn GitHub. Vui lòng chuyển repo sang chế độ Public" |
 | `NOT_FOUND` | 404 | Không tìm thấy đội thi, đề tài hoặc tài nguyên theo UUID | Hiển thị thông báo 404 hoặc toast "Không tìm thấy dữ liệu yêu cầu" |
 | `VALIDATION_ERROR` | 422 | Dữ liệu gửi lên thiếu trường bắt buộc hoặc sai định dạng | Highlight form field tương ứng với thông điệp từ backend |
@@ -343,13 +411,11 @@ Bảng đối chiếu dành cho Frontend (Linh) để hiển thị thông báo l
 
 Nhằm đảm bảo sự minh bạch trong kế hoạch phối hợp giữa các nhóm, các chức năng sau được phân kỳ thực hiện trong Sprint tiếp theo:
 
-1. **Sprint 2: Checkpoint & Milestones API**
-   - Quản lý các mốc thời gian Hackathon (Vòng sơ loại, Vòng nộp ý tưởng, Bán kết, Chung kết).
-   - Kiểm tra trạng thái nộp bài theo từng checkpoint.
-2. **Sprint 2: Submissions & GitHub Code Inspection API**
-   - Nộp link Repository GitHub, video demo, slide thuyết trình.
-   - Cơ chế tự động verify truy cập GitHub Repository của đội thi.
-3. **Sprint 3: Evaluation & Scoring Rubrics API**
+1. **Sprint 2: Checkpoint & Submissions**
+   - ✅ `HF-32`: Lập trình API Checkpoint Time-gated (Mở/Khóa cổng nộp bài, ân hạn mạng 5s) — **Đã hoàn thành**.
+   - ⏳ `HF-33`: Lập trình module tích hợp GitHub API xác thực HEAD Commit SHA.
+   - ⏳ `HF-34`: Lập trình API POST /submissions (Lưu trữ bài nộp) và Audit Log.
+2. **Sprint 3: Evaluation & Scoring Matrix API**
    - Bảng điểm tiêu chí (Rubric) cho Giám khảo (Judge).
    - Tổng hợp điểm số, xếp hạng (Leaderboard) tự động theo trọng số.
 
@@ -357,7 +423,7 @@ Nhằm đảm bảo sự minh bạch trong kế hoạch phối hợp giữa các
 
 ## 8. 🛡️ Báo cáo Kiểm thử Tự động (Quality Assurance)
 
-Tất cả các endpoint bàn giao trong tài liệu này đều đã được kiểm thử tự động toàn diện qua **43 bài test (100% Pass)**:
+Tất cả các endpoint bàn giao trong tài liệu này đều đã được kiểm thử tự động toàn diện qua **55 bài test (100% Pass)**:
 - `tests/test_health.py`: 3/3 tests (Liveness, Database connection, CORS origins).
 - `tests/test_docs.py`: 3/3 tests (Swagger UI /docs, ReDoc /redoc, OpenAPI JSON schema /api/v1/openapi.json).
 - `tests/test_envelope.py`: 4/4 tests (Format chuẩn hóa `ApiResponse[T]`, xử lý lỗi 400, 404, 422).
@@ -365,6 +431,7 @@ Tất cả các endpoint bàn giao trong tài liệu này đều đã được k
 - `tests/test_admin_whitelist.py`: 8/8 tests (Whitelist CRUD, bulk import, candidate approval auto-whitelist).
 - `tests/test_teams.py`: 7/7 tests (Create team, 6-char unique invite code, member bounds 3-5, anti-duplicate team).
 - `tests/test_topics.py`: 9/9 tests (Atomic selection with `SELECT FOR UPDATE`, quota limit prevention, leader-only privilege, cancel topic).
+- `tests/test_checkpoints.py`: 12/12 tests (Time-gating: upcoming, open, grace period 5s, deadline exceeded, inactive toggle, Admin CRUD, FastAPI dependency).
 
 ---
 *Tài liệu được lập bởi Lê Tiến Minh — HackFlow Tech Lead. Mọi thắc mắc kỹ thuật xin liên hệ kênh Slack `#backend-dev`.*

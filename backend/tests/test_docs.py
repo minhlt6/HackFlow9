@@ -41,6 +41,7 @@ async def test_openapi_json_schema(client: AsyncClient):
     assert "/api/v1/teams" in schema["paths"]
     assert "/api/v1/topics" in schema["paths"]
     assert "/api/v1/admin/whitelist" in schema["paths"]
+    assert "/api/v1/checkpoints" in schema["paths"]
 
     # Validate tags
     tag_names = [t["name"] for t in schema.get("tags", [])]
@@ -48,3 +49,4 @@ async def test_openapi_json_schema(client: AsyncClient):
     assert "Teams (HF-20)" in tag_names
     assert "Topics (HF-21)" in tag_names
     assert "Admin" in tag_names
+    assert "Checkpoints (HF-32)" in tag_names
