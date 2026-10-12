@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "HackFlow Backend API — API Documentation",
-    "description": "# 🚀 HackFlow Backend API — Nền tảng tổ chức & Chấm thi Hackathon\n\nChào mừng bạn đến với tài liệu kỹ thuật API chính thức của dự án **HackFlow9**. Tài liệu này được thiết kế và bàn giao bởi **Lê Tiến Minh (Tech Lead / Core Backend Architect)** phục vụ cho việc tích hợp của Frontend (Trần Thùy Linh), QA/Postman (Đỗ Thị Lan Anh) và nghiệm thu chức năng từ BA (Dương Thị Khánh Ly).\n\n---\n\n## 🏛️ Kiến trúc hệ thống (3-Tier Architecture)\nHệ thống tuân thủ nghiêm ngặt mô hình 3 tầng phân tách độc lập:\n1. **Router (API Layer)**: Tiếp nhận HTTP request, xác thực schema Pydantic, bảo mật JWT Bearer / RBAC, trả về Envelope chuẩn hóa.\n2. **Service (Business Layer)**: Thực thi toàn bộ quy tắc nghiệp vụ Hackathon (ràng buộc 3-5 thành viên/đội, kiểm tra hạn chót, kiểm tra trạng thái phê duyệt).\n3. **Repository (Data Layer)**: Truy xuất cơ sở dữ liệu qua Async SQLAlchemy 2.0 (PostgreSQL / Supabase), hỗ trợ khóa chống tranh chấp `SELECT FOR UPDATE`.\n\n---\n\n## 📦 Chuẩn hóa phản hồi (API Envelope Pattern)\nToàn bộ phản hồi HTTP (cả 2xx thành công lẫn 4xx/5xx lỗi) đều được đóng gói theo định dạng `ApiResponse[T]` thống nhất:\n\n### Thành công (HTTP 200 / 201):\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"message\": \"Thông báo kết quả thao tác thành công\"\n}\n```\n\n### Thất bại (HTTP 400 / 401 / 403 / 404 / 409 / 422 / 500):\n```json\n{\n  \"success\": false,\n  \"data\": null,\n  \"message\": \"Mô tả chi tiết nguyên nhân lỗi\",\n  \"error_code\": \"TEN_MA_LOI_CHUAN_HOA\"\n}\n```\n\n---\n\n## 🔐 Xác thực & Phân quyền (Authentication & Authorization)\n- **Cơ chế xác thực**: JSON Web Token (JWT) theo chuẩn RFC 7519.\n- **Header gửi kèm**: `Authorization: Bearer <access_token>`\n- **Phương thức đăng nhập**:\n  - Email + Password nội bộ (cho Admin, Judge, Mentor)\n  - GitHub OAuth 2.0 (dành cho Thí sinh - Candidate)\n- **Trạng thái phê duyệt (Approval Status)**:\n  - `pending`: Thí sinh mới đăng ký, chờ BTC phê duyệt.\n  - `approved`: Đã được duyệt hoặc có trong Whitelist, toàn quyền tạo đội & chọn đề tài.\n  - `rejected`: Đơn đăng ký bị từ chối.\n- **Vai trò người dùng (Roles)**:\n  - `admin`: Ban Tổ Chức (toàn quyền quản lý Whitelist, duyệt thí sinh, cấu hình đề tài).\n  - `judge`: Giám khảo chấm thi.\n  - `mentor`: Cố vấn hướng dẫn.\n  - `candidate`: Thí sinh thi đấu (Leader / Member).\n\n---\n\n## ⚠️ Bảng mã lỗi chuẩn hóa (Standard Error Codes)\n| Mã lỗi (`error_code`) | HTTP Status | Ý nghĩa & Hướng xử lý cho Frontend |\n|---|---|---|\n| `UNAUTHORIZED` | 401 | Thiếu token hoặc token đã hết hạn/không hợp lệ. Điều hướng về `/login`. |\n| `FORBIDDEN_ROLE` | 403 | Người dùng không đủ quyền RBAC truy cập chức năng này. |\n| `ACCOUNT_NOT_APPROVED` | 403 | Tài khoản chưa được BTC phê duyệt (`approval_status != 'approved'`). |\n| `ALREADY_IN_TEAM` | 400 | Thí sinh đã tham gia một đội thi khác, không thể tạo hoặc tham gia thêm. |\n| `TEAM_FULL` | 400 | Đội thi đã đạt số lượng tối đa 5 thành viên. |\n| `TEAM_NAME_TAKEN` | 400 | Tên đội thi đã được đăng ký trước đó. |\n| `NOT_IN_TEAM` | 400 | Thao tác yêu cầu người dùng phải thuộc một đội thi. |\n| `ONLY_LEADER_CAN_PERFORM`| 403 | Thao tác (như chọn hoặc hủy đề tài) chỉ dành riêng cho Đội trưởng. |\n| `TEAM_NOT_QUALIFIED` | 400 | Đội thi chưa đủ điều kiện (chưa đạt tối thiểu 3 thành viên để đăng ký đề tài). |\n| `TOPIC_FULL` | 409 | Đề tài đã đạt giới hạn quota số đội đăng ký tối đa. |\n| `TOPIC_SELECTION_CLOSED` | 400 | Thời gian đăng ký đề tài đã kết thúc hoặc đề tài tạm khóa. |\n| `TOPIC_ALREADY_SELECTED` | 400 | Đội thi đã chọn một đề tài trước đó (cần hủy đề tài cũ trước). |\n| `DEADLINE_EXCEEDED` | 400 | Đã quá hạn chót cho phép thao tác (chọn đề tài hoặc nộp bài). |\n| `GITHUB_REPO_INACCESSIBLE`| 400 | Repo GitHub nộp bài không công khai hoặc không truy cập được. |\n| `NOT_FOUND` | 404 | Không tìm thấy bản ghi/tài nguyên yêu cầu. |\n| `VALIDATION_ERROR` | 422 | Dữ liệu gửi lên sai kiểu dữ liệu hoặc vi phạm validation rules. |\n\n---\n\n## 🗺️ Lộ trình triển khai API (Implementation Status)\n- ✅ **Sprint 1 (Hoàn tất)**:\n  - `HF-17`: Khởi tạo kiến trúc 3 tầng & chuẩn hóa ApiResponse Envelope.\n  - `HF-19`: Xác thực JWT, GitHub OAuth 2.0 Callback, RBAC, Admin Whitelist & Candidate Approval.\n  - `HF-20`: Quản lý Đội thi (Create, Join by 6-char code, Me, Team Detail, giới hạn 3-5 thành viên).\n  - `HF-21`: Quản lý Đề tài thi (List Topics, Quota, Atomic Select `SELECT FOR UPDATE`, Cancel Topic).\n  - `HF-22`: Xuất Swagger Docs & Tài liệu Bàn giao API Contract.\n- ⏳ **Sprint 2 & 3 (Roadmap sắp tới)**:\n  - Checkpoint & Milestones API (Quản lý các mốc nộp bài).\n  - Submissions & GitHub Repo Inspection API (Nộp bài thi, kiểm tra repo, nộp link demo).\n  - Evaluation & Scoring Matrix API (Chấm điểm Rubric cho Giám khảo, xếp hạng tự động).\n",
+    "description": "# 🚀 HackFlow Backend API — Nền tảng tổ chức & Chấm thi Hackathon\n\nChào mừng bạn đến với tài liệu kỹ thuật API chính thức của dự án **HackFlow9**. Tài liệu này được thiết kế và bàn giao bởi **Lê Tiến Minh (Tech Lead / Core Backend Architect)** phục vụ cho việc tích hợp của Frontend (Trần Thùy Linh), QA/Postman (Đỗ Thị Lan Anh) và nghiệm thu chức năng từ BA (Dương Thị Khánh Ly).\n\n---\n\n## 🏛️ Kiến trúc hệ thống (3-Tier Architecture)\nHệ thống tuân thủ nghiêm ngặt mô hình 3 tầng phân tách độc lập:\n1. **Router (API Layer)**: Tiếp nhận HTTP request, xác thực schema Pydantic, bảo mật JWT Bearer / RBAC, trả về Envelope chuẩn hóa.\n2. **Service (Business Layer)**: Thực thi toàn bộ quy tắc nghiệp vụ Hackathon (ràng buộc 3-5 thành viên/đội, kiểm tra hạn chót, kiểm tra trạng thái phê duyệt).\n3. **Repository (Data Layer)**: Truy xuất cơ sở dữ liệu qua Async SQLAlchemy 2.0 (PostgreSQL / Supabase), hỗ trợ khóa chống tranh chấp `SELECT FOR UPDATE`.\n\n---\n\n## 📦 Chuẩn hóa phản hồi (API Envelope Pattern)\nToàn bộ phản hồi HTTP (cả 2xx thành công lẫn 4xx/5xx lỗi) đều được đóng gói theo định dạng `ApiResponse[T]` thống nhất:\n\n### Thành công (HTTP 200 / 201):\n```json\n{\n  \"success\": true,\n  \"data\": { ... },\n  \"message\": \"Thông báo kết quả thao tác thành công\"\n}\n```\n\n### Thất bại (HTTP 400 / 401 / 403 / 404 / 409 / 422 / 500):\n```json\n{\n  \"success\": false,\n  \"data\": null,\n  \"message\": \"Mô tả chi tiết nguyên nhân lỗi\",\n  \"error_code\": \"TEN_MA_LOI_CHUAN_HOA\"\n}\n```\n\n---\n\n## 🔐 Xác thực & Phân quyền (Authentication & Authorization)\n- **Cơ chế xác thực**: JSON Web Token (JWT) theo chuẩn RFC 7519.\n- **Header gửi kèm**: `Authorization: Bearer <access_token>`\n- **Phương thức đăng nhập**:\n  - Email + Password nội bộ (cho Admin, Judge, Mentor)\n  - GitHub OAuth 2.0 (dành cho Thí sinh - Candidate)\n- **Trạng thái phê duyệt (Approval Status)**:\n  - `pending`: Thí sinh mới đăng ký, chờ BTC phê duyệt.\n  - `approved`: Đã được duyệt hoặc có trong Whitelist, toàn quyền tạo đội & chọn đề tài.\n  - `rejected`: Đơn đăng ký bị từ chối.\n- **Vai trò người dùng (Roles)**:\n  - `admin`: Ban Tổ Chức (toàn quyền quản lý Whitelist, duyệt thí sinh, cấu hình đề tài).\n  - `judge`: Giám khảo chấm thi.\n  - `mentor`: Cố vấn hướng dẫn.\n  - `candidate`: Thí sinh thi đấu (Leader / Member).\n\n---\n\n## ⚠️ Bảng mã lỗi chuẩn hóa (Standard Error Codes)\n| Mã lỗi (`error_code`) | HTTP Status | Ý nghĩa & Hướng xử lý cho Frontend |\n|---|---|---|\n| `UNAUTHORIZED` | 401 | Thiếu token hoặc token đã hết hạn/không hợp lệ. Điều hướng về `/login`. |\n| `FORBIDDEN_ROLE` | 403 | Người dùng không đủ quyền RBAC truy cập chức năng này. |\n| `ACCOUNT_NOT_APPROVED` | 403 | Tài khoản chưa được BTC phê duyệt (`approval_status != 'approved'`). |\n| `ALREADY_IN_TEAM` | 400 | Thí sinh đã tham gia một đội thi khác, không thể tạo hoặc tham gia thêm. |\n| `TEAM_FULL` | 400 | Đội thi đã đạt số lượng tối đa 5 thành viên. |\n| `TEAM_NAME_TAKEN` | 400 | Tên đội thi đã được đăng ký trước đó. |\n| `NOT_IN_TEAM` | 400 | Thao tác yêu cầu người dùng phải thuộc một đội thi. |\n| `ONLY_LEADER_CAN_PERFORM`| 403 | Thao tác (như chọn hoặc hủy đề tài) chỉ dành riêng cho Đội trưởng. |\n| `TEAM_NOT_QUALIFIED` | 400 | Đội thi chưa đủ điều kiện (chưa đạt tối thiểu 3 thành viên để đăng ký đề tài). |\n| `TOPIC_FULL` | 409 | Đề tài đã đạt giới hạn quota số đội đăng ký tối đa. |\n| `TOPIC_SELECTION_CLOSED` | 400 | Thời gian đăng ký đề tài đã kết thúc hoặc đề tài tạm khóa. |\n| `TOPIC_ALREADY_SELECTED` | 400 | Đội thi đã chọn một đề tài trước đó (cần hủy đề tài cũ trước). |\n| `CHECKPOINT_NOT_OPEN` | 403 | Cổng nộp bài cho checkpoint này chưa đến giờ mở (`now < start_time`). |\n| `CHECKPOINT_INACTIVE` | 403 | Checkpoint này đang tạm khóa hoặc đã bị vô hiệu hóa bởi Ban tổ chức (`is_active=False`). |\n| `DEADLINE_EXCEEDED` | 403/400 | Đã quá hạn chót cho phép thao tác (chọn đề tài hoặc nộp bài sau Deadline + Grace Period 5s). |\n| `GITHUB_REPO_INACCESSIBLE`| 400 | Repo GitHub nộp bài không công khai hoặc không truy cập được. |\n| `NOT_FOUND` | 404 | Không tìm thấy bản ghi/tài nguyên yêu cầu. |\n| `VALIDATION_ERROR` | 422 | Dữ liệu gửi lên sai kiểu dữ liệu hoặc vi phạm validation rules. |\n\n---\n\n## 🗺️ Lộ trình triển khai API (Implementation Status)\n- ✅ **Sprint 1 (Hoàn tất)**:\n  - `HF-17`: Khởi tạo kiến trúc 3 tầng & chuẩn hóa ApiResponse Envelope.\n  - `HF-19`: Xác thực JWT, GitHub OAuth 2.0 Callback, RBAC, Admin Whitelist & Candidate Approval.\n  - `HF-20`: Quản lý Đội thi (Create, Join by 6-char code, Me, Team Detail, giới hạn 3-5 thành viên).\n  - `HF-21`: Quản lý Đề tài thi (List Topics, Quota, Atomic Select `SELECT FOR UPDATE`, Cancel Topic).\n  - `HF-22`: Xuất Swagger Docs & Tài liệu Bàn giao API Contract.\n- 🚀 **Sprint 2 (Đang triển khai)**:\n  - `HF-32`: Lập trình API Checkpoint Time-gated (Mở/Khóa cổng nộp bài, ân hạn mạng 5s) — **Hoàn tất**.\n  - `HF-33`: Lập trình module tích hợp GitHub API xác thực HEAD Commit SHA.\n  - `HF-34`: Lập trình API POST /submissions (Lưu trữ bài nộp) và Audit Log.\n- ⏳ **Sprint 3 (Roadmap sắp tới)**:\n  - Evaluation & Scoring Matrix API (Chấm điểm Rubric cho Giám khảo, xếp hạng tự động).\n",
     "contact": {
       "name": "Lê Tiến Minh (Tech Lead / Core Backend Architect)",
       "url": "https://github.com/minhlt6/HackFlow9",
@@ -999,6 +999,353 @@
         ]
       }
     },
+    "/api/v1/checkpoints": {
+      "get": {
+        "tags": [
+          "Checkpoints (HF-32)"
+        ],
+        "summary": "Lấy danh sách các mốc Checkpoint của cuộc thi",
+        "description": "Hiển thị danh sách các mốc nộp bài (Milestones/Checkpoints) kèm thông tin\ntrạng thái time-gated (upcoming, open, grace_period, closed) và số giây còn lại.",
+        "operationId": "list_checkpoints_api_v1_checkpoints_get",
+        "parameters": [
+          {
+            "name": "only_active",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Only Active"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_List_CheckpointResponse__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Checkpoints (HF-32)"
+        ],
+        "summary": "Tạo mới mốc Checkpoint (Chỉ Admin)",
+        "description": "Ban Tổ Chức (BTC) cấu hình mốc Checkpoint mới kèm thời gian bắt đầu và hạn chót.",
+        "operationId": "create_checkpoint_api_v1_checkpoints_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckpointCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CheckpointResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/checkpoints/{checkpoint_id}": {
+      "get": {
+        "tags": [
+          "Checkpoints (HF-32)"
+        ],
+        "summary": "Xem chi tiết một Checkpoint",
+        "description": "Lấy thông tin chi tiết một mốc Checkpoint theo UUID.",
+        "operationId": "get_checkpoint_api_v1_checkpoints__checkpoint_id__get",
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Checkpoint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CheckpointResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Checkpoints (HF-32)"
+        ],
+        "summary": "Cập nhật mốc Checkpoint (Chỉ Admin)",
+        "description": "Ban Tổ Chức (BTC) gia hạn thời gian nộp bài hoặc sửa đổi thông tin Checkpoint.",
+        "operationId": "update_checkpoint_api_v1_checkpoints__checkpoint_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Checkpoint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckpointUpdateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CheckpointResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/checkpoints/{checkpoint_id}/status": {
+      "get": {
+        "tags": [
+          "Checkpoints (HF-32)"
+        ],
+        "summary": "Kiểm tra trạng thái Time-gated của Checkpoint (Mở/Khóa cổng)",
+        "description": "Truy vấn trạng thái time-gated thời gian thực:\n- Server Time (UTC)\n- Trạng thái: 'upcoming' | 'open' | 'grace_period' | 'closed'\n- Cờ can_submit, grace_period_applied (5s network latency), thời gian đếm ngược.",
+        "operationId": "get_checkpoint_time_gated_status_api_v1_checkpoints__checkpoint_id__status_get",
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Checkpoint Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CheckpointTimeGatedStatusResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/checkpoints/{checkpoint_id}/validate-window": {
+      "post": {
+        "tags": [
+          "Checkpoints (HF-32)"
+        ],
+        "summary": "Kiểm tra điều kiện hợp lệ để nộp bài (Time-gated Validation)",
+        "description": "API xác thực cửa sổ thời gian nộp bài nghiêm ngặt theo Acceptance Criteria HF-32:\n- Trả về HTTP 200 OK nếu nằm trong khung giờ hợp lệ [start_time, deadline] hoặc Grace Period [deadline, deadline + 5s].\n- Ném HTTP 403 Forbidden nếu:\n  + Chưa đến giờ mở cổng: error_code=\"CHECKPOINT_NOT_OPEN\"\n  + Quá hạn nộp bài: error_code=\"DEADLINE_EXCEEDED\"\n  + BTC đã khóa checkpoint: error_code=\"CHECKPOINT_INACTIVE\"",
+        "operationId": "validate_submission_window_api_v1_checkpoints__checkpoint_id__validate_window_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Checkpoint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckpointValidateWindowRequest",
+                "default": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_ValidateSubmissionWindowResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/checkpoints/{checkpoint_id}/toggle-active": {
+      "patch": {
+        "tags": [
+          "Checkpoints (HF-32)"
+        ],
+        "summary": "Khóa hoặc Mở kích hoạt mốc Checkpoint (Chỉ Admin)",
+        "description": "Ban Tổ Chức (BTC) chủ động khóa khẩn cấp hoặc mở lại cổng Checkpoint.",
+        "operationId": "toggle_active_checkpoint_api_v1_checkpoints__checkpoint_id__toggle_active_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "checkpoint_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Checkpoint Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckpointToggleActiveRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_CheckpointResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/": {
       "get": {
         "tags": [
@@ -1021,6 +1368,94 @@
   },
   "components": {
     "schemas": {
+      "ApiResponse_CheckpointResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckpointResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "default": "Success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "type": "object",
+        "title": "ApiResponse[CheckpointResponse]"
+      },
+      "ApiResponse_CheckpointTimeGatedStatusResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CheckpointTimeGatedStatusResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "default": "Success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "type": "object",
+        "title": "ApiResponse[CheckpointTimeGatedStatusResponse]"
+      },
       "ApiResponse_DemoPayload_": {
         "properties": {
           "success": {
@@ -1246,6 +1681,54 @@
         },
         "type": "object",
         "title": "ApiResponse[List[CandidatePendingResponse]]"
+      },
+      "ApiResponse_List_CheckpointResponse__": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/CheckpointResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "default": "Success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "type": "object",
+        "title": "ApiResponse[List[CheckpointResponse]]"
       },
       "ApiResponse_List_TopicResponse__": {
         "properties": {
@@ -1563,6 +2046,50 @@
         "type": "object",
         "title": "ApiResponse[UserResponse]"
       },
+      "ApiResponse_ValidateSubmissionWindowResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValidateSubmissionWindowResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "default": "Success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "type": "object",
+        "title": "ApiResponse[ValidateSubmissionWindowResponse]"
+      },
       "ApiResponse_WhitelistBulkAddResponse_": {
         "properties": {
           "success": {
@@ -1827,6 +2354,380 @@
           "email"
         ],
         "title": "CandidatePendingResponse"
+      },
+      "CheckpointCreateRequest": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 3,
+            "title": "Title",
+            "description": "Tên mốc checkpoint / milestone"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Mô tả chi tiết yêu cầu mốc nộp bài"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time",
+            "description": "Thời điểm mở cổng nộp bài (ISO 8601 UTC)"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deadline",
+            "description": "Hạn chót đóng cổng nộp bài (ISO 8601 UTC)"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements",
+            "description": "Chi tiết các tiêu chí/tệp cần nộp (Markdown)"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "Trạng thái kích hoạt mốc checkpoint của BTC",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "start_time",
+          "deadline"
+        ],
+        "title": "CheckpointCreateRequest"
+      },
+      "CheckpointResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deadline"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "upcoming | open | grace_period | closed"
+          },
+          "is_open": {
+            "type": "boolean",
+            "title": "Is Open",
+            "description": "True nếu cổng đang mở hoặc đang trong thời gian ân hạn mạng"
+          },
+          "can_submit": {
+            "type": "boolean",
+            "title": "Can Submit",
+            "description": "True nếu cho phép nộp bài tại thời điểm hiện tại"
+          },
+          "grace_period_seconds": {
+            "type": "integer",
+            "title": "Grace Period Seconds",
+            "description": "Thời gian ân hạn mạng cho phép (giây)",
+            "default": 5
+          },
+          "time_remaining_seconds": {
+            "type": "integer",
+            "title": "Time Remaining Seconds",
+            "description": "Số giây còn lại đến deadline chính thức (0 nếu đã quá hạn)",
+            "default": 0
+          },
+          "time_until_start_seconds": {
+            "type": "integer",
+            "title": "Time Until Start Seconds",
+            "description": "Số giây đếm ngược đến lúc mở cổng (0 nếu đã mở)",
+            "default": 0
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Server Time",
+            "description": "Thời gian hiện tại của Server chuẩn UTC"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "start_time",
+          "deadline",
+          "is_active",
+          "status",
+          "is_open",
+          "can_submit",
+          "server_time"
+        ],
+        "title": "CheckpointResponse"
+      },
+      "CheckpointTimeGatedStatusResponse": {
+        "properties": {
+          "checkpoint_id": {
+            "type": "string",
+            "title": "Checkpoint Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Server Time"
+          },
+          "start_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Start Time"
+          },
+          "deadline": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Deadline"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "is_open": {
+            "type": "boolean",
+            "title": "Is Open"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "can_submit": {
+            "type": "boolean",
+            "title": "Can Submit"
+          },
+          "grace_period_applied": {
+            "type": "boolean",
+            "title": "Grace Period Applied"
+          },
+          "grace_period_seconds": {
+            "type": "integer",
+            "title": "Grace Period Seconds",
+            "default": 5
+          },
+          "time_remaining_seconds": {
+            "type": "integer",
+            "title": "Time Remaining Seconds"
+          },
+          "time_until_start_seconds": {
+            "type": "integer",
+            "title": "Time Until Start Seconds"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "checkpoint_id",
+          "title",
+          "server_time",
+          "start_time",
+          "deadline",
+          "is_active",
+          "is_open",
+          "status",
+          "can_submit",
+          "grace_period_applied",
+          "time_remaining_seconds",
+          "time_until_start_seconds",
+          "message"
+        ],
+        "title": "CheckpointTimeGatedStatusResponse"
+      },
+      "CheckpointToggleActiveRequest": {
+        "properties": {
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "description": "True: Mở kích hoạt; False: Tạm khóa bởi BTC"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_active"
+        ],
+        "title": "CheckpointToggleActiveRequest"
+      },
+      "CheckpointUpdateRequest": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "start_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Time"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Deadline"
+          },
+          "requirements": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requirements"
+          },
+          "is_active": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "title": "CheckpointUpdateRequest"
+      },
+      "CheckpointValidateWindowRequest": {
+        "properties": {
+          "simulate_time": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Simulate Time",
+            "description": "Thời điểm giả lập để kiểm thử UAT/QA (Chỉ áp dụng khi Admin test). Mặc định là thời gian thực của server."
+          }
+        },
+        "type": "object",
+        "title": "CheckpointValidateWindowRequest"
       },
       "DemoPayload": {
         "properties": {
@@ -2489,6 +3390,45 @@
         ],
         "title": "UserResponse"
       },
+      "ValidateSubmissionWindowResponse": {
+        "properties": {
+          "is_valid": {
+            "type": "boolean",
+            "title": "Is Valid"
+          },
+          "grace_period_applied": {
+            "type": "boolean",
+            "title": "Grace Period Applied"
+          },
+          "checkpoint_id": {
+            "type": "string",
+            "title": "Checkpoint Id"
+          },
+          "checkpoint_title": {
+            "type": "string",
+            "title": "Checkpoint Title"
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Server Time"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "is_valid",
+          "grace_period_applied",
+          "checkpoint_id",
+          "checkpoint_title",
+          "server_time",
+          "message"
+        ],
+        "title": "ValidateSubmissionWindowResponse"
+      },
       "ValidationError": {
         "properties": {
           "loc": {
@@ -2712,6 +3652,10 @@
     {
       "name": "Topics (HF-21)",
       "description": "Quản lý Đề tài thi: Xem danh sách đề tài & Quota giới hạn số đội, đăng ký đề tài bằng giao dịch nguyên tử chống tranh chấp đồng thời (SELECT FOR UPDATE) và hủy chọn đề tài."
+    },
+    {
+      "name": "Checkpoints (HF-32)",
+      "description": "Quản lý mốc Checkpoint nộp bài & Kiểm tra Time-gated (Mở/Khóa cổng nộp bài, thời gian ân hạn mạng 5 giây)."
     },
     {
       "name": "Examples & Envelope Demo",

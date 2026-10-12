@@ -84,3 +84,30 @@ def require_approved():
         return user
 
     return approval_checker
+
+
+async def require_checkpoint_open_by_id(
+    checkpoint_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Time-gated Checkpoint validator dependency (HF-32).
+    Verifies that the requested checkpoint exists and is within the allowed
+    submission window (accounting for 5s network latency grace period).
+    Returns tuple: (checkpoint, grace_period_applied).
+    Raises HTTP 403 Forbidden with exact error_code if outside allowed window:
+      - CHECKPOINT_INACTIVE
+      - CHECKPOINT_NOT_OPEN
+      - DEADLINE_EXCEEDED
+    """
+    from app.core.exceptions import NotFoundException
+    from app.repositories.checkpoint_repo import checkpoint_repo
+    from app.services.checkpoint_service import checkpoint_service
+
+    cp = await checkpoint_repo.get_by_id(db, checkpoint_id)
+    if not cp:
+        raise NotFoundException(message=f"Không tìm thấy checkpoint với ID '{checkpoint_id}'.")
+
+    _, grace_applied, _ = checkpoint_service.validate_checkpoint_submission_window(cp)
+    return cp, grace_applied
+
