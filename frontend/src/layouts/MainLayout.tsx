@@ -202,7 +202,7 @@ export const MainLayout: React.FC = () => {
                 HACKFLOW AI &amp; DEEPTECH HACKATHON 2026
               </span>
               <span className="text-[11px] text-slate-400 block">
-                Giai đoạn: Giai đoạn 3: Thực thi dự án &amp; Nộp bài các chặng
+                Giai đoạn 3: Thực thi dự án và Nộp bài các chặng
               </span>
             </div>
           </div>

@@ -5,6 +5,7 @@ import { RejectedAccountPage } from './pages/RejectedAccountPage';
 import { AuthCallback } from './pages/AuthCallback';
 import { DashboardPage } from './pages/DashboardPage';
 import { TeamsPage } from './pages/TeamsPage';
+import { CandidateCheckpointsPage } from './pages/candidate/candidateCheckpointsPage';
 import { UIPreviewPage } from './pages/UIPreviewPage';
 import { MainLayout } from './layouts/MainLayout';
 
@@ -21,6 +22,14 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: '/preview-checkpoints',
+    element: (
+      <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+        <CandidateCheckpointsPage />
+      </div>
+    ),
+  },
+  {
     path: '/preview-ui',
     element: <UIPreviewPage />,
   },
@@ -31,6 +40,7 @@ const router = createBrowserRouter([
       { path: '/', element: <DashboardPage /> },
       { path: '/dashboard', element: <DashboardPage /> },
       { path: '/teams', element: <TeamsPage /> },
+      { path: '/checkpoints', element: <CandidateCheckpointsPage /> },
       { path: '/onboarding', element: <OnboardingPage /> },
       { path: '/profile', element: <OnboardingPage /> },
     ],
