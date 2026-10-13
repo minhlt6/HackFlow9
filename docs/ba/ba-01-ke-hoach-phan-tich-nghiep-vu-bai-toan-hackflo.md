@@ -141,16 +141,17 @@ Xây dựng nền tảng nghiệp vụ đủ rõ để nhóm kỹ thuật **khô
 
 ### US-05 — Nộp bài theo checkpoint
 
-**Đầu vào:** Đội nộp bài, checkpoint, `repo_url` (GitHub public), `demo_url`, thời điểm nộp.
+**Đầu vào:** Đội trưởng nộp bài (chỉ Team Leader), checkpoint, dữ liệu nộp theo cấu hình động `submission_fields` của checkpoint (ví dụ: `repo_url`, `demo_url`, `slide_url`, `progress_note`...), thời điểm nộp.
 
 | AC | Kịch bản | Mô tả |
 |----|---------|-------|
-| AC-05.1 | Kiểm tra trước khi nhận | Gọi GitHub REST API kiểm tra tồn tại & quyền truy cập repo. Nếu private/không tồn tại → trả `GITHUB_REPO_INACCESSIBLE`, không tạo bản ghi. |
-| AC-05.2 | Nộp thành công | `server_timestamp < deadline` + repo hợp lệ → Backend gọi GitHub lấy commit SHA, lưu vào `submissions`, trả về commit SHA đã đóng băng. |
-| AC-05.3 | Nộp quá hạn | `server_timestamp > deadline` → từ chối, trả `DEADLINE_EXCEEDED`, không tạo/sửa bản ghi. |
-| AC-05.4 | Lỗi hệ thống | Lỗi mạng/API GitHub → không tạo bản ghi hợp lệ, hiển thị nguyên nhân, cho phép thử lại nếu còn hạn. |
-| AC-05.5 | Chống nộp trùng | Nhiều request đồng thời → khóa tạm thời / nhận diện trùng → chỉ tạo 1 bản ghi duy nhất. |
-| AC-05.6 | Gia hạn có kiểm soát | Sau deadline, Admin/BTC cấp quyền gia hạn → hệ thống mở lại cửa sổ nộp có thời hạn và ghi log. |
+| AC-05.1 | Kiểm tra phân quyền & Dữ liệu hợp lệ | Chỉ Đội trưởng (Team Leader) mới được nộp bài (tránh nhiều thành viên cùng nộp gây xung đột). Hệ thống kiểm tra các trường bắt buộc theo cấu hình `submission_fields`. Nếu là Checkpoint cuối (`is_final_checkpoint = true`): kiểm tra repo GitHub tồn tại & public (nếu private/lỗi → trả `GITHUB_REPO_INACCESSIBLE`). |
+| AC-05.2 | Nộp thành công | `server_timestamp <= deadline` + dữ liệu hợp lệ: <br>• Checkpoint trung gian (`is_final_checkpoint = false`): Lưu dữ liệu nộp theo cấu hình, không gọi GitHub freeze SHA.<br>• Checkpoint cuối (`is_final_checkpoint = true`): Backend gọi GitHub lấy Commit SHA đóng băng và lưu vào `submissions`. |
+| AC-05.3 | Nộp quá hạn | `server_timestamp > deadline` → từ chối ngay lập tức, trả `400 DEADLINE_EXCEEDED`, không tạo/sửa bản ghi (hệ thống không có grace period tự động). |
+| AC-05.4 | Lỗi hệ thống | Lỗi mạng/API GitHub khi lấy SHA → không tạo bản ghi hợp lệ, hiển thị nguyên nhân để thí sinh thử lại nếu còn hạn. |
+| AC-05.5 | Chống nộp trùng & Idempotency | Ràng buộc khóa duy nhất `(team_id, checkpoint_id)`. Cho phép nộp lại ghi đè nếu VẪN TRONG HẠN. Xử lý request đồng thời tránh trùng lặp. |
+| AC-05.6 | Gia hạn có kiểm soát | Sau deadline, Admin/BTC cấp quyền gia hạn → hệ thống mở lại cửa sổ nộp có thời hạn và bắt buộc ghi Audit Log. |
+
 
 ---
 
@@ -313,8 +314,12 @@ Xây dựng nền tảng nghiệp vụ đủ rõ để nhóm kỹ thuật **khô
 
 1. **Phương thức đăng nhập:** Thí sinh bắt buộc dùng GitHub OAuth 2.0; Ban tổ chức (Admin), Ban Giám khảo (Judge) và Mentor dùng Email/Password nội bộ (mã hóa mật khẩu chuẩn SHA-256 + Salt, xác thực bằng JWT Bearer Token).
 2. **Vòng đời tài khoản & Phê duyệt Onboarding:** Thí sinh đăng nhập lần đầu có trạng thái `PENDING`. Chỉ khi Ban tổ chức phê duyệt sang `APPROVED` mới được phép tạo đội, tham gia đội và nộp bài. Nếu bị `REJECTED`, hệ thống khóa toàn bộ chức năng và hiển thị lý do từ chối.
-3. **Đóng băng bài nộp & cơ chế Commit SHA:** Khi thí sinh bấm nộp bài Checkpoint, Backend tự động gọi GitHub REST API để lấy chính xác HEAD Commit SHA tại thời điểm đó và lưu vào CSDL (`submissions`) kèm Server Timestamp UTC (`datetime.now(timezone.utc)`), ngăn chặn tuyệt đối việc chỉnh sửa code sau deadline.
-4. **Deadline & cơ chế gia hạn có kiểm soát:** Hệ thống từ chối mọi bài nộp sau deadline (`server_timestamp > deadline`), trả về mã lỗi `400 DEADLINE_EXCEEDED`. Việc gia hạn chỉ do Ban tổ chức thực hiện thông qua việc mở lại cửa sổ nộp bài và bắt buộc lưu log kiểm toán (audit log) chi tiết.
+3. **Đóng băng bài nộp & cơ chế Commit SHA theo Checkpoint:**
+   - **Cấu hình động:** Các trường dữ liệu nộp bài (repo_url, demo_url, slide_url, ghi chú...) do Ban tổ chức linh hoạt cấu hình theo từng Checkpoint (`submission_fields`).
+   - **Đóng băng Commit SHA chỉ áp dụng cho Checkpoint cuối cùng (`is_final_checkpoint = true`):** Các checkpoint trung gian chỉ nộp tài liệu/tiến độ theo cấu hình, không gọi GitHub API hay freeze SHA. Khi nộp bài tại Checkpoint cuối cùng, Backend tự động gọi GitHub REST API để lấy chính xác HEAD Commit SHA tại thời điểm đó và lưu vào CSDL (`submissions`) kèm Server Timestamp UTC (`datetime.now(timezone.utc)`), ngăn chặn tuyệt đối việc chỉnh sửa code sau deadline.
+   - **Quyền nộp:** Chỉ Đội trưởng (Team Leader) mới được phép gửi bài nộp để chống xung đột dữ liệu.
+4. **Deadline & cơ chế gia hạn có kiểm soát:** Hệ thống từ chối mọi bài nộp sau deadline (`server_timestamp > deadline`), trả về mã lỗi `400 DEADLINE_EXCEEDED` (không áp dụng grace period tự động). Việc gia hạn chỉ do Ban tổ chức thực hiện thông qua việc mở lại cửa sổ nộp bài và bắt buộc lưu log kiểm toán (audit log) chi tiết.
+
 5. **Khóa tranh chấp khi chọn đề tài (Concurrency Lock):** Áp dụng `SELECT FOR UPDATE` trong transaction PostgreSQL khi đội thi đăng ký đề tài để ngăn chặn race condition khi nhiều đội cùng tranh chấp slot cuối cùng của đề tài.
 6. **Phân quyền và bảo mật dữ liệu (RBAC):** Ban Giám khảo chấm thi theo cơ chế Blind Judging (ẩn danh toàn bộ thông tin đội thi và thành viên). Mentor chỉ được phân công xem và xử lý Ticket hỗ trợ, tuyệt đối không được xem bài nộp, repo URL hay điểm số của thí sinh (trả về 403 FORBIDDEN nếu cố tình truy cập).
 
