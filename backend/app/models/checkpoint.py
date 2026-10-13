@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
-from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text
+from typing import TYPE_CHECKING, Any, List, Optional
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -13,6 +13,8 @@ if TYPE_CHECKING:
 
 class SubmissionStatus(str, Enum):
     SUBMITTED = "submitted"
+    PENDING_SHA_FREEZE = "pending_sha_freeze"
+    SHA_VERIFICATION_FAILED = "sha_verification_failed"
     EVALUATED = "evaluated"
     LATE = "late"
     INVALID = "invalid"
@@ -30,6 +32,9 @@ class Checkpoint(BaseModel):
     deadline: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     requirements: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_final_checkpoint: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    grace_period_seconds: Mapped[int] = mapped_column(Integer, default=5, nullable=False)
+    submission_fields: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     # Relationships
     submissions: Mapped[List["Submission"]] = relationship(
@@ -42,6 +47,9 @@ class Submission(BaseModel):
     Team submission per checkpoint, capturing frozen GitHub Commit SHA.
     """
     __tablename__ = "submissions"
+    __table_args__ = (
+        UniqueConstraint("team_id", "checkpoint_id", name="uq_submission_team_checkpoint"),
+    )
 
     checkpoint_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("checkpoints.id", ondelete="CASCADE"), nullable=False, index=True
@@ -49,9 +57,10 @@ class Submission(BaseModel):
     team_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    repo_url: Mapped[str] = mapped_column(String(255), nullable=False)
+    repo_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     demo_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    commit_sha: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    commit_sha: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    submission_data: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     status: Mapped[str] = mapped_column(
         String(32), default=SubmissionStatus.SUBMITTED.value, nullable=False, index=True
     )

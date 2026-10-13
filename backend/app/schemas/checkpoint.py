@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
@@ -9,6 +9,15 @@ class CheckpointStatus(str, Enum):
     OPEN = "open"
     GRACE_PERIOD = "grace_period"
     CLOSED = "closed"
+
+
+# ─── Dynamic Field Schema (SRS HF-23) ──────────────────────────────────────
+
+class SubmissionFieldConfig(BaseModel):
+    field_key: str = Field(..., min_length=1, max_length=64, description="Khóa định danh trường (vd: repo_url, presentation_pdf)")
+    field_label: str = Field(..., min_length=1, max_length=128, description="Tên nhãn hiển thị cho thí sinh")
+    required: bool = Field(True, description="Bắt buộc phải nộp hay tùy chọn")
+    apply_sha_freeze: bool = Field(False, description="True nếu trường này chứa GitHub Repo để freeze SHA")
 
 
 # ─── Request Schemas ────────────────────────────────────────────────────────
@@ -20,6 +29,9 @@ class CheckpointCreateRequest(BaseModel):
     deadline: datetime = Field(..., description="Hạn chót đóng cổng nộp bài (ISO 8601 UTC)")
     requirements: Optional[str] = Field(None, description="Chi tiết các tiêu chí/tệp cần nộp (Markdown)")
     is_active: bool = Field(True, description="Trạng thái kích hoạt mốc checkpoint của BTC")
+    is_final_checkpoint: bool = Field(False, description="True: Checkpoint chốt sản phẩm cuối cùng; False: Checkpoint trung gian")
+    grace_period_seconds: int = Field(5, ge=0, le=300, description="Thời gian ân hạn mạng riêng từng checkpoint (0 - 300 giây, mặc định 5s)")
+    submission_fields: Optional[List[SubmissionFieldConfig]] = Field(None, description="Cấu hình các trường nộp bài động")
 
     @field_validator("deadline")
     @classmethod
@@ -37,6 +49,9 @@ class CheckpointUpdateRequest(BaseModel):
     deadline: Optional[datetime] = None
     requirements: Optional[str] = None
     is_active: Optional[bool] = None
+    is_final_checkpoint: Optional[bool] = None
+    grace_period_seconds: Optional[int] = Field(None, ge=0, le=300)
+    submission_fields: Optional[List[SubmissionFieldConfig]] = None
 
 
 class CheckpointToggleActiveRequest(BaseModel):
@@ -60,6 +75,8 @@ class CheckpointResponse(BaseModel):
     deadline: datetime
     requirements: Optional[str] = None
     is_active: bool
+    is_final_checkpoint: bool = Field(False, description="True nếu là checkpoint chốt sản phẩm HEAD Commit SHA")
+    submission_fields: Optional[List[Dict[str, Any]]] = Field(None, description="Danh sách các trường nộp bài động")
     status: str = Field(..., description="upcoming | open | grace_period | closed")
     is_open: bool = Field(..., description="True nếu cổng đang mở hoặc đang trong thời gian ân hạn mạng")
     can_submit: bool = Field(..., description="True nếu cho phép nộp bài tại thời điểm hiện tại")
@@ -85,6 +102,7 @@ class CheckpointTimeGatedStatusResponse(BaseModel):
     can_submit: bool
     grace_period_applied: bool
     grace_period_seconds: int = 5
+    is_final_checkpoint: bool = False
     time_remaining_seconds: int
     time_until_start_seconds: int
     message: str

@@ -44,7 +44,11 @@ class CheckpointService:
         current_time = ensure_utc(now or datetime.now(timezone.utc))
         start_time = ensure_utc(checkpoint.start_time)
         deadline = ensure_utc(checkpoint.deadline)
-        grace_deadline = deadline + timedelta(seconds=GRACE_PERIOD_SECONDS)
+        grace_sec = getattr(checkpoint, "grace_period_seconds", GRACE_PERIOD_SECONDS)
+        if grace_sec is None:
+            grace_sec = GRACE_PERIOD_SECONDS
+        grace_deadline = deadline + timedelta(seconds=grace_sec)
+        is_final = getattr(checkpoint, "is_final_checkpoint", False)
 
         time_remaining_sec = max(0, int((deadline - current_time).total_seconds()))
         time_until_start_sec = max(0, int((start_time - current_time).total_seconds()))
@@ -56,6 +60,8 @@ class CheckpointService:
                 "is_open": False,
                 "can_submit": False,
                 "grace_period_applied": False,
+                "grace_period_seconds": grace_sec,
+                "is_final_checkpoint": is_final,
                 "message": "Checkpoint này đang tạm khóa hoặc đã bị vô hiệu hóa bởi Ban tổ chức.",
                 "server_time": current_time,
                 "start_time": start_time,
@@ -71,6 +77,8 @@ class CheckpointService:
                 "is_open": False,
                 "can_submit": False,
                 "grace_period_applied": False,
+                "grace_period_seconds": grace_sec,
+                "is_final_checkpoint": is_final,
                 "message": "Cổng nộp bài cho checkpoint này chưa đến giờ mở.",
                 "server_time": current_time,
                 "start_time": start_time,
@@ -86,6 +94,8 @@ class CheckpointService:
                 "is_open": True,
                 "can_submit": True,
                 "grace_period_applied": False,
+                "grace_period_seconds": grace_sec,
+                "is_final_checkpoint": is_final,
                 "message": "Cổng nộp bài đang mở hợp lệ.",
                 "server_time": current_time,
                 "start_time": start_time,
@@ -94,14 +104,16 @@ class CheckpointService:
                 "time_until_start_seconds": 0,
             }
 
-        # 4. Trong khoảng ân hạn mạng (Grace Period 5 giây)
+        # 4. Trong khoảng ân hạn mạng (Grace Period)
         if deadline < current_time <= grace_deadline:
             return {
                 "status": CheckpointStatus.GRACE_PERIOD.value,
                 "is_open": True,
                 "can_submit": True,
                 "grace_period_applied": True,
-                "message": "Nộp bài trong thời gian ân hạn mạng (Grace Period 5 giây).",
+                "grace_period_seconds": grace_sec,
+                "is_final_checkpoint": is_final,
+                "message": f"Nộp bài trong thời gian ân hạn mạng (Grace Period {grace_sec} giây).",
                 "server_time": current_time,
                 "start_time": start_time,
                 "deadline": deadline,
@@ -109,13 +121,15 @@ class CheckpointService:
                 "time_until_start_seconds": 0,
             }
 
-        # 5. Quá hạn nộp bài hoàn toàn (Sau deadline + 5 giây)
+        # 5. Quá hạn nộp bài hoàn toàn (Sau deadline + grace_period_seconds)
         return {
             "status": CheckpointStatus.CLOSED.value,
             "is_open": False,
             "can_submit": False,
             "grace_period_applied": False,
-            "message": "Đã quá thời hạn nộp bài cho checkpoint này (kể cả thời gian ân hạn mạng 5 giây).",
+            "grace_period_seconds": grace_sec,
+            "is_final_checkpoint": is_final,
+            "message": f"Đã quá thời hạn nộp bài cho checkpoint này (kể cả thời gian ân hạn mạng {grace_sec} giây).",
             "server_time": current_time,
             "start_time": start_time,
             "deadline": deadline,
@@ -137,6 +151,7 @@ class CheckpointService:
         - Trả về (is_valid=True, grace_period_applied=bool, message=str) nếu hợp lệ.
         """
         info = CheckpointService.calculate_time_gate_info(checkpoint, now)
+        grace_sec = info.get("grace_period_seconds", GRACE_PERIOD_SECONDS)
 
         if not checkpoint.is_active:
             raise ForbiddenException(
@@ -152,7 +167,7 @@ class CheckpointService:
 
         if info["status"] == CheckpointStatus.CLOSED.value:
             raise ForbiddenException(
-                message="Đã quá thời hạn nộp bài cho checkpoint này (kể cả thời gian ân hạn mạng 5 giây).",
+                message=f"Đã quá thời hạn nộp bài cho checkpoint này (kể cả thời gian ân hạn mạng {grace_sec} giây).",
                 error_code="DEADLINE_EXCEEDED",
             )
 
@@ -173,10 +188,12 @@ class CheckpointService:
             deadline=info["deadline"],
             requirements=checkpoint.requirements,
             is_active=checkpoint.is_active,
+            is_final_checkpoint=info["is_final_checkpoint"],
+            submission_fields=checkpoint.submission_fields,
             status=info["status"],
             is_open=info["is_open"],
             can_submit=info["can_submit"],
-            grace_period_seconds=GRACE_PERIOD_SECONDS,
+            grace_period_seconds=info["grace_period_seconds"],
             time_remaining_seconds=info["time_remaining_seconds"],
             time_until_start_seconds=info["time_until_start_seconds"],
             server_time=info["server_time"],
@@ -202,7 +219,8 @@ class CheckpointService:
             status=info["status"],
             can_submit=info["can_submit"],
             grace_period_applied=info["grace_period_applied"],
-            grace_period_seconds=GRACE_PERIOD_SECONDS,
+            grace_period_seconds=info["grace_period_seconds"],
+            is_final_checkpoint=info["is_final_checkpoint"],
             time_remaining_seconds=info["time_remaining_seconds"],
             time_until_start_seconds=info["time_until_start_seconds"],
             message=info["message"],
@@ -274,6 +292,12 @@ class CheckpointService:
         if deadline_utc <= start_utc:
             raise BadRequestException(message="Hạn chót (deadline) phải diễn ra sau thời điểm mở cổng (start_time).")
 
+        fields_dump = (
+            [f.model_dump() for f in data.submission_fields]
+            if data.submission_fields is not None
+            else None
+        )
+
         checkpoint = await checkpoint_repo.create(
             db=db,
             title=data.title,
@@ -282,6 +306,9 @@ class CheckpointService:
             description=data.description,
             requirements=data.requirements,
             is_active=data.is_active,
+            is_final_checkpoint=data.is_final_checkpoint,
+            grace_period_seconds=data.grace_period_seconds,
+            submission_fields=fields_dump,
         )
         await db.commit()
         await db.refresh(checkpoint)
@@ -306,6 +333,12 @@ class CheckpointService:
             update_fields["requirements"] = data.requirements
         if data.is_active is not None:
             update_fields["is_active"] = data.is_active
+        if data.is_final_checkpoint is not None:
+            update_fields["is_final_checkpoint"] = data.is_final_checkpoint
+        if data.grace_period_seconds is not None:
+            update_fields["grace_period_seconds"] = data.grace_period_seconds
+        if data.submission_fields is not None:
+            update_fields["submission_fields"] = [f.model_dump() for f in data.submission_fields]
 
         new_start = ensure_utc(data.start_time) if data.start_time is not None else ensure_utc(cp.start_time)
         new_deadline = ensure_utc(data.deadline) if data.deadline is not None else ensure_utc(cp.deadline)

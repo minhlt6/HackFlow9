@@ -507,3 +507,163 @@ async def test_dependency_require_checkpoint_open():
         # 3. Non-existent ID raises NotFoundException
         with pytest.raises(NotFoundException):
             await require_checkpoint_open_by_id("00000000-0000-0000-0000-000000000000", db=session)
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_custom_grace_period(client: AsyncClient):
+    """
+    SRS HF-23: Test custom configurable grace_period_seconds (e.g. 20s).
+    A submission 10s after deadline is valid under 20s grace period.
+    A submission 25s after deadline is rejected (DEADLINE_EXCEEDED).
+    """
+    async with TestSessionLocal() as session:
+        _, admin_token = await create_test_user(
+            session, "admin_grace@hackflow.dev", "Admin Grace", role=UserRole.ADMIN.value
+        )
+        _, user_token = await create_test_user(
+            session, "user_grace@hackflow.dev", "User Grace"
+        )
+
+    now = datetime.now(timezone.utc)
+    # Checkpoint with deadline 10s ago, but grace_period_seconds = 20s
+    start_time = now - timedelta(hours=1)
+    deadline = now - timedelta(seconds=10)
+
+    create_res = await client.post(
+        "/api/v1/checkpoints",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "title": "Custom 20s Grace Period Checkpoint",
+            "start_time": start_time.isoformat(),
+            "deadline": deadline.isoformat(),
+            "grace_period_seconds": 20,
+            "is_final_checkpoint": True,
+        },
+    )
+    assert create_res.status_code == 201
+    cp_data = create_res.json()["data"]
+    assert cp_data["grace_period_seconds"] == 20
+    assert cp_data["is_final_checkpoint"] is True
+    assert cp_data["status"] == "grace_period"
+    assert cp_data["can_submit"] is True
+
+    # Validate window returns 200 OK with grace_period_applied=True
+    val_res = await client.post(
+        f"/api/v1/checkpoints/{cp_data['id']}/validate-window",
+        headers={"Authorization": f"Bearer {user_token}"},
+    )
+    assert val_res.status_code == 200
+    assert val_res.json()["data"]["grace_period_applied"] is True
+
+    # Simulate 25s after deadline -> Should be rejected
+    val_late_res = await client.post(
+        f"/api/v1/checkpoints/{cp_data['id']}/validate-window",
+        headers={"Authorization": f"Bearer {user_token}"},
+        json={"simulate_time": (deadline + timedelta(seconds=25)).isoformat()},
+    )
+    assert val_late_res.status_code == 403
+    assert val_late_res.json()["error_code"] == "DEADLINE_EXCEEDED"
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_dynamic_submission_fields(client: AsyncClient):
+    """
+    SRS HF-23: Test Admin configures dynamic submission_fields and updates them.
+    """
+    async with TestSessionLocal() as session:
+        _, admin_token = await create_test_user(
+            session, "admin_fields@hackflow.dev", "Admin Fields", role=UserRole.ADMIN.value
+        )
+
+    now = datetime.now(timezone.utc)
+    fields = [
+        {
+            "field_key": "repo_url",
+            "field_label": "GitHub Repository URL",
+            "required": True,
+            "apply_sha_freeze": True,
+        },
+        {
+            "field_key": "presentation_pdf",
+            "field_label": "Slide báo cáo (PDF)",
+            "required": False,
+            "apply_sha_freeze": False,
+        },
+    ]
+
+    create_res = await client.post(
+        "/api/v1/checkpoints",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "title": "Final Checkpoint with Dynamic Fields",
+            "start_time": (now + timedelta(hours=1)).isoformat(),
+            "deadline": (now + timedelta(hours=5)).isoformat(),
+            "is_final_checkpoint": True,
+            "grace_period_seconds": 10,
+            "submission_fields": fields,
+        },
+    )
+    assert create_res.status_code == 201
+    cp_data = create_res.json()["data"]
+    assert cp_data["is_final_checkpoint"] is True
+    assert cp_data["grace_period_seconds"] == 10
+    assert len(cp_data["submission_fields"]) == 2
+    assert cp_data["submission_fields"][0]["field_key"] == "repo_url"
+    assert cp_data["submission_fields"][0]["apply_sha_freeze"] is True
+
+    # Test update submission_fields
+    updated_fields = [
+        {
+            "field_key": "demo_video",
+            "field_label": "Video Demo Youtube",
+            "required": True,
+            "apply_sha_freeze": False,
+        }
+    ]
+    update_res = await client.put(
+        f"/api/v1/checkpoints/{cp_data['id']}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"submission_fields": updated_fields},
+    )
+    assert update_res.status_code == 200
+    assert len(update_res.json()["data"]["submission_fields"]) == 1
+    assert update_res.json()["data"]["submission_fields"][0]["field_key"] == "demo_video"
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_grace_period_validation_bounds(client: AsyncClient):
+    """
+    Validation error if grace_period_seconds is out of range [0, 300].
+    """
+    async with TestSessionLocal() as session:
+        _, admin_token = await create_test_user(
+            session, "admin_bounds@hackflow.dev", "Admin Bounds", role=UserRole.ADMIN.value
+        )
+
+    now = datetime.now(timezone.utc)
+    # Negative grace period
+    res_neg = await client.post(
+        "/api/v1/checkpoints",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "title": "Invalid Negative Grace",
+            "start_time": (now + timedelta(hours=1)).isoformat(),
+            "deadline": (now + timedelta(hours=2)).isoformat(),
+            "grace_period_seconds": -1,
+        },
+    )
+    assert res_neg.status_code == 422
+
+    # Exceeding max 300s
+    res_max = await client.post(
+        "/api/v1/checkpoints",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "title": "Invalid Large Grace",
+            "start_time": (now + timedelta(hours=1)).isoformat(),
+            "deadline": (now + timedelta(hours=2)).isoformat(),
+            "grace_period_seconds": 301,
+        },
+    )
+    assert res_max.status_code == 422
+

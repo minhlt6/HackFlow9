@@ -2405,6 +2405,35 @@
             "title": "Is Active",
             "description": "Trạng thái kích hoạt mốc checkpoint của BTC",
             "default": true
+          },
+          "is_final_checkpoint": {
+            "type": "boolean",
+            "title": "Is Final Checkpoint",
+            "description": "True: Checkpoint chốt sản phẩm cuối cùng; False: Checkpoint trung gian",
+            "default": false
+          },
+          "grace_period_seconds": {
+            "type": "integer",
+            "maximum": 300.0,
+            "minimum": 0.0,
+            "title": "Grace Period Seconds",
+            "description": "Thời gian ân hạn mạng riêng từng checkpoint (0 - 300 giây, mặc định 5s)",
+            "default": 5
+          },
+          "submission_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SubmissionFieldConfig"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Fields",
+            "description": "Cấu hình các trường nộp bài động"
           }
         },
         "type": "object",
@@ -2460,6 +2489,28 @@
           "is_active": {
             "type": "boolean",
             "title": "Is Active"
+          },
+          "is_final_checkpoint": {
+            "type": "boolean",
+            "title": "Is Final Checkpoint",
+            "description": "True nếu là checkpoint chốt sản phẩm HEAD Commit SHA",
+            "default": false
+          },
+          "submission_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Fields",
+            "description": "Danh sách các trường nộp bài động"
           },
           "status": {
             "type": "string",
@@ -2589,6 +2640,11 @@
             "title": "Grace Period Seconds",
             "default": 5
           },
+          "is_final_checkpoint": {
+            "type": "boolean",
+            "title": "Is Final Checkpoint",
+            "default": false
+          },
           "time_remaining_seconds": {
             "type": "integer",
             "title": "Time Remaining Seconds"
@@ -2705,6 +2761,44 @@
               }
             ],
             "title": "Is Active"
+          },
+          "is_final_checkpoint": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Final Checkpoint"
+          },
+          "grace_period_seconds": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 300.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grace Period Seconds"
+          },
+          "submission_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SubmissionFieldConfig"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Fields"
           }
         },
         "type": "object",
@@ -2908,6 +3002,42 @@
           "full_name"
         ],
         "title": "RegisterRequest"
+      },
+      "SubmissionFieldConfig": {
+        "properties": {
+          "field_key": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Field Key",
+            "description": "Khóa định danh trường (vd: repo_url, presentation_pdf)"
+          },
+          "field_label": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Field Label",
+            "description": "Tên nhãn hiển thị cho thí sinh"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required",
+            "description": "Bắt buộc phải nộp hay tùy chọn",
+            "default": true
+          },
+          "apply_sha_freeze": {
+            "type": "boolean",
+            "title": "Apply Sha Freeze",
+            "description": "True nếu trường này chứa GitHub Repo để freeze SHA",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "field_key",
+          "field_label"
+        ],
+        "title": "SubmissionFieldConfig"
       },
       "SubtopicResponse": {
         "properties": {

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -43,6 +43,9 @@ class CheckpointRepository:
         description: Optional[str] = None,
         requirements: Optional[str] = None,
         is_active: bool = True,
+        is_final_checkpoint: bool = False,
+        grace_period_seconds: int = 5,
+        submission_fields: Optional[Any] = None,
     ) -> Checkpoint:
         checkpoint = Checkpoint(
             title=title.strip(),
@@ -51,6 +54,9 @@ class CheckpointRepository:
             description=description,
             requirements=requirements,
             is_active=is_active,
+            is_final_checkpoint=is_final_checkpoint,
+            grace_period_seconds=grace_period_seconds,
+            submission_fields=submission_fields,
         )
         db.add(checkpoint)
         await db.flush()
