@@ -8,6 +8,7 @@ export interface User {
   fullName: string;
   role: UserRole;
   approvalStatus: ApprovalStatus;
+  team_role?: 'TEAM_LEADER' | 'MEMBER' | 'leader' | 'member';
 }
 
 export interface Team {

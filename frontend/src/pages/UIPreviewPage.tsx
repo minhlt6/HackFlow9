@@ -17,15 +17,25 @@ export const UIPreviewPage: React.FC = () => {
     new Date(Date.now() + (2 * 24 * 3600 + 4 * 3600 + 12 * 60 + 59) * 1000).toISOString()
   );
 
-  const [previewCheckpoint] = useState(() => ({
-    id: 'preview-cp-1',
-    title: 'Checkpoint Thử nghiệm: Kiến trúc & Prototype',
-    description: 'Nộp link repository GitHub để hệ thống freeze commit SHA.',
-    start_time: new Date().toISOString(),
-    deadline: new Date(Date.now() + 86400000).toISOString(),
+  const [isPreviewFinal, setIsPreviewFinal] = useState<boolean>(true);
+  const [previewRole, setPreviewRole] = useState<'TEAM_LEADER' | 'MEMBER'>('TEAM_LEADER');
+  const [previewStartTime] = useState(() => new Date().toISOString());
+  const [previewDeadline] = useState(() => new Date(Date.now() + 86400000).toISOString());
+
+  const previewCheckpoint = {
+    id: isPreviewFinal ? 'preview-cp-final' : 'preview-cp-intermediate',
+    title: isPreviewFinal
+      ? 'Checkpoint 3: MVP Hoàn chỉnh & Video Pitch Deck (Chặng cuối)'
+      : 'Checkpoint 1: Đăng ký Ý tưởng & Wireframe (Chặng tiến độ)',
+    description: isPreviewFinal
+      ? 'Chặng chốt sản phẩm: Bắt buộc GitHub repo và hệ thống sẽ đóng băng Commit SHA.'
+      : 'Chặng tiến độ: Nộp slide/tài liệu/demo, không bắt buộc GitHub repo và không đóng băng commit.',
+    start_time: previewStartTime,
+    deadline: previewDeadline,
     is_active: true,
+    is_final_checkpoint: isPreviewFinal,
     status: 'open' as const,
-  }));
+  };
 
   const handleResetShortTimer = () => {
     setShortTimerEndTime(new Date(Date.now() + 15 * 1000).toISOString());
@@ -145,15 +155,15 @@ export const UIPreviewPage: React.FC = () => {
           </div>
         </Modal>
 
-        {/* 6. Form nộp bài Checkpoint (HF-30) */}
+        {/* 6. Form nộp bài Checkpoint (HF-30 & SRS HF-23) */}
         <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-4">
-          <div className="flex items-center justify-between border-b border-[#334155] pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#334155] pb-3 gap-2">
             <div>
               <h2 className="text-base font-semibold text-white">
-                6. Form nộp bài Checkpoint (HF-30 React Hook Form + Zod)
+                6. Form nộp bài Checkpoint (HF-30 & SRS HF-23)
               </h2>
               <p className="text-xs text-slate-400">
-                Validate <code className="text-indigo-400">repo_url</code> bắt đầu bằng <code className="text-indigo-400">https://github.com/</code>, mở Dialog xác nhận ghi nhận Commit SHA và hiển thị loading button.
+                Phân biệt Chặng thường (không ép repo, không freeze SHA) vs Chặng cuối (bắt buộc repo & freeze SHA) và kiểm tra quyền Đội trưởng.
               </p>
             </div>
             <a
@@ -164,7 +174,69 @@ export const UIPreviewPage: React.FC = () => {
             </a>
           </div>
 
-          <CheckpointSubmissionForm checkpoint={previewCheckpoint} />
+          {/* Điều khiển Test nhanh các tiêu chí feedback */}
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-[#1E293B]/70 rounded-lg border border-[#334155] text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 font-medium">Loại chặng:</span>
+              <button
+                type="button"
+                onClick={() => setIsPreviewFinal(false)}
+                className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                  !isPreviewFinal
+                    ? 'bg-indigo-600 text-white font-semibold'
+                    : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                }`}
+              >
+                Chặng tiến độ (HF-23)
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsPreviewFinal(true)}
+                className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                  isPreviewFinal
+                    ? 'bg-rose-600 text-white font-semibold'
+                    : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                }`}
+              >
+                Chặng cuối (Freeze SHA)
+              </button>
+            </div>
+
+            <div className="h-4 w-px bg-slate-700 mx-1 hidden sm:block" />
+
+            <div className="flex items-center gap-1.5">
+              <span className="text-slate-400 font-medium">Quyền hạn:</span>
+              <button
+                type="button"
+                onClick={() => setPreviewRole('TEAM_LEADER')}
+                className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                  previewRole === 'TEAM_LEADER'
+                    ? 'bg-emerald-600 text-white font-semibold'
+                    : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                }`}
+              >
+                Đội trưởng (Submit OK)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewRole('MEMBER')}
+                className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                  previewRole === 'MEMBER'
+                    ? 'bg-amber-600 text-white font-semibold'
+                    : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                }`}
+              >
+                Thành viên (Disabled)
+              </button>
+            </div>
+          </div>
+
+          <CheckpointSubmissionForm
+            key={`${previewCheckpoint.id}-${previewRole}`}
+            checkpoint={previewCheckpoint}
+            userRole={previewRole}
+            isLeader={previewRole === 'TEAM_LEADER'}
+          />
         </div>
       </div>
     </div>

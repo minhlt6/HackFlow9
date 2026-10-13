@@ -8,6 +8,7 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
+  titleClassName?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -16,6 +17,7 @@ export const Modal: React.FC<ModalProps> = ({
   title,
   children,
   maxWidth = 'md',
+  titleClassName,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -59,7 +61,7 @@ export const Modal: React.FC<ModalProps> = ({
         className={`relative z-10 w-full ${maxWidthClass} max-h-[92vh] flex flex-col rounded-[16px] border border-[#334155] bg-[#1E293B] shadow-2xl transition-all duration-200 my-auto`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]/80 shrink-0 bg-[#1E293B] rounded-t-[16px]">
-          <h3 className="text-lg sm:text-xl font-bold tracking-wide text-white truncate pr-2">
+          <h3 className={titleClassName || "font-['Righteous'] text-lg sm:text-xl tracking-wide text-white truncate pr-2"}>
             {title}
           </h3>
           <button

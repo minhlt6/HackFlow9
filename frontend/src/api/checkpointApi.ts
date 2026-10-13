@@ -6,7 +6,7 @@ import type {
   Submission,
 } from '../types/checkpoint';
 
-// Mock data ban đầu nếu backend chưa triển khai endpoint Checkpoint
+// Mock data ban đầu nếu backend chưa triển khai endpoint Checkpoint (theo chuẩn SRS HF-23)
 const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
   {
     id: 'cp-01',
@@ -15,8 +15,9 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
     description: 'Nộp tài liệu đặc tả ý tưởng sản phẩm, phân tích yêu cầu BA và sơ đồ Wireframe Figma.',
     start_time: '2026-10-01T00:00:00.000Z',
     deadline: '2026-10-08T23:59:59.000Z',
-    requirements: 'Repository chứa tài liệu PRD/SRS và link Figma hoặc Wireframe sơ bộ.',
+    requirements: 'Tài liệu PRD/SRS và link Figma hoặc Wireframe sơ bộ.',
     is_active: false,
+    is_final_checkpoint: false, // Chặng tiến độ trung gian: không bắt buộc repo, không đóng băng SHA
     status: 'closed',
     latest_submission: {
       id: 'sub-01',
@@ -24,7 +25,7 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
       team_id: 'team-01',
       repo_url: 'https://github.com/cyber-samurai/hackflow-project',
       demo_url: 'https://figma.com/@cybersamurai/hackflow',
-      commit_sha: 'a1b2c3d4e5f67890123456789abcdef012345678',
+      commit_sha: null, // Chặng trung gian không đóng băng SHA
       status: 'evaluated',
       submitted_at: '2026-10-08T21:15:30.000Z',
       feedback: 'Ý tưởng rõ ràng, wireframe đáp ứng đầy đủ luồng người dùng chính.',
@@ -35,24 +36,25 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
     id: 'cp-02',
     order: 2,
     title: 'Checkpoint 2: Prototype & System Architecture (Đang mở)',
-    description: 'Nộp mã nguồn khung hệ thống (Frontend + Backend skeleton), Dockerfile và API documentation.',
-    // Hạn chót: 2 ngày tới
+    description: 'Nộp báo cáo tiến độ khung hệ thống (Frontend + Backend skeleton), tài liệu API hoặc Prototype.',
     start_time: '2026-10-09T00:00:00.000Z',
     deadline: new Date(Date.now() + (2 * 24 * 3600 + 4 * 3600) * 1000).toISOString(),
-    requirements: 'Repository GitHub public có mã nguồn chạy được, kèm Dockerfile hoặc hướng dẫn cài đặt trong README.md.',
+    requirements: 'Link báo cáo tiến độ, tài liệu kiến trúc hoặc link demo (Không bắt buộc GitHub và không đóng băng SHA).',
     is_active: true,
+    is_final_checkpoint: false, // Chặng tiến độ trung gian
     status: 'open',
     latest_submission: null,
   },
   {
     id: 'cp-03',
     order: 3,
-    title: 'Checkpoint 3: MVP Hoàn chỉnh & Video Pitch Deck',
-    description: 'Nộp phiên bản sản phẩm hoàn thiện, đường dẫn Live Demo và Slide thuyết trình trước Hội đồng.',
+    title: 'Checkpoint 3: MVP Hoàn chỉnh & Video Pitch Deck (Chặng cuối)',
+    description: 'Nộp phiên bản sản phẩm hoàn thiện, đường dẫn Live Demo và Slide thuyết trình. Hệ thống sẽ khóa và đóng băng Commit SHA tại thời điểm nộp.',
     start_time: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
     deadline: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
-    requirements: 'Mã nguồn đầy đủ các tính năng cam kết, link trang web hoặc ứng dụng đã deploy và slide PDF.',
+    requirements: 'Mã nguồn đầy đủ các tính năng cam kết trên GitHub repository public. Hệ thống sẽ ghi nhận Commit HEAD tại thời điểm nộp bài.',
     is_active: true,
+    is_final_checkpoint: true, // Chặng cuối cùng: Bắt buộc GitHub repo & đóng băng Commit SHA
     status: 'upcoming',
     latest_submission: null,
   },
@@ -73,15 +75,6 @@ function saveStoredSubmission(submission: Submission) {
   const all = getStoredSubmissions();
   all[submission.checkpoint_id] = submission;
   localStorage.setItem(LOCAL_STORAGE_SUBMISSIONS_KEY, JSON.stringify(all));
-}
-
-function generateRandomCommitSha(): string {
-  const chars = '0123456789abcdef';
-  let result = '';
-  for (let i = 0; i < 40; i++) {
-    result += chars[Math.floor(Math.random() * chars.length)];
-  }
-  return result;
 }
 
 export const checkpointApi = {
@@ -111,50 +104,26 @@ export const checkpointApi = {
   },
 
   /**
-   * Nộp bài cho một Checkpoint (HF-30)
-   * Gửi repo_url, demo_url và note lên hệ thống.
-   * Backend sẽ kiểm tra repo và đóng băng Commit SHA tại thời điểm nộp.
+   * Nộp bài cho một Checkpoint (HF-30 & SRS HF-23)
+   * Gửi repo_url (bắt buộc nếu là chặng cuối), demo_url và note lên hệ thống.
+   * Gỡ bỏ hoàn toàn logic tự sinh commit SHA ảo khi gặp lỗi mạng/404.
+   * Khi API trả về lỗi thì ném lỗi để UI hiển thị thông báo lỗi rõ ràng cho thí sinh.
    */
   submitCheckpoint: async (
     checkpointId: string,
     payload: CheckpointSubmissionPayload
   ): Promise<Submission> => {
-    try {
-      const response = await axiosClient.post<ApiResponse<Submission>>(
-        `/checkpoints/${checkpointId}/submissions`,
-        payload
-      );
-      if (response.data && response.data.data) {
-        saveStoredSubmission(response.data.data);
-        return response.data.data;
-      }
-    } catch (err: unknown) {
-      // Nếu là lỗi 404 (endpoint chưa mở trên backend) thì mô phỏng quá trình backend gọi GitHub API freeze commit SHA
-      const axiosErr = err as { response?: { status?: number } };
-      if (axiosErr?.response?.status !== 404 && axiosErr?.response?.status) {
-        throw err;
-      }
+    const response = await axiosClient.post<ApiResponse<Submission>>(
+      `/checkpoints/${checkpointId}/submissions`,
+      payload
+    );
+
+    if (response.data && response.data.data) {
+      saveStoredSubmission(response.data.data);
+      return response.data.data;
     }
 
-    // Giả lập network latency khi backend gọi GitHub API để lấy HEAD commit SHA
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    const simulatedCommitSha = generateRandomCommitSha();
-    const newSubmission: Submission = {
-      id: `sub-${Date.now()}`,
-      checkpoint_id: checkpointId,
-      team_id: 'team-me',
-      repo_url: payload.repo_url,
-      demo_url: payload.demo_url || null,
-      commit_sha: simulatedCommitSha,
-      status: 'submitted',
-      submitted_at: new Date().toISOString(),
-      feedback: null,
-      note: payload.note || null,
-    };
-
-    saveStoredSubmission(newSubmission);
-    return newSubmission;
+    throw new Error(response.data?.message || 'Không nhận được dữ liệu phản hồi hợp lệ từ máy chủ.');
   },
 
   /**
