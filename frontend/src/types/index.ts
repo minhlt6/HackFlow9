@@ -23,4 +23,5 @@ export interface ApiResponse<T> {
   message?: string;
 }
 
-export * from './team';
+export * from './team';
+export * from './checkpoint';

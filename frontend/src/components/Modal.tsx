@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -43,11 +44,11 @@ export const Modal: React.FC<ModalProps> = ({
     '5xl': 'max-w-5xl',
   }[maxWidth];
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#080D18]/85 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-[#080D18]/85 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
     >
       <div
         className="fixed inset-0"
@@ -58,7 +59,7 @@ export const Modal: React.FC<ModalProps> = ({
         className={`relative z-10 w-full ${maxWidthClass} max-h-[92vh] flex flex-col rounded-[16px] border border-[#334155] bg-[#1E293B] shadow-2xl transition-all duration-200 my-auto`}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#334155]/80 shrink-0 bg-[#1E293B] rounded-t-[16px]">
-          <h3 className="font-['Righteous'] text-lg sm:text-xl tracking-wide text-white truncate pr-2">
+          <h3 className="text-lg sm:text-xl font-bold tracking-wide text-white truncate pr-2">
             {title}
           </h3>
           <button
@@ -72,6 +73,7 @@ export const Modal: React.FC<ModalProps> = ({
         </div>
         <div className="p-6 overflow-y-auto flex-1 min-h-0 text-slate-200 font-['Roboto']">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

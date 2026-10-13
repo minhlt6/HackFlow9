@@ -4,6 +4,7 @@ import { Input } from '../components/Input';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { CountdownTimer } from '../components/CountdownTimer';
+import { CheckpointSubmissionForm } from '../components/CheckpointSubmissionForm';
 
 export const UIPreviewPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,6 +16,16 @@ export const UIPreviewPage: React.FC = () => {
   const [sampleTwoDaysEndTime] = useState<string>(() =>
     new Date(Date.now() + (2 * 24 * 3600 + 4 * 3600 + 12 * 60 + 59) * 1000).toISOString()
   );
+
+  const [previewCheckpoint] = useState(() => ({
+    id: 'preview-cp-1',
+    title: 'Checkpoint Thử nghiệm: Kiến trúc & Prototype',
+    description: 'Nộp link repository GitHub để hệ thống freeze commit SHA.',
+    start_time: new Date().toISOString(),
+    deadline: new Date(Date.now() + 86400000).toISOString(),
+    is_active: true,
+    status: 'open' as const,
+  }));
 
   const handleResetShortTimer = () => {
     setShortTimerEndTime(new Date(Date.now() + 15 * 1000).toISOString());
@@ -115,7 +126,7 @@ export const UIPreviewPage: React.FC = () => {
 
         {/* 5. Hộp thoại tương tác */}
         <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-3">
-          <h2 className="text-base font-semibold text-white">Hộp thoại tương tác</h2>
+          <h2 className="text-base font-semibold text-white">5. Hộp thoại tương tác</h2>
           <Button onClick={() => setIsModalOpen(true)}>Mở hộp thoại tạo đội thi</Button>
         </div>
 
@@ -133,6 +144,28 @@ export const UIPreviewPage: React.FC = () => {
             </div>
           </div>
         </Modal>
+
+        {/* 6. Form nộp bài Checkpoint (HF-30) */}
+        <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-4">
+          <div className="flex items-center justify-between border-b border-[#334155] pb-2">
+            <div>
+              <h2 className="text-base font-semibold text-white">
+                6. Form nộp bài Checkpoint (HF-30 React Hook Form + Zod)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Validate <code className="text-indigo-400">repo_url</code> bắt đầu bằng <code className="text-indigo-400">https://github.com/</code>, mở Dialog xác nhận ghi nhận Commit SHA và hiển thị loading button.
+              </p>
+            </div>
+            <a
+              href="/preview-checkpoints"
+              className="text-xs text-[#818CF8] hover:underline shrink-0"
+            >
+              Mở trang Checkpoint đầy đủ &rarr;
+            </a>
+          </div>
+
+          <CheckpointSubmissionForm checkpoint={previewCheckpoint} />
+        </div>
       </div>
     </div>
   );
