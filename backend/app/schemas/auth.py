@@ -23,6 +23,10 @@ class UserResponse(BaseModel):
     avatar_url: Optional[str] = None
     github_id: Optional[str] = None
     github_username: Optional[str] = None
+    student_id: Optional[str] = None
+    school: Optional[str] = None
+    phone: Optional[str] = None
+    skills: Optional[list[str]] = None
     is_active: bool = True
 
     model_config = {"from_attributes": True}
@@ -42,3 +46,18 @@ class GitHubOAuthUrlResponse(BaseModel):
 class GitHubOAuthCallbackRequest(BaseModel):
     code: str = Field(..., description="Mã xác thực code trả về từ GitHub OAuth redirect")
     state: Optional[str] = Field(None, description="State token chống CSRF")
+
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: str = Field(..., min_length=2, description="Họ và tên thí sinh")
+    student_id: Optional[str] = Field(None, description="Mã số sinh viên")
+    school: Optional[str] = Field(None, description="Trường / Học viện")
+    phone: Optional[str] = Field(None, description="Số điện thoại liên hệ")
+    skills: Optional[list[str]] = Field(default_factory=list, description="Danh sách kỹ năng")
+
+
+class ProfileUpdateResponse(BaseModel):
+    approval_status: str
+    role: str
+    message: str
+    user: UserResponse

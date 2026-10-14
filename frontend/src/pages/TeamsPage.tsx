@@ -36,19 +36,71 @@ import {
   mockCreateTeamApi,
   mockJoinTeamApi,
 } from '../mocks/mockTeams';
-import type { TeamDetails } from '../types/team';
+import type { TeamDetails, TeamMember } from '../types/team';
 import { useAuthStore } from '../store/useAuthStore';
+import { useMockStore } from '../store/useMockStore';
 
 type PreviewMode = 'no_team' | 'in_team' | 'full' | 'loading' | 'error';
+
+const TEAM_STORAGE_KEY = 'hackflow_team_details_v2';
+
+const loadInitialTeam = (): TeamDetails | null => {
+  try {
+    const raw = localStorage.getItem(TEAM_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as TeamDetails | null;
+      if (parsed && Array.isArray(parsed.members)) {
+        const hasLeader = parsed.members.some((m) => m.role === 'leader');
+        if (!hasLeader && parsed.members.length > 0) {
+          parsed.members = parsed.members.map((m, idx) => ({
+            ...m,
+            role: m.user_id === parsed.leader_id || idx === 0 ? 'leader' : 'member',
+          }));
+        }
+        return parsed;
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return mockTeamInTeam;
+};
 
 export const TeamsPage: React.FC = () => {
   const navigate = useNavigate();
   const currentUser = useAuthStore((state) => state.user);
+  const transferTeamLeaderInStore = useMockStore((state) => state.transferTeamLeader);
+  const removeTeamMemberInStore = useMockStore((state) => state.removeTeamMember);
 
   // State dữ liệu đội thi
-  const [team, setTeam] = useState<TeamDetails | null>(mockTeamInTeam);
+  const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   const [previewMode, setPreviewMode] = useState<PreviewMode>('in_team');
   const [isDevOpen, setIsDevOpen] = useState<boolean>(false);
+
+  // Thành viên đang đăng nhập / đóng vai xem trang (mặc định khớp email user hoặc Nguyễn Văn Minh)
+  const [activeMemberId, setActiveMemberId] = useState<string>(() => {
+    const initial = loadInitialTeam();
+    if (initial && currentUser?.email) {
+      const matched = initial.members.find(
+        (m) => m.email.toLowerCase() === currentUser.email.toLowerCase(),
+      );
+      if (matched) return matched.id;
+    }
+    return initial?.members[0]?.id || 'tm-01';
+  });
+
+  const setTeam = (nextTeam: TeamDetails | null) => {
+    setTeamState(nextTeam);
+    try {
+      if (nextTeam) {
+        localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(nextTeam));
+      } else {
+        localStorage.removeItem(TEAM_STORAGE_KEY);
+      }
+    } catch {
+      // ignore storage errors
+    }
+  };
 
   // Loading & Error states
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -80,6 +132,11 @@ export const TeamsPage: React.FC = () => {
   const [isEditOpen, setIsEditOpen] = useState<boolean>(false);
   const [editDesc, setEditDesc] = useState<string>('');
 
+  // Modal Chuyển giao quyền Đội Trưởng & Mời thành viên rời đội & Rời đội
+  const [transferTarget, setTransferTarget] = useState<TeamMember | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
+  const [isLeaveOpen, setIsLeaveOpen] = useState<boolean>(false);
+
   // Tự tắt Toast sau 3s
   useEffect(() => {
     if (toast) {
@@ -91,6 +148,30 @@ export const TeamsPage: React.FC = () => {
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
   };
+
+  // Xác định thành viên hiện tại (Bạn) và người đang cầm quyền Đội Trưởng
+  const selfMember: TeamMember | null = team
+    ? team.members.find((m) => m.id === activeMemberId) ||
+      team.members.find(
+        (m) => currentUser?.email && m.email.toLowerCase() === currentUser.email.toLowerCase(),
+      ) ||
+      team.members[0] ||
+      null
+    : null;
+
+  const isMemberLeader = (m: TeamMember): boolean => {
+    if (!team) return false;
+    const explicitLeader = team.members.find((mem) => mem.role === 'leader');
+    if (explicitLeader) {
+      return explicitLeader.id === m.id;
+    }
+    return team.leader_id === m.user_id || team.leader_id === m.id;
+  };
+
+  // Chỉ người đang cầm quyền Đội Trưởng mới có isLeader = true
+  const isLeader: boolean = Boolean(selfMember && isMemberLeader(selfMember));
+  const currentLeaderMember: TeamMember | null =
+    team?.members.find((m) => isMemberLeader(m)) || null;
 
   // Đổi trạng thái kiểm thử (nếu cần gọi ngầm)
   const handleSwitchPreviewMode = async (mode: PreviewMode) => {
@@ -105,7 +186,7 @@ export const TeamsPage: React.FC = () => {
     if (mode === 'error') {
       setIsLoading(false);
       setErrorMessage('Không thể kết nối đến máy chủ API (Mã lỗi: 500 SERVER_ERROR). Vui lòng thử lại sau.');
-      setTeam(null);
+      setTeamState(null);
       return;
     }
 
@@ -113,6 +194,9 @@ export const TeamsPage: React.FC = () => {
     try {
       const result = await fetchMockTeam(mode, 300);
       setTeam(result);
+      if (result && result.members.length > 0) {
+        setActiveMemberId(result.members[0].id);
+      }
     } catch {
       setErrorMessage('Đã xảy ra lỗi khi tải dữ liệu đội thi.');
     } finally {
@@ -156,6 +240,9 @@ export const TeamsPage: React.FC = () => {
         created.description = newTeamDesc.trim();
       }
       setTeam(created);
+      if (created.members[0]) {
+        setActiveMemberId(created.members[0].id);
+      }
       setPreviewMode('in_team');
       setIsCreateOpen(false);
       setNewTeamName('');
@@ -203,10 +290,13 @@ export const TeamsPage: React.FC = () => {
     }
   };
 
-  // Cập nhật mô tả đội
+  // Cập nhật mô tả đội (chỉ Đội Trưởng)
   const handleUpdateTeamInfo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!team) return;
+    if (!team || !isLeader) {
+      showToast('Chỉ Đội Trưởng mới có quyền chỉnh sửa thông tin đội thi.', 'error');
+      return;
+    }
     setTeam({
       ...team,
       description: editDesc,
@@ -215,48 +305,86 @@ export const TeamsPage: React.FC = () => {
     showToast('Đã cập nhật thông tin giới thiệu đội thi!', 'success');
   };
 
-  // Chuyển giao quyền Leader
-  const handleTransfer = (memberId: string, memberName: string) => {
-    if (!team) return;
-    if (window.confirm(`Bạn có chắc chắn muốn chuyển giao vị trí Đội Trưởng cho ${memberName}?`)) {
-      const updatedMembers = team.members.map((m) => ({
-        ...m,
-        role: (m.id === memberId ? 'leader' : 'member') as 'leader' | 'member',
-      }));
-      setTeam({
-        ...team,
-        leader_id: memberId,
-        members: updatedMembers,
-      });
-      showToast(`Đã chuyển giao vai trò Đội Trưởng cho ${memberName}!`, 'success');
+  // Mở modal xác nhận chuyển quyền Đội Trưởng (chỉ Đội Trưởng hiện tại mới gọi được)
+  const handleOpenTransferModal = (member: TeamMember) => {
+    if (!team || !isLeader) {
+      showToast('Chỉ Đội Trưởng hiện tại mới có quyền chuyển nhượng vai trò Đội Trưởng.', 'error');
+      return;
     }
+    if (isMemberLeader(member)) return;
+    setTransferTarget(member);
   };
 
-  // Mời thành viên ra khỏi đội
-  const handleRemove = (memberId: string, memberName: string) => {
-    if (!team) return;
-    if (window.confirm(`Bạn có chắc chắn muốn mời ${memberName} rời khỏi đội?`)) {
-      const updatedMembers = team.members.filter((m) => m.id !== memberId);
-      setTeam({
-        ...team,
-        member_count: updatedMembers.length,
-        members: updatedMembers,
-      });
-      showToast(`Đã xóa thành viên ${memberName} khỏi đội.`, 'info');
+  // Xác nhận chuyển giao quyền Đội Trưởng
+  const handleConfirmTransfer = () => {
+    if (!team || !isLeader || !transferTarget) return;
+
+    const updatedMembers = team.members.map((m) => ({
+      ...m,
+      role: (m.id === transferTarget.id ? 'leader' : 'member') as 'leader' | 'member',
+    }));
+
+    setTeam({
+      ...team,
+      leader_id: transferTarget.user_id,
+      members: updatedMembers,
+    });
+
+    // Đồng bộ sang MockStore nếu có team tương ứng
+    transferTeamLeaderInStore('team-cyber', transferTarget.user_id);
+
+    const newLeaderName = transferTarget.full_name;
+    setTransferTarget(null);
+    showToast(
+      `Đã chuyển quyền Đội Trưởng cho ${newLeaderName}. Bạn hiện là Thành viên của đội.`,
+      'success',
+    );
+  };
+
+  // Mở modal xác nhận mời thành viên ra khỏi đội (chỉ Đội Trưởng hiện tại mới gọi được)
+  const handleOpenRemoveModal = (member: TeamMember) => {
+    if (!team || !isLeader) {
+      showToast('Chỉ Đội Trưởng mới có quyền mời thành viên rời khỏi đội.', 'error');
+      return;
     }
+    if (isMemberLeader(member)) return;
+    setRemoveTarget(member);
+  };
+
+  // Xác nhận mời thành viên ra khỏi đội
+  const handleConfirmRemove = () => {
+    if (!team || !isLeader || !removeTarget) return;
+
+    const updatedMembers = team.members.filter((m) => m.id !== removeTarget.id);
+    setTeam({
+      ...team,
+      member_count: updatedMembers.length,
+      members: updatedMembers,
+    });
+
+    removeTeamMemberInStore('team-cyber', removeTarget.user_id);
+
+    const removedName = removeTarget.full_name;
+    setRemoveTarget(null);
+    showToast(`Đã mời thành viên ${removedName} rời khỏi đội.`, 'info');
   };
 
   // Rời khỏi đội thi
-  const handleLeave = () => {
+  const handleConfirmLeave = () => {
     if (!team) return;
-    if (window.confirm('Bạn có chắc chắn muốn rời khỏi đội này?')) {
-      setTeam(null);
-      setPreviewMode('no_team');
-      showToast('Bạn đã rời khỏi đội thi.', 'info');
+    if (isLeader && team.members.length > 1) {
+      showToast(
+        'Bạn đang là Đội Trưởng. Vui lòng chuyển quyền Đội Trưởng cho thành viên khác trước khi rời đội!',
+        'error',
+      );
+      setIsLeaveOpen(false);
+      return;
     }
+    setTeam(null);
+    setPreviewMode('no_team');
+    setIsLeaveOpen(false);
+    showToast('Bạn đã rời khỏi đội thi.', 'info');
   };
-
-  const isLeader = true;
 
   return (
     <div className="space-y-6 font-['Roboto'] max-w-7xl mx-auto">
@@ -364,6 +492,48 @@ export const TeamsPage: React.FC = () => {
                 5. Lỗi kết nối API (500)
               </button>
             </div>
+
+            {team && team.members.length > 0 && (
+              <div className="pt-2 border-t border-[#334155] space-y-1.5">
+                <span className="text-[10px] uppercase tracking-wider font-mono text-slate-400 block">
+                  Góc nhìn thành viên (Ai là &quot;Bạn&quot;):
+                </span>
+                <div className="space-y-1">
+                  {team.members.map((m) => {
+                    const active = selfMember?.id === m.id;
+                    const memberIsLeader = isMemberLeader(m);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveMemberId(m.id);
+                          showToast(
+                            `Đang xem với tư cách: ${m.full_name} (${memberIsLeader ? 'Đội Trưởng' : 'Thành viên'})`,
+                            'info',
+                          );
+                        }}
+                        className={`w-full px-2.5 py-1.5 rounded-lg text-[11px] flex items-center justify-between transition-colors cursor-pointer ${
+                          active
+                            ? 'bg-[#6366F1]/25 border border-[#6366F1]/50 text-white font-semibold'
+                            : 'bg-[#1E293B] text-slate-300 hover:bg-[#28374f]'
+                        }`}
+                      >
+                        <span className="truncate">{m.full_name}</span>
+                        {memberIsLeader ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
+                            <Crown size={10} />
+                            <span>Đội Trưởng</span>
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 shrink-0">Thành viên</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -497,10 +667,22 @@ export const TeamsPage: React.FC = () => {
 
               {/* BẢNG THÀNH VIÊN - BỔ SUNG CỘT CHUYÊN MÔN & TRẠNG THÁI & TOOLTIP (FEEDBACK 5) */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-['Righteous'] text-lg text-white">
-                    Danh Sách Thành Viên ({team.members.length}/{team.max_members})
-                  </h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 flex-wrap">
+                    <h3 className="font-['Righteous'] text-lg text-white">
+                      Danh Sách Thành Viên ({team.members.length}/{team.max_members})
+                    </h3>
+                    {isLeader ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                        <Crown size={12} />
+                        <span>Bạn đang là Đội Trưởng</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                        <span>Bạn đang là Thành viên</span>
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs text-slate-400">
                     {team.max_members - team.members.length > 0
                       ? `Còn thiếu ${team.max_members - team.members.length} thành viên để đạt tối đa`
@@ -508,60 +690,101 @@ export const TeamsPage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-[12px] border border-[#334155] bg-[#0F172A]">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead className="bg-[#1E293B]/70 border-b border-[#334155] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+                {/* Thông báo phân quyền khi người dùng hiện tại KHÔNG phải là Đội Trưởng */}
+                {!isLeader && currentLeaderMember && (
+                  <div className="rounded-[10px] border border-amber-500/30 bg-amber-500/10 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-200">
+                    <div className="flex items-start sm:items-center gap-2">
+                      <Crown size={15} className="text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
+                      <span>
+                        Quyền <strong>Chuyển nhượng Đội Trưởng</strong> và <strong>Mời thành viên ra khỏi đội</strong> hiện thuộc về Đội Trưởng{' '}
+                        <strong className="text-white">{currentLeaderMember.full_name}</strong>.
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveMemberId(currentLeaderMember.id);
+                        showToast(
+                          `Đã chuyển góc nhìn sang Đội Trưởng: ${currentLeaderMember.full_name}`,
+                          'info',
+                        );
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-200 font-medium text-[11px] shrink-0 transition-colors cursor-pointer"
+                    >
+                      Xem góc nhìn Đội Trưởng ({currentLeaderMember.full_name})
+                    </button>
+                  </div>
+                )}
+
+                <div className="overflow-hidden rounded-[12px] border border-[#334155] bg-[#0F172A]">
+                  <table className="w-full table-fixed text-left text-xs">
+                    <thead className="bg-[#1E293B]/70 border-b border-[#334155] text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
                       <tr>
-                        <th className="py-3.5 px-4">Thành viên</th>
-                        <th className="py-3.5 px-4">Vai trò</th>
-                        <th className="py-3.5 px-4">Chuyên môn</th>
-                        <th className="py-3.5 px-4 hidden md:table-cell">Trường / Đơn vị</th>
-                        <th className="py-3.5 px-4 hidden sm:table-cell">Xác thực</th>
-                        <th className="py-3.5 px-4 text-right">Thao tác</th>
+                        <th className="py-3 px-3 w-[38%]">Thành viên &amp; Đơn vị</th>
+                        <th className="py-3 px-2.5 w-[20%]">Vai trò &amp; Trạng thái</th>
+                        <th className="py-3 px-2.5 w-[24%]">Chuyên môn</th>
+                        <th className="py-3 px-3 w-[18%] text-right">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#334155]/60 text-slate-200">
                       {team.members.map((m) => {
-                        const isSelf = m.email === currentUser?.email || m.full_name === 'Nguyễn Văn Minh';
-                        const isLeaderOfTeam = m.role === 'leader';
+                        const isSelf = Boolean(selfMember && m.id === selfMember.id);
+                        const isLeaderOfTeam = isMemberLeader(m);
 
                         return (
-                          <tr key={m.id} className="hover:bg-[#1E293B]/40 transition-colors">
-                            {/* Cột 1: Thông tin thành viên */}
-                            <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-3">
-                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#6366F1]/20 border border-[#6366F1]/30 text-[#818CF8] font-bold text-xs shrink-0">
+                          <tr key={m.id} className="hover:bg-[#1E293B]/40 transition-colors align-middle">
+                            {/* Cột 1: Thông tin thành viên + Email + Trường/Đơn vị */}
+                            <td className="py-3 px-3">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#6366F1]/20 border border-[#6366F1]/30 text-[#818CF8] font-bold text-xs shrink-0 mt-0.5">
                                   {m.full_name.charAt(0)}
                                 </div>
-                                <div className="min-w-0">
-                                  <span className="font-medium text-white block truncate">
-                                    {m.full_name} {isSelf && <span className="text-[#818CF8] font-normal">(Bạn)</span>}
-                                  </span>
-                                  <span className="text-[11px] text-slate-400 block truncate">{m.email}</span>
+                                <div className="min-w-0 flex-1 space-y-0.5">
+                                  <div className="font-semibold text-white truncate">
+                                    {m.full_name}{' '}
+                                    {isSelf && <span className="text-[#818CF8] font-normal">(Bạn)</span>}
+                                  </div>
+                                  <div className="text-[11px] text-slate-400 truncate" title={m.email}>
+                                    {m.email}
+                                  </div>
+                                  <div
+                                    className="text-[11px] text-slate-300/90 truncate"
+                                    title={m.university || 'Đại học Bách Khoa Hà Nội'}
+                                  >
+                                    {m.university || 'Đại học Bách Khoa Hà Nội'}
+                                  </div>
                                 </div>
                               </div>
                             </td>
 
-                            {/* Cột 2: Vai trò */}
-                            <td className="py-3.5 px-4">
-                              {isLeaderOfTeam ? (
-                                <span className="inline-flex items-center gap-1 text-amber-300 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30 text-xs">
-                                  <Crown size={12} />
-                                  <span>Đội Trưởng</span>
+                            {/* Cột 2: Vai trò & Xác thực */}
+                            <td className="py-3 px-2.5">
+                              <div className="flex flex-col items-start gap-1">
+                                {isLeaderOfTeam ? (
+                                  <span className="inline-flex items-center gap-1 text-amber-300 font-semibold bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30 text-[11px] whitespace-nowrap">
+                                    <Crown size={11} className="shrink-0" />
+                                    <span>Đội Trưởng</span>
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center text-slate-300 bg-slate-800/80 px-2 py-0.5 rounded-full border border-slate-700 text-[11px] whitespace-nowrap">
+                                    Thành viên
+                                  </span>
+                                )}
+                                <span className="inline-flex items-center gap-1 text-emerald-400 text-[10px] bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 whitespace-nowrap">
+                                  <ShieldCheck size={11} className="shrink-0" />
+                                  <span>Đã duyệt</span>
                                 </span>
-                              ) : (
-                                <span className="text-slate-400 text-xs">Thành viên</span>
-                              )}
+                              </div>
                             </td>
 
-                            {/* Cột 3: Chuyên môn (Skill Tags - Mới bổ sung theo Feedback) */}
-                            <td className="py-3.5 px-4">
-                              <div className="flex flex-wrap gap-1 max-w-[170px]">
+                            {/* Cột 3: Chuyên môn (Skill Tags) */}
+                            <td className="py-3 px-2.5">
+                              <div className="flex flex-wrap gap-1">
                                 {m.skills && m.skills.length > 0 ? (
                                   m.skills.map((skill) => (
                                     <span
                                       key={skill}
-                                      className="text-[10px] font-medium px-2 py-0.5 rounded bg-[#1E293B] text-[#818CF8] border border-[#334155] whitespace-nowrap"
+                                      className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[#1E293B] text-[#818CF8] border border-[#334155]"
                                     >
                                       {skill}
                                     </span>
@@ -572,43 +795,39 @@ export const TeamsPage: React.FC = () => {
                               </div>
                             </td>
 
-                            {/* Cột 4: Trường / Đơn vị */}
-                            <td className="py-3.5 px-4 hidden md:table-cell text-slate-300 truncate max-w-[150px]">
-                              {m.university || 'Đại học Bách Khoa Hà Nội'}
-                            </td>
-
-                            {/* Cột 5: Trạng thái xác thực */}
-                            <td className="py-3.5 px-4 hidden sm:table-cell">
-                              <span className="inline-flex items-center gap-1 text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                                <ShieldCheck size={12} />
-                                <span>Đã duyệt</span>
-                              </span>
-                            </td>
-
-                            {/* Cột 6: Thao tác có Tooltip */}
-                            <td className="py-3.5 px-4 text-right">
-                              {isLeader && !isSelf && (
+                            {/* Cột 4: Thao tác - CHỈ ĐỘI TRƯỞNG HIỆN TẠI MỚI ĐƯỢC HIỂN THỊ NÚT CHUYỂN QUYỀN & MỜI RA KHỎI ĐỘI */}
+                            <td className="py-3 px-3 text-right">
+                              {isLeader && !isSelf && !isLeaderOfTeam && (
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
                                     type="button"
-                                    onClick={() => handleTransfer(m.id, m.full_name)}
-                                    className="p-1.5 rounded-lg hover:bg-[#334155] text-amber-300 hover:text-amber-200 transition-colors cursor-pointer"
-                                    title="Chuyển giao vai trò Đội Trưởng"
+                                    onClick={() => handleOpenTransferModal(m)}
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 transition-colors cursor-pointer text-[11px] font-medium"
+                                    title="Chuyển giao vai trò Đội Trưởng cho thành viên này"
                                   >
-                                    <Crown size={15} />
+                                    <Crown size={13} className="shrink-0" />
+                                    <span className="hidden xl:inline">Chuyển quyền</span>
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() => handleRemove(m.id, m.full_name)}
-                                    className="p-1.5 rounded-lg hover:bg-[#334155] text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                                    onClick={() => handleOpenRemoveModal(m)}
+                                    className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
                                     title="Mời thành viên rời khỏi đội"
                                   >
-                                    <UserX size={15} />
+                                    <UserX size={13} />
                                   </button>
                                 </div>
                               )}
+                              {!isLeader && !isSelf && (
+                                <span
+                                  className="text-[11px] text-slate-600 select-none"
+                                  title="Chỉ Đội Trưởng mới có quyền thao tác"
+                                >
+                                  —
+                                </span>
+                              )}
                               {isSelf && (
-                                <span className="text-[11px] text-slate-500 italic pr-2">Hiện tại</span>
+                                <span className="text-[11px] text-slate-500 italic">Hiện tại</span>
                               )}
                             </td>
                           </tr>
@@ -624,7 +843,7 @@ export const TeamsPage: React.FC = () => {
                 <Button
                   variant="danger"
                   size="sm"
-                  onClick={handleLeave}
+                  onClick={() => setIsLeaveOpen(true)}
                   className="w-full sm:w-auto gap-2 cursor-pointer"
                 >
                   <LogOut size={14} />
@@ -632,18 +851,20 @@ export const TeamsPage: React.FC = () => {
                 </Button>
 
                 <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => {
-                      setEditDesc(team.description || '');
-                      setIsEditOpen(true);
-                    }}
-                    className="gap-2 cursor-pointer"
-                  >
-                    <Edit3 size={14} />
-                    <span>Chỉnh sửa thông tin</span>
-                  </Button>
+                  {isLeader && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setEditDesc(team.description || '');
+                        setIsEditOpen(true);
+                      }}
+                      className="gap-2 cursor-pointer"
+                    >
+                      <Edit3 size={14} />
+                      <span>Chỉnh sửa thông tin</span>
+                    </Button>
+                  )}
 
                   <Button
                     variant="primary"
@@ -1005,6 +1226,155 @@ export const TeamsPage: React.FC = () => {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal: Xác nhận Chuyển giao quyền Đội Trưởng */}
+      <Modal
+        isOpen={Boolean(transferTarget)}
+        onClose={() => setTransferTarget(null)}
+        title="Xác Nhận Chuyển Quyền Đội Trưởng"
+      >
+        {transferTarget && (
+          <div className="space-y-4">
+            <div className="rounded-[12px] bg-[#0F172A] border border-[#334155] p-4 space-y-3">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-400">Đội Trưởng hiện tại (Bạn):</span>
+                <span className="font-semibold text-slate-200">
+                  {selfMember?.full_name} → <span className="text-slate-400">Thành viên</span>
+                </span>
+              </div>
+              <div className="border-t border-[#334155]/60 pt-3 flex items-center justify-between text-xs">
+                <span className="text-slate-400">Đội Trưởng mới:</span>
+                <span className="inline-flex items-center gap-1.5 font-bold text-amber-300">
+                  <Crown size={14} />
+                  <span>{transferTarget.full_name}</span>
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400">
+                Email: <span className="text-slate-300 font-mono">{transferTarget.email}</span>
+              </div>
+            </div>
+
+            <div className="rounded-[10px] bg-amber-500/10 border border-amber-500/30 p-3 text-xs text-amber-200 flex items-start gap-2.5 leading-relaxed">
+              <AlertCircle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                Sau khi xác nhận, <strong>{transferTarget.full_name}</strong> sẽ nắm quyền Đội Trưởng. Bạn sẽ trở thành{' '}
+                <strong>Thành viên</strong> và không còn hiển thị các chức năng chuyển quyền Đội Trưởng hay mời thành viên khác ra khỏi đội.
+              </span>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => setTransferTarget(null)}
+                className="cursor-pointer"
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="primary"
+                type="button"
+                onClick={handleConfirmTransfer}
+                className="gap-1.5 cursor-pointer"
+              >
+                <Crown size={15} />
+                <span>Xác nhận chuyển quyền</span>
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal: Xác nhận Mời thành viên rời khỏi đội */}
+      <Modal
+        isOpen={Boolean(removeTarget)}
+        onClose={() => setRemoveTarget(null)}
+        title="Mời Thành Viên Rời Khỏi Đội"
+      >
+        {removeTarget && (
+          <div className="space-y-4">
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Bạn có chắc chắn muốn mời thành viên{' '}
+              <strong className="text-white">{removeTarget.full_name}</strong> ({removeTarget.email}) rời khỏi đội thi{' '}
+              <strong className="text-[#818CF8]">{team?.team_name}</strong>?
+            </p>
+
+            {team && team.members.length - 1 < team.min_members && (
+              <div className="rounded-[10px] bg-rose-500/10 border border-rose-500/30 p-3 text-xs text-rose-200 flex items-start gap-2">
+                <AlertCircle size={15} className="text-rose-400 shrink-0 mt-0.5" />
+                <span>
+                  Lưu ý: Sau khi xóa thành viên này, đội sẽ còn {team.members.length - 1}/{team.min_members} thành viên tối thiểu theo quy định.
+                </span>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="ghost"
+                type="button"
+                onClick={() => setRemoveTarget(null)}
+                className="cursor-pointer"
+              >
+                Hủy
+              </Button>
+              <Button
+                variant="danger"
+                type="button"
+                onClick={handleConfirmRemove}
+                className="gap-1.5 cursor-pointer"
+              >
+                <UserX size={15} />
+                <span>Xác nhận mời rời đội</span>
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal: Xác nhận Rời khỏi đội thi */}
+      <Modal
+        isOpen={isLeaveOpen}
+        onClose={() => setIsLeaveOpen(false)}
+        title="Xác Nhận Rời Khỏi Đội Thi"
+      >
+        <div className="space-y-4">
+          {isLeader && team && team.members.length > 1 ? (
+            <div className="rounded-[10px] bg-amber-500/10 border border-amber-500/30 p-3.5 text-xs text-amber-200 flex items-start gap-2.5 leading-relaxed">
+              <Crown size={16} className="text-amber-400 shrink-0 mt-0.5" />
+              <span>
+                Bạn đang giữ vai trò <strong>Đội Trưởng</strong> của đội <strong>{team.team_name}</strong>. Vui lòng{' '}
+                <strong>chuyển quyền Đội Trưởng</strong> cho một thành viên khác trong danh sách trước khi rời khỏi đội.
+              </span>
+            </div>
+          ) : (
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+              Bạn có chắc chắn muốn rời khỏi đội thi <strong className="text-white">{team?.team_name}</strong>?
+            </p>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              variant="ghost"
+              type="button"
+              onClick={() => setIsLeaveOpen(false)}
+              className="cursor-pointer"
+            >
+              Đóng
+            </Button>
+            {(!isLeader || (team && team.members.length <= 1)) && (
+              <Button
+                variant="danger"
+                type="button"
+                onClick={handleConfirmLeave}
+                className="gap-1.5 cursor-pointer"
+              >
+                <LogOut size={15} />
+                <span>Xác nhận rời đội</span>
+              </Button>
+            )}
+          </div>
+        </div>
       </Modal>
     </div>
   );

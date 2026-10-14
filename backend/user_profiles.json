@@ -1,0 +1,28 @@
+{
+  "a03aa9fa-1648-4472-9305-3b5f3c9834a6": {
+    "student_id": "2432423",
+    "school": "fsdfs",
+    "phone": "0789156225",
+    "skills": [
+      "Frontend (FE)",
+      "Mobile App",
+      "DevOps / Cloud",
+      "Backend (BE)",
+      "Fullstack",
+      "UI/UX Design"
+    ]
+  },
+  "mle409640@gmail.com": {
+    "student_id": "2432423",
+    "school": "fsdfs",
+    "phone": "0789156225",
+    "skills": [
+      "Frontend (FE)",
+      "Mobile App",
+      "DevOps / Cloud",
+      "Backend (BE)",
+      "Fullstack",
+      "UI/UX Design"
+    ]
+  }
+}

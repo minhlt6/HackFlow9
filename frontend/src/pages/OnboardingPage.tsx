@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Users,
   Save,
@@ -16,8 +16,10 @@ import {
   Circle,
 } from 'lucide-react';
 import { Button } from '../components/Button';
+import { axiosClient } from '../api/axiosClient';
 import { profileApi } from '../api/profileApi';
 import { useAuthStore } from '../store/useAuthStore';
+import { useMockStore } from '../store/useMockStore';
 import type { ApprovalStatus, UserRole } from '../types';
 import type { ProfileFieldErrors, ProfileForm } from '../types/profile';
 
@@ -36,30 +38,109 @@ const skillOptions = [
 
 const rolePaths: Record<UserRole, string> = {
   admin: '/admin/dashboard',
-  judge: '/judge',
-  mentor: '/mentor',
+  judge: '/judge/dashboard',
+  mentor: '/mentor/dashboard',
   candidate: '/dashboard',
+};
+
+const getProfileStorageKey = (emailOrId?: string) =>
+  `hackflow_profile_${(emailOrId || 'default').toLowerCase()}`;
+
+const loadSavedProfileForm = (
+  user: ReturnType<typeof useAuthStore.getState>['user'],
+): ProfileForm => {
+  try {
+    const keysToTry = [
+      user?.email ? getProfileStorageKey(user.email) : null,
+      user?.id ? getProfileStorageKey(user.id) : null,
+      'hackflow_last_profile',
+    ].filter(Boolean) as string[];
+
+    for (const key of keysToTry) {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<ProfileForm>;
+        return {
+          fullName: (parsed.fullName || user?.fullName || '').trim(),
+          studentId: (parsed.studentId || user?.studentId || '').trim(),
+          university: (parsed.university || user?.university || user?.school || '').trim(),
+          phone: (parsed.phone || user?.phone || '').trim(),
+          skills:
+            Array.isArray(parsed.skills) && parsed.skills.length > 0
+              ? parsed.skills
+              : Array.isArray(user?.skills)
+              ? user.skills
+              : [],
+        };
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
+
+  return {
+    ...initialForm,
+    fullName: (user?.fullName || '').trim(),
+    studentId: (user?.studentId || '').trim(),
+    university: (user?.university || user?.school || '').trim(),
+    phone: (user?.phone || '').trim(),
+    skills: Array.isArray(user?.skills) ? user.skills : [],
+  };
+};
+
+const saveProfileFormToStorage = (
+  form: ProfileForm,
+  email?: string,
+  userId?: string,
+) => {
+  try {
+    const payload = JSON.stringify(form);
+    if (email) localStorage.setItem(getProfileStorageKey(email), payload);
+    if (userId) localStorage.setItem(getProfileStorageKey(userId), payload);
+    localStorage.setItem('hackflow_last_profile', payload);
+
+    // Đồng bộ thông tin (tên, trường, kỹ năng) sang bảng thành viên đội thi hiện tại
+    const teamRaw = localStorage.getItem('hackflow_team_details_v2');
+    if (teamRaw) {
+      const teamData = JSON.parse(teamRaw);
+      if (teamData && Array.isArray(teamData.members) && teamData.members.length > 0) {
+        const lowerEmail = (email || '').toLowerCase();
+        const matchIdx = teamData.members.findIndex(
+          (m: { email?: string; user_id?: string }) =>
+            (lowerEmail && (m.email || '').toLowerCase() === lowerEmail) ||
+            (userId && m.user_id === userId),
+        );
+        const targetIdx = matchIdx >= 0 ? matchIdx : 0;
+        teamData.members[targetIdx] = {
+          ...teamData.members[targetIdx],
+          full_name: form.fullName || teamData.members[targetIdx].full_name,
+          university: form.university || teamData.members[targetIdx].university,
+          skills: form.skills.length > 0 ? form.skills : teamData.members[targetIdx].skills,
+        };
+        localStorage.setItem('hackflow_team_details_v2', JSON.stringify(teamData));
+      }
+    }
+  } catch {
+    // ignore storage errors
+  }
 };
 
 export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, updateUser, login } = useAuthStore();
+  const updateMockUserProfile = useMockStore((state) => state.updateCurrentUserProfile);
+
   const activeUser = user || {
     id: 'candidate-demo-1',
     email: 'leader@cybersamurai.team',
     fullName: 'Nguyễn Văn Minh',
     role: 'candidate' as UserRole,
     approvalStatus: 'pending' as ApprovalStatus,
+    githubUsername: 'github_user',
   };
 
-  const [form, setForm] = useState<ProfileForm>(() => ({
-    ...initialForm,
-    fullName: activeUser.fullName || 'Nguyễn Văn Minh',
-    studentId: '20210001',
-    university: 'Đại học Bách Khoa Hà Nội',
-    phone: '0901234567',
-    skills: ['AI / Machine Learning', 'Computer Vision'],
-  }));
+  const [form, setForm] = useState<ProfileForm>(() => loadSavedProfileForm(user));
   const [errors, setErrors] = useState<ProfileFieldErrors>({});
   const [customSkill, setCustomSkill] = useState('');
   const [status, setStatus] = useState<ApprovalStatus>(activeUser.approvalStatus || 'pending');
@@ -68,10 +149,89 @@ export const OnboardingPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      login(activeUser, 'mock-dev-token-2026');
-    }
-  }, [user, login]);
+    const syncCurrentUser = async () => {
+      const token = localStorage.getItem('token');
+      if (token && !token.startsWith('mock-')) {
+        try {
+          const res = await axiosClient.get<{
+            data?: {
+              id: string;
+              email: string;
+              full_name: string;
+              role: UserRole;
+              approval_status: ApprovalStatus;
+              github_username?: string;
+              avatar_url?: string;
+              student_id?: string;
+              school?: string;
+              phone?: string;
+              skills?: string[];
+            };
+          }>('/auth/me');
+          const me = res.data?.data;
+          if (me) {
+            const savedLocal = loadSavedProfileForm({
+              id: me.id,
+              email: me.email,
+              fullName: me.full_name,
+              role: me.role,
+              approvalStatus: me.approval_status,
+            });
+            const syncedName = (me.full_name || savedLocal.fullName || '').trim();
+            const syncedStudentId = (me.student_id || savedLocal.studentId || '').trim();
+            const syncedUniversity = (me.school || savedLocal.university || '').trim();
+            const syncedPhone = (me.phone || savedLocal.phone || '').trim();
+            const syncedSkills =
+              Array.isArray(me.skills) && me.skills.length > 0
+                ? me.skills
+                : savedLocal.skills;
+
+            updateUser({
+              id: me.id,
+              email: me.email,
+              fullName: syncedName || me.github_username || me.email,
+              role: me.role,
+              approvalStatus: me.approval_status,
+              githubUsername: me.github_username,
+              avatarUrl: me.avatar_url,
+              studentId: syncedStudentId || undefined,
+              university: syncedUniversity || undefined,
+              school: syncedUniversity || undefined,
+              phone: syncedPhone || undefined,
+              skills: syncedSkills.length > 0 ? syncedSkills : undefined,
+            });
+            setStatus(me.approval_status);
+            setForm((prev) => ({
+              fullName: syncedName || prev.fullName || me.github_username || '',
+              studentId: syncedStudentId || prev.studentId,
+              university: syncedUniversity || prev.university,
+              phone: syncedPhone || prev.phone,
+              skills: syncedSkills.length > 0 ? syncedSkills : prev.skills,
+            }));
+            return;
+          }
+        } catch {
+          // Ignore and fallback to current store state
+        }
+      }
+
+      if (!user) {
+        login(activeUser, 'mock-dev-token-2026');
+      } else {
+        const savedLocal = loadSavedProfileForm(user);
+        setStatus(user.approvalStatus || 'pending');
+        setForm((prev) => ({
+          fullName: prev.fullName || savedLocal.fullName || user.fullName.trim(),
+          studentId: prev.studentId || savedLocal.studentId,
+          university: prev.university || savedLocal.university,
+          phone: prev.phone || savedLocal.phone,
+          skills: prev.skills.length > 0 ? prev.skills : savedLocal.skills,
+        }));
+      }
+    };
+
+    void syncCurrentUser();
+  }, []);
 
   const updateField = (field: Exclude<keyof ProfileForm, 'skills'>, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -118,14 +278,33 @@ export const OnboardingPage: React.FC = () => {
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
 
+    const cleanedForm: ProfileForm = {
+      fullName: form.fullName.trim(),
+      studentId: form.studentId.trim(),
+      university: form.university.trim(),
+      phone: form.phone.trim(),
+      skills: form.skills,
+    };
+
+    // Lưu ngay vào localStorage & Store để đồng bộ toàn hệ thống
+    saveProfileFormToStorage(cleanedForm, user?.email || activeUser.email, user?.id || activeUser.id);
+    updateMockUserProfile({
+      fullName: cleanedForm.fullName,
+      studentId: cleanedForm.studentId,
+      university: cleanedForm.university,
+      school: cleanedForm.university,
+      phone: cleanedForm.phone,
+      skills: cleanedForm.skills,
+    });
+
     setLoading(true);
     try {
       const result = await profileApi.submit({
-        full_name: form.fullName.trim(),
-        student_id: form.studentId.trim(),
-        school: form.university.trim(),
-        phone: form.phone.trim(),
-        skills: form.skills,
+        full_name: cleanedForm.fullName,
+        student_id: cleanedForm.studentId,
+        school: cleanedForm.university,
+        phone: cleanedForm.phone,
+        skills: cleanedForm.skills,
       });
 
       const nextStatus = (
@@ -133,6 +312,7 @@ export const OnboardingPage: React.FC = () => {
         result.approval_status ||
         result.user?.approvalStatus ||
         result.user?.approval_status ||
+        user?.approvalStatus ||
         'pending'
       ).toLowerCase() as ApprovalStatus;
 
@@ -143,11 +323,24 @@ export const OnboardingPage: React.FC = () => {
           : 'candidate';
 
       setStatus(nextStatus);
-      updateUser({ approvalStatus: nextStatus, role: mappedRole });
+      updateUser({
+        fullName: cleanedForm.fullName,
+        studentId: cleanedForm.studentId,
+        university: cleanedForm.university,
+        school: cleanedForm.university,
+        phone: cleanedForm.phone,
+        skills: cleanedForm.skills,
+        approvalStatus: nextStatus,
+        role: mappedRole,
+      });
 
       if (nextStatus === 'approved') {
-        setSuccessMessage('Hồ sơ đã được duyệt thành công! Đang chuyển hướng đến không gian thi đấu...');
-        window.setTimeout(() => navigate(rolePaths[mappedRole], { replace: true }), 900);
+        if (location.pathname === '/onboarding') {
+          setSuccessMessage('Hồ sơ đã được duyệt thành công! Đang chuyển hướng đến không gian thi đấu...');
+          window.setTimeout(() => navigate(rolePaths[mappedRole], { replace: true }), 900);
+        } else {
+          setSuccessMessage('Đã lưu và đồng bộ thông tin hồ sơ cá nhân & kỹ năng chuyên môn thành công!');
+        }
       } else if (nextStatus === 'rejected') {
         setErrorMessage(
           result.rejectionReason ||
@@ -160,8 +353,34 @@ export const OnboardingPage: React.FC = () => {
         setSuccessMessage(result.message || 'Lưu thông tin thành công. Hồ sơ đang được Ban Tổ Chức xét duyệt!');
       }
     } catch (error) {
-      const message = axios.isAxiosError<{ message?: string }>(error) ? error.response?.data?.message : null;
-      setErrorMessage(message || 'Không thể gửi hồ sơ. Vui lòng kiểm tra lại kết nối mạng hoặc thử lại sau.');
+      const apiErrorMsg = axios.isAxiosError<{ message?: string }>(error)
+        ? error.response?.data?.message
+        : null;
+
+      // Nếu có lỗi 4xx tường minh từ server thì hiển thị, ngược lại (offline/mock/network) vẫn lưu thành công trên local
+      if (apiErrorMsg && axios.isAxiosError(error) && error.response && error.response.status < 500 && error.response.status !== 401) {
+        setErrorMessage(apiErrorMsg);
+      } else {
+        const currentStatus = (user?.approvalStatus || status || 'approved') as ApprovalStatus;
+        const currentRole = (user?.role || 'candidate') as UserRole;
+        setStatus(currentStatus);
+        updateUser({
+          fullName: cleanedForm.fullName,
+          studentId: cleanedForm.studentId,
+          university: cleanedForm.university,
+          school: cleanedForm.university,
+          phone: cleanedForm.phone,
+          skills: cleanedForm.skills,
+          approvalStatus: currentStatus,
+          role: currentRole,
+        });
+        if (currentStatus === 'approved' && location.pathname === '/onboarding') {
+          setSuccessMessage('Hồ sơ đã được duyệt thành công! Đang chuyển hướng đến không gian thi đấu...');
+          window.setTimeout(() => navigate(rolePaths[currentRole], { replace: true }), 900);
+        } else {
+          setSuccessMessage('Đã lưu và đồng bộ thông tin hồ sơ cá nhân & kỹ năng chuyên môn thành công!');
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -169,6 +388,7 @@ export const OnboardingPage: React.FC = () => {
 
   const displayedSkills = [...skillOptions, ...form.skills.filter((skill) => !skillOptions.includes(skill))];
   const userInitial = (form.fullName.trim() || user?.fullName || 'N').charAt(0).toUpperCase();
+  const githubHandle = user?.githubUsername || user?.email?.split('@')[0] || 'github_user';
 
   // Tính toán checklist hoàn thiện hồ sơ
   const isNameValid = form.fullName.trim().length >= 2;
@@ -283,14 +503,22 @@ export const OnboardingPage: React.FC = () => {
           <section className="rounded-2xl border border-[#243049] bg-[#131B2E] p-6 sm:p-8 shadow-xl space-y-7">
             {/* Header User Summary */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 pb-6 border-b border-[#243049]">
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center font-bold text-white text-2xl shadow-lg shrink-0">
-                {userInitial}
-              </div>
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={form.fullName.trim() || user?.fullName || githubHandle}
+                  className="w-16 h-16 rounded-2xl object-cover shadow-lg border border-indigo-400/30 shrink-0"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center font-bold text-white text-2xl shadow-lg shrink-0">
+                  {userInitial}
+                </div>
+              )}
 
               <div className="space-y-1.5 flex-1">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h2 className="text-xl sm:text-2xl font-bold text-white">
-                    {form.fullName.trim() || user?.fullName || 'Nguyễn Văn Minh'}
+                    {form.fullName.trim() || user?.fullName || githubHandle}
                   </h2>
                   <span className="px-2.5 py-0.5 text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700 rounded-full">
                     Thí sinh
@@ -305,12 +533,12 @@ export const OnboardingPage: React.FC = () => {
                     <svg className="w-3.5 h-3.5 fill-slate-300" viewBox="0 0 24 24">
                       <path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.11.82-.26.82-.58v-2.26c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.09-.75.08-.74.08-.74 1.2.09 1.84 1.23 1.84 1.23 1.07 1.84 2.8 1.31 3.49 1 .11-.78.42-1.31.76-1.61-2.67-.3-5.47-1.34-5.47-5.95 0-1.31.47-2.38 1.23-3.22-.12-.3-.53-1.52.12-3.17 0 0 1-.32 3.3 1.23A11.5 11.5 0 0 1 12 6.2c1.02 0 2.05.14 3.01.42 2.3-1.55 3.3-1.23 3.3-1.23.65 1.65.24 2.87.12 3.17.77.84 1.23 1.91 1.23 3.22 0 4.62-2.8 5.65-5.48 5.95.43.37.81 1.1.81 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z" />
                     </svg>
-                    <span>@{user?.email?.split('@')[0] || 'github_user'}</span>
+                    <span>@{githubHandle}</span>
                   </span>
                   <span className="text-slate-600">•</span>
                   <span className="flex items-center gap-1.5">
                     <Mail size={14} className="text-slate-300" />
-                    <span>{user?.email || 'leader@cybersamurai.team'}</span>
+                    <span>{user?.email || 'Chưa cập nhật email'}</span>
                   </span>
                 </div>
               </div>
@@ -329,7 +557,7 @@ export const OnboardingPage: React.FC = () => {
                     required
                     value={form.fullName}
                     onChange={(e) => updateField('fullName', e.target.value)}
-                    placeholder="Nguyễn Văn Minh"
+                    placeholder="Nhập họ và tên của bạn..."
                     className="w-full rounded-xl border border-[#26354F] bg-[#0F172A] px-4 py-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                   />
                   {errors.fullName && <p className="text-xs text-red-400">{errors.fullName}</p>}
@@ -361,7 +589,7 @@ export const OnboardingPage: React.FC = () => {
                     required
                     value={form.university}
                     onChange={(e) => updateField('university', e.target.value)}
-                    placeholder="Đại học Bách Khoa Hà Nội"
+                    placeholder="Đại học Thủy Lợi / Bách Khoa..."
                     className="w-full rounded-xl border border-[#26354F] bg-[#0F172A] px-4 py-3 text-sm text-slate-100 placeholder-slate-500 outline-none transition focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                   />
                   {errors.university && <p className="text-xs text-red-400">{errors.university}</p>}
@@ -375,7 +603,7 @@ export const OnboardingPage: React.FC = () => {
                   <input
                     type="text"
                     readOnly
-                    value={`@${user?.email?.split('@')[0] || 'github_user'}`}
+                    value={`@${githubHandle}`}
                     className="w-full rounded-xl border border-[#26354F] bg-[#0F172A]/70 px-4 py-3 text-sm text-slate-400 cursor-not-allowed outline-none font-mono"
                   />
                   <p className="text-[11px] text-slate-400">Đã liên kết OAuth2 vĩnh viễn</p>
@@ -510,12 +738,20 @@ export const OnboardingPage: React.FC = () => {
             <div className="pt-5 space-y-5">
               {/* Avatar + Main Info */}
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center font-bold text-white text-2xl shadow-md border border-indigo-400/30">
-                  {userInitial}
-                </div>
+                {user?.avatarUrl ? (
+                  <img
+                    src={user.avatarUrl}
+                    alt={form.fullName.trim() || user?.fullName || githubHandle}
+                    className="w-16 h-16 rounded-2xl object-cover shadow-md border border-indigo-400/30"
+                  />
+                ) : (
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center font-bold text-white text-2xl shadow-md border border-indigo-400/30">
+                    {userInitial}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
                   <h3 className="font-bold text-lg text-white truncate">
-                    {form.fullName.trim() || 'Nguyễn Văn Minh'}
+                    {form.fullName.trim() || user?.fullName || githubHandle}
                   </h3>
                   <div className="flex items-center gap-2 text-xs text-slate-300 mt-1">
                     <GraduationCap size={14} className="text-slate-400 shrink-0" />
@@ -531,7 +767,7 @@ export const OnboardingPage: React.FC = () => {
               <div className="p-3 rounded-xl bg-[#080D18]/70 border border-[#243049] space-y-2 text-xs">
                 <div className="flex items-center justify-between text-slate-300">
                   <span className="text-slate-400">Email:</span>
-                  <span className="font-mono truncate ml-2">{user?.email || 'leader@cybersamurai.team'}</span>
+                  <span className="font-mono truncate ml-2">{user?.email || 'Chưa cập nhật email'}</span>
                 </div>
                 <div className="flex items-center justify-between text-slate-300">
                   <span className="text-slate-400">Điện thoại:</span>
@@ -543,7 +779,7 @@ export const OnboardingPage: React.FC = () => {
                 <div className="flex items-center justify-between text-slate-300">
                   <span className="text-slate-400">GitHub:</span>
                   <span className="font-mono text-indigo-400">
-                    @{user?.email?.split('@')[0] || 'github_user'}
+                    @{githubHandle}
                   </span>
                 </div>
               </div>

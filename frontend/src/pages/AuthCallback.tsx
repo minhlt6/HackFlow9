@@ -14,6 +14,10 @@ interface BackendUser {
   role?: string;
   approvalStatus?: string;
   approval_status?: string;
+  githubUsername?: string;
+  github_username?: string;
+  avatarUrl?: string;
+  avatar_url?: string;
 }
 
 interface AuthPayload {
@@ -38,8 +42,10 @@ const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
     return null;
   }
 
-  const fullName = backendUser.fullName || backendUser.full_name || backendUser.name;
+  const fullName = (backendUser.fullName || backendUser.full_name || backendUser.name || backendUser.github_username)?.trim();
   const approvalStatus = backendUser.approvalStatus || backendUser.approval_status;
+  const githubUsername = backendUser.githubUsername || backendUser.github_username;
+  const avatarUrl = backendUser.avatarUrl || backendUser.avatar_url;
 
   if (!fullName || !approvalStatus || !isUserRole(backendUser.role) || !isApprovalStatus(approvalStatus)) {
     return null;
@@ -51,6 +57,8 @@ const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
     fullName,
     role: backendUser.role,
     approvalStatus,
+    githubUsername,
+    avatarUrl,
   };
 };
 
@@ -65,11 +73,13 @@ const getRedirectPath = (user: User): string => {
 
   return {
     admin: '/admin/dashboard',
-    judge: '/judge',
-    mentor: '/mentor',
+    judge: '/judge/dashboard',
+    mentor: '/mentor/dashboard',
     candidate: '/dashboard',
   }[user.role];
 };
+
+const processedOAuthCodes = new Set<string>();
 
 export const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -85,6 +95,11 @@ export const AuthCallback: React.FC = () => {
         return;
       }
 
+      if (processedOAuthCodes.has(code)) {
+        return;
+      }
+      processedOAuthCodes.add(code);
+
       try {
         const response = await axiosClient.post<AuthResponse>('/auth/github/callback', { code });
         const authData = response.data.data || response.data;
@@ -98,6 +113,7 @@ export const AuthCallback: React.FC = () => {
         login(user, token);
         navigate(getRedirectPath(user), { replace: true });
       } catch {
+        processedOAuthCodes.delete(code);
         navigate('/login?error=auth_failed', { replace: true });
       }
     };

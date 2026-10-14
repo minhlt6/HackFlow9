@@ -155,20 +155,20 @@ class AuthService:
                 profile = user_res.json()
                 github_id = str(profile.get("id"))
                 github_username = profile.get("login")
-                full_name = profile.get("name") or github_username
+                full_name = (profile.get("name") or github_username or "").strip()
                 avatar_url = profile.get("avatar_url")
                 email = profile.get("email")
 
-                # If email is private, fetch primary email from emails endpoint
-                if not email:
-                    emails_res = await client.get(
-                        "https://api.github.com/user/emails",
-                        headers={"Authorization": f"Bearer {gh_token}", "Accept": "application/json"},
-                    )
-                    if emails_res.status_code == 200:
-                        emails_data = emails_res.json()
+                # Fetch primary email from /user/emails endpoint
+                emails_res = await client.get(
+                    "https://api.github.com/user/emails",
+                    headers={"Authorization": f"Bearer {gh_token}", "Accept": "application/json"},
+                )
+                if emails_res.status_code == 200:
+                    emails_data = emails_res.json()
+                    if isinstance(emails_data, list):
                         primary_email = next((e["email"] for e in emails_data if e.get("primary")), None)
-                        email = primary_email or (emails_data[0]["email"] if emails_data else None)
+                        email = primary_email or email or (emails_data[0]["email"] if emails_data else None)
         else:
             # Development fallback / mock when credentials are placeholders
             github_id = f"dev-gh-{code}"
@@ -195,10 +195,13 @@ class AuthService:
             user = await user_repo.get_by_email(db, email)
 
         if user:
-            # Update github linkage and avatar
+            # Update github linkage, email, and avatar
             if not user.github_id:
                 user.github_id = github_id
             user.github_username = github_username
+            user.email = email.lower().strip()
+            if full_name:
+                user.full_name = full_name
             if avatar_url:
                 user.avatar_url = avatar_url
             # If user was PENDING and now email is in whitelist → promote to APPROVED
