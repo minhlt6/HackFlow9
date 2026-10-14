@@ -131,7 +131,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                   Thời gian nộp
                 </th>
                 <th scope="col" className="py-3 px-4 min-w-[140px]">
-                  Commit SHA (7 ký tự)
+                  Commit SHA
                 </th>
                 <th scope="col" className="py-3 px-4 min-w-[170px]">
                   Tài nguyên nộp
