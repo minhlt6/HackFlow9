@@ -106,8 +106,11 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
   },
 ];
 
-// Danh sách mock lịch sử nộp bài ban đầu (HF-31)
-const INITIAL_MOCK_SUBMISSION_HISTORY: Submission[] = [
+// Cờ môi trường dev mock: Chỉ kích hoạt mock khi có cờ VITE_USE_MOCK=true (HF-31 Lỗi 1)
+const USE_DEV_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
+
+// Mock lịch sử nộp bài chỉ dùng khi bật cờ dev mock
+export const INITIAL_MOCK_SUBMISSION_HISTORY: Submission[] = [
   {
     id: 'sub-01-v2',
     checkpoint_id: 'cp-01',
@@ -223,60 +226,61 @@ export const checkpointApi = {
 
   /**
    * Tích hợp API GET /submissions để hiển thị table lịch sử nộp bài (HF-31 AC-1)
-   * Có hỗ trợ lọc theo checkpointId hoặc lấy toàn bộ lịch sử nộp của đội thi.
+   * - Tuyệt đối không nuốt lỗi để trả mock giả khi chạy môi trường thật (Review Lỗi 1)
+   * - Nếu lỗi 404 (chưa có bản nộp): trả về mảng rỗng [] để UI hiển thị Empty State
+   * - Nếu lỗi mạng / 500: Ném lỗi để UI hiển thị thông báo lỗi kèm nút Tải lại
    */
   getSubmissions: async (checkpointId?: string): Promise<Submission[]> => {
-    // 1. Thử gọi API GET /submissions theo chuẩn REST
+    // 1. Nếu cờ dev mock được bật rõ ràng qua VITE_USE_MOCK=true
+    if (USE_DEV_MOCK) {
+      const storedHistory = getStoredHistory();
+      const allHistory = [...storedHistory];
+      for (const mockItem of INITIAL_MOCK_SUBMISSION_HISTORY) {
+        if (!allHistory.some((item) => item.id === mockItem.id)) {
+          allHistory.push(mockItem);
+        }
+      }
+      if (checkpointId) {
+        return allHistory.filter((s) => s.checkpoint_id === checkpointId);
+      }
+      return allHistory;
+    }
+
+    // 2. Môi trường thật: Gọi API GET /submissions theo chuẩn REST
     try {
       const url = checkpointId ? `/submissions?checkpoint_id=${checkpointId}` : '/submissions';
       const response = await axiosClient.get<ApiResponse<Submission[]>>(url);
       if (response.data && response.data.data) {
         return response.data.data;
       }
-    } catch {
-      // 2. Thử endpoint lồng /checkpoints/:id/submissions nếu có checkpointId
-      if (checkpointId) {
-        try {
-          const cpResponse = await axiosClient.get<ApiResponse<Submission[]>>(
-            `/checkpoints/${checkpointId}/submissions`
-          );
-          if (cpResponse.data && cpResponse.data.data) {
-            return cpResponse.data.data;
-          }
-        } catch {
-          // fallback xuống local
-        }
+      return [];
+    } catch (err: unknown) {
+      const errorObj = err as {
+        response?: {
+          status?: number;
+          data?: {
+            message?: string;
+          };
+        };
+        message?: string;
+      };
+
+      const status = errorObj.response?.status;
+
+      // 404: Đội thi chưa có bài nộp nào cho checkpoint này -> Trả về mảng rỗng [] để hiển thị Empty State
+      if (status === 404) {
+        return [];
       }
+
+      // Các lỗi khác (500 Server Error, Network Error, 401 Unauthorized...):
+      // Ném lỗi để UI hiển thị trạng thái lỗi kèm nút Retry (Lỗi 1)
+      throw new Error(
+        errorObj.response?.data?.message ||
+          errorObj.message ||
+          'Không thể tải lịch sử nộp bài do sự cố kết nối máy chủ.',
+        { cause: err }
+      );
     }
-
-    // 3. Fallback: Lấy từ Local Storage kết hợp Initial Mock Data
-    const storedHistory = getStoredHistory();
-    const allHistory = [...storedHistory];
-
-    for (const mockItem of INITIAL_MOCK_SUBMISSION_HISTORY) {
-      if (!allHistory.some((item) => item.id === mockItem.id)) {
-        allHistory.push(mockItem);
-      }
-    }
-
-    // Nếu có checkpointId cụ thể, lọc theo checkpoint_id
-    if (checkpointId) {
-      const filtered = allHistory.filter((s) => s.checkpoint_id === checkpointId);
-      if (filtered.length > 0) {
-        return filtered;
-      }
-
-      // Nếu trong history chưa có nhưng latest_submission có trong storedSubmissions
-      const stored = getStoredSubmissions();
-      if (stored[checkpointId]) {
-        return [stored[checkpointId]];
-      }
-
-      const defaultCp = INITIAL_MOCK_CHECKPOINTS.find((c) => c.id === checkpointId);
-      return defaultCp?.latest_submission ? [defaultCp.latest_submission] : [];
-    }
-
-    return allHistory;
   },
 
   /**

@@ -29,6 +29,7 @@ export const UIPreviewPage: React.FC = () => {
   const [sampleTwoMinutesAgoTime] = useState(() =>
     new Date(Date.now() - 2 * 60 * 1000).toISOString()
   );
+  const [previewHistoryMode, setPreviewHistoryMode] = useState<'normal' | 'error' | 'empty'>('normal');
 
   const canSubmit = previewWindowStatus === 'open' || previewWindowStatus === 'grace_period';
 
@@ -363,59 +364,111 @@ export const UIPreviewPage: React.FC = () => {
 
         {/* 7. Bảng hiển thị lịch sử nộp bài (HF-31) */}
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#334155] pb-3">
             <div>
               <h2 className="text-base font-semibold text-white">
                 7. Bảng hiển thị lịch sử nộp bài (HF-31)
               </h2>
               <p className="text-xs text-slate-400">
-                Demo tích hợp API GET /submissions, rút gọn Commit SHA 7 ký tự (mở GitHub commit link) và định dạng nhãn thời gian ("2 phút trước", "12/10/2026 15:30").
+                Demo tích hợp API GET /submissions, sort theo submitted_at giảm dần, cắt ngắn Commit SHA 7 ký tự (cắt đuôi .git), hiển thị link động từ submission_data và nhãn thời gian tự động cập nhật.
               </p>
+            </div>
+
+            {/* Điều khiển Test các trạng thái của Bảng lịch sử */}
+            <div className="flex items-center gap-1.5 p-1 bg-[#1E293B] rounded-lg border border-[#334155] self-start sm:self-auto text-xs">
+              <button
+                type="button"
+                onClick={() => setPreviewHistoryMode('normal')}
+                className={`px-2.5 py-1 rounded transition-colors ${
+                  previewHistoryMode === 'normal'
+                    ? 'bg-indigo-600 text-white font-semibold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Mặc định (3 bản)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewHistoryMode('error')}
+                className={`px-2.5 py-1 rounded transition-colors ${
+                  previewHistoryMode === 'error'
+                    ? 'bg-rose-600 text-white font-semibold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Lỗi API 500
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewHistoryMode('empty')}
+                className={`px-2.5 py-1 rounded transition-colors ${
+                  previewHistoryMode === 'empty'
+                    ? 'bg-slate-700 text-white font-semibold'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Chưa nộp (Rỗng)
+              </button>
             </div>
           </div>
 
           <SubmissionHistoryTable
-            submissions={[
-              {
-                id: 'preview-sub-v3',
-                checkpoint_id: previewCheckpoint.id,
-                team_id: 'team-01',
-                repo_url: 'https://github.com/cyber-samurai/hackflow-mvp',
-                demo_url: 'https://hackflow-demo.vercel.app',
-                commit_sha: 'a1b2c3d4e5f678901234567890abcdef12345678', // SHA 40 ký tự
-                status: 'submitted',
-                grace_period_applied: true,
-                submitted_at: sampleTwoMinutesAgoTime, // "2 phút trước"
-                note: 'Bản nộp hoàn thiện MVP với Live Demo và tài liệu kiểm thử',
-              },
-              {
-                id: 'preview-sub-v2',
-                checkpoint_id: previewCheckpoint.id,
-                team_id: 'team-01',
-                repo_url: 'https://github.com/cyber-samurai/hackflow-mvp',
-                demo_url: 'https://figma.com/@cybersamurai/hackflow',
-                commit_sha: '9f8e7d6c5b4a3210fedcba9876543210abcdef12', // SHA 40 ký tự
-                status: 'evaluated',
-                grace_period_applied: false,
-                submitted_at: '2026-10-12T15:30:00.000Z', // "12/10/2026 15:30"
-                feedback: 'Sản phẩm hoàn thiện tốt, đáp ứng 100% tiêu chí đề bài. Điểm: 9.5/10',
-                note: 'Bản nộp thử nghiệm đợt 2',
-              },
-              {
-                id: 'preview-sub-v1',
-                checkpoint_id: previewCheckpoint.id,
-                team_id: 'team-01',
-                repo_url: 'https://github.com/cyber-samurai/hackflow-mvp',
-                demo_url: null,
-                commit_sha: null,
-                status: 'sha_verification_failed',
-                grace_period_applied: false,
-                submitted_at: '2026-10-10T10:15:00.000Z',
-                note: 'Bản nộp ban đầu',
-              },
-            ]}
+            submissions={
+              previewHistoryMode === 'empty'
+                ? []
+                : [
+                    {
+                      id: 'preview-sub-v3',
+                      checkpoint_id: previewCheckpoint.id,
+                      team_id: 'team-01',
+                      // Test URL có đuôi .git để kiểm tra hàm getCommitUrl cắt đuôi .git (Lỗi 4)
+                      repo_url: 'https://github.com/cyber-samurai/hackflow-mvp.git',
+                      demo_url: 'https://hackflow-demo.vercel.app',
+                      commit_sha: 'a1b2c3d4e5f678901234567890abcdef12345678', // SHA 40 ký tự
+                      status: 'submitted',
+                      grace_period_applied: true,
+                      submitted_at: sampleTwoMinutesAgoTime, // "2 phút trước"
+                      note: 'Bản nộp hoàn thiện MVP với Live Demo và tài liệu kiểm thử',
+                      // Test trường động từ submission_data (Lỗi 3)
+                      submission_data: {
+                        presentation_pdf: 'https://slides.google.com/presentation/d/hackflow-pitch-deck',
+                      },
+                    },
+                    {
+                      id: 'preview-sub-v2',
+                      checkpoint_id: previewCheckpoint.id,
+                      team_id: 'team-01',
+                      repo_url: 'https://github.com/cyber-samurai/hackflow-mvp',
+                      demo_url: 'https://figma.com/@cybersamurai/hackflow',
+                      commit_sha: '9f8e7d6c5b4a3210fedcba9876543210abcdef12',
+                      status: 'evaluated',
+                      grace_period_applied: false,
+                      submitted_at: '2026-10-12T15:30:00.000Z', // "12/10/2026 15:30"
+                      feedback: 'Sản phẩm hoàn thiện tốt, đáp ứng 100% tiêu chí đề bài. Điểm: 9.5/10',
+                      note: 'Bản nộp thử nghiệm đợt 2',
+                    },
+                    {
+                      id: 'preview-sub-v1',
+                      checkpoint_id: previewCheckpoint.id,
+                      team_id: 'team-01',
+                      repo_url: 'https://github.com/cyber-samurai/hackflow-mvp',
+                      demo_url: null,
+                      commit_sha: null,
+                      status: 'pending_sha_freeze', // Test trạng thái "Đang lấy SHA..." (Lỗi 3)
+                      grace_period_applied: false,
+                      submitted_at: '2026-10-10T10:15:00.000Z',
+                      note: 'Bản nộp ghi nhận thời gian hợp lệ, đang freeze SHA',
+                    },
+                  ]
+            }
+            errorMessage={
+              previewHistoryMode === 'error'
+                ? 'Lỗi 500 Internal Server Error: Không thể kết nối tới cơ sở dữ liệu submissions. Vui lòng thử lại sau.'
+                : null
+            }
             checkpointTitle={previewCheckpoint.title}
             isFinalCheckpoint={true}
+            onRefresh={() => setPreviewHistoryMode('normal')}
           />
         </div>
       </div>

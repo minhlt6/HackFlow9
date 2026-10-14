@@ -29,19 +29,26 @@ export const CandidateCheckpointsPage: React.FC = () => {
   // Danh sách lịch sử nộp bài của checkpoint được chọn (HF-31)
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isSubmissionsLoading, setIsSubmissionsLoading] = useState<boolean>(false);
+  const [submissionsError, setSubmissionsError] = useState<string | null>(null);
 
   // Lấy người dùng hiện tại từ AuthStore
   const authUser = useAuthStore((state) => state.user);
   const userRole = authUser?.team_role || authUser?.role;
 
-  // Tải lịch sử nộp bài của checkpoint (HF-31 AC-1)
+  // Tải lịch sử nộp bài của checkpoint (HF-31 AC-1 & Lỗi 1)
   const fetchSubmissions = useCallback(async (cpId: string) => {
     try {
       setIsSubmissionsLoading(true);
+      setSubmissionsError(null);
       const data = await checkpointApi.getSubmissions(cpId);
       setSubmissions(data);
-    } catch (err) {
-      console.error('Lỗi khi tải lịch sử nộp bài:', err);
+    } catch (err: unknown) {
+      const errorObj = err as { response?: { data?: { message?: string } }; message?: string };
+      setSubmissionsError(
+        errorObj.response?.data?.message ||
+          errorObj.message ||
+          'Không thể tải lịch sử nộp bài do sự cố kết nối máy chủ.'
+      );
     } finally {
       setIsSubmissionsLoading(false);
     }
@@ -414,6 +421,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                 <SubmissionHistoryTable
                   submissions={submissions}
                   isLoading={isSubmissionsLoading}
+                  errorMessage={submissionsError}
                   checkpointTitle={selectedCheckpoint.title}
                   isFinalCheckpoint={Boolean(selectedCheckpoint.is_final_checkpoint)}
                   onRefresh={() => fetchSubmissions(selectedCheckpoint.id)}
