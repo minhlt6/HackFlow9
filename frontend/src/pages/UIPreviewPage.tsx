@@ -5,6 +5,7 @@ import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { CountdownTimer } from '../components/CountdownTimer';
 import { CheckpointSubmissionForm } from '../components/CheckpointSubmissionForm';
+import { SubmissionHistoryTable } from '../components/SubmissionHistoryTable';
 import type { CheckpointStatus, SubmissionStatus, Submission } from '../types/checkpoint';
 
 export const UIPreviewPage: React.FC = () => {
@@ -25,6 +26,9 @@ export const UIPreviewPage: React.FC = () => {
   const [previewGraceApplied, setPreviewGraceApplied] = useState<boolean>(false);
   const [previewStartTime] = useState(() => new Date().toISOString());
   const [previewDeadline] = useState(() => new Date(Date.now() + 86400000).toISOString());
+  const [sampleTwoMinutesAgoTime] = useState(() =>
+    new Date(Date.now() - 2 * 60 * 1000).toISOString()
+  );
 
   const canSubmit = previewWindowStatus === 'open' || previewWindowStatus === 'grace_period';
 
@@ -354,6 +358,64 @@ export const UIPreviewPage: React.FC = () => {
             currentSubmission={previewSubmission}
             userRole={previewRole}
             isLeader={previewRole === 'TEAM_LEADER'}
+          />
+        </div>
+
+        {/* 7. Bảng hiển thị lịch sử nộp bài (HF-31) */}
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h2 className="text-base font-semibold text-white">
+                7. Bảng hiển thị lịch sử nộp bài (HF-31)
+              </h2>
+              <p className="text-xs text-slate-400">
+                Demo tích hợp API GET /submissions, rút gọn Commit SHA 7 ký tự (mở GitHub commit link) và định dạng nhãn thời gian ("2 phút trước", "12/10/2026 15:30").
+              </p>
+            </div>
+          </div>
+
+          <SubmissionHistoryTable
+            submissions={[
+              {
+                id: 'preview-sub-v3',
+                checkpoint_id: previewCheckpoint.id,
+                team_id: 'team-01',
+                repo_url: 'https://github.com/cyber-samurai/hackflow-mvp',
+                demo_url: 'https://hackflow-demo.vercel.app',
+                commit_sha: 'a1b2c3d4e5f678901234567890abcdef12345678', // SHA 40 ký tự
+                status: 'submitted',
+                grace_period_applied: true,
+                submitted_at: sampleTwoMinutesAgoTime, // "2 phút trước"
+                note: 'Bản nộp hoàn thiện MVP với Live Demo và tài liệu kiểm thử',
+              },
+              {
+                id: 'preview-sub-v2',
+                checkpoint_id: previewCheckpoint.id,
+                team_id: 'team-01',
+                repo_url: 'https://github.com/cyber-samurai/hackflow-mvp',
+                demo_url: 'https://figma.com/@cybersamurai/hackflow',
+                commit_sha: '9f8e7d6c5b4a3210fedcba9876543210abcdef12', // SHA 40 ký tự
+                status: 'evaluated',
+                grace_period_applied: false,
+                submitted_at: '2026-10-12T15:30:00.000Z', // "12/10/2026 15:30"
+                feedback: 'Sản phẩm hoàn thiện tốt, đáp ứng 100% tiêu chí đề bài. Điểm: 9.5/10',
+                note: 'Bản nộp thử nghiệm đợt 2',
+              },
+              {
+                id: 'preview-sub-v1',
+                checkpoint_id: previewCheckpoint.id,
+                team_id: 'team-01',
+                repo_url: 'https://github.com/cyber-samurai/hackflow-mvp',
+                demo_url: null,
+                commit_sha: null,
+                status: 'sha_verification_failed',
+                grace_period_applied: false,
+                submitted_at: '2026-10-10T10:15:00.000Z',
+                note: 'Bản nộp ban đầu',
+              },
+            ]}
+            checkpointTitle={previewCheckpoint.title}
+            isFinalCheckpoint={true}
           />
         </div>
       </div>
