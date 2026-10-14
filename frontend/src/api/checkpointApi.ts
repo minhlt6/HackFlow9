@@ -31,7 +31,7 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
       },
     ],
     latest_submission: {
-      id: 'sub-01',
+      id: 'sub-01-v2',
       checkpoint_id: 'cp-01',
       team_id: 'team-01',
       repo_url: null,
@@ -41,7 +41,7 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
       grace_period_applied: false,
       submitted_at: '2026-10-08T21:15:30.000Z',
       feedback: 'Ý tưởng rõ ràng, wireframe đáp ứng đầy đủ luồng người dùng chính.',
-      note: 'Bản nộp tài liệu giai đoạn 1',
+      note: 'Bản cập nhật bổ sung User Flow và sơ đồ cấu trúc dữ liệu',
     },
   },
   {
@@ -106,7 +106,37 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
   },
 ];
 
+// Danh sách mock lịch sử nộp bài ban đầu (HF-31)
+const INITIAL_MOCK_SUBMISSION_HISTORY: Submission[] = [
+  {
+    id: 'sub-01-v2',
+    checkpoint_id: 'cp-01',
+    team_id: 'team-01',
+    repo_url: null,
+    demo_url: 'https://figma.com/@cybersamurai/hackflow',
+    commit_sha: null,
+    status: 'evaluated',
+    grace_period_applied: false,
+    submitted_at: '2026-10-08T21:15:30.000Z',
+    feedback: 'Ý tưởng rõ ràng, wireframe đáp ứng đầy đủ luồng người dùng chính.',
+    note: 'Bản cập nhật bổ sung User Flow và sơ đồ cấu trúc dữ liệu',
+  },
+  {
+    id: 'sub-01-v1',
+    checkpoint_id: 'cp-01',
+    team_id: 'team-01',
+    repo_url: null,
+    demo_url: 'https://figma.com/@cybersamurai/hackflow-draft',
+    commit_sha: null,
+    status: 'submitted',
+    grace_period_applied: false,
+    submitted_at: '2026-10-05T14:20:00.000Z',
+    note: 'Bản thảo ý tưởng sơ bộ và khung sườn Wireframe',
+  },
+];
+
 const LOCAL_STORAGE_SUBMISSIONS_KEY = 'hackflow_checkpoint_submissions';
+const LOCAL_STORAGE_HISTORY_KEY = 'hackflow_checkpoint_submission_history';
 
 function getStoredSubmissions(): Record<string, Submission> {
   try {
@@ -121,6 +151,26 @@ function saveStoredSubmission(submission: Submission) {
   const all = getStoredSubmissions();
   all[submission.checkpoint_id] = submission;
   localStorage.setItem(LOCAL_STORAGE_SUBMISSIONS_KEY, JSON.stringify(all));
+}
+
+function getStoredHistory(): Submission[] {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredHistory(submission: Submission) {
+  try {
+    const current = getStoredHistory();
+    // Đẩy bản nộp mới lên đầu danh sách lịch sử
+    const updated = [submission, ...current.filter((s) => s.id !== submission.id)];
+    localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updated));
+  } catch {
+    // ignore
+  }
 }
 
 export const checkpointApi = {
@@ -152,8 +202,6 @@ export const checkpointApi = {
   /**
    * Nộp bài cho một Checkpoint (HF-30 & SRS HF-23)
    * Gửi repo_url (bắt buộc nếu là chặng cuối), demo_url, submission_data và note lên hệ thống.
-   * Gỡ bỏ hoàn toàn logic tự sinh commit SHA ảo khi gặp lỗi mạng/404.
-   * Khi API trả về lỗi thì ném lỗi để UI hiển thị thông báo lỗi rõ ràng cho thí sinh.
    */
   submitCheckpoint: async (
     checkpointId: string,
@@ -166,6 +214,7 @@ export const checkpointApi = {
 
     if (response.data && response.data.data) {
       saveStoredSubmission(response.data.data);
+      saveStoredHistory(response.data.data);
       return response.data.data;
     }
 
@@ -173,25 +222,67 @@ export const checkpointApi = {
   },
 
   /**
-   * Lấy lịch sử bài nộp của một checkpoint
+   * Tích hợp API GET /submissions để hiển thị table lịch sử nộp bài (HF-31 AC-1)
+   * Có hỗ trợ lọc theo checkpointId hoặc lấy toàn bộ lịch sử nộp của đội thi.
    */
-  getSubmissionHistory: async (checkpointId: string): Promise<Submission[]> => {
+  getSubmissions: async (checkpointId?: string): Promise<Submission[]> => {
+    // 1. Thử gọi API GET /submissions theo chuẩn REST
     try {
-      const response = await axiosClient.get<ApiResponse<Submission[]>>(
-        `/checkpoints/${checkpointId}/submissions`
-      );
+      const url = checkpointId ? `/submissions?checkpoint_id=${checkpointId}` : '/submissions';
+      const response = await axiosClient.get<ApiResponse<Submission[]>>(url);
       if (response.data && response.data.data) {
         return response.data.data;
       }
     } catch {
-      // fallback
+      // 2. Thử endpoint lồng /checkpoints/:id/submissions nếu có checkpointId
+      if (checkpointId) {
+        try {
+          const cpResponse = await axiosClient.get<ApiResponse<Submission[]>>(
+            `/checkpoints/${checkpointId}/submissions`
+          );
+          if (cpResponse.data && cpResponse.data.data) {
+            return cpResponse.data.data;
+          }
+        } catch {
+          // fallback xuống local
+        }
+      }
     }
 
-    const stored = getStoredSubmissions();
-    if (stored[checkpointId]) {
-      return [stored[checkpointId]];
+    // 3. Fallback: Lấy từ Local Storage kết hợp Initial Mock Data
+    const storedHistory = getStoredHistory();
+    const allHistory = [...storedHistory];
+
+    for (const mockItem of INITIAL_MOCK_SUBMISSION_HISTORY) {
+      if (!allHistory.some((item) => item.id === mockItem.id)) {
+        allHistory.push(mockItem);
+      }
     }
-    const defaultCp = INITIAL_MOCK_CHECKPOINTS.find((c) => c.id === checkpointId);
-    return defaultCp?.latest_submission ? [defaultCp.latest_submission] : [];
+
+    // Nếu có checkpointId cụ thể, lọc theo checkpoint_id
+    if (checkpointId) {
+      const filtered = allHistory.filter((s) => s.checkpoint_id === checkpointId);
+      if (filtered.length > 0) {
+        return filtered;
+      }
+
+      // Nếu trong history chưa có nhưng latest_submission có trong storedSubmissions
+      const stored = getStoredSubmissions();
+      if (stored[checkpointId]) {
+        return [stored[checkpointId]];
+      }
+
+      const defaultCp = INITIAL_MOCK_CHECKPOINTS.find((c) => c.id === checkpointId);
+      return defaultCp?.latest_submission ? [defaultCp.latest_submission] : [];
+    }
+
+    return allHistory;
+  },
+
+  /**
+   * Lấy lịch sử bài nộp của một checkpoint (backward compatibility)
+   */
+  getSubmissionHistory: async (checkpointId: string): Promise<Submission[]> => {
+    return checkpointApi.getSubmissions(checkpointId);
   },
 };
