@@ -5,6 +5,7 @@ import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { CountdownTimer } from '../components/CountdownTimer';
 import { CheckpointSubmissionForm } from '../components/CheckpointSubmissionForm';
+import type { CheckpointStatus, SubmissionStatus, Submission } from '../types/checkpoint';
 
 export const UIPreviewPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,23 +20,80 @@ export const UIPreviewPage: React.FC = () => {
 
   const [isPreviewFinal, setIsPreviewFinal] = useState<boolean>(true);
   const [previewRole, setPreviewRole] = useState<'TEAM_LEADER' | 'MEMBER'>('TEAM_LEADER');
+  const [previewWindowStatus, setPreviewWindowStatus] = useState<CheckpointStatus>('open');
+  const [previewSubState, setPreviewSubState] = useState<'none' | SubmissionStatus>('none');
+  const [previewGraceApplied, setPreviewGraceApplied] = useState<boolean>(false);
   const [previewStartTime] = useState(() => new Date().toISOString());
   const [previewDeadline] = useState(() => new Date(Date.now() + 86400000).toISOString());
+
+  const canSubmit = previewWindowStatus === 'open' || previewWindowStatus === 'grace_period';
 
   const previewCheckpoint = {
     id: isPreviewFinal ? 'preview-cp-final' : 'preview-cp-intermediate',
     title: isPreviewFinal
       ? 'Checkpoint 3: MVP Hoàn chỉnh & Video Pitch Deck (Chặng cuối)'
-      : 'Checkpoint 1: Đăng ký Ý tưởng & Wireframe (Chặng tiến độ)',
+      : 'Checkpoint 2: Báo cáo Kiến trúc & Prototype (Chặng tiến độ)',
     description: isPreviewFinal
       ? 'Chặng chốt sản phẩm: Bắt buộc GitHub repo và hệ thống sẽ đóng băng Commit SHA.'
-      : 'Chặng tiến độ: Nộp slide/tài liệu/demo, không bắt buộc GitHub repo và không đóng băng commit.',
+      : 'Chặng tiến độ: Render theo submission_fields, ẩn ô GitHub repo và không đóng băng commit.',
     start_time: previewStartTime,
     deadline: previewDeadline,
-    is_active: true,
+    is_active: previewWindowStatus !== 'closed',
     is_final_checkpoint: isPreviewFinal,
-    status: 'open' as const,
+    grace_period_seconds: 5,
+    status: previewWindowStatus,
+    is_open: canSubmit,
+    can_submit: canSubmit,
+    submission_fields: isPreviewFinal
+      ? [
+          {
+            field_key: 'repo_url',
+            field_label: 'GitHub Repository URL',
+            required: true,
+            apply_sha_freeze: true,
+          },
+          {
+            field_key: 'demo_url',
+            field_label: 'Link Live Demo / Video Pitch Deck',
+            required: false,
+            apply_sha_freeze: false,
+          },
+        ]
+      : [
+          {
+            field_key: 'demo_url',
+            field_label: 'Link Báo cáo tiến độ / Prototype Figma',
+            required: true,
+            apply_sha_freeze: false,
+          },
+          {
+            field_key: 'presentation_pdf',
+            field_label: 'Slide thuyết trình tiến độ (PDF / Google Slides)',
+            required: false,
+            apply_sha_freeze: false,
+          },
+        ],
   };
+
+  const previewSubmission: Submission | null =
+    previewSubState === 'none'
+      ? null
+      : {
+          id: 'preview-sub-01',
+          checkpoint_id: previewCheckpoint.id,
+          team_id: 'team-01',
+          repo_url: isPreviewFinal ? 'https://github.com/cyber-samurai/hackflow-mvp' : null,
+          demo_url: 'https://hackflow-demo.vercel.app',
+          commit_sha:
+            isPreviewFinal &&
+            (previewSubState === 'submitted' || previewSubState === 'evaluated')
+              ? 'a1b2c3d4e5f678901234567890abcdef12345678'
+              : null,
+          status: previewSubState,
+          grace_period_applied: previewGraceApplied,
+          submitted_at: new Date().toISOString(),
+          note: 'Bản nộp thử nghiệm trên trang Preview UI',
+        };
 
   const handleResetShortTimer = () => {
     setShortTimerEndTime(new Date(Date.now() + 15 * 1000).toISOString());
@@ -163,7 +221,7 @@ export const UIPreviewPage: React.FC = () => {
                 6. Form nộp bài Checkpoint (HF-30 & SRS HF-23)
               </h2>
               <p className="text-xs text-slate-400">
-                Phân biệt Chặng thường (không ép repo, không freeze SHA) vs Chặng cuối (bắt buộc repo & freeze SHA) và kiểm tra quyền Đội trưởng.
+                Kiểm thử nhanh loại chặng, quyền Đội trưởng/Thành viên, trạng thái cổng thời gian và trạng thái bài nộp.
               </p>
             </div>
             <a
@@ -174,66 +232,126 @@ export const UIPreviewPage: React.FC = () => {
             </a>
           </div>
 
-          {/* Điều khiển Test nhanh các tiêu chí feedback */}
-          <div className="flex flex-wrap items-center gap-3 p-3 bg-[#1E293B]/70 rounded-lg border border-[#334155] text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-400 font-medium">Loại chặng:</span>
-              <button
-                type="button"
-                onClick={() => setIsPreviewFinal(false)}
-                className={`px-2.5 py-1 rounded text-xs transition-colors ${
-                  !isPreviewFinal
-                    ? 'bg-indigo-600 text-white font-semibold'
-                    : 'bg-[#0F172A] text-slate-400 hover:text-white'
-                }`}
-              >
-                Chặng tiến độ (HF-23)
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPreviewFinal(true)}
-                className={`px-2.5 py-1 rounded text-xs transition-colors ${
-                  isPreviewFinal
-                    ? 'bg-rose-600 text-white font-semibold'
-                    : 'bg-[#0F172A] text-slate-400 hover:text-white'
-                }`}
-              >
-                Chặng cuối (Freeze SHA)
-              </button>
+          {/* Điều khiển Test nhanh các tiêu chí feedback (Chỉ đặt tại UIPreviewPage) */}
+          <div className="space-y-2.5 p-3 bg-[#1E293B]/70 rounded-lg border border-[#334155] text-xs">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 font-medium">Loại chặng:</span>
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewFinal(false)}
+                  className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                    !isPreviewFinal
+                      ? 'bg-indigo-600 text-white font-semibold'
+                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Chặng tiến độ (Ẩn Repo)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsPreviewFinal(true)}
+                  className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                    isPreviewFinal
+                      ? 'bg-rose-600 text-white font-semibold'
+                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Chặng cuối (Freeze SHA)
+                </button>
+              </div>
+
+              <div className="h-4 w-px bg-slate-700 mx-1 hidden sm:block" />
+
+              <div className="flex items-center gap-1.5">
+                <span className="text-slate-400 font-medium">Quyền hạn:</span>
+                <button
+                  type="button"
+                  onClick={() => setPreviewRole('TEAM_LEADER')}
+                  className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                    previewRole === 'TEAM_LEADER'
+                      ? 'bg-emerald-600 text-white font-semibold'
+                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Đội trưởng (TEAM_LEADER)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewRole('MEMBER')}
+                  className={`px-2.5 py-1 rounded text-xs transition-colors ${
+                    previewRole === 'MEMBER'
+                      ? 'bg-amber-600 text-white font-semibold'
+                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Thành viên (MEMBER)
+                </button>
+              </div>
             </div>
 
-            <div className="h-4 w-px bg-slate-700 mx-1 hidden sm:block" />
+            <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-slate-700/60">
+              <span className="text-slate-400 font-medium">Trạng thái cổng:</span>
+              {(['open', 'grace_period', 'upcoming', 'closed'] as CheckpointStatus[]).map((st) => (
+                <button
+                  key={st}
+                  type="button"
+                  onClick={() => setPreviewWindowStatus(st)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                    previewWindowStatus === st
+                      ? 'bg-[#6366F1] text-white font-semibold'
+                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {st}
+                </button>
+              ))}
+            </div>
 
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-400 font-medium">Quyền hạn:</span>
+            <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-slate-700/60">
+              <span className="text-slate-400 font-medium">Trạng thái bài nộp:</span>
+              {(
+                [
+                  'none',
+                  'submitted',
+                  'pending_sha_freeze',
+                  'sha_verification_failed',
+                  'evaluated',
+                  'invalid',
+                ] as const
+              ).map((subSt) => (
+                <button
+                  key={subSt}
+                  type="button"
+                  onClick={() => setPreviewSubState(subSt)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
+                    previewSubState === subSt
+                      ? 'bg-cyan-600 text-white font-semibold'
+                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                  }`}
+                >
+                  {subSt}
+                </button>
+              ))}
+
               <button
                 type="button"
-                onClick={() => setPreviewRole('TEAM_LEADER')}
-                className={`px-2.5 py-1 rounded text-xs transition-colors ${
-                  previewRole === 'TEAM_LEADER'
-                    ? 'bg-emerald-600 text-white font-semibold'
-                    : 'bg-[#0F172A] text-slate-400 hover:text-white'
-                }`}
-              >
-                Đội trưởng (Submit OK)
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewRole('MEMBER')}
-                className={`px-2.5 py-1 rounded text-xs transition-colors ${
-                  previewRole === 'MEMBER'
+                onClick={() => setPreviewGraceApplied((prev) => !prev)}
+                className={`ml-auto px-2 py-0.5 rounded text-[11px] transition-colors ${
+                  previewGraceApplied
                     ? 'bg-amber-600 text-white font-semibold'
                     : 'bg-[#0F172A] text-slate-400 hover:text-white'
                 }`}
               >
-                Thành viên (Disabled)
+                grace_period_applied: {String(previewGraceApplied)}
               </button>
             </div>
           </div>
 
           <CheckpointSubmissionForm
-            key={`${previewCheckpoint.id}-${previewRole}`}
+            key={`${previewCheckpoint.id}-${previewRole}-${previewWindowStatus}-${previewSubState}-${previewGraceApplied}`}
             checkpoint={previewCheckpoint}
+            currentSubmission={previewSubmission}
             userRole={previewRole}
             isLeader={previewRole === 'TEAM_LEADER'}
           />

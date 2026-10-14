@@ -18,15 +18,27 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
     requirements: 'Tài liệu PRD/SRS và link Figma hoặc Wireframe sơ bộ.',
     is_active: false,
     is_final_checkpoint: false, // Chặng tiến độ trung gian: không bắt buộc repo, không đóng băng SHA
+    grace_period_seconds: 5,
     status: 'closed',
+    is_open: false,
+    can_submit: false,
+    submission_fields: [
+      {
+        field_key: 'demo_url',
+        field_label: 'Link Tài liệu PRD/SRS & Wireframe Figma',
+        required: true,
+        apply_sha_freeze: false,
+      },
+    ],
     latest_submission: {
       id: 'sub-01',
       checkpoint_id: 'cp-01',
       team_id: 'team-01',
-      repo_url: 'https://github.com/cyber-samurai/hackflow-project',
+      repo_url: null,
       demo_url: 'https://figma.com/@cybersamurai/hackflow',
       commit_sha: null, // Chặng trung gian không đóng băng SHA
       status: 'evaluated',
+      grace_period_applied: false,
       submitted_at: '2026-10-08T21:15:30.000Z',
       feedback: 'Ý tưởng rõ ràng, wireframe đáp ứng đầy đủ luồng người dùng chính.',
       note: 'Bản nộp tài liệu giai đoạn 1',
@@ -41,8 +53,25 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
     deadline: new Date(Date.now() + (2 * 24 * 3600 + 4 * 3600) * 1000).toISOString(),
     requirements: 'Link báo cáo tiến độ, tài liệu kiến trúc hoặc link demo (Không bắt buộc GitHub và không đóng băng SHA).',
     is_active: true,
-    is_final_checkpoint: false, // Chặng tiến độ trung gian
+    is_final_checkpoint: false, // Chặng tiến độ trung gian: ẩn ô GitHub Repo nếu không yêu cầu
+    grace_period_seconds: 5,
     status: 'open',
+    is_open: true,
+    can_submit: true,
+    submission_fields: [
+      {
+        field_key: 'demo_url',
+        field_label: 'Link Báo cáo tiến độ / Kiến trúc hệ thống / Prototype',
+        required: true,
+        apply_sha_freeze: false,
+      },
+      {
+        field_key: 'presentation_pdf',
+        field_label: 'Link Slide thuyết trình tiến độ (PDF / Google Slides)',
+        required: false,
+        apply_sha_freeze: false,
+      },
+    ],
     latest_submission: null,
   },
   {
@@ -55,7 +84,24 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
     requirements: 'Mã nguồn đầy đủ các tính năng cam kết trên GitHub repository public. Hệ thống sẽ ghi nhận Commit HEAD tại thời điểm nộp bài.',
     is_active: true,
     is_final_checkpoint: true, // Chặng cuối cùng: Bắt buộc GitHub repo & đóng băng Commit SHA
+    grace_period_seconds: 5,
     status: 'upcoming',
+    is_open: false,
+    can_submit: false,
+    submission_fields: [
+      {
+        field_key: 'repo_url',
+        field_label: 'GitHub Repository URL',
+        required: true,
+        apply_sha_freeze: true,
+      },
+      {
+        field_key: 'demo_url',
+        field_label: 'Link Live Demo / Video Pitch Deck',
+        required: false,
+        apply_sha_freeze: false,
+      },
+    ],
     latest_submission: null,
   },
 ];
@@ -105,7 +151,7 @@ export const checkpointApi = {
 
   /**
    * Nộp bài cho một Checkpoint (HF-30 & SRS HF-23)
-   * Gửi repo_url (bắt buộc nếu là chặng cuối), demo_url và note lên hệ thống.
+   * Gửi repo_url (bắt buộc nếu là chặng cuối), demo_url, submission_data và note lên hệ thống.
    * Gỡ bỏ hoàn toàn logic tự sinh commit SHA ảo khi gặp lỗi mạng/404.
    * Khi API trả về lỗi thì ném lỗi để UI hiển thị thông báo lỗi rõ ràng cho thí sinh.
    */
