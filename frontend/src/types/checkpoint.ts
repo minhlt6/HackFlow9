@@ -220,3 +220,77 @@ export function getSubmissionStatusMeta(status: SubmissionStatus, isFinal: boole
       };
   }
 }
+
+/**
+ * Cắt ngắn Commit SHA (40 ký tự) xuống 7 ký tự đầu theo chuẩn Git/GitHub (HF-31 AC-2)
+ */
+export function formatCommitSha(sha?: string | null): string {
+  if (!sha || !sha.trim()) return '-';
+  const clean = sha.trim();
+  return clean.length <= 7 ? clean : clean.slice(0, 7);
+}
+
+/**
+ * Tạo đường dẫn liên kết trực tiếp tới GitHub Commit (HF-31 AC-2)
+ */
+export function getCommitUrl(repoUrl?: string | null, commitSha?: string | null): string | null {
+  if (!commitSha || !commitSha.trim()) return null;
+  const sha = commitSha.trim();
+  if (repoUrl && repoUrl.trim().startsWith('http')) {
+    const cleanRepo = repoUrl.trim().replace(/\/$/, '');
+    return `${cleanRepo}/commit/${sha}`;
+  }
+  return null;
+}
+
+/**
+ * Định dạng nhãn thời gian nộp bài gồm cả thời gian tương đối và tuyệt đối (HF-31 AC-3)
+ * Ví dụ: "2 phút trước", "12/10/2026 15:30"
+ */
+export function formatSubmissionTime(dateString: string): {
+  relative: string;
+  absolute: string;
+  combined: string;
+} {
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) {
+    return { relative: 'Vừa xong', absolute: dateString, combined: dateString };
+  }
+
+  const now = new Date();
+  const diffSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+
+  let relative: string;
+  if (diffSeconds < 15) {
+    relative = 'Vừa xong';
+  } else if (diffSeconds < 60) {
+    relative = `${diffSeconds} giây trước`;
+  } else if (diffSeconds < 3600) {
+    const mins = Math.floor(diffSeconds / 60);
+    relative = `${mins} phút trước`;
+  } else if (diffSeconds < 86400) {
+    const hours = Math.floor(diffSeconds / 3600);
+    relative = `${hours} giờ trước`;
+  } else if (diffSeconds < 86400 * 30) {
+    const days = Math.floor(diffSeconds / 86400);
+    relative = `${days} ngày trước`;
+  } else {
+    const months = Math.floor(diffSeconds / (86400 * 30));
+    relative = `${months} tháng trước`;
+  }
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const day = pad(date.getDate());
+  const month = pad(date.getMonth() + 1);
+  const year = date.getFullYear();
+  const hours = pad(date.getHours());
+  const minutes = pad(date.getMinutes());
+  const absolute = `${day}/${month}/${year} ${hours}:${minutes}`;
+
+  return {
+    relative,
+    absolute,
+    combined: `${relative} (${absolute})`,
+  };
+}
+

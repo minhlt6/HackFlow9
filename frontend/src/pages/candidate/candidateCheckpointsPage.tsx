@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   CheckSquare,
   Clock,
@@ -12,6 +12,7 @@ import {
 import { Badge } from '../../components/Badge';
 import { CountdownTimer } from '../../components/CountdownTimer';
 import { CheckpointSubmissionForm } from '../../components/CheckpointSubmissionForm';
+import { SubmissionHistoryTable } from '../../components/SubmissionHistoryTable';
 import { checkpointApi } from '../../api/checkpointApi';
 import { useAuthStore } from '../../store/useAuthStore';
 import {
@@ -25,16 +26,35 @@ export const CandidateCheckpointsPage: React.FC = () => {
   const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Lấy người dùng hiện tại từ AuthStore (Không hiển thị thanh chuyển đổi vai trò giả lập trên trang thật)
+  // Danh sách lịch sử nộp bài của checkpoint được chọn (HF-31)
+  const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [isSubmissionsLoading, setIsSubmissionsLoading] = useState<boolean>(false);
+
+  // Lấy người dùng hiện tại từ AuthStore
   const authUser = useAuthStore((state) => state.user);
   const userRole = authUser?.team_role || authUser?.role;
 
-  // Load danh sách checkpoints
+  // Tải lịch sử nộp bài của checkpoint (HF-31 AC-1)
+  const fetchSubmissions = useCallback(async (cpId: string) => {
+    try {
+      setIsSubmissionsLoading(true);
+      const data = await checkpointApi.getSubmissions(cpId);
+      setSubmissions(data);
+    } catch (err) {
+      console.error('Lỗi khi tải lịch sử nộp bài:', err);
+    } finally {
+      setIsSubmissionsLoading(false);
+    }
+  }, []);
+
+  // Load danh sách checkpoints & lịch sử nộp bài ban đầu
   useEffect(() => {
-    const fetchCheckpoints = async () => {
+    let isMounted = true;
+    const fetchInitialData = async () => {
       try {
         setIsLoading(true);
         const data = await checkpointApi.getCheckpoints();
+        if (!isMounted) return;
         setCheckpoints(data);
 
         // Mặc định chọn checkpoint đang mở ('open' hoặc 'grace_period') hoặc checkpoint đầu tiên
@@ -42,21 +62,36 @@ export const CandidateCheckpointsPage: React.FC = () => {
           data.find((cp) => cp.status === 'open' || cp.status === 'grace_period') || data[0];
         if (openCp) {
           setSelectedCheckpointId(openCp.id);
+          const history = await checkpointApi.getSubmissions(openCp.id);
+          if (isMounted) {
+            setSubmissions(history);
+          }
         }
       } catch (err) {
         console.error('Lỗi khi tải danh sách checkpoints:', err);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchCheckpoints();
+    fetchInitialData();
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const handleSelectCheckpoint = (cpId: string) => {
+    setSelectedCheckpointId(cpId);
+    fetchSubmissions(cpId);
+  };
 
   const selectedCheckpoint = checkpoints.find((cp) => cp.id === selectedCheckpointId);
 
   // Callback khi nộp bài thành công từ CheckpointSubmissionForm
   const handleSubmissionSuccess = (newSub: Submission) => {
+    // 1. Cập nhật latest_submission trong danh sách checkpoint
     setCheckpoints((prev) =>
       prev.map((cp) => {
         if (cp.id === newSub.checkpoint_id) {
@@ -68,6 +103,9 @@ export const CandidateCheckpointsPage: React.FC = () => {
         return cp;
       })
     );
+
+    // 2. Đẩy bài nộp mới lên đầu bảng lịch sử nộp bài (HF-31)
+    setSubmissions((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
   };
 
   const getStatusBadge = (status?: string) => {
@@ -98,7 +136,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
               Tiến độ và Nộp bài Checkpoint
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-              Quản lý tiến độ các chặng thi và đóng băng Commit SHA theo chuẩn kiến trúc SRS HF-23.
+              Quản lý tiến độ các chặng thi, đóng băng Commit SHA và theo dõi lịch sử bài nộp của đội.
             </p>
           </div>
         </div>
@@ -136,7 +174,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                 return (
                   <div
                     key={cp.id}
-                    onClick={() => setSelectedCheckpointId(cp.id)}
+                    onClick={() => handleSelectCheckpoint(cp.id)}
                     className={`p-4 rounded-[14px] border transition-all cursor-pointer relative overflow-hidden ${
                       isSelected
                         ? 'bg-[#1E293B] border-[#6366F1] shadow-lg shadow-[#6366F1]/10 ring-1 ring-[#6366F1]/50'
@@ -242,7 +280,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
             </div>
           </div>
 
-          {/* CỘT PHẢI: CHI TIẾT CHECKPOINT & FORM NỘP BÀI (7 CỘT) */}
+          {/* CỘT PHẢI: CHI TIẾT CHECKPOINT, FORM NỘP BÀI & BẢNG LỊCH SỬ NỘP BÀI (7 CỘT) */}
           <div className="lg:col-span-7 space-y-6">
             {selectedCheckpoint ? (
               <div className="space-y-6">
@@ -371,6 +409,15 @@ export const CandidateCheckpointsPage: React.FC = () => {
                     onSuccess={handleSubmissionSuccess}
                   />
                 </div>
+
+                {/* BẢNG HIỂN THỊ LỊCH SỬ NỘP BÀI CỦA ĐỘI THI (HF-31) */}
+                <SubmissionHistoryTable
+                  submissions={submissions}
+                  isLoading={isSubmissionsLoading}
+                  checkpointTitle={selectedCheckpoint.title}
+                  isFinalCheckpoint={Boolean(selectedCheckpoint.is_final_checkpoint)}
+                  onRefresh={() => fetchSubmissions(selectedCheckpoint.id)}
+                />
               </div>
             ) : (
               <div className="p-12 text-center rounded-[16px] bg-[#0F172A] border border-[#334155]">
