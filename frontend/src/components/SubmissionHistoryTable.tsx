@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   History,
   GitCommit,
@@ -10,6 +10,7 @@ import {
   MessageSquare,
   ShieldCheck,
   AlertTriangle,
+  AlertCircle,
   Inbox,
 } from 'lucide-react';
 import { Badge } from './Badge';
@@ -44,6 +45,7 @@ const GithubIcon: React.FC<{ size?: number; className?: string }> = ({
 export interface SubmissionHistoryTableProps {
   submissions: Submission[];
   isLoading?: boolean;
+  errorMessage?: string | null;
   checkpointTitle?: string;
   isFinalCheckpoint?: boolean;
   onRefresh?: () => void;
@@ -53,11 +55,30 @@ export interface SubmissionHistoryTableProps {
 export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
   submissions,
   isLoading = false,
+  errorMessage = null,
   checkpointTitle,
   isFinalCheckpoint = false,
   onRefresh,
   className = '',
 }) => {
+  // Tự động làm mới nhãn thời gian tương đối mỗi 30 giây (HF-31 Review Lỗi 4)
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Sắp xếp danh sách nộp bài theo thời gian submitted_at giảm dần (Mới nhất lên đầu) (HF-31 Review Lỗi 2)
+  const sortedSubmissions = useMemo(() => {
+    return [...submissions].sort((a, b) => {
+      const timeA = new Date(a.submitted_at).getTime() || 0;
+      const timeB = new Date(b.submitted_at).getTime() || 0;
+      return timeB - timeA;
+    });
+  }, [submissions]);
+
   return (
     <div
       className={`rounded-[16px] bg-[#0F172A] border border-[#334155] shadow-xl overflow-hidden ${className}`}
@@ -73,9 +94,11 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
               <h3 className="text-base sm:text-lg font-bold text-white tracking-wide">
                 Lịch sử nộp bài
               </h3>
-              <Badge variant="indigo" size="sm">
-                {submissions.length} lần nộp
-              </Badge>
+              {!isLoading && !errorMessage && (
+                <Badge variant="indigo" size="sm">
+                  {sortedSubmissions.length} lần nộp
+                </Badge>
+              )}
             </div>
             {checkpointTitle && (
               <p className="text-xs text-slate-400 mt-0.5 truncate max-w-md">
@@ -99,13 +122,37 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
         )}
       </div>
 
-      {/* Nội dung bảng hoặc Loading / Empty State */}
+      {/* Trạng thái Loading */}
       {isLoading ? (
         <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-400">
           <RefreshCw size={24} className="animate-spin text-[#818CF8]" />
           <p className="text-xs">Đang tải lịch sử các lần nộp bài...</p>
         </div>
-      ) : submissions.length === 0 ? (
+      ) : errorMessage ? (
+        /* Trạng thái Lỗi API thật kèm nút Thử lại (HF-31 Review Lỗi 1) */
+        <div className="p-10 text-center flex flex-col items-center justify-center gap-3">
+          <div className="p-3 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30">
+            <AlertCircle size={26} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-rose-300">
+              Không thể tải lịch sử nộp bài
+            </p>
+            <p className="text-xs text-rose-200/80 max-w-md">{errorMessage}</p>
+          </div>
+          {onRefresh && (
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium bg-[#1E293B] hover:bg-[#334155] text-white border border-[#334155] transition-colors"
+            >
+              <RefreshCw size={12} />
+              <span>Thử lại</span>
+            </button>
+          )}
+        </div>
+      ) : sortedSubmissions.length === 0 ? (
+        /* Trạng thái Rỗng (Chưa có bài nộp nào) */
         <div className="p-12 text-center flex flex-col items-center justify-center gap-3 text-slate-400">
           <div className="p-3 rounded-full bg-[#1E293B] text-slate-500 border border-[#334155]">
             <Inbox size={26} />
@@ -120,6 +167,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
           </div>
         </div>
       ) : (
+        /* Bảng hiển thị danh sách bài nộp */
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
@@ -133,7 +181,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                 <th scope="col" className="py-3 px-4 min-w-[140px]">
                   Commit SHA
                 </th>
-                <th scope="col" className="py-3 px-4 min-w-[170px]">
+                <th scope="col" className="py-3 px-4 min-w-[180px]">
                   Tài nguyên nộp
                 </th>
                 <th scope="col" className="py-3 px-4 min-w-[130px]">
@@ -145,9 +193,10 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#334155]/60">
-              {submissions.map((sub, index) => {
+              {sortedSubmissions.map((sub, index) => {
                 const isLatest = index === 0;
-                const versionNumber = submissions.length - index;
+                // Phiên bản tăng dần theo thứ tự thời gian: bản cũ nhất là v1, bản mới nhất là vN
+                const versionNumber = sortedSubmissions.length - index;
                 const timeInfo = formatSubmissionTime(sub.submitted_at);
                 const statusMeta = getSubmissionStatusMeta(sub.status, isFinalCheckpoint);
                 const shortSha = formatCommitSha(sub.commit_sha);
@@ -160,7 +209,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                       isLatest ? 'bg-[#1E293B]/15' : ''
                     }`}
                   >
-                    {/* Cột 1: Phiên bản nộp */}
+                    {/* Cột 1: Phiên bản nộp (v1, v2...) & Nhãn Mới nhất */}
                     <td className="py-3.5 px-4 font-mono">
                       <div className="flex items-center gap-1.5">
                         <span className="font-bold text-slate-200">v{versionNumber}</span>
@@ -191,7 +240,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                       </div>
                     </td>
 
-                    {/* Cột 3: Commit SHA cắt ngắn 7 ký tự & click mở link GitHub (HF-31 AC-2) */}
+                    {/* Cột 3: Commit SHA (HF-31 AC-2 & Review Lỗi 3) */}
                     <td className="py-3.5 px-4">
                       {sub.commit_sha ? (
                         commitUrl ? (
@@ -218,10 +267,19 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                             <span className="font-semibold">{shortSha}</span>
                           </span>
                         )
+                      ) : statusMeta.normalizedStatus === 'pending_sha_freeze' ? (
+                        <span className="inline-flex items-center gap-1 text-indigo-300 text-[11px] font-medium">
+                          <RefreshCw size={11} className="animate-spin text-indigo-400 shrink-0" />
+                          <span>Đang lấy SHA...</span>
+                        </span>
                       ) : statusMeta.normalizedStatus === 'sha_verification_failed' ? (
-                        <span className="inline-flex items-center gap-1 text-amber-300 text-[11px]">
+                        <span className="inline-flex items-center gap-1 text-amber-300 text-[11px] font-medium">
                           <AlertTriangle size={12} className="shrink-0 text-amber-400" />
                           <span>Chờ xác minh</span>
+                        </span>
+                      ) : isFinalCheckpoint ? (
+                        <span className="text-slate-500 font-mono text-xs italic">
+                          - (Chưa có SHA)
                         </span>
                       ) : (
                         <span className="text-slate-500 font-mono text-xs italic">
@@ -230,7 +288,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                       )}
                     </td>
 
-                    {/* Cột 4: Tài nguyên nộp (Repo / Demo URL) */}
+                    {/* Cột 4: Tài nguyên nộp (Repo, Demo URL & Các link từ submission_data - Review Lỗi 3) */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-1.5">
                         {sub.repo_url && (
@@ -239,7 +297,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 text-slate-200 hover:text-indigo-300 transition-colors truncate max-w-[200px]"
-                            title={sub.repo_url}
+                            title={`GitHub Repo: ${sub.repo_url}`}
                           >
                             <GithubIcon size={13} className="shrink-0 text-slate-400" />
                             <span className="truncate">{sub.repo_url.replace(/^https?:\/\//, '')}</span>
@@ -253,7 +311,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1.5 text-cyan-300 hover:text-cyan-200 transition-colors truncate max-w-[200px]"
-                            title={sub.demo_url}
+                            title={`Demo / Báo cáo: ${sub.demo_url}`}
                           >
                             <Globe size={13} className="shrink-0 text-cyan-400" />
                             <span className="truncate">{sub.demo_url.replace(/^https?:\/\//, '')}</span>
@@ -261,7 +319,35 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                           </a>
                         )}
 
-                        {!sub.repo_url && !sub.demo_url && (
+                        {/* Các link động cấu hình từ sub.submission_data */}
+                        {sub.submission_data &&
+                          Object.entries(sub.submission_data).map(([key, val]) => {
+                            if (!val || typeof val !== 'string') return null;
+                            if (val === sub.repo_url || val === sub.demo_url) return null;
+                            const isUrl = /^https?:\/\/.+/i.test(val);
+                            if (!isUrl) return null;
+
+                            const label = key
+                              .replace(/_/g, ' ')
+                              .replace(/\b\w/g, (c) => c.toUpperCase());
+
+                            return (
+                              <a
+                                key={key}
+                                href={val}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-indigo-300 hover:text-indigo-200 transition-colors truncate max-w-[200px]"
+                                title={`${label}: ${val}`}
+                              >
+                                <Globe size={13} className="shrink-0 text-indigo-400" />
+                                <span className="truncate">{label}: {val.replace(/^https?:\/\//, '')}</span>
+                                <ExternalLink size={10} className="shrink-0 text-slate-500" />
+                              </a>
+                            );
+                          })}
+
+                        {!sub.repo_url && !sub.demo_url && !sub.submission_data && (
                           <span className="text-slate-500 text-xs">-</span>
                         )}
                       </div>
