@@ -36,6 +36,19 @@ class VerifyGitHubRepoResponse(BaseModel):
     author: Optional[str] = Field(None, description="Tên tác giả commit")
     committed_at: Optional[datetime] = Field(None, description="Thời điểm commit chuẩn UTC")
     html_url: Optional[str] = Field(None, description="Link xem commit trực tiếp trên GitHub")
+    status: str = Field(
+        "submitted",
+        description="Trạng thái xác thực theo SRS HF-23: 'submitted' | 'sha_verification_failed'",
+    )
+    error_code: Optional[str] = Field(
+        None,
+        description="Mã lỗi nghiệp vụ nếu kích hoạt fallback (vd: 'GITHUB_API_UNAVAILABLE')",
+    )
+    retry_attempts: int = Field(
+        1,
+        ge=1,
+        description="Số lần đã gọi thử GitHub REST API (tối đa 3 lần khi gặp sự cố mạng/5xx/rate-limit)",
+    )
     is_verified: bool = Field(..., description="True nếu xác thực SHA thành công")
     is_fallback: bool = Field(
         False,
@@ -53,8 +66,10 @@ class GitHubFreezeResult(BaseModel):
     commit_sha: Optional[str] = None
     repo_url: Optional[str] = None
     status: str
+    error_code: Optional[str] = None
     commit_message: Optional[str] = None
     author: Optional[str] = None
     committed_at: Optional[datetime] = None
+    retry_attempts: int = 0
     is_fallback: bool = False
     incident_note: Optional[str] = None

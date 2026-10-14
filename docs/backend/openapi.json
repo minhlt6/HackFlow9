@@ -3809,6 +3809,31 @@
             "title": "Html Url",
             "description": "Link xem commit trực tiếp trên GitHub"
           },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Trạng thái xác thực theo SRS HF-23: 'submitted' | 'sha_verification_failed'",
+            "default": "submitted"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "Mã lỗi nghiệp vụ nếu kích hoạt fallback (vd: 'GITHUB_API_UNAVAILABLE')"
+          },
+          "retry_attempts": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Retry Attempts",
+            "description": "Số lần đã gọi thử GitHub REST API (tối đa 3 lần khi gặp sự cố mạng/5xx/rate-limit)",
+            "default": 1
+          },
           "is_verified": {
             "type": "boolean",
             "title": "Is Verified",
