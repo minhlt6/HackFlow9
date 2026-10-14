@@ -1,6 +1,6 @@
 import json
 from functools import lru_cache
-from typing import List, Union
+from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -58,10 +58,11 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 
-    # GitHub OAuth Settings (for HF-19)
+    # GitHub OAuth Settings (for HF-19) & GitHub REST API Settings (for HF-33)
     GITHUB_CLIENT_ID: str = ""
     GITHUB_CLIENT_SECRET: str = ""
     GITHUB_REDIRECT_URI: str = "http://localhost:5173/auth/callback"
+    GITHUB_API_TOKEN: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

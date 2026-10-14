@@ -14,8 +14,10 @@ from app.schemas.checkpoint import (
     CheckpointValidateWindowRequest,
     ValidateSubmissionWindowResponse,
 )
+from app.schemas.github import VerifyGitHubRepoRequest, VerifyGitHubRepoResponse
 from app.schemas.response import ApiResponse, success_response
 from app.services.checkpoint_service import checkpoint_service
+from app.services.github_service import github_service
 
 router = APIRouter()
 
@@ -37,6 +39,33 @@ async def list_checkpoints(
     return success_response(
         data=checkpoints,
         message=f"Lấy danh sách checkpoint thành công ({len(checkpoints)} mốc).",
+    )
+
+
+@router.post(
+    "/verify-github-repo",
+    response_model=ApiResponse[VerifyGitHubRepoResponse],
+    summary="Xác thực kho mã nguồn GitHub và trích xuất HEAD Commit SHA (HF-33)",
+)
+async def verify_github_repo(
+    body: VerifyGitHubRepoRequest,
+    _: User = Depends(get_current_user),
+) -> ApiResponse[VerifyGitHubRepoResponse]:
+    """
+    Module xác thực repository GitHub công khai và trích xuất HEAD Commit SHA mới nhất (HF-33):
+    - Parse owner/repo từ URL hợp lệ (hỗ trợ .git, tree/branch, format shorthand).
+    - Gọi GitHub REST API xác thực trạng thái public và commit mới nhất.
+    - Cơ chế Retry 3 lần đối với sự cố kết nối / timeout.
+    - Graceful Fallback (bảo lưu trạng thái đối soát thủ công) nếu hạ tầng GitHub gặp sự cố.
+    - Từ chối HTTP 422 (GITHUB_REPO_INACCESSIBLE) nếu repo là Private hoặc không tồn tại.
+    """
+    result = await github_service.fetch_head_commit(
+        repo_url=body.repo_url,
+        branch=body.branch,
+    )
+    return success_response(
+        data=result,
+        message=result.message,
     )
 
 
