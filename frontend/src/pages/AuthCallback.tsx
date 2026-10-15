@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { axiosClient } from '../api/axiosClient';
 import { useAuthStore } from '../store/useAuthStore';
+import { useMockStore } from '../store/useMockStore';
 import type { ApprovalStatus, User, UserRole } from '../types';
 
 
@@ -18,6 +19,12 @@ interface BackendUser {
   github_username?: string;
   avatarUrl?: string;
   avatar_url?: string;
+  studentId?: string;
+  student_id?: string;
+  university?: string;
+  school?: string;
+  phone?: string;
+  skills?: string[];
 }
 
 interface AuthPayload {
@@ -46,6 +53,8 @@ const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
   const approvalStatus = backendUser.approvalStatus || backendUser.approval_status;
   const githubUsername = backendUser.githubUsername || backendUser.github_username;
   const avatarUrl = backendUser.avatarUrl || backendUser.avatar_url;
+  const studentId = backendUser.studentId || backendUser.student_id;
+  const university = backendUser.university || backendUser.school;
 
   if (!fullName || !approvalStatus || !isUserRole(backendUser.role) || !isApprovalStatus(approvalStatus)) {
     return null;
@@ -59,7 +68,34 @@ const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
     approvalStatus,
     githubUsername,
     avatarUrl,
+    studentId,
+    university,
+    school: university,
+    phone: backendUser.phone,
+    skills: Array.isArray(backendUser.skills) ? backendUser.skills : undefined,
   };
+};
+
+const syncMockStoreWithUser = (user: User) => {
+  const mockStore = useMockStore.getState();
+  let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected' = 'leader';
+  if (user.role === 'admin') targetPersona = 'admin';
+  else if (user.role === 'judge') targetPersona = 'judge';
+  else if (user.role === 'mentor') targetPersona = 'mentor';
+  else if (user.approvalStatus === 'pending') targetPersona = 'pending';
+  else if (user.approvalStatus === 'rejected') targetPersona = 'rejected';
+  else if (user.email.toLowerCase().includes('member')) targetPersona = 'member';
+  else targetPersona = 'leader';
+
+  mockStore.switchPersona(targetPersona);
+  mockStore.updateCurrentUserProfile({
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+    approvalStatus: user.approvalStatus,
+    githubUsername: user.githubUsername,
+    avatarUrl: user.avatarUrl,
+  });
 };
 
 const getRedirectPath = (user: User): string => {
@@ -115,6 +151,7 @@ export const AuthCallback: React.FC = () => {
         }
 
         login(user, token);
+        syncMockStoreWithUser(user);
         navigate(getRedirectPath(user), { replace: true });
       } catch {
         processedOAuthCodes.delete(code);

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Eye, EyeOff, UserRound, Lock, AlertCircle, LogIn } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { axiosClient } from '../api/axiosClient';
@@ -114,6 +114,7 @@ export const LoginPage: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingGithub, setIsLoadingGithub] = useState(false);
+  const [prefetchedGithubUrl, setPrefetchedGithubUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(() =>
     searchParams.get('error') === 'auth_rejected'
       ? 'Tài khoản chưa được phê duyệt để truy cập hệ thống.'
@@ -121,6 +122,28 @@ export const LoginPage: React.FC = () => {
       ? 'Đăng nhập thất bại. Vui lòng thử lại.'
       : null,
   );
+
+  // Pre-fetch GitHub OAuth URL on mount so clicking the button redirects immediately
+  useEffect(() => {
+    let active = true;
+    const redirectUri = `${window.location.origin}/auth/callback`;
+    axiosClient
+      .get<{ url?: string; data?: { url?: string } }>('/auth/github', {
+        params: { redirect_uri: redirectUri },
+      })
+      .then((response) => {
+        const authUrl = response.data.data?.url || response.data.url;
+        if (active && authUrl) {
+          setPrefetchedGithubUrl(authUrl);
+        }
+      })
+      .catch(() => {
+        // Ignore pre-fetch error; will retry on click
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Unified Login Handler
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -156,6 +179,11 @@ export const LoginPage: React.FC = () => {
   const handleGithubLogin = async () => {
     setErrorMessage(null);
     setIsLoadingGithub(true);
+
+    if (prefetchedGithubUrl) {
+      window.location.href = prefetchedGithubUrl;
+      return;
+    }
 
     try {
       const redirectUri = `${window.location.origin}/auth/callback`;

@@ -10,7 +10,7 @@ from sqlalchemy import text
 from app.core.config import settings
 
 # Create async engine with connection pooling and pre-ping
-_engine_kwargs = {"echo": settings.DEBUG, "pool_pre_ping": True}
+_engine_kwargs = {"echo": False, "pool_pre_ping": True, "pool_recycle": 300}
 if not settings.async_database_url.startswith("sqlite"):
     _engine_kwargs["pool_size"] = 5
     _engine_kwargs["max_overflow"] = 10
@@ -40,7 +40,7 @@ def switch_to_sqlite_fallback() -> None:
     sqlite_url = "sqlite+aiosqlite:///./hackflow.db"
     engine = create_async_engine(
         sqlite_url,
-        echo=settings.DEBUG,
+        echo=False,
         pool_pre_ping=True,
     )
     AsyncSessionLocal.configure(bind=engine)
@@ -68,7 +68,8 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            await session.commit()
+            if session.new or session.dirty or session.deleted:
+                await session.commit()
         except Exception:
             await session.rollback()
             raise

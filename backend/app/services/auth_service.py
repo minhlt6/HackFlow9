@@ -1,5 +1,7 @@
+import asyncio
 from typing import Any, Dict, Optional, Tuple
 import httpx
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -14,6 +16,10 @@ from app.repositories.user_repo import user_repo
 from app.repositories.whitelist_repo import whitelist_repo
 from app.schemas.auth import RegisterRequest
 
+_github_http_client = httpx.AsyncClient(
+    timeout=10.0,
+    limits=httpx.Limits(max_keepalive_connections=10, max_connections=20),
+)
 
 
 class AuthService:
@@ -113,7 +119,7 @@ class AuthService:
     ) -> Tuple[User, str]:
         """
         Exchange GitHub OAuth authorization code for GitHub access token,
-        fetch GitHub profile and emails, and upsert local user.
+        fetch GitHub profile and emails concurrently, and upsert local user.
         Supports development mock tokens for testing when secrets are not configured.
         """
         github_id: Optional[str] = None
@@ -124,52 +130,48 @@ class AuthService:
 
         if settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET:
             target_redirect_uri = (redirect_uri or "").strip() or settings.GITHUB_REDIRECT_URI
-            # 1. Exchange code for access token with GitHub
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                token_res = await client.post(
-                    "https://github.com/login/oauth/access_token",
-                    headers={"Accept": "application/json"},
-                    data={
-                        "client_id": settings.GITHUB_CLIENT_ID,
-                        "client_secret": settings.GITHUB_CLIENT_SECRET,
-                        "code": code,
-                        "redirect_uri": target_redirect_uri,
-                    },
-                )
-                if token_res.status_code != 200:
-                    raise BadRequestException(message="Lỗi khi xác thực mã code với GitHub.")
+            # 1. Exchange code for access token with GitHub (reusing pooled client)
+            token_res = await _github_http_client.post(
+                "https://github.com/login/oauth/access_token",
+                headers={"Accept": "application/json"},
+                data={
+                    "client_id": settings.GITHUB_CLIENT_ID,
+                    "client_secret": settings.GITHUB_CLIENT_SECRET,
+                    "code": code,
+                    "redirect_uri": target_redirect_uri,
+                },
+            )
+            if token_res.status_code != 200:
+                raise BadRequestException(message="Lỗi khi xác thực mã code với GitHub.")
 
-                token_data = token_res.json()
-                gh_token = token_data.get("access_token")
-                if not gh_token:
-                    error_desc = token_data.get("error_description", "Không lấy được access token từ GitHub.")
-                    raise BadRequestException(message=f"GitHub OAuth thất bại: {error_desc}")
+            token_data = token_res.json()
+            gh_token = token_data.get("access_token")
+            if not gh_token:
+                error_desc = token_data.get("error_description", "Không lấy được access token từ GitHub.")
+                raise BadRequestException(message=f"GitHub OAuth thất bại: {error_desc}")
 
-                # 2. Fetch user profile from GitHub
-                user_res = await client.get(
-                    "https://api.github.com/user",
-                    headers={"Authorization": f"Bearer {gh_token}", "Accept": "application/json"},
-                )
-                if user_res.status_code != 200:
-                    raise BadRequestException(message="Không thể lấy thông tin người dùng từ GitHub.")
+            auth_headers = {"Authorization": f"Bearer {gh_token}", "Accept": "application/json"}
 
-                profile = user_res.json()
-                github_id = str(profile.get("id"))
-                github_username = profile.get("login")
-                full_name = (profile.get("name") or github_username or "").strip()
-                avatar_url = profile.get("avatar_url")
-                email = profile.get("email")
+            # 2. Fetch user profile and emails from GitHub IN PARALLEL
+            user_res, emails_res = await asyncio.gather(
+                _github_http_client.get("https://api.github.com/user", headers=auth_headers),
+                _github_http_client.get("https://api.github.com/user/emails", headers=auth_headers),
+            )
+            if user_res.status_code != 200:
+                raise BadRequestException(message="Không thể lấy thông tin người dùng từ GitHub.")
 
-                # Fetch primary email from /user/emails endpoint
-                emails_res = await client.get(
-                    "https://api.github.com/user/emails",
-                    headers={"Authorization": f"Bearer {gh_token}", "Accept": "application/json"},
-                )
-                if emails_res.status_code == 200:
-                    emails_data = emails_res.json()
-                    if isinstance(emails_data, list):
-                        primary_email = next((e["email"] for e in emails_data if e.get("primary")), None)
-                        email = primary_email or email or (emails_data[0]["email"] if emails_data else None)
+            profile = user_res.json()
+            github_id = str(profile.get("id"))
+            github_username = profile.get("login")
+            full_name = (profile.get("name") or github_username or "").strip()
+            avatar_url = profile.get("avatar_url")
+            email = profile.get("email")
+
+            if emails_res.status_code == 200:
+                emails_data = emails_res.json()
+                if isinstance(emails_data, list):
+                    primary_email = next((e["email"] for e in emails_data if e.get("primary")), None)
+                    email = primary_email or email or (emails_data[0]["email"] if emails_data else None)
         else:
             # Development fallback / mock when credentials are placeholders
             github_id = f"dev-gh-{code}"
@@ -181,42 +183,54 @@ class AuthService:
         if not email:
             raise BadRequestException(message="Tài khoản GitHub không cung cấp email hợp lệ.")
 
-        # 3. Check whitelist: whitelisted emails get APPROVED immediately,
-        #    unknown emails get PENDING and wait for BTC manual review.
-        whitelist_entry = await whitelist_repo.get_by_email(db, email)
-        initial_approval = (
-            ApprovalStatus.APPROVED.value
-            if whitelist_entry
-            else ApprovalStatus.PENDING.value
-        )
+        clean_email = email.lower().strip()
 
-        # 4. Check existing user by github_id or email
-        user = await user_repo.get_by_github_id(db, github_id)
-        if not user:
-            user = await user_repo.get_by_email(db, email)
+        # 3. Single combined query for existing user by github_id OR email
+        user_stmt = select(User).where(
+            or_(User.github_id == str(github_id), User.email == clean_email)
+        )
+        user_result = await db.execute(user_stmt)
+        user = user_result.scalars().first()
+
+        # Only query whitelist if user does not exist yet or is still pending
+        whitelist_entry = None
+        if not user or user.approval_status == ApprovalStatus.PENDING.value:
+            whitelist_entry = await whitelist_repo.get_by_email(db, clean_email)
 
         if user:
-            # Update github linkage, email, and avatar
+            changed = False
             if not user.github_id:
                 user.github_id = github_id
-            user.github_username = github_username
-            user.email = email.lower().strip()
-            if full_name:
+                changed = True
+            if github_username and user.github_username != github_username:
+                user.github_username = github_username
+                changed = True
+            if user.email != clean_email:
+                user.email = clean_email
+                changed = True
+            if full_name and user.full_name != full_name:
                 user.full_name = full_name
-            if avatar_url:
+                changed = True
+            if avatar_url and user.avatar_url != avatar_url:
                 user.avatar_url = avatar_url
-            # If user was PENDING and now email is in whitelist → promote to APPROVED
+                changed = True
             if (
                 user.approval_status == ApprovalStatus.PENDING.value
                 and whitelist_entry
             ):
                 user.approval_status = ApprovalStatus.APPROVED.value
-            db.add(user)
-            await db.flush()
+                changed = True
+            if changed:
+                db.add(user)
+                await db.flush()
         else:
-            # Create new user with approval status based on whitelist
+            initial_approval = (
+                ApprovalStatus.APPROVED.value
+                if whitelist_entry
+                else ApprovalStatus.PENDING.value
+            )
             user = User(
-                email=email.lower().strip(),
+                email=clean_email,
                 full_name=full_name or "Thí sinh Hackathon",
                 github_id=github_id,
                 github_username=github_username,
@@ -225,7 +239,8 @@ class AuthService:
                 approval_status=initial_approval,
                 is_active=True,
             )
-            user = await user_repo.create(db, user)
+            db.add(user)
+            await db.flush()
 
         token = cls.create_user_token(user)
         return user, token
