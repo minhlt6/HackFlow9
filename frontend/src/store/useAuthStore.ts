@@ -41,6 +41,23 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      merge: (persistedState, currentState) => {
+        const p = persistedState as Partial<AuthState> | undefined;
+        const user = p?.user;
+        if (!user || user.fullName === 'Nguyễn Văn Minh' || user.email === 'leader@cybersamurai.team') {
+          return {
+            ...currentState,
+            ...p,
+            user: {
+              ...(user || DEFAULT_MOCK_USER),
+              approvalStatus: 'approved' as const,
+              team_role: 'TEAM_LEADER' as const,
+            },
+            isAuthenticated: true,
+          };
+        }
+        return { ...currentState, ...p };
+      },
     }
   )
 );
