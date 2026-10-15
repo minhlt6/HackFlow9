@@ -281,6 +281,40 @@ class CheckpointService:
             message=message,
         )
 
+    @staticmethod
+    def _normalize_submission_fields(
+        is_final_checkpoint: bool,
+        raw_fields: Optional[List[dict]],
+    ) -> Optional[List[dict]]:
+        """
+        SRS HF-23 Mục 1.1:
+        - Nếu is_final_checkpoint = False: Tự động bỏ qua (ép apply_sha_freeze = False) trên mọi trường.
+        - Nếu is_final_checkpoint = True: Trường có apply_sha_freeze = True bắt buộc phải có required = True,
+          và tối đa chỉ có 1 trường được bật apply_sha_freeze = True.
+        """
+        if raw_fields is None:
+            return None
+
+        normalized: List[dict] = []
+        freeze_count = 0
+
+        for item in raw_fields:
+            field_copy = dict(item)
+            if not is_final_checkpoint:
+                field_copy["apply_sha_freeze"] = False
+            else:
+                if field_copy.get("apply_sha_freeze"):
+                    freeze_count += 1
+                    field_copy["required"] = True
+            normalized.append(field_copy)
+
+        if is_final_checkpoint and freeze_count > 1:
+            raise BadRequestException(
+                message="Checkpoint chốt sản phẩm cuối cùng chỉ được phép cấu hình tối đa 1 trường apply_sha_freeze = true."
+            )
+
+        return normalized
+
     async def create_checkpoint(
         self,
         db: AsyncSession,
@@ -292,11 +326,12 @@ class CheckpointService:
         if deadline_utc <= start_utc:
             raise BadRequestException(message="Hạn chót (deadline) phải diễn ra sau thời điểm mở cổng (start_time).")
 
-        fields_dump = (
+        raw_fields = (
             [f.model_dump() for f in data.submission_fields]
             if data.submission_fields is not None
             else None
         )
+        fields_dump = self._normalize_submission_fields(data.is_final_checkpoint, raw_fields)
 
         checkpoint = await checkpoint_repo.create(
             db=db,
@@ -333,12 +368,26 @@ class CheckpointService:
             update_fields["requirements"] = data.requirements
         if data.is_active is not None:
             update_fields["is_active"] = data.is_active
+
+        effective_is_final = (
+            data.is_final_checkpoint
+            if data.is_final_checkpoint is not None
+            else bool(cp.is_final_checkpoint)
+        )
         if data.is_final_checkpoint is not None:
             update_fields["is_final_checkpoint"] = data.is_final_checkpoint
         if data.grace_period_seconds is not None:
             update_fields["grace_period_seconds"] = data.grace_period_seconds
+
         if data.submission_fields is not None:
-            update_fields["submission_fields"] = [f.model_dump() for f in data.submission_fields]
+            raw_fields = [f.model_dump() for f in data.submission_fields]
+            update_fields["submission_fields"] = self._normalize_submission_fields(
+                effective_is_final, raw_fields
+            )
+        elif data.is_final_checkpoint is False and cp.submission_fields:
+            update_fields["submission_fields"] = self._normalize_submission_fields(
+                False, list(cp.submission_fields)
+            )
 
         new_start = ensure_utc(data.start_time) if data.start_time is not None else ensure_utc(cp.start_time)
         new_deadline = ensure_utc(data.deadline) if data.deadline is not None else ensure_utc(cp.deadline)

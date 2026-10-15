@@ -1088,6 +1088,53 @@
         }
       }
     },
+    "/api/v1/checkpoints/verify-github-repo": {
+      "post": {
+        "tags": [
+          "Checkpoints (HF-32)"
+        ],
+        "summary": "Xác thực kho mã nguồn GitHub và trích xuất HEAD Commit SHA (HF-33)",
+        "description": "Module xác thực repository GitHub công khai và trích xuất HEAD Commit SHA mới nhất (HF-33):\n- Parse owner/repo từ URL hợp lệ (hỗ trợ .git, tree/branch, format shorthand).\n- Gọi GitHub REST API xác thực trạng thái public và commit mới nhất.\n- Cơ chế Retry 3 lần đối với sự cố kết nối / timeout.\n- Graceful Fallback (bảo lưu trạng thái đối soát thủ công) nếu hạ tầng GitHub gặp sự cố.\n- Từ chối HTTP 422 (GITHUB_REPO_INACCESSIBLE) nếu repo là Private hoặc không tồn tại.",
+        "operationId": "verify_github_repo_api_v1_checkpoints_verify_github_repo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyGitHubRepoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_VerifyGitHubRepoResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/checkpoints/{checkpoint_id}": {
       "get": {
         "tags": [
@@ -2089,6 +2136,50 @@
         },
         "type": "object",
         "title": "ApiResponse[ValidateSubmissionWindowResponse]"
+      },
+      "ApiResponse_VerifyGitHubRepoResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerifyGitHubRepoResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "default": "Success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "type": "object",
+        "title": "ApiResponse[VerifyGitHubRepoResponse]"
       },
       "ApiResponse_WhitelistBulkAddResponse_": {
         "properties": {
@@ -3598,6 +3689,178 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "VerifyGitHubRepoRequest": {
+        "properties": {
+          "repo_url": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 5,
+            "title": "Repo Url",
+            "description": "Đường dẫn repository GitHub (vd: https://github.com/owner/repo hoặc đuôi .git)",
+            "examples": [
+              "https://github.com/torvalds/linux"
+            ]
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch",
+            "description": "Tên nhánh cần lấy SHA (tùy chọn). Mặc định lấy commit HEAD của default branch."
+          }
+        },
+        "type": "object",
+        "required": [
+          "repo_url"
+        ],
+        "title": "VerifyGitHubRepoRequest",
+        "description": "Request model for inspecting public GitHub repository and latest HEAD commit."
+      },
+      "VerifyGitHubRepoResponse": {
+        "properties": {
+          "repo_url": {
+            "type": "string",
+            "title": "Repo Url"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner"
+          },
+          "repo": {
+            "type": "string",
+            "title": "Repo"
+          },
+          "branch": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Branch"
+          },
+          "commit_sha": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Sha",
+            "description": "Mã hash SHA-1 40 ký tự của commit HEAD mới nhất"
+          },
+          "commit_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Commit Message",
+            "description": "Tiêu đề commit mới nhất"
+          },
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author",
+            "description": "Tên tác giả commit"
+          },
+          "committed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Committed At",
+            "description": "Thời điểm commit chuẩn UTC"
+          },
+          "html_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Html Url",
+            "description": "Link xem commit trực tiếp trên GitHub"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Trạng thái xác thực theo SRS HF-23: 'submitted' | 'sha_verification_failed'",
+            "default": "submitted"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code",
+            "description": "Mã lỗi nghiệp vụ nếu kích hoạt fallback (vd: 'GITHUB_API_UNAVAILABLE')"
+          },
+          "retry_attempts": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Retry Attempts",
+            "description": "Số lần đã gọi thử GitHub REST API (tối đa 3 lần khi gặp sự cố mạng/5xx/rate-limit)",
+            "default": 1
+          },
+          "is_verified": {
+            "type": "boolean",
+            "title": "Is Verified",
+            "description": "True nếu xác thực SHA thành công"
+          },
+          "is_fallback": {
+            "type": "boolean",
+            "title": "Is Fallback",
+            "description": "True nếu GitHub API gặp sự cố và kích hoạt Graceful Fallback chuyển sang đối soát thủ công",
+            "default": false
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "Thông báo chi tiết kết quả xác thực"
+          }
+        },
+        "type": "object",
+        "required": [
+          "repo_url",
+          "owner",
+          "repo",
+          "is_verified",
+          "message"
+        ],
+        "title": "VerifyGitHubRepoResponse",
+        "description": "Response model returning extracted commit metadata and verification status."
       },
       "WhitelistAddRequest": {
         "properties": {

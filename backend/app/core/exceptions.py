@@ -103,6 +103,36 @@ class ConflictException(AppException):
         )
 
 
+class UnprocessableEntityException(AppException):
+    def __init__(
+        self,
+        message: str = "Unprocessable entity",
+        data: Optional[Any] = None,
+        error_code: Optional[str] = None,
+    ):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            data=data,
+            error_code=error_code,
+        )
+
+
+class ServiceUnavailableException(AppException):
+    def __init__(
+        self,
+        message: str = "Service unavailable",
+        data: Optional[Any] = None,
+        error_code: Optional[str] = None,
+    ):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            data=data,
+            error_code=error_code,
+        )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     """
     Register global exception handlers on FastAPI application instance to guarantee

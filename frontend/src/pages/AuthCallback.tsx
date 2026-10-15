@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { axiosClient } from '../api/axiosClient';
 import { useAuthStore } from '../store/useAuthStore';
+import { useMockStore } from '../store/useMockStore';
 import type { ApprovalStatus, User, UserRole } from '../types';
 
 
@@ -14,6 +15,16 @@ interface BackendUser {
   role?: string;
   approvalStatus?: string;
   approval_status?: string;
+  githubUsername?: string;
+  github_username?: string;
+  avatarUrl?: string;
+  avatar_url?: string;
+  studentId?: string;
+  student_id?: string;
+  university?: string;
+  school?: string;
+  phone?: string;
+  skills?: string[];
 }
 
 interface AuthPayload {
@@ -38,8 +49,12 @@ const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
     return null;
   }
 
-  const fullName = backendUser.fullName || backendUser.full_name || backendUser.name;
+  const fullName = (backendUser.fullName || backendUser.full_name || backendUser.name || backendUser.github_username)?.trim();
   const approvalStatus = backendUser.approvalStatus || backendUser.approval_status;
+  const githubUsername = backendUser.githubUsername || backendUser.github_username;
+  const avatarUrl = backendUser.avatarUrl || backendUser.avatar_url;
+  const studentId = backendUser.studentId || backendUser.student_id;
+  const university = backendUser.university || backendUser.school;
 
   if (!fullName || !approvalStatus || !isUserRole(backendUser.role) || !isApprovalStatus(approvalStatus)) {
     return null;
@@ -51,7 +66,36 @@ const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
     fullName,
     role: backendUser.role,
     approvalStatus,
+    githubUsername,
+    avatarUrl,
+    studentId,
+    university,
+    school: university,
+    phone: backendUser.phone,
+    skills: Array.isArray(backendUser.skills) ? backendUser.skills : undefined,
   };
+};
+
+const syncMockStoreWithUser = (user: User) => {
+  const mockStore = useMockStore.getState();
+  let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected' = 'leader';
+  if (user.role === 'admin') targetPersona = 'admin';
+  else if (user.role === 'judge') targetPersona = 'judge';
+  else if (user.role === 'mentor') targetPersona = 'mentor';
+  else if (user.approvalStatus === 'pending') targetPersona = 'pending';
+  else if (user.approvalStatus === 'rejected') targetPersona = 'rejected';
+  else if (user.email.toLowerCase().includes('member')) targetPersona = 'member';
+  else targetPersona = 'leader';
+
+  mockStore.switchPersona(targetPersona);
+  mockStore.updateCurrentUserProfile({
+    fullName: user.fullName,
+    email: user.email,
+    role: user.role,
+    approvalStatus: user.approvalStatus,
+    githubUsername: user.githubUsername,
+    avatarUrl: user.avatarUrl,
+  });
 };
 
 const getRedirectPath = (user: User): string => {
@@ -65,11 +109,13 @@ const getRedirectPath = (user: User): string => {
 
   return {
     admin: '/admin/dashboard',
-    judge: '/judge',
-    mentor: '/mentor',
+    judge: '/judge/dashboard',
+    mentor: '/mentor/dashboard',
     candidate: '/dashboard',
   }[user.role];
 };
+
+const processedOAuthCodes = new Set<string>();
 
 export const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -85,8 +131,17 @@ export const AuthCallback: React.FC = () => {
         return;
       }
 
+      if (processedOAuthCodes.has(code)) {
+        return;
+      }
+      processedOAuthCodes.add(code);
+
       try {
-        const response = await axiosClient.post<AuthResponse>('/auth/github/callback', { code });
+        const redirectUri = `${window.location.origin}/auth/callback`;
+        const response = await axiosClient.post<AuthResponse>('/auth/github/callback', {
+          code,
+          redirect_uri: redirectUri,
+        });
         const authData = response.data.data || response.data;
         const token = authData.token || authData.access_token;
         const user = normalizeUser(authData.user);
@@ -96,8 +151,10 @@ export const AuthCallback: React.FC = () => {
         }
 
         login(user, token);
+        syncMockStoreWithUser(user);
         navigate(getRedirectPath(user), { replace: true });
       } catch {
+        processedOAuthCodes.delete(code);
         navigate('/login?error=auth_failed', { replace: true });
       }
     };

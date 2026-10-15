@@ -5,7 +5,7 @@ import type { TeamDetails, CreateTeamPayload, JoinTeamPayload } from '../types/t
  */
 export const mockTeamNoTeam: TeamDetails | null = null;
 
-export const MOCK_TEAM_STORAGE_KEY = 'hackflow_mock_team';
+export const MOCK_TEAM_STORAGE_KEY = 'hackflow_team_details_v2';
 
 export const getStoredMockTeam = (): TeamDetails => {
   try {
@@ -170,7 +170,7 @@ export const mockCreateTeamApi = async (
         user_id: 'usr-minh-01',
         full_name: 'Nguyễn Văn Minh',
         email: 'leader@cybersamurai.team',
-        role: 'member',
+        role: 'leader',
         github_username: 'github_user',
         university: 'Đại học Bách Khoa Hà Nội',
         joined_at: new Date().toISOString(),

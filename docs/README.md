@@ -26,6 +26,14 @@ docs/
 |---------|-------|---------|--------|
 | [BA-01 — Phân tích Nghiệp vụ & Bài toán HackFlow](./ba/ba-01-ke-hoach-phan-tich-nghiep-vu-bai-toan-hackflo.md) | Bài toán HackFlow · 20 User Stories (US-01~20) · Acceptance Criteria đầy đủ · Ma trận ưu tiên P0/P1 · Danh sách điểm cần chốt | Đinh Phương Ly | Sprint 0 |
 
+### 🟢 Architecture & Database Specification (Backend / System)
+
+| Tài liệu | Mô tả | Tác giả | Sprint |
+|---------|-------|---------|--------|
+| [Kiến trúc Hệ thống Toàn diện (`system-architecture.md`)](./backend/system-architecture.md) | Kiến trúc Full-Stack (React 19 + FastAPI 3-Tier) · Sơ đồ Topology & Sequence · Cơ chế Concurrency `SELECT FOR UPDATE` · Time-Gated Checkpoints · Phân quyền Đội trưởng & Deploy Cloud | Lê Tiến Minh | Sprint 1–4 |
+| [Thiết kế Cơ sở Dữ liệu Chi tiết (`database-schema.md`)](./backend/database-schema.md) | Sơ đồ ERD 12 bảng · Đặc tả từng cột, kiểu dữ liệu, PK/FK, Unique Constraints, Indexes · Mở rộng `user_profiles.json` · Dữ liệu Seed mặc định | Lê Tiến Minh | Sprint 1–4 |
+| [Bàn giao Hợp đồng API (`api-contract-handover.md`)](./backend/api-contract-handover.md) | Chuẩn ApiResponse Envelope · Danh mục Endpoints · Mã lỗi chuẩn hóa | Lê Tiến Minh | Sprint 1–2 |
+
 ---
 
 ## 🤔 Khi nào nên thêm vào `docs/`?

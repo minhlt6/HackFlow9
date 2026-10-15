@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -9,6 +9,14 @@ import {
   Send,
   HelpCircle,
   User,
+  ShieldCheck,
+  ListOrdered,
+  Megaphone,
+  Settings,
+  Scale,
+  Columns,
+  GraduationCap,
+  EyeOff,
   LogOut,
   Menu,
   X,
@@ -16,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../components/Badge';
 import { useAuthStore } from '../store/useAuthStore';
+import { useMockStore } from '../store/useMockStore';
 import { NotificationBell } from '../components/NotificationBell';
 import { NotificationBanner } from '../components/NotificationBanner';
 import { UrgentNotificationModal } from '../components/UrgentNotificationModal';
@@ -23,11 +32,69 @@ import { InfoToast } from '../components/InfoToast';
 
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
+  const {
+    config,
+        switchPersona,
+    updateCurrentUserProfile,
+    logout: mockLogout,
+  } = useMockStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const navigate = useNavigate();
+    const navigate = useNavigate();
+
+  // Synchronize useMockStore persona & profile with the authenticated user from useAuthStore
+  useEffect(() => {
+    if (!user) return;
+
+    let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected' =
+      'leader';
+
+    if (user.role === 'admin') {
+      targetPersona = 'admin';
+    } else if (user.role === 'judge') {
+      targetPersona = 'judge';
+    } else if (user.role === 'mentor') {
+      targetPersona = 'mentor';
+    } else {
+      if (user.approvalStatus === 'pending') {
+        targetPersona = 'pending';
+      } else if (user.approvalStatus === 'rejected') {
+        targetPersona = 'rejected';
+      } else if (
+        user.team_role === 'MEMBER' ||
+        user.team_role === 'member' ||
+        user.email.toLowerCase().includes('member')
+      ) {
+        targetPersona = 'member';
+      } else {
+        targetPersona = 'leader';
+      }
+    }
+
+    switchPersona(targetPersona);
+    updateCurrentUserProfile({
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      approvalStatus: user.approvalStatus,
+      githubUsername: user.githubUsername,
+      avatarUrl: user.avatarUrl,
+    });
+  }, [
+    user?.id,
+    user?.role,
+    user?.approvalStatus,
+    user?.fullName,
+    user?.email,
+    user?.githubUsername,
+    user?.avatarUrl,
+    user?.team_role,
+    switchPersona,
+    updateCurrentUserProfile,
+  ]);
 
   const handleLogout = () => {
     logout();
+    mockLogout();
     navigate('/login');
   };
 
@@ -35,49 +102,123 @@ export const MainLayout: React.FC = () => {
   const displayEmail = user?.email || 'leader@cybersamurai.team';
   const displayInitial = displayName.charAt(0).toUpperCase();
 
+  const currentRole = user?.role || 'candidate';
   const isApproved =
+    currentRole !== 'candidate' ||
     user?.approvalStatus === 'approved' ||
     user?.fullName === 'Nguyễn Văn Minh' ||
     user?.email === 'leader@cybersamurai.team' ||
     !user;
 
-  const menuGroups = [
+  const candidateMenuGroups = isApproved
+    ? [
+        {
+          title: 'Dự án & Đội thi',
+          items: [
+            { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
+            { to: '/teams', label: 'Đội thi của tôi', icon: Users },
+            { to: '/topics', label: 'Chọn đề tài', icon: Lightbulb },
+          ],
+        },
+        {
+          title: 'Tiến trình thi đấu',
+          items: [
+            { to: '/checkpoints', label: 'Tiến độ các chặng', icon: CheckSquare },
+            { to: '/final-submission', label: 'Nộp bài chung cuộc', icon: Send },
+            { to: '/scoreboard', label: 'Bảng xếp hạng', icon: Award },
+          ],
+        },
+        {
+          title: 'Cá nhân & Trợ giúp',
+          items: [
+            { to: '/profile', label: 'Hồ sơ cá nhân', icon: User },
+            { to: '/tickets', label: 'Hỗ trợ trực tuyến', icon: HelpCircle },
+          ],
+        },
+      ]
+    : [
+        {
+          title: 'Hoàn thiện hồ sơ',
+          items: [{ to: '/onboarding', label: 'Hồ sơ cá nhân', icon: User }],
+        },
+      ];
+
+  const adminMenuGroups = [
     {
-      title: 'Dự án & Đội thi',
+      title: 'Quản trị & Xét duyệt',
       items: [
-        { to: '/dashboard', label: 'Tổng quan', icon: LayoutDashboard },
-        {
-          to: '/teams',
-          label: 'Đội thi của tôi',
-          icon: Users,
-          locked: !isApproved,
-          lockReason: 'Mở sau khi hồ sơ được duyệt',
-        },
-        {
-          to: '/topics',
-          label: 'Chọn đề tài',
-          icon: Lightbulb,
-          locked: !isApproved,
-          lockReason: 'Mở sau khi có đội thi',
-        },
+        { to: '/admin/dashboard', label: 'Tổng quan Quản trị', icon: LayoutDashboard },
+        { to: '/admin/approvals', label: 'Phê duyệt tài khoản', icon: ShieldCheck },
+        { to: '/admin/whitelist', label: 'Danh sách hợp lệ', icon: ListOrdered },
+        { to: '/admin/teams', label: 'Quản lý Đội thi', icon: Users },
       ],
     },
     {
-      title: 'Tiến trình thi đấu',
+      title: 'Nội dung & Chấm thi',
       items: [
-        { to: '/checkpoints', label: 'Tiến độ các chặng', icon: CheckSquare },
-        { to: '/final-submission', label: 'Nộp bài chung cuộc', icon: Send },
-        { to: '/scoreboard', label: 'Bảng xếp hạng', icon: Award },
+        { to: '/admin/topics', label: 'Quản lý Đề tài', icon: Lightbulb },
+        { to: '/admin/checkpoints', label: 'Cấu hình chặng nộp', icon: CheckSquare },
+        { to: '/admin/criteria', label: 'Tiêu chí chấm điểm', icon: Scale },
+        { to: '/admin/personnel', label: 'Giám khảo & Cố vấn', icon: GraduationCap },
+        { to: '/admin/results', label: 'Kết quả & Công bố', icon: Award },
       ],
     },
     {
-      title: 'Cá nhân & Trợ giúp',
+      title: 'Hệ thống & Thông báo',
       items: [
-        { to: '/onboarding', label: 'Hồ sơ cá nhân', icon: User },
-        { to: '/tickets', label: 'Hỗ trợ trực tuyến', icon: HelpCircle },
+        { to: '/admin/announcements', label: 'Phát thông báo', icon: Megaphone },
+        { to: '/admin/config', label: 'Cấu hình cuộc thi', icon: Settings },
       ],
     },
   ];
+
+  const judgeMenuGroups = [
+    {
+      title: 'Hội đồng Giám khảo',
+      items: [
+        { to: '/judge/dashboard', label: 'Tổng quan Chấm thi', icon: LayoutDashboard },
+        { to: '/judge/split-screen', label: 'Chấm song song', icon: Columns },
+        { to: '/judge/topics', label: 'Đề tài & Đội thi', icon: Lightbulb },
+        { to: '/judge/results', label: 'Bảng tổng hợp điểm', icon: Award },
+      ],
+    },
+  ];
+
+  const mentorMenuGroups = [
+    {
+      title: 'Cố vấn chuyên môn',
+      items: [
+        { to: '/mentor/dashboard', label: 'Tổng quan Cố vấn', icon: LayoutDashboard },
+        { to: '/mentor/tickets', label: 'Yêu cầu hỗ trợ', icon: HelpCircle },
+        { to: '/mentor/teams', label: 'Đội thi phụ trách', icon: Users },
+        { to: '/mentor/checkpoints', label: 'Tiến độ các chặng', icon: CheckSquare },
+      ],
+    },
+  ];
+
+  const menuGroups =
+    currentRole === 'admin'
+      ? adminMenuGroups
+      : currentRole === 'judge'
+      ? judgeMenuGroups
+      : currentRole === 'mentor'
+      ? mentorMenuGroups
+      : candidateMenuGroups;
+
+  const roleBadgeMeta: {
+    label: string;
+    variant: 'indigo' | 'warning' | 'purple' | 'success';
+  } =
+    currentRole === 'admin'
+      ? { label: 'Quản trị viên', variant: 'indigo' }
+      : currentRole === 'judge'
+      ? { label: 'Giám khảo', variant: 'warning' }
+      : currentRole === 'mentor'
+      ? { label: 'Cố vấn chuyên môn', variant: 'purple' }
+      : {
+          label: isApproved ? 'Thí sinh' : 'Chờ duyệt',
+          variant: isApproved ? 'success' : 'warning',
+        };
 
   return (
     <div className="min-h-screen bg-[#080D18] text-slate-100 flex font-['Roboto'] antialiased">
@@ -122,14 +263,22 @@ export const MainLayout: React.FC = () => {
           {/* Current Role Banner */}
           <div className="p-3.5 mx-3 my-3 rounded-[12px] bg-[#1E293B] border border-[#334155] shrink-0">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#818CF8] font-bold">
-                {displayInitial}
-              </div>
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={displayName}
+                  className="h-10 w-10 shrink-0 rounded-full object-cover border border-[#6366F1]/40"
+                />
+              ) : (
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#818CF8] font-bold">
+                  {displayInitial}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-white truncate">{displayName}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge variant={isApproved ? (user?.team_role === 'TEAM_LEADER' || user?.team_role === 'leader' || !user ? 'indigo' : 'success') : 'warning'} size="sm">
-                    {isApproved ? (user?.team_role === 'TEAM_LEADER' || user?.team_role === 'leader' || !user ? 'Đội trưởng' : 'Thành viên') : 'Chờ duyệt'}
+                  <Badge variant={roleBadgeMeta.variant} size="sm">
+                    {roleBadgeMeta.label}
                   </Badge>
                 </div>
               </div>
@@ -151,7 +300,6 @@ export const MainLayout: React.FC = () => {
                         key={item.to}
                         to={item.to}
                         onClick={() => setMobileMenuOpen(false)}
-                        title={item.locked ? item.lockReason : undefined}
                         className={({ isActive }) =>
                           `flex items-center justify-between px-3.5 py-2.5 rounded-[10px] text-xs sm:text-sm font-medium transition-all group ${
                             isActive
@@ -164,20 +312,24 @@ export const MainLayout: React.FC = () => {
                           <Icon size={18} className="shrink-0" />
                           <span className="truncate">{item.label}</span>
                         </div>
-                        {item.locked && (
-                          <div
-                            className="flex items-center justify-center ml-2 p-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0"
-                            title={item.lockReason}
-                          >
-                            <Lock size={12} />
-                          </div>
-                        )}
                       </NavLink>
                     );
                   })}
                 </div>
               </div>
             ))}
+
+            {currentRole === 'candidate' && !isApproved && (
+              <div className="mx-2 mt-4 rounded-xl border border-amber-500/25 bg-amber-500/10 p-3.5 text-xs text-amber-200/90 leading-relaxed space-y-1.5">
+                <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                  <Lock size={13} className="shrink-0" />
+                  <span>Đang chờ BTC phê duyệt</span>
+                </div>
+                <p className="text-[11px] text-slate-300">
+                  Các chức năng Tổng quan, Đội thi, Chọn đề tài và Nộp bài sẽ tự động hiển thị sau khi hồ sơ của bạn được duyệt.
+                </p>
+              </div>
+            )}
           </nav>
         </div>
 
@@ -206,12 +358,20 @@ export const MainLayout: React.FC = () => {
             </button>
             <div className="hidden sm:block">
               <span className="text-xs font-bold tracking-wider text-slate-300 font-mono">
-                HACKFLOW AI &amp; DEEPTECH HACKATHON 2026
+                {config?.name || 'HACKFLOW AI & DEEPTECH HACKATHON 2026'}
               </span>
+
             </div>
           </div>
 
           <div className="flex items-center gap-4">
+            {config?.blindJudgingMode && (
+              <div className="hidden md:flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-medium">
+                <EyeOff size={14} />
+                <span>Chấm ẩn danh: BẬT</span>
+              </div>
+            )}
+
             <div className="hidden md:flex items-center gap-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-full font-mono">
               <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Live Sync</span>
@@ -224,9 +384,17 @@ export const MainLayout: React.FC = () => {
                 <p className="text-xs font-semibold text-white">{displayName}</p>
                 <p className="text-[10px] text-slate-400">{displayEmail}</p>
               </div>
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#6366F1] text-white font-bold text-xs shadow-md">
-                {displayInitial}
-              </div>
+              {user?.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={displayName}
+                  className="h-8 w-8 rounded-full object-cover border border-[#6366F1]/40 shadow-md"
+                />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#6366F1] text-white font-bold text-xs shadow-md">
+                  {displayInitial}
+                </div>
+              )}
             </div>
           </div>
         </header>

@@ -1,3 +1,5 @@
+import json
+from pathlib import Path
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +11,8 @@ from app.schemas.auth import (
     GitHubOAuthCallbackRequest,
     GitHubOAuthUrlResponse,
     LoginRequest,
+    ProfileUpdateRequest,
+    ProfileUpdateResponse,
     RegisterRequest,
     TokenResponse,
     UserResponse,
@@ -17,6 +21,39 @@ from app.schemas.response import ApiResponse, success_response
 from app.services.auth_service import auth_service
 
 router = APIRouter()
+users_router = APIRouter()
+
+PROFILE_STORE_PATH = Path(__file__).resolve().parents[4] / "user_profiles.json"
+
+
+def _load_profile_store() -> dict:
+    try:
+        if PROFILE_STORE_PATH.exists():
+            return json.loads(PROFILE_STORE_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return {}
+
+
+def _save_profile_store(data: dict) -> None:
+    try:
+        PROFILE_STORE_PATH.write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+    except Exception:
+        pass
+
+
+def _build_user_response(user: User) -> UserResponse:
+    resp = UserResponse.model_validate(user)
+    store = _load_profile_store()
+    extra = store.get(user.id) or store.get(user.email.lower())
+    if isinstance(extra, dict):
+        resp.student_id = extra.get("student_id")
+        resp.school = extra.get("school")
+        resp.phone = extra.get("phone")
+        resp.skills = extra.get("skills")
+    return resp
 
 
 @router.post(
@@ -35,7 +72,7 @@ async def login(
     return success_response(
         data=TokenResponse(
             access_token=token,
-            user=UserResponse.model_validate(user),
+            user=_build_user_response(user),
         ),
         message="Đăng nhập thành công.",
     )
@@ -58,7 +95,7 @@ async def register(
     return success_response(
         data=TokenResponse(
             access_token=token,
-            user=UserResponse.model_validate(user),
+            user=_build_user_response(user),
         ),
         message="Đăng ký tài khoản thành công.",
         status_code=status.HTTP_201_CREATED,
@@ -71,11 +108,13 @@ async def register(
     response_model=ApiResponse[GitHubOAuthUrlResponse],
     summary="Lấy URL chuyển hướng GitHub OAuth 2.0",
 )
-async def get_github_oauth_url() -> ApiResponse[GitHubOAuthUrlResponse]:
+async def get_github_oauth_url(
+    redirect_uri: str | None = None,
+) -> ApiResponse[GitHubOAuthUrlResponse]:
     """
     Tạo URL chuyển hướng người dùng đến trang ủy quyền GitHub OAuth 2.0.
     """
-    url = auth_service.get_github_oauth_url()
+    url = auth_service.get_github_oauth_url(redirect_uri=redirect_uri)
     client_id = settings.GITHUB_CLIENT_ID or "mock-github-client-id"
     return success_response(
         data=GitHubOAuthUrlResponse(url=url, client_id=client_id),
@@ -96,11 +135,13 @@ async def github_oauth_callback(
     Đổi authorization code lấy GitHub profile, tự động tạo tài khoản thí sinh
     (approval_status='pending') nếu lần đầu đăng nhập, và cấp JWT Bearer Token.
     """
-    user, token = await auth_service.authenticate_github_code(db, req.code)
+    user, token = await auth_service.authenticate_github_code(
+        db, req.code, redirect_uri=req.redirect_uri
+    )
     return success_response(
         data=TokenResponse(
             access_token=token,
-            user=UserResponse.model_validate(user),
+            user=_build_user_response(user),
         ),
         message="Xác thực GitHub OAuth thành công.",
     )
@@ -118,8 +159,53 @@ async def get_profile(
     Lấy thông tin hồ sơ của người dùng đang đăng nhập dựa trên JWT Bearer Token.
     """
     return success_response(
-        data=UserResponse.model_validate(current_user),
+        data=_build_user_response(current_user),
         message="Lấy thông tin hồ sơ thành công.",
+    )
+
+
+@users_router.post(
+    "/profile",
+    response_model=ApiResponse[ProfileUpdateResponse],
+    summary="Cập nhật hồ sơ cá nhân thí sinh (Onboarding)",
+)
+async def update_user_profile(
+    req: ProfileUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApiResponse[ProfileUpdateResponse]:
+    """
+    Lưu thông tin hồ sơ cá nhân của thí sinh tại màn hình Onboarding.
+    """
+    current_user.full_name = req.full_name.strip()
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+
+    store = _load_profile_store()
+    extra_payload = {
+        "student_id": (req.student_id or "").strip(),
+        "school": (req.school or "").strip(),
+        "phone": (req.phone or "").strip(),
+        "skills": list(req.skills or []),
+    }
+    store[current_user.id] = extra_payload
+    store[current_user.email.lower()] = extra_payload
+    _save_profile_store(store)
+
+    msg = (
+        "Hồ sơ đã được duyệt thành công!"
+        if current_user.approval_status == "approved"
+        else "Lưu thông tin thành công. Hồ sơ đang được Ban Tổ Chức xét duyệt!"
+    )
+    return success_response(
+        data=ProfileUpdateResponse(
+            approval_status=current_user.approval_status,
+            role=current_user.role,
+            message=msg,
+            user=_build_user_response(current_user),
+        ),
+        message=msg,
     )
 
 

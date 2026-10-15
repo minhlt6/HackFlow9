@@ -20,19 +20,82 @@ logging.basicConfig(
 logger = logging.getLogger("hackflow.main")
 
 
+async def _seed_default_accounts() -> None:
+    """
+    Ensure default demo accounts and whitelist entries exist on fresh deployments (Supabase / SQLite).
+    """
+    from sqlalchemy import select
+    import app.models  # noqa: F401
+    import app.core.database as db_module
+    from app.core.database import Base
+    from app.core.security import hash_password
+    from app.models.user import User
+
+    async with db_module.engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+    default_users = [
+        ("admin@hackflow.dev", "BTC HackFlow Administrator", "admin", "approved", "admin-dev"),
+        ("admin@hackflow.com", "Admin HackFlow", "admin", "approved", "admin-com"),
+        ("judge.tech@hackathon.org", "TS. Nguyễn Hoàng Giám Khảo", "judge", "approved", "judge-hf"),
+        ("mentor.ai@ailab.org.vn", "ThS. Phạm Cố Vấn AI", "mentor", "approved", "mentor-hf"),
+        ("leader@cybersamurai.team", "Trần Minh Trưởng Nhóm", "candidate", "approved", "leader-cyber"),
+        ("member@cybersamurai.team", "Lê Thu Thành Viên", "candidate", "approved", "member-cyber"),
+        ("pending@hust.edu.vn", "Vũ Hoàng Chờ Duyệt", "candidate", "pending", "pending-hust"),
+        ("rejected@fpt.edu.vn", "Đặng Tuấn Từ Chối", "candidate", "rejected", "rejected-fpt"),
+    ]
+    default_pw_hash = hash_password("123456")
+
+    async with db_module.AsyncSessionLocal() as session:
+        for email, full_name, role, approval_status, gh_user in default_users:
+            res = await session.execute(select(User).where(User.email == email))
+            existing = res.scalar_one_or_none()
+            if not existing:
+                session.add(
+                    User(
+                        email=email,
+                        full_name=full_name,
+                        hashed_password=default_pw_hash,
+                        role=role,
+                        approval_status=approval_status,
+                        github_username=gh_user,
+                        is_active=True,
+                    )
+                )
+            elif existing.hashed_password != default_pw_hash:
+                existing.hashed_password = default_pw_hash
+
+        await session.commit()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Application lifespan management: executes startup and shutdown routines.
     """
+    import app.core.database as db_module
+
     # Startup
     logger.info(f"Khởi động {settings.PROJECT_NAME} v{settings.VERSION} [{settings.ENVIRONMENT}]")
+    try:
+        await _seed_default_accounts()
+        logger.info("Đã khởi tạo schema cơ sở dữ liệu và tài khoản mặc định thành công.")
+    except Exception as exc:
+        logger.warning(
+            f"Không thể kết nối DATABASE_URL từ xa ({exc}). Tự động chuyển sang SQLite dự phòng (hackflow.db)..."
+        )
+        try:
+            db_module.switch_to_sqlite_fallback()
+            await _seed_default_accounts()
+            logger.info("Đã khởi tạo SQLite dự phòng (hackflow.db) và tài khoản mặc định thành công.")
+        except Exception as fallback_exc:
+            logger.error(f"Lỗi khi khởi tạo SQLite dự phòng: {fallback_exc}")
     logger.info(f"CORS origins cho phép: {settings.CORS_ORIGINS}")
     logger.info(f"Docs UI sẵn sàng tại: http://localhost:8000/docs")
     yield
     # Shutdown
     logger.info("Đang giải phóng tài nguyên và đóng database engine...")
-    await engine.dispose()
+    await db_module.engine.dispose()
     logger.info("Hoàn tất tắt ứng dụng an toàn.")
 
 
@@ -207,6 +270,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
+        allow_origin_regex=r"https://.*\.(vercel\.app|up\.railway\.app|onrender\.com)",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

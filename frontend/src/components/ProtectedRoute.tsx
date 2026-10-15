@@ -8,6 +8,13 @@ interface ProtectedRouteProps {
   requiredApprovalStatus?: ApprovalStatus;
 }
 
+const roleDashboardMap: Record<UserRole, string> = {
+  admin: '/admin/dashboard',
+  judge: '/judge/dashboard',
+  mentor: '/mentor/dashboard',
+  candidate: '/dashboard',
+};
+
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   allowedRoles,
   requiredApprovalStatus,
@@ -18,18 +25,22 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to="/login" replace />;
   }
 
-  if (requiredApprovalStatus && user.approvalStatus !== requiredApprovalStatus) {
-    if (user.approvalStatus === 'pending') {
+  // Internal staff roles (admin, judge, mentor) are always treated as approved
+  const effectiveApprovalStatus: ApprovalStatus =
+    user.role !== 'candidate' ? 'approved' : user.approvalStatus;
+
+  if (requiredApprovalStatus && effectiveApprovalStatus !== requiredApprovalStatus) {
+    if (effectiveApprovalStatus === 'pending') {
       return <Navigate to="/onboarding" replace />;
     }
-    if (user.approvalStatus === 'rejected') {
+    if (effectiveApprovalStatus === 'rejected') {
       return <Navigate to="/rejected" replace />;
     }
     return <Navigate to="/login" replace />;
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={roleDashboardMap[user.role] || '/dashboard'} replace />;
   }
 
   return <Outlet />;
