@@ -85,21 +85,16 @@ export const AdminTopicsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1
-            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
+            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
           >
             Quản Lý Đề Tài & Hạn Ngạch Đội
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Thiết lập danh mục lĩnh vực đề tài lớn, đề tài nhánh và giới hạn số lượng đội thi đăng ký tối đa.
           </p>
         </div>
@@ -128,7 +123,7 @@ export const AdminTopicsPage: React.FC = () => {
       </div>
 
       {alert && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
           <CheckCircle2 size={15} />
           <span>{alert}</span>
         </div>
@@ -137,10 +132,10 @@ export const AdminTopicsPage: React.FC = () => {
       {/* Major Topics List */}
       <div className="space-y-6">
         {majorTopics.length === 0 ? (
-          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-10 text-center space-y-3">
-            <Lightbulb size={36} className="mx-auto text-slate-500" />
-            <h3 className="font-bold text-white text-base">Chưa có đề tài nào</h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
+          <div className="rounded-[16px] border border-border bg-card p-10 text-center space-y-3">
+            <Lightbulb size={36} className="mx-auto text-muted-foreground" />
+            <h3 className="font-bold text-foreground text-base">Chưa có đề tài nào</h3>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto">
               Hệ thống hiện đang trống. Hãy bấm nút "Thêm Lĩnh Vực Lớn" để tạo chủ đề và đề tài thi đấu từ đầu.
             </p>
             <Button variant="primary" onClick={() => setIsAddMajorOpen(true)} className="gap-2 mt-2">
@@ -152,16 +147,16 @@ export const AdminTopicsPage: React.FC = () => {
           majorTopics.map((major) => (
             <div
               key={major.id}
-              className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4"
+              className="rounded-[16px] border border-border bg-card p-6 space-y-4"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-[#334155]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-border">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6366F1]/20 text-[#818CF8]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6366F1]/20 text-primary">
                     <Lightbulb size={20} />
                   </div>
                   <div>
-                    <h2 className="font-['Righteous'] text-xl text-white">{major.title}</h2>
-                    <p className="text-xs text-slate-400">{major.description}</p>
+                    <h2 className="font-semibold tracking-tight text-foreground text-xl text-foreground">{major.title}</h2>
+                    <p className="text-xs text-muted-foreground">{major.description}</p>
                   </div>
                 </div>
 
@@ -174,7 +169,7 @@ export const AdminTopicsPage: React.FC = () => {
                       setSelectedMajorId(major.id);
                       setIsAddOpen(true);
                     }}
-                    className="text-[#818CF8] hover:text-white"
+                    className="text-primary hover:text-foreground"
                   >
                     + Thêm đề tài con
                   </Button>
@@ -192,7 +187,7 @@ export const AdminTopicsPage: React.FC = () => {
               {/* SubTopics Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {major.subTopics.length === 0 ? (
-                  <div className="col-span-full py-6 text-center text-xs text-slate-400 italic">
+                  <div className="col-span-full py-6 text-center text-xs text-muted-foreground italic">
                     Chưa có đề tài con nào trong lĩnh vực này.
                   </div>
                 ) : (
@@ -204,25 +199,25 @@ export const AdminTopicsPage: React.FC = () => {
                     return (
                       <div
                         key={sub.id}
-                        className="rounded-[12px] bg-[#0F172A] border border-[#334155] p-4 flex flex-col justify-between space-y-3"
+                        className="rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border p-4 flex flex-col justify-between space-y-3"
                       >
                         <div className="space-y-1.5">
                           <div className="flex items-start justify-between gap-2">
-                            <span className="font-bold text-white text-sm">{sub.title}</span>
+                            <span className="font-bold text-foreground text-sm">{sub.title}</span>
                             <Badge variant={isFull ? 'danger' : 'success'}>
                               {isFull ? 'Đã Hết Chỗ' : 'Đang Mở'}
                             </Badge>
                           </div>
-                          <p className="text-xs text-slate-400 leading-relaxed">
+                          <p className="text-xs text-muted-foreground leading-relaxed">
                             {sub.description}
                           </p>
                         </div>
 
-                        <div className="pt-2 border-t border-[#334155]/60 flex items-center justify-between text-xs text-slate-400">
+                        <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
                           <div className="flex items-center gap-1.5">
-                            <Users size={13} className="text-[#818CF8]" />
+                            <Users size={13} className="text-primary" />
                             <span>
-                              Đã đăng ký: <strong className="text-white font-mono">{currentTeams}/{maxQuota}</strong> đội
+                              Đã đăng ký: <strong className="text-foreground font-mono">{currentTeams}/{maxQuota}</strong> đội
                             </span>
                           </div>
 
@@ -269,12 +264,12 @@ export const AdminTopicsPage: React.FC = () => {
           />
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-xs">Mô tả lĩnh vực</label>
+            <label className="text-muted-foreground font-medium text-xs">Mô tả lĩnh vực</label>
             <textarea
               rows={3}
               value={majorDescription}
               onChange={(e) => setMajorDescription(e.target.value)}
-              className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+              className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
               placeholder="Định hướng nghiên cứu, công nghệ trọng tâm..."
             />
           </div>
@@ -298,11 +293,11 @@ export const AdminTopicsPage: React.FC = () => {
       >
         <form onSubmit={handleAddSubTopic} className="space-y-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-xs">Lĩnh vực lớn *</label>
+            <label className="text-muted-foreground font-medium text-xs">Lĩnh vực lớn *</label>
             <select
               value={selectedMajorId}
               onChange={(e) => setSelectedMajorId(e.target.value)}
-              className="p-2.5 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+              className="p-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
               required
             >
               {majorTopics.map((m) => (
@@ -322,12 +317,12 @@ export const AdminTopicsPage: React.FC = () => {
           />
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-xs">Mô tả bài toán & Dữ liệu</label>
+            <label className="text-muted-foreground font-medium text-xs">Mô tả bài toán & Dữ liệu</label>
             <textarea
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+              className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
               placeholder="Yêu cầu kỹ thuật, tập dữ liệu cung cấp..."
             />
           </div>
@@ -368,8 +363,8 @@ export const AdminTopicsPage: React.FC = () => {
         title="Điều Chỉnh Hạn Ngạch Đề Tài"
       >
         <form onSubmit={handleSaveQuota} className="space-y-4">
-          <p className="text-xs text-slate-300">
-            Đề tài: <strong className="text-white">{editingSubTopic?.title}</strong>
+          <p className="text-xs text-muted-foreground">
+            Đề tài: <strong className="text-foreground">{editingSubTopic?.title}</strong>
           </p>
 
           <Input

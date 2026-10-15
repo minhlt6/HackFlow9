@@ -145,12 +145,12 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
   if (teams.length === 0 || !selectedTeam) {
     return (
-      <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-12 text-center font-['Roboto']">
-        <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4">
+      <div className="rounded-[14px] border border-border bg-card p-12 text-center ">
+        <div className="w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-primary flex items-center justify-center mx-auto mb-4">
           <CheckSquare size={32} />
         </div>
-        <h3 className="text-xl font-bold font-['Righteous'] text-white tracking-wide mb-2">Chưa có đội thi sẵn sàng chấm điểm</h3>
-        <p className="text-slate-400 text-sm max-w-md mx-auto">
+        <h3 className="text-xl font-bold font-semibold tracking-tight text-foreground text-foreground tracking-wide mb-2">Chưa có đội thi sẵn sàng chấm điểm</h3>
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
           Hiện tại hệ thống đang ở giai đoạn đầu của cuộc thi. Danh sách sản phẩm chung kết sẽ hiển thị tại đây ngay khi các đội hoàn thành bài nộp.
         </p>
       </div>
@@ -158,15 +158,15 @@ export const JudgeSplitScreenPage: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 font-['Roboto'] h-[calc(100vh-100px)] flex flex-col">
+    <div className="space-y-4  h-[calc(100vh-100px)] flex flex-col">
       {/* Top Bar: Team Switcher & Header */}
-      <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
+      <div className="rounded-[14px] border border-border bg-card px-5 py-3 flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1">
             <button
               onClick={handlePrevTeam}
               disabled={currentTeamIndex === 0}
-              className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-30"
+              className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
               title="Đội trước"
             >
               <ChevronLeft size={20} />
@@ -174,7 +174,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
             <button
               onClick={handleNextTeam}
               disabled={currentTeamIndex === teams.length - 1}
-              className="p-1 rounded text-slate-400 hover:text-white disabled:opacity-30"
+              className="p-1 rounded text-muted-foreground hover:text-foreground disabled:opacity-30"
               title="Đội tiếp theo"
             >
               <ChevronRight size={20} />
@@ -182,14 +182,14 @@ export const JudgeSplitScreenPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400">Đang chấm:</span>
+            <span className="text-xs text-muted-foreground">Đang chấm:</span>
             <select
               value={selectedTeamId}
               onChange={(e) => {
                 setSelectedTeamId(e.target.value);
                 setSearchParams({ teamId: e.target.value });
               }}
-              className="px-3 py-1.5 rounded-[8px] bg-[#0F172A] border border-[#334155] text-white text-xs font-bold focus:border-[#6366F1] focus:outline-none"
+              className="px-3 py-1.5 rounded-[8px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs font-bold focus:border-[#6366F1] focus:outline-none"
             >
               {teams.map((t, idx) => (
                 <option key={t.id} value={t.id}>
@@ -211,9 +211,9 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
         {/* Live Total Score Pill */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#0F172A] border border-[#334155]">
-            <span className="text-xs text-slate-400">Tổng điểm quy đổi:</span>
-            <span className="font-['Righteous'] text-lg text-emerald-400 font-mono">
+          <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-muted/40 dark:bg-slate-900/60 border border-border">
+            <span className="text-xs text-muted-foreground">Tổng điểm quy đổi:</span>
+            <span className="font-semibold tracking-tight text-foreground text-lg text-emerald-700 dark:text-emerald-400 font-mono">
               {totalWeightedScore} / 100
             </span>
           </div>
@@ -225,7 +225,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
       </div>
 
       {alert && (
-        <div className="p-3 rounded-[10px] bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300 flex items-center gap-2 shrink-0">
+        <div className="p-3 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2 shrink-0">
           <CheckCircle2 size={15} />
           <span>{alert}</span>
         </div>
@@ -234,15 +234,15 @@ export const JudgeSplitScreenPage: React.FC = () => {
       {/* 50/50 Split Screen Content Area */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
         {/* Left Pane: Artifacts & Submissions (6/12) */}
-        <div className="lg:col-span-6 rounded-[16px] border border-[#334155] bg-[#1E293B] flex flex-col min-h-0 overflow-hidden">
+        <div className="lg:col-span-6 rounded-[16px] border border-border bg-card flex flex-col min-h-0 overflow-hidden">
           {/* Artifact Tabs Header */}
-          <div className="flex items-center border-b border-[#334155] bg-[#0B1120] px-4 pt-2 gap-2 shrink-0 overflow-x-auto">
+          <div className="flex items-center border-b border-border bg-muted/40 dark:bg-slate-900/60 px-4 pt-2 gap-2 shrink-0 overflow-x-auto">
             <button
               onClick={() => setLeftTab('code')}
               className={`px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 flex items-center gap-1.5 transition-colors ${
                 leftTab === 'code'
-                  ? 'border-[#6366F1] text-[#818CF8] bg-[#1E293B]'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-[#6366F1] text-primary bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-slate-200'
               }`}
             >
               <FileCode size={14} />
@@ -253,8 +253,8 @@ export const JudgeSplitScreenPage: React.FC = () => {
               onClick={() => setLeftTab('video')}
               className={`px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 flex items-center gap-1.5 transition-colors ${
                 leftTab === 'video'
-                  ? 'border-[#6366F1] text-[#818CF8] bg-[#1E293B]'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-[#6366F1] text-primary bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-slate-200'
               }`}
             >
               <Video size={14} />
@@ -265,8 +265,8 @@ export const JudgeSplitScreenPage: React.FC = () => {
               onClick={() => setLeftTab('slides')}
               className={`px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 flex items-center gap-1.5 transition-colors ${
                 leftTab === 'slides'
-                  ? 'border-[#6366F1] text-[#818CF8] bg-[#1E293B]'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-[#6366F1] text-primary bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-slate-200'
               }`}
             >
               <Presentation size={14} />
@@ -277,8 +277,8 @@ export const JudgeSplitScreenPage: React.FC = () => {
               onClick={() => setLeftTab('checkpoints')}
               className={`px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 flex items-center gap-1.5 transition-colors ${
                 leftTab === 'checkpoints'
-                  ? 'border-[#6366F1] text-[#818CF8] bg-[#1E293B]'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-[#6366F1] text-primary bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-slate-200'
               }`}
             >
               <CheckSquare size={14} />
@@ -291,23 +291,23 @@ export const JudgeSplitScreenPage: React.FC = () => {
             {leftTab === 'code' && (
               <div className="space-y-4">
                 {/* Frozen Commit SHA Badge */}
-                <div className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-2">
+                <div className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400 flex items-center gap-1">
-                      <GitBranch size={13} className="text-[#818CF8]" />
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <GitBranch size={13} className="text-primary" />
                       <span>Mã Commit Đã Khóa:</span>
                     </span>
-                    <span className="font-mono text-emerald-400 font-bold">
+                    <span className="font-mono text-emerald-700 dark:text-emerald-400 font-bold">
                       {finalSub?.commitSha || 'd7b1a459e8f2038c'}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-400">Đường dẫn kho:</span>
+                    <span className="text-muted-foreground">Đường dẫn kho:</span>
                     <a
                       href={finalSub?.repoUrl || 'https://github.com/cybersentinels/ai-health-core'}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-[#818CF8] hover:underline flex items-center gap-1 font-mono text-[11px]"
+                      className="text-primary hover:underline flex items-center gap-1 font-mono text-[11px]"
                     >
                       <span>{finalSub?.repoUrl || 'https://github.com/cybersentinels/ai-health-core'}</span>
                       <ExternalLink size={11} />
@@ -316,17 +316,17 @@ export const JudgeSplitScreenPage: React.FC = () => {
                 </div>
 
                 {/* Simulated Code / README Preview */}
-                <div className="rounded-[12px] bg-[#0B1120] border border-[#334155] p-4 font-mono text-xs text-slate-300 space-y-3">
-                  <div className="flex items-center justify-between pb-2 border-b border-[#334155] text-slate-400 text-[11px]">
+                <div className="rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border p-4 font-mono text-xs text-muted-foreground space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-border text-muted-foreground text-[11px]">
                     <span>README.md • Branch: main</span>
                     <span>Commit Verified ✓</span>
                   </div>
                   <div className="space-y-2 leading-relaxed">
-                    <h4 className="text-white font-bold text-sm"># Medical AI Diagnostic Copilot</h4>
-                    <p className="text-slate-400">
+                    <h4 className="text-foreground font-bold text-sm"># Medical AI Diagnostic Copilot</h4>
+                    <p className="text-muted-foreground">
                       An end-to-end multi-modal deep learning platform for automated pulmonary disease detection.
                     </p>
-                    <div className="bg-[#080D18] p-3 rounded border border-[#334155]/60 text-[11px] text-emerald-300">
+                    <div className="bg-muted/40 dark:bg-slate-900/60 p-3 rounded border border-border text-[11px] text-emerald-700 dark:text-emerald-400">
                       <code>
                         {`// Core Inference Pipeline\nasync function predictXRay(imageTensor: Tensor) {\n  const resnetWeights = await loadModel('vgg-resnet50-v2');\n  const segmentation = await resnetWeights.infer(imageTensor);\n  return formatClinicalReport(segmentation);\n}`}
                       </code>
@@ -338,10 +338,10 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
             {leftTab === 'video' && (
               <div className="space-y-3">
-                <div className="aspect-video w-full rounded-[12px] bg-[#0F172A] border border-[#334155] flex flex-col items-center justify-center p-6 text-center">
-                  <Video size={48} className="text-emerald-400 mb-2 opacity-80" />
-                  <p className="text-sm font-semibold text-white">Video Thuyết Trình Dự Án</p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                <div className="aspect-video w-full rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col items-center justify-center p-6 text-center">
+                  <Video size={48} className="text-emerald-700 dark:text-emerald-400 mb-2 opacity-80" />
+                  <p className="text-sm font-semibold text-foreground">Video Thuyết Trình Dự Án</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">
                     {finalSub?.demoVideoUrl || 'https://youtube.com/watch?v=demo-health-ai'}
                   </p>
                   <a
@@ -359,10 +359,10 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
             {leftTab === 'slides' && (
               <div className="space-y-3">
-                <div className="aspect-video w-full rounded-[12px] bg-[#0F172A] border border-[#334155] flex flex-col items-center justify-center p-6 text-center">
-                  <Presentation size={48} className="text-amber-400 mb-2 opacity-80" />
-                  <p className="text-sm font-semibold text-white">Slide Báo Cáo Dự Án</p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                <div className="aspect-video w-full rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col items-center justify-center p-6 text-center">
+                  <Presentation size={48} className="text-amber-700 dark:text-amber-400 mb-2 opacity-80" />
+                  <p className="text-sm font-semibold text-foreground">Slide Báo Cáo Dự Án</p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm">
                     {finalSub?.slideUrl || 'https://docs.google.com/presentation/d/demo-pitch-deck'}
                   </p>
                   <a
@@ -383,15 +383,15 @@ export const JudgeSplitScreenPage: React.FC = () => {
                 {teamCheckpoints.map((sub, idx) => (
                   <div
                     key={sub.id}
-                    className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] text-xs space-y-2"
+                    className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border text-xs space-y-2"
                   >
-                    <div className="flex items-center justify-between font-bold text-white">
+                    <div className="flex items-center justify-between font-bold text-foreground">
                       <span>Checkpoint #{idx + 1}</span>
-                      <span className="text-emerald-400 font-mono text-[11px]">
+                      <span className="text-emerald-700 dark:text-emerald-400 font-mono text-[11px]">
                         SHA: {sub.commitSha.slice(0, 8)}
                       </span>
                     </div>
-                    <div className="text-slate-400 text-[11px]">
+                    <div className="text-muted-foreground text-[11px]">
                       Nộp lúc: {new Date(sub.submittedAt).toLocaleString('vi-VN')}
                     </div>
 
@@ -402,7 +402,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
                           href={sub.repoUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-[#818CF8] hover:text-white text-[11px] font-mono hover:border-[#6366F1]"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-card border border-border text-primary hover:text-foreground text-[11px] font-mono hover:border-[#6366F1]"
                         >
                           <GitBranch size={10} />
                           <span>Repo</span>
@@ -414,7 +414,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
                           href={sub.demoUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-emerald-400 hover:text-white text-[11px] font-mono hover:border-emerald-500"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-card border border-border text-emerald-700 dark:text-emerald-400 hover:text-foreground text-[11px] font-mono hover:border-emerald-500"
                         >
                           <Globe size={10} />
                           <span>Demo</span>
@@ -426,7 +426,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
                           href={sub.slideUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-amber-300 hover:text-white text-[11px] font-mono hover:border-amber-500"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-card border border-border text-amber-700 dark:text-amber-400 hover:text-foreground text-[11px] font-mono hover:border-amber-500"
                         >
                           <Presentation size={10} />
                           <span>Slide</span>
@@ -438,7 +438,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
                           href={sub.videoUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-rose-300 hover:text-white text-[11px] font-mono hover:border-rose-500"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-card border border-border text-rose-700 dark:text-rose-400 hover:text-foreground text-[11px] font-mono hover:border-rose-500"
                         >
                           <Video size={10} />
                           <span>Video</span>
@@ -450,7 +450,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
                           href={sub.figmaUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-purple-300 hover:text-white text-[11px] font-mono hover:border-purple-500"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-card border border-border text-purple-700 dark:text-purple-400 hover:text-foreground text-[11px] font-mono hover:border-purple-500"
                         >
                           <Palette size={10} />
                           <span>Figma</span>
@@ -461,7 +461,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
                     {/* Description text */}
                     {sub.description && (
-                      <p className="text-[11px] text-slate-300 italic line-clamp-2 bg-[#1E293B]/60 p-1.5 rounded border border-[#334155]/40">
+                      <p className="text-[11px] text-muted-foreground italic line-clamp-2 bg-card p-1.5 rounded border border-border">
                         "{sub.description}"
                       </p>
                     )}
@@ -473,18 +473,18 @@ export const JudgeSplitScreenPage: React.FC = () => {
         </div>
 
         {/* Right Pane: Rubric Scoring Sheet (6/12) */}
-        <div className="lg:col-span-6 rounded-[16px] border border-[#334155] bg-[#1E293B] flex flex-col min-h-0 overflow-hidden">
-          <div className="p-4 border-b border-[#334155] bg-[#0B1120] flex items-center justify-between shrink-0">
+        <div className="lg:col-span-6 rounded-[16px] border border-border bg-card flex flex-col min-h-0 overflow-hidden">
+          <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 flex items-center justify-between shrink-0">
             <div>
-              <h3 className="font-['Righteous'] text-lg text-white">
+              <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
                 Bảng Điểm Rubric ({displayName})
               </h3>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Chấm điểm theo từng tiêu chuẩn kỹ thuật có trọng số
               </p>
             </div>
-            <span className="font-mono text-xl font-bold text-emerald-400">
-              {totalWeightedScore} <span className="text-xs text-slate-400">/ 100</span>
+            <span className="font-mono text-xl font-bold text-emerald-700 dark:text-emerald-400">
+              {totalWeightedScore} <span className="text-xs text-muted-foreground">/ 100</span>
             </span>
           </div>
 
@@ -496,13 +496,13 @@ export const JudgeSplitScreenPage: React.FC = () => {
               return (
                 <div
                   key={c.id}
-                  className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-2"
+                  className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2"
                 >
                   <div className="flex items-center justify-between text-xs">
                     <div>
-                      <span className="font-bold text-white text-sm">{c.name}</span>
-                      <span className="ml-2 text-slate-400">
-                        (Trọng số: <strong className="text-[#818CF8]">{c.weight}%</strong>)
+                      <span className="font-bold text-foreground text-sm">{c.name}</span>
+                      <span className="ml-2 text-muted-foreground">
+                        (Trọng số: <strong className="text-primary">{c.weight}%</strong>)
                       </span>
                     </div>
 
@@ -515,13 +515,13 @@ export const JudgeSplitScreenPage: React.FC = () => {
                         onChange={(e) =>
                           handleScoreChange(c.id, Number(e.target.value), c.maxScore)
                         }
-                        className="w-14 h-8 text-center rounded bg-[#1E293B] border border-[#334155] text-white font-bold text-sm focus:border-[#6366F1] focus:outline-none"
+                        className="w-14 h-8 text-center rounded bg-card border border-border text-foreground font-bold text-sm focus:border-[#6366F1] focus:outline-none"
                       />
-                      <span className="text-slate-400">/ {c.maxScore}</span>
+                      <span className="text-muted-foreground">/ {c.maxScore}</span>
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-slate-400 leading-snug">{c.description}</p>
+                  <p className="text-[11px] text-muted-foreground leading-snug">{c.description}</p>
 
                   {/* Range Slider */}
                   <input
@@ -541,7 +541,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
             {/* General Feedback Textarea */}
             <div className="space-y-1.5 pt-2">
-              <label className="text-xs font-semibold text-slate-300">
+              <label className="text-xs font-semibold text-muted-foreground">
                 Nhận xét & Góp ý chuyên môn của Giám khảo *
               </label>
               <textarea
@@ -549,13 +549,13 @@ export const JudgeSplitScreenPage: React.FC = () => {
                 value={generalComment}
                 onChange={(e) => setGeneralComment(e.target.value)}
                 placeholder="Ghi lại các ưu điểm, nhược điểm và khuyến nghị kỹ thuật dành cho đội thi..."
-                className="w-full p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 placeholder-slate-400 text-xs focus:border-[#6366F1] focus:outline-none"
+                className="w-full p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground text-xs focus:border-[#6366F1] focus:outline-none"
               />
             </div>
           </div>
 
           {/* Action Footer */}
-          <div className="p-4 border-t border-[#334155] bg-[#0B1120] flex items-center justify-between shrink-0 gap-3">
+          <div className="p-4 border-t border-border bg-muted/40 dark:bg-slate-900/60 flex items-center justify-between shrink-0 gap-3">
             <Button variant="secondary" onClick={handleSaveDraft} className="gap-1.5 text-xs">
               <Save size={14} />
               <span>Lưu Bản Nháp</span>

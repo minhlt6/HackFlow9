@@ -12,27 +12,22 @@ export const JudgeResultsPage: React.FC = () => {
   const myEvaluations = evaluations.filter((e) => e.judgeId === currentUser.id);
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       <div>
         <h1
-          className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-          style={{
-            background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
+          className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
         >
           Bảng Điểm Đã Chấm
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1">
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Danh sách các đội thi bạn đã cho điểm hoặc lưu bản nháp đánh giá.
         </p>
       </div>
 
-      <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-        <div className="overflow-x-auto rounded-[12px] border border-[#334155] bg-[#0F172A]">
+      <div className="rounded-[16px] border border-border bg-card p-6 space-y-4">
+        <div className="overflow-x-auto rounded-[12px] border border-border bg-muted/40 dark:bg-slate-900/60">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-[#1E293B]/70 border-b border-[#334155] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+            <thead className="bg-card border-b border-border text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3.5 px-4">Đội Thi</th>
                 <th className="py-3.5 px-4 text-center">Trạng Thái</th>
@@ -41,7 +36,7 @@ export const JudgeResultsPage: React.FC = () => {
                 <th className="py-3.5 px-4 text-right">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#334155]/60 text-slate-200">
+            <tbody className="divide-y divide-border text-foreground">
               {teams.map((t) => {
                 const evalItem = myEvaluations.find((e) => e.teamId === t.id);
                 const hasScore = Boolean(evalItem);
@@ -50,8 +45,8 @@ export const JudgeResultsPage: React.FC = () => {
                   : 0;
 
                 return (
-                  <tr key={t.id} className="hover:bg-[#1E293B]/40 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-white">{t.name}</td>
+                  <tr key={t.id} className="hover:bg-accent transition-colors">
+                    <td className="py-3.5 px-4 font-bold text-foreground">{t.name}</td>
 
                     <td className="py-3.5 px-4 text-center">
                       <Badge
@@ -67,11 +62,11 @@ export const JudgeResultsPage: React.FC = () => {
                       </Badge>
                     </td>
 
-                    <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-400">
+                    <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400">
                       {hasScore ? `${normalizedScore}đ` : '—'}
                     </td>
 
-                    <td className="py-3.5 px-4 text-slate-300 max-w-sm truncate text-xs">
+                    <td className="py-3.5 px-4 text-muted-foreground max-w-sm truncate text-xs">
                       {evalItem?.generalComment || 'Chưa có nhận xét'}
                     </td>
 

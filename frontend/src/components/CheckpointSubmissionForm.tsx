@@ -363,15 +363,15 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
     <div className={`space-y-6 ${className}`}>
       {/* Banner thông báo trạng thái cổng thời gian (Upcoming / Grace Period / Closed) */}
       {isGracePeriod && (
-        <div className="p-3.5 rounded-[12px] bg-amber-500/15 border border-amber-500/40 text-amber-200 text-xs flex items-start gap-2.5 animate-pulse">
-          <Clock size={18} className="text-amber-400 shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-[12px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5 animate-pulse">
+          <Clock size={18} className="text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
           <div>
-            <p className="font-semibold text-amber-100">
+            <p className="font-semibold text-amber-700 dark:text-amber-400">
               Đang trong thời gian ân hạn mạng (Grace Period {checkpoint.grace_period_seconds ?? 5} giây)
             </p>
-            <p className="text-amber-200/90 mt-0.5">
+            <p className="text-amber-700 dark:text-amber-400 mt-0.5">
               Cổng nộp bài đang áp dụng thời gian ân hạn độ trễ mạng. Bài nộp ngay lúc này vẫn được ghi nhận hợp lệ với cờ{' '}
-              <code className="font-mono text-amber-100 bg-amber-950/60 px-1 py-0.5 rounded">
+              <code className="font-mono text-amber-700 dark:text-amber-400 bg-amber-500/10 px-1 py-0.5 rounded">
                 grace_period_applied = true
               </code>
               .
@@ -381,11 +381,11 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
       )}
 
       {isUpcoming && (
-        <div className="p-3.5 rounded-[12px] bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-xs flex items-center gap-2.5">
-          <Lock size={18} className="text-indigo-400 shrink-0" />
+        <div className="p-3.5 rounded-[12px] bg-indigo-500/10 border border-indigo-500/30 text-primary text-xs flex items-center gap-2.5">
+          <Lock size={18} className="text-primary shrink-0" />
           <span>
             <strong>Chưa đến giờ mở cổng (UPCOMING):</strong> Cổng nộp bài cho chặng này sẽ mở vào lúc{' '}
-            <span className="font-mono text-white">
+            <span className="font-mono text-foreground">
               {new Date(checkpoint.start_time).toLocaleString('vi-VN')}
             </span>
             . Hiện tại các trường nhập liệu đang tạm khóa.
@@ -394,8 +394,8 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
       )}
 
       {!isUpcoming && (isClosed || isInactive || isCanSubmitFalse) && (
-        <div className="p-3.5 rounded-[12px] bg-slate-800/80 border border-slate-600/50 text-slate-300 text-xs flex items-center gap-2.5">
-          <Lock size={18} className="text-slate-400 shrink-0" />
+        <div className="p-3.5 rounded-[12px] bg-muted/60 border border-border text-muted-foreground text-xs flex items-center gap-2.5">
+          <Lock size={18} className="text-muted-foreground shrink-0" />
           <span>
             <strong>Cổng nộp bài đã đóng:</strong>{' '}
             {isInactive
@@ -408,7 +408,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
       {/* Banner kết quả nộp bài gần nhất (Xử lý đầy đủ SUBMITTED, EVALUATED, PENDING_SHA_FREEZE, SHA_VERIFICATION_FAILED, INVALID & grace_period_applied) */}
       {lastSubmitted && statusMeta && (
         <div
-          className={`p-4 sm:p-5 rounded-[12px] border text-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${statusMeta.containerClass}`}
+          className={`p-4 sm:p-5 rounded-[12px] border text-foreground flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${statusMeta.containerClass}`}
         >
           <div className="flex items-start gap-3">
             <span className={`p-2 rounded-lg shrink-0 mt-0.5 ${statusMeta.iconBgClass}`}>
@@ -425,7 +425,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
             </span>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="font-semibold text-white text-sm">{statusMeta.title}</span>
+                <span className="font-semibold text-foreground text-sm">{statusMeta.title}</span>
                 <Badge variant={statusMeta.badgeVariant} size="sm">
                   {statusMeta.badgeLabel}
                 </Badge>
@@ -437,7 +437,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
               </div>
 
               {statusMeta.statusNote && (
-                <p className="text-xs text-slate-200/90 mt-1 leading-relaxed">
+                <p className="text-xs text-foreground mt-1 leading-relaxed">
                   {statusMeta.statusNote}
                 </p>
               )}
@@ -445,39 +445,39 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
               {/* Hiển thị thông tin Commit SHA hoặc trạng thái SHA tương ứng */}
               {isFinal ? (
                 lastSubmitted.commit_sha ? (
-                  <p className="text-xs text-slate-300 mt-1.5 flex items-center gap-1.5 font-mono">
-                    <GitCommit size={14} className="text-emerald-400 shrink-0" />
+                  <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5 font-mono">
+                    <GitCommit size={14} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
                     <span>Frozen Commit SHA:</span>
-                    <span className="text-emerald-300 font-semibold bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                    <span className="text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
                       {lastSubmitted.commit_sha.slice(0, 10)}...{lastSubmitted.commit_sha.slice(-6)}
                     </span>
                   </p>
                 ) : statusMeta.normalizedStatus === 'sha_verification_failed' ? (
-                  <p className="text-xs text-amber-300 mt-1.5 flex items-center gap-1.5">
-                    <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5 flex items-center gap-1.5">
+                    <AlertTriangle size={14} className="text-amber-700 dark:text-amber-400 shrink-0" />
                     <span>
                       Commit SHA: Đang chờ Ban tổ chức xác minh thủ công (Đã bảo lưu thời điểm nộp hợp lệ)
                     </span>
                   </p>
                 ) : statusMeta.normalizedStatus === 'pending_sha_freeze' ? (
-                  <p className="text-xs text-indigo-300 mt-1.5 flex items-center gap-1.5">
-                    <RefreshCw size={13} className="text-indigo-400 shrink-0 animate-spin" />
+                  <p className="text-xs text-primary mt-1.5 flex items-center gap-1.5">
+                    <RefreshCw size={13} className="text-primary shrink-0 animate-spin" />
                     <span>Commit SHA: Hệ thống đang truy xuất HEAD SHA từ GitHub API...</span>
                   </p>
                 ) : null
               ) : (
-                <p className="text-xs text-slate-300 mt-1 flex items-center gap-1.5">
-                  <Info size={14} className="text-emerald-400 shrink-0" />
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                  <Info size={14} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
                   <span>Chặng tiến độ: Không khóa Commit SHA (Đội thi tiếp tục code bình thường)</span>
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400 mt-1.5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground mt-1.5">
                 <span>
                   Thời gian nộp: {new Date(lastSubmitted.submitted_at).toLocaleString('vi-VN')}
                 </span>
                 {lastSubmitted.grace_period_applied && (
-                  <span className="text-amber-300 font-medium">
+                  <span className="text-amber-700 dark:text-amber-400 font-medium">
                     • Ghi nhận hợp lệ trong khung giờ ân hạn mạng (Grace Period)
                   </span>
                 )}
@@ -491,7 +491,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                 href={lastSubmitted.repo_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E293B] hover:bg-[#334155] border border-[#334155] text-xs font-medium text-slate-200 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs font-medium text-foreground transition-colors"
               >
                 <GithubIcon size={14} />
                 <span>Mở repo</span>
@@ -503,7 +503,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                 href={lastSubmitted.demo_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E293B] hover:bg-[#334155] border border-[#334155] text-xs font-medium text-cyan-300 transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent border border-border text-xs font-medium text-sky-700 dark:text-cyan-400 transition-colors"
               >
                 <Globe size={14} />
                 <span>Mở demo/tài liệu</span>
@@ -516,26 +516,26 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
 
       {/* Thông báo lỗi nếu có (kèm mã lỗi chuẩn SRS HF-23) */}
       {errorMessage && (
-        <div className="p-4 rounded-[12px] bg-rose-500/10 border border-rose-500/30 text-rose-300 flex items-start gap-3 animate-in fade-in duration-200">
-          <AlertCircle size={20} className="shrink-0 text-rose-400 mt-0.5" />
+        <div className="p-4 rounded-[12px] bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 flex items-start gap-3 animate-in fade-in duration-200">
+          <AlertCircle size={20} className="shrink-0 text-rose-700 dark:text-rose-400 mt-0.5" />
           <div className="text-xs sm:text-sm space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <p className="font-semibold text-rose-200">Nộp bài không thành công</p>
+              <p className="font-semibold text-rose-700 dark:text-rose-400">Nộp bài không thành công</p>
               {errorCodeBadge && (
                 <Badge variant="danger" size="sm" className="font-mono text-[11px]">
                   {errorCodeBadge}
                 </Badge>
               )}
             </div>
-            <p className="text-rose-200/90 leading-relaxed">{errorMessage}</p>
+            <p className="text-rose-700 dark:text-rose-400 leading-relaxed">{errorMessage}</p>
           </div>
         </div>
       )}
 
       {/* Cảnh báo phân quyền nếu là thành viên thường (MEMBER) */}
       {!isTeamLeader && (
-        <div className="p-3.5 rounded-[12px] bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center gap-2.5">
-          <ShieldAlert size={18} className="text-amber-400 shrink-0" />
+        <div className="p-3.5 rounded-[12px] bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs flex items-center gap-2.5">
+          <ShieldAlert size={18} className="text-amber-700 dark:text-amber-400 shrink-0" />
           <span>
             <strong>Lưu ý quyền hạn:</strong> Bạn đang xem với vai trò Thành viên (MEMBER). Chỉ Đội trưởng mới có quyền nộp hoặc cập nhật bài thi cho đội.
           </span>
@@ -556,18 +556,18 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                 <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                   <label
                     htmlFor={field.field_key}
-                    className="text-slate-200 font-medium text-sm flex items-center gap-1.5"
+                    className="text-foreground font-medium text-sm flex items-center gap-1.5"
                   >
-                    <GithubIcon size={16} className="text-indigo-400" />
+                    <GithubIcon size={16} className="text-primary" />
                     <span>
                       {field.field_label}{' '}
-                      {isRequired && <span className="text-rose-400">*</span>}
+                      {isRequired && <span className="text-rose-700 dark:text-rose-400">*</span>}
                     </span>
                     {!isRequired && (
-                      <span className="text-xs text-slate-400 font-normal">(Không bắt buộc)</span>
+                      <span className="text-xs text-muted-foreground font-normal">(Không bắt buộc)</span>
                     )}
                   </label>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-muted-foreground">
                     {field.apply_sha_freeze || isFinal
                       ? 'Yêu cầu public repo để đóng băng Commit SHA'
                       : 'Public GitHub repository'}
@@ -584,11 +584,11 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                   className="font-mono text-sm"
                 />
 
-                <div className="flex items-center gap-1.5 mt-1.5 text-xs text-slate-400">
-                  <HelpCircle size={13} className="shrink-0 text-slate-500" />
+                <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+                  <HelpCircle size={13} className="shrink-0 text-muted-foreground" />
                   <span>
                     Quy tắc: URL bắt buộc phải bắt đầu bằng{' '}
-                    <code className="text-[#818CF8] bg-[#0F172A] px-1 py-0.5 rounded border border-[#334155]">
+                    <code className="text-primary bg-muted/40 dark:bg-slate-900/60 px-1 py-0.5 rounded border border-border">
                       https://github.com/
                     </code>
                     {(field.apply_sha_freeze || isFinal) &&
@@ -604,18 +604,18 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
               <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                 <label
                   htmlFor={field.field_key}
-                  className="text-slate-200 font-medium text-sm flex items-center gap-1.5"
+                  className="text-foreground font-medium text-sm flex items-center gap-1.5"
                 >
-                  <Globe size={16} className="text-cyan-400" />
+                  <Globe size={16} className="text-sky-700 dark:text-cyan-400" />
                   <span>
                     {field.field_label}{' '}
-                    {isRequired && <span className="text-rose-400">*</span>}
+                    {isRequired && <span className="text-rose-700 dark:text-rose-400">*</span>}
                   </span>
                   {!isRequired && (
-                    <span className="text-xs text-slate-400 font-normal">(Không bắt buộc)</span>
+                    <span className="text-xs text-muted-foreground font-normal">(Không bắt buộc)</span>
                   )}
                 </label>
-                <span className="text-[11px] text-slate-400">
+                <span className="text-[11px] text-muted-foreground">
                   {isFinal ? 'Vercel / Netlify / YouTube / Slide' : 'Figma / Google Slide / Drive / Web'}
                 </span>
               </div>
@@ -641,9 +641,9 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
         <div>
           <label
             htmlFor="note"
-            className="text-slate-200 font-medium text-sm flex items-center gap-1.5 mb-1.5"
+            className="text-foreground font-medium text-sm flex items-center gap-1.5 mb-1.5"
           >
-            <FileText size={16} className="text-amber-400" />
+            <FileText size={16} className="text-amber-700 dark:text-amber-400" />
             <span>Ghi chú / Tóm tắt tiến độ</span>
           </label>
 
@@ -657,24 +657,24 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
             }
             disabled={isFormLocked || isSubmitting || !isTeamLeader}
             {...register('note')}
-            className="w-full px-4 py-2.5 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 placeholder-slate-400 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] text-sm resize-none disabled:opacity-50 disabled:bg-[#0B1120]"
+            className="w-full px-4 py-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] text-sm resize-none disabled:opacity-50 disabled:bg-[#0B1120]"
           />
           {errors.note && (
-            <span className="text-xs text-rose-400 mt-1 block">{errors.note.message}</span>
+            <span className="text-xs text-rose-700 dark:text-rose-400 mt-1 block">{errors.note.message}</span>
           )}
         </div>
 
         {/* Thanh thao tác Actions */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-[#334155]/60">
-          <div className="text-xs text-slate-400 flex items-center gap-1.5">
+        <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border">
+          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
             {isFinal ? (
               <>
-                <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+                <AlertTriangle size={14} className="text-amber-700 dark:text-amber-400 shrink-0" />
                 <span>Chặng cuối: Đảm bảo repo public và đã push commit mới nhất trước khi chốt nộp</span>
               </>
             ) : (
               <>
-                <Info size={14} className="text-indigo-400 shrink-0" />
+                <Info size={14} className="text-primary shrink-0" />
                 <span>Chặng tiến độ: Chỉ nộp tài liệu báo cáo theo cấu hình, không đóng băng Commit SHA</span>
               </>
             )}
@@ -735,31 +735,31 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
           {/* Cảnh báo xác nhận với câu từ linh hoạt theo đúng chuẩn SRS HF-23 */}
           {isFinal ? (
             <div className="p-4 rounded-[12px] bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
-              <span className="p-2 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+              <span className="p-2 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5">
                 <AlertTriangle size={20} />
               </span>
               <div className="space-y-1">
-                <h4 className="text-sm font-bold text-amber-200">
+                <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400">
                   Xác nhận nộp phiên bản chốt
                 </h4>
-                <p className="text-sm text-slate-200 leading-relaxed font-medium">
+                <p className="text-sm text-foreground leading-relaxed font-medium">
                   Bạn có chắc chắn nộp phiên bản này? (Hệ thống sẽ ghi nhận Commit hiện tại của repo)
                 </p>
               </div>
             </div>
           ) : (
             <div className="p-4 rounded-[12px] bg-indigo-500/10 border border-indigo-500/30 flex items-start gap-3">
-              <span className="p-2 rounded-lg bg-indigo-500/20 text-indigo-400 shrink-0 mt-0.5">
+              <span className="p-2 rounded-lg bg-indigo-500/20 text-primary shrink-0 mt-0.5">
                 <Info size={20} />
               </span>
               <div className="space-y-1">
-                <h4 className="text-sm font-bold text-indigo-200">
+                <h4 className="text-sm font-bold text-primary">
                   Xác nhận nộp báo cáo
                 </h4>
-                <p className="text-sm text-slate-200 leading-relaxed font-medium">
+                <p className="text-sm text-foreground leading-relaxed font-medium">
                   Bạn có chắc chắn muốn nộp báo cáo cho chặng thi này?
                 </p>
-                <p className="text-xs text-slate-400 pt-0.5">
+                <p className="text-xs text-muted-foreground pt-0.5">
                   Chặng tiến độ trung gian sẽ không đóng băng Commit SHA để bạn tiếp tục code bình thường.
                 </p>
               </div>
@@ -767,10 +767,10 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
           )}
 
           {/* Chi tiết nội dung sắp nộp theo submission_fields */}
-          <div className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-2.5 text-xs">
-            <div className="flex justify-between items-center text-slate-400 pb-2 border-b border-[#334155]/60">
+          <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2.5 text-xs">
+            <div className="flex justify-between items-center text-muted-foreground pb-2 border-b border-border">
               <span>Chặng thi:</span>
-              <span className="text-white font-medium">{checkpoint.title}</span>
+              <span className="text-foreground font-medium">{checkpoint.title}</span>
             </div>
 
             {effectiveFields.map((field) => {
@@ -781,13 +781,13 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
 
               return (
                 <div key={field.field_key} className="space-y-1 pt-1">
-                  <span className="text-slate-400">{field.field_label}:</span>
+                  <span className="text-muted-foreground">{field.field_label}:</span>
                   {isRepoField ? (
-                    <p className="font-mono text-indigo-300 font-semibold break-all bg-[#1E293B] p-2 rounded border border-[#334155]">
+                    <p className="font-mono text-primary font-semibold break-all bg-card p-2 rounded border border-border">
                       {value}
                     </p>
                   ) : (
-                    <p className="text-cyan-300 font-medium break-all">{value}</p>
+                    <p className="text-sky-700 dark:text-cyan-400 font-medium break-all">{value}</p>
                   )}
                 </div>
               );
@@ -795,8 +795,8 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
 
             {pendingData?.note && (
               <div className="space-y-1 pt-1">
-                <span className="text-slate-400">Ghi chú:</span>
-                <p className="text-slate-300 italic">{pendingData.note}</p>
+                <span className="text-muted-foreground">Ghi chú:</span>
+                <p className="text-muted-foreground italic">{pendingData.note}</p>
               </div>
             )}
           </div>

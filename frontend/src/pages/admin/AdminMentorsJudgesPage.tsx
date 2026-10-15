@@ -152,21 +152,16 @@ export const AdminMentorsJudgesPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1
-            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
+            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
           >
             Quản Lý Hội Đồng Giám Khảo & Cố Vấn
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Phân bổ chuyên gia chấm thi độc lập và cố vấn chuyên môn hỗ trợ giải đáp kỹ thuật.
           </p>
         </div>
@@ -178,20 +173,20 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       </div>
 
       {alert && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
           <CheckCircle2 size={15} />
           <span>{alert}</span>
         </div>
       )}
 
       {/* Tabs */}
-      <div className="flex border-b border-[#334155] gap-4">
+      <div className="flex border-b border-border gap-4">
         <button
           onClick={() => setActiveTab('judges')}
           className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all ${
             activeTab === 'judges'
-              ? 'border-[#6366F1] text-[#818CF8]'
-              : 'border-transparent text-slate-400 hover:text-white'
+              ? 'border-[#6366F1] text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           <Scale size={16} />
@@ -202,8 +197,8 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           onClick={() => setActiveTab('mentors')}
           className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all ${
             activeTab === 'mentors'
-              ? 'border-[#6366F1] text-[#818CF8]'
-              : 'border-transparent text-slate-400 hover:text-white'
+              ? 'border-[#6366F1] text-primary'
+              : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
           <GraduationCap size={16} />
@@ -213,10 +208,10 @@ export const AdminMentorsJudgesPage: React.FC = () => {
 
       {/* Empty States */}
       {activeTab === 'judges' && judges.length === 0 && (
-        <div className="rounded-[16px] border border-dashed border-[#334155] p-12 text-center bg-[#1E293B]/40">
-          <Scale size={40} className="mx-auto text-slate-500 mb-3" />
-          <h3 className="font-['Righteous'] text-lg text-white mb-1">Chưa Có Giám Khảo</h3>
-          <p className="text-slate-400 text-xs max-w-sm mx-auto mb-4">
+        <div className="rounded-[16px] border border-dashed border-border p-12 text-center bg-card">
+          <Scale size={40} className="mx-auto text-muted-foreground mb-3" />
+          <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground mb-1">Chưa Có Giám Khảo</h3>
+          <p className="text-muted-foreground text-xs max-w-sm mx-auto mb-4">
             Hội đồng giám khảo hiện chưa có thành viên. Hãy mời các chuyên gia chấm thi để bắt đầu đánh giá bài nộp.
           </p>
           <Button variant="primary" size="sm" onClick={() => setIsInviteOpen(true)} className="gap-1.5">
@@ -227,10 +222,10 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       )}
 
       {activeTab === 'mentors' && mentors.length === 0 && (
-        <div className="rounded-[16px] border border-dashed border-[#334155] p-12 text-center bg-[#1E293B]/40">
-          <GraduationCap size={40} className="mx-auto text-slate-500 mb-3" />
-          <h3 className="font-['Righteous'] text-lg text-white mb-1">Chưa Có Cố Vấn Chuyên Môn</h3>
-          <p className="text-slate-400 text-xs max-w-sm mx-auto mb-4">
+        <div className="rounded-[16px] border border-dashed border-border p-12 text-center bg-card">
+          <GraduationCap size={40} className="mx-auto text-muted-foreground mb-3" />
+          <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground mb-1">Chưa Có Cố Vấn Chuyên Môn</h3>
+          <p className="text-muted-foreground text-xs max-w-sm mx-auto mb-4">
             Chưa có cố vấn nào trong danh sách. Hãy mời các cố vấn theo từng chuyên môn để hỗ trợ thí sinh.
           </p>
           <Button variant="primary" size="sm" onClick={() => setIsInviteOpen(true)} className="gap-1.5">
@@ -246,16 +241,16 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           ? judges.map((j) => (
               <div
                 key={j.id}
-                className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-5 space-y-4 relative group"
+                className="rounded-[16px] border border-border bg-card p-5 space-y-4 relative group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20 text-blue-300 font-['Righteous'] text-lg border border-blue-500/30">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-500/20 text-blue-300 font-semibold tracking-tight text-foreground text-lg border border-blue-500/30">
                       {j.avatar}
                     </div>
                     <div>
-                      <h4 className="font-bold text-white text-base">{j.name}</h4>
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <h4 className="font-bold text-foreground text-base">{j.name}</h4>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Mail size={12} />
                         <span>{j.email}</span>
                       </span>
@@ -264,20 +259,20 @@ export const AdminMentorsJudgesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDeleteJudge(j.id, j.name)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                     title="Xóa giám khảo"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
 
-                <div className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-xs space-y-1">
-                  <span className="text-slate-400 block">Chuyên môn:</span>
-                  <span className="text-slate-200 font-medium">{j.specialization}</span>
+                <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-xs space-y-1">
+                  <span className="text-muted-foreground block">Chuyên môn:</span>
+                  <span className="text-foreground font-medium">{j.specialization}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-[#334155]/60">
-                  <span className="text-slate-400">Đội thi được phân công:</span>
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-border">
+                  <span className="text-muted-foreground">Đội thi được phân công:</span>
                   <Badge variant="indigo">{j.assignedCount} đội</Badge>
                 </div>
               </div>
@@ -285,16 +280,16 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           : mentors.map((m) => (
               <div
                 key={m.id}
-                className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-5 space-y-4 relative group"
+                className="rounded-[16px] border border-border bg-card p-5 space-y-4 relative group"
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/20 text-purple-300 font-['Righteous'] text-lg border border-purple-500/30">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-400 font-semibold tracking-tight text-foreground text-lg border border-purple-500/30">
                       {m.avatar}
                     </div>
                     <div>
-                      <h4 className="font-bold text-white text-base">{m.name}</h4>
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <h4 className="font-bold text-foreground text-base">{m.name}</h4>
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Mail size={12} />
                         <span>{m.email}</span>
                       </span>
@@ -303,20 +298,20 @@ export const AdminMentorsJudgesPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => handleDeleteMentor(m.id, m.name)}
-                    className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                     title="Xóa cố vấn"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
 
-                <div className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-xs space-y-1">
-                  <span className="text-slate-400 block">Lĩnh vực phụ trách:</span>
-                  <span className="text-purple-300 font-medium">{m.topic}</span>
+                <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-xs space-y-1">
+                  <span className="text-muted-foreground block">Lĩnh vực phụ trách:</span>
+                  <span className="text-purple-700 dark:text-purple-400 font-medium">{m.topic}</span>
                 </div>
 
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-[#334155]/60">
-                  <span className="text-slate-400">Tickets cần hỗ trợ:</span>
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-border">
+                  <span className="text-muted-foreground">Tickets cần hỗ trợ:</span>
                   <Badge variant={m.openTickets > 0 ? 'warning' : 'success'}>
                     {m.openTickets} tickets
                   </Badge>

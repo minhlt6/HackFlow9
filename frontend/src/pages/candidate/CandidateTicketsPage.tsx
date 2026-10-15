@@ -74,21 +74,16 @@ export const CandidateTicketsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1
-            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
+            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
           >
             Hỗ Trợ Kỹ Thuật Trực Tuyến
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Quy trình hỗ trợ 3 bước: Thí sinh gửi yêu cầu → Cố vấn chuyên môn tiếp nhận → Trao đổi trực tiếp và giải quyết vướng mắc.
           </p>
         </div>
@@ -106,15 +101,15 @@ export const CandidateTicketsPage: React.FC = () => {
       {/* Main Grid: Ticket List (Left) & Chat Conversation (Right) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[560px]">
         {/* Left Column: Tickets Queue */}
-        <div className="lg:col-span-5 rounded-[16px] border border-[#334155] bg-[#1E293B] p-4 flex flex-col">
-          <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
-            <span className="font-['Righteous'] text-base text-white">Danh Sách Yêu Cầu</span>
+        <div className="lg:col-span-5 rounded-[16px] border border-border bg-card p-4 flex flex-col">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <span className="font-semibold tracking-tight text-foreground text-base text-foreground">Danh Sách Yêu Cầu</span>
             <Badge variant="indigo">{myTeamTickets.length} ticket</Badge>
           </div>
 
           <div className="flex-1 overflow-y-auto mt-3 space-y-2.5 pr-1">
             {myTeamTickets.length === 0 ? (
-              <div className="p-8 text-center text-slate-400 text-xs italic">
+              <div className="p-8 text-center text-muted-foreground text-xs italic">
                 Chưa có ticket nào được tạo. Nhấn &quot;Tạo Ticket mới&quot; khi cần hỗ trợ.
               </div>
             ) : (
@@ -126,12 +121,12 @@ export const CandidateTicketsPage: React.FC = () => {
                     onClick={() => setSelectedTicketId(t.id)}
                     className={`p-3.5 rounded-[12px] border cursor-pointer transition-all ${
                       isSelected
-                        ? 'bg-[#0F172A] border-[#6366F1] shadow-md'
-                        : 'bg-[#0F172A]/50 border-[#334155] hover:border-slate-500'
+                        ? 'bg-muted/40 dark:bg-slate-900/60 border-[#6366F1] shadow-md'
+                        : 'bg-muted/40 dark:bg-slate-900/60 border-border hover:border-slate-500'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <span className="font-semibold text-xs sm:text-sm text-white line-clamp-1">
+                      <span className="font-semibold text-xs sm:text-sm text-foreground line-clamp-1">
                         {t.title}
                       </span>
                       <Badge
@@ -151,16 +146,16 @@ export const CandidateTicketsPage: React.FC = () => {
                       </Badge>
                     </div>
 
-                    <p className="mt-1 text-xs text-slate-400 line-clamp-2">{t.description}</p>
+                    <p className="mt-1 text-xs text-muted-foreground line-clamp-2">{t.description}</p>
 
-                    <div className="mt-3 pt-2 border-t border-[#334155]/60 flex items-center justify-between text-[11px] text-slate-400">
+                    <div className="mt-3 pt-2 border-t border-border flex items-center justify-between text-[11px] text-muted-foreground">
                       <span>Độ ưu tiên: {t.priority.toUpperCase()}</span>
                       {t.assignedMentorName ? (
-                        <span className="text-emerald-400 font-medium">
+                        <span className="text-emerald-700 dark:text-emerald-400 font-medium">
                           Mentor: {t.assignedMentorName}
                         </span>
                       ) : (
-                        <span className="text-amber-400">Chờ tiếp nhận...</span>
+                        <span className="text-amber-700 dark:text-amber-400">Chờ tiếp nhận...</span>
                       )}
                     </div>
                   </div>
@@ -171,13 +166,13 @@ export const CandidateTicketsPage: React.FC = () => {
         </div>
 
         {/* Right Column: Conversation Thread */}
-        <div className="lg:col-span-7 rounded-[16px] border border-[#334155] bg-[#1E293B] p-5 flex flex-col justify-between">
+        <div className="lg:col-span-7 rounded-[16px] border border-border bg-card p-5 flex flex-col justify-between">
           {activeTicket ? (
             <div className="flex-1 flex flex-col justify-between">
               {/* Thread Header */}
-              <div className="pb-4 border-b border-[#334155]">
+              <div className="pb-4 border-b border-border">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h3 className="font-['Righteous'] text-lg text-white">
+                  <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
                     {activeTicket.title}
                   </h3>
                   <div className="flex items-center gap-2">
@@ -201,7 +196,7 @@ export const CandidateTicketsPage: React.FC = () => {
                         variant="secondary"
                         size="sm"
                         onClick={handleResolve}
-                        className="gap-1 border-emerald-500/40 text-emerald-400"
+                        className="gap-1 border-emerald-500/40 text-emerald-700 dark:text-emerald-400"
                       >
                         <CheckCircle2 size={13} />
                         <span>Đóng Ticket</span>
@@ -210,11 +205,11 @@ export const CandidateTicketsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-slate-400">
+                <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
                   <span>Mã: #{activeTicket.id}</span>
                   <span>Tạo lúc: {activeTicket.createdAt}</span>
                   {activeTicket.assignedMentorName && (
-                    <span className="text-[#818CF8] font-medium flex items-center gap-1">
+                    <span className="text-primary font-medium flex items-center gap-1">
                       <UserCheck size={13} />
                       <span>Cố vấn: {activeTicket.assignedMentorName}</span>
                     </span>
@@ -225,8 +220,8 @@ export const CandidateTicketsPage: React.FC = () => {
               {/* Thread Messages List */}
               <div className="flex-1 overflow-y-auto py-4 space-y-3.5 pr-2 max-h-[380px]">
                 {/* Initial Description */}
-                <div className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] text-xs text-slate-200">
-                  <div className="flex justify-between items-center text-slate-400 mb-1 font-semibold">
+                <div className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border text-xs text-foreground">
+                  <div className="flex justify-between items-center text-muted-foreground mb-1 font-semibold">
                     <span>{activeTicket.creatorName} (Thí sinh)</span>
                     <span className="text-[10px]">{activeTicket.createdAt}</span>
                   </div>
@@ -241,15 +236,15 @@ export const CandidateTicketsPage: React.FC = () => {
                       key={rep.id}
                       className={`p-3.5 rounded-[12px] text-xs space-y-1 ${
                         isMentor
-                          ? 'bg-purple-950/30 border border-purple-800/50 text-purple-200 ml-4'
-                          : 'bg-[#0F172A] border border-[#334155] text-slate-200 mr-4'
+                          ? 'bg-purple-500/10 border border-purple-500/30 text-purple-700 dark:text-purple-400 ml-4'
+                          : 'bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground mr-4'
                       }`}
                     >
                       <div className="flex items-center justify-between font-semibold">
-                        <span className={isMentor ? 'text-purple-300 font-bold' : 'text-slate-300'}>
+                        <span className={isMentor ? 'text-purple-700 dark:text-purple-400 font-bold' : 'text-muted-foreground'}>
                           {rep.authorName} {isMentor && '(Cố vấn Mentor)'}
                         </span>
-                        <span className="text-[10px] text-slate-400">{rep.createdAt}</span>
+                        <span className="text-[10px] text-muted-foreground">{rep.createdAt}</span>
                       </div>
                       <p className="leading-relaxed">{rep.content}</p>
                     </div>
@@ -259,13 +254,13 @@ export const CandidateTicketsPage: React.FC = () => {
               </div>
 
               {/* Reply Form */}
-              <form onSubmit={handleSendReply} className="pt-3 border-t border-[#334155] flex gap-2">
+              <form onSubmit={handleSendReply} className="pt-3 border-t border-border flex gap-2">
                 <input
                   type="text"
                   placeholder="Nhập nội dung phản hồi tới Cố vấn..."
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-[10px] bg-[#0F172A] border border-[#334155] text-white placeholder-slate-400 text-xs focus:border-[#6366F1] focus:outline-none"
+                  className="flex-1 px-4 py-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground text-xs focus:border-[#6366F1] focus:outline-none"
                 />
                 <Button variant="primary" type="submit" size="sm" className="gap-1.5 px-4">
                   <Send size={14} />
@@ -274,7 +269,7 @@ export const CandidateTicketsPage: React.FC = () => {
               </form>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-slate-400">
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-muted-foreground">
               <MessageSquare size={36} className="text-slate-600 mb-2" />
               <p className="text-sm font-medium">Chọn một Ticket bên trái để xem cuộc hội thoại</p>
             </div>
@@ -298,13 +293,13 @@ export const CandidateTicketsPage: React.FC = () => {
           />
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-sm">
+            <label className="text-muted-foreground font-medium text-sm">
               Mức độ ưu tiên
             </label>
             <select
               value={priority}
               onChange={(e) => setPriority(e.target.value as any)}
-              className="p-2.5 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-sm focus:border-[#6366F1] focus:outline-none"
+              className="p-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-sm focus:border-[#6366F1] focus:outline-none"
             >
               <option value="low">Thấp (Câu hỏi thông thường)</option>
               <option value="medium">Trung bình (Vướng mắc trong triển khai)</option>
@@ -313,7 +308,7 @@ export const CandidateTicketsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-sm">
+            <label className="text-muted-foreground font-medium text-sm">
               Mô tả chi tiết vấn đề & Logs lỗi *
             </label>
             <textarea
@@ -321,7 +316,7 @@ export const CandidateTicketsPage: React.FC = () => {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Cung cấp các bước tái hiện, mã lỗi hoặc ảnh chụp màn hình đường dẫn để Cố vấn hỗ trợ nhanh nhất..."
-              className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 placeholder-slate-400 text-sm focus:border-[#6366F1] focus:outline-none"
+              className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground text-sm focus:border-[#6366F1] focus:outline-none"
               required
             />
           </div>

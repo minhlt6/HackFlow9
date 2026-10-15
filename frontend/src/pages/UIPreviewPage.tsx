@@ -105,38 +105,33 @@ export const UIPreviewPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#060911] text-slate-100 p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-muted/40 dark:bg-slate-900/60 text-foreground p-4 sm:p-6 lg:p-8">
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header Title */}
-        <div className="border-b border-[#1E293B] pb-4">
+        <div className="border-b border-border pb-4">
           <h1
             className="text-2xl sm:text-3xl font-extrabold tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #EDEDED 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
           >
             Preview UI Atoms
           </h1>
         </div>
 
         {/* 1. Đồng hồ đếm ngược */}
-        <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-4">
-          <h2 className="text-base font-semibold text-white">Đồng hồ đếm ngược</h2>
+        <div className="p-5 bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border shadow-lg space-y-4">
+          <h2 className="text-base font-semibold text-foreground">Đồng hồ đếm ngược</h2>
 
           {/* Trường hợp nhiều ngày */}
-          <div className="border border-[#334155]/60 bg-[#1E293B]/60 p-4 rounded-lg space-y-2">
-            <p className="text-xs text-slate-300 font-medium">Thời gian còn lại nộp bài chặng 1:</p>
+          <div className="border border-border bg-card p-4 rounded-lg space-y-2">
+            <p className="text-xs text-muted-foreground font-medium">Thời gian còn lại nộp bài chặng 1:</p>
             <div>
               <CountdownTimer endTime={sampleTwoDaysEndTime} />
             </div>
           </div>
 
           {/* Trường hợp sắp hết giờ */}
-          <div className="border border-[#334155]/60 bg-[#1E293B]/60 p-4 rounded-lg space-y-2.5">
+          <div className="border border-border bg-card p-4 rounded-lg space-y-2.5">
             <div className="flex items-center justify-between">
-              <p className="text-xs text-slate-300 font-medium">Đếm ngược thử nghiệm (15 giây):</p>
+              <p className="text-xs text-muted-foreground font-medium">Đếm ngược thử nghiệm (15 giây):</p>
               <Button size="sm" variant="secondary" onClick={handleResetShortTimer}>
                 Đếm lại 15s
               </Button>
@@ -147,8 +142,8 @@ export const UIPreviewPage: React.FC = () => {
           </div>
 
           {/* Trường hợp đã hết hạn */}
-          <div className="border border-[#334155]/60 bg-[#1E293B]/60 p-4 rounded-lg space-y-2">
-            <p className="text-xs text-slate-300 font-medium">Hạn chót đã qua:</p>
+          <div className="border border-border bg-card p-4 rounded-lg space-y-2">
+            <p className="text-xs text-muted-foreground font-medium">Hạn chót đã qua:</p>
             <div>
               <CountdownTimer endTime="2020-01-01T00:00:00.000Z" />
             </div>
@@ -156,8 +151,8 @@ export const UIPreviewPage: React.FC = () => {
         </div>
 
         {/* 2. Thao tác */}
-        <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-3">
-          <h2 className="text-base font-semibold text-white">Thao tác</h2>
+        <div className="p-5 bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border shadow-lg space-y-3">
+          <h2 className="text-base font-semibold text-foreground">Thao tác</h2>
           <div className="flex gap-3 items-center flex-wrap">
             <Button variant="primary">Xác nhận</Button>
             <Button variant="secondary">Hủy bỏ</Button>
@@ -176,8 +171,8 @@ export const UIPreviewPage: React.FC = () => {
         </div>
 
         {/* 3. Nhập thông tin */}
-        <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-4">
-          <h2 className="text-base font-semibold text-white">Nhập thông tin</h2>
+        <div className="p-5 bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border shadow-lg space-y-4">
+          <h2 className="text-base font-semibold text-foreground">Nhập thông tin</h2>
           <Input label="Tên đội thi" placeholder="Nhập tên đội..." />
           <Input
             label="Mã mời"
@@ -187,8 +182,8 @@ export const UIPreviewPage: React.FC = () => {
         </div>
 
         {/* 4. Trạng thái */}
-        <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-3">
-          <h2 className="text-base font-semibold text-white">Trạng thái</h2>
+        <div className="p-5 bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border shadow-lg space-y-3">
+          <h2 className="text-base font-semibold text-foreground">Trạng thái</h2>
           <div className="flex gap-2.5 flex-wrap">
             <Badge variant="indigo">Đang diễn ra</Badge>
             <Badge variant="pending">Chờ duyệt</Badge>
@@ -198,8 +193,8 @@ export const UIPreviewPage: React.FC = () => {
         </div>
 
         {/* 5. Hộp thoại tương tác */}
-        <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-3">
-          <h2 className="text-base font-semibold text-white">5. Hộp thoại tương tác</h2>
+        <div className="p-5 bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border shadow-lg space-y-3">
+          <h2 className="text-base font-semibold text-foreground">5. Hộp thoại tương tác</h2>
           <Button onClick={() => setIsModalOpen(true)}>Mở hộp thoại tạo đội thi</Button>
         </div>
 
@@ -219,36 +214,36 @@ export const UIPreviewPage: React.FC = () => {
         </Modal>
 
         {/* 6. Form nộp bài Checkpoint (HF-30 & SRS HF-23) */}
-        <div className="p-5 bg-[#0F172A] rounded-xl border border-[#334155] shadow-lg space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#334155] pb-3 gap-2">
+        <div className="p-5 bg-muted/40 dark:bg-slate-900/60 rounded-xl border border-border shadow-lg space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border pb-3 gap-2">
             <div>
-              <h2 className="text-base font-semibold text-white">
+              <h2 className="text-base font-semibold text-foreground">
                 6. Form nộp bài Checkpoint (HF-30 & SRS HF-23)
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Kiểm thử nhanh loại chặng, quyền Đội trưởng/Thành viên, trạng thái cổng thời gian và trạng thái bài nộp.
               </p>
             </div>
             <a
               href="/preview-checkpoints"
-              className="text-xs text-[#818CF8] hover:underline shrink-0"
+              className="text-xs text-primary hover:underline shrink-0"
             >
               Mở trang Checkpoint đầy đủ &rarr;
             </a>
           </div>
 
           {/* Điều khiển Test nhanh các tiêu chí feedback (Chỉ đặt tại UIPreviewPage) */}
-          <div className="space-y-2.5 p-3 bg-[#1E293B]/70 rounded-lg border border-[#334155] text-xs">
+          <div className="space-y-2.5 p-3 bg-card rounded-lg border border-border text-xs">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 font-medium">Loại chặng:</span>
+                <span className="text-muted-foreground font-medium">Loại chặng:</span>
                 <button
                   type="button"
                   onClick={() => setIsPreviewFinal(false)}
                   className={`px-2.5 py-1 rounded text-xs transition-colors ${
                     !isPreviewFinal
                       ? 'bg-indigo-600 text-white font-semibold'
-                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                      : 'bg-muted/40 dark:bg-slate-900/60 text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Chặng tiến độ (Ẩn Repo)
@@ -259,24 +254,24 @@ export const UIPreviewPage: React.FC = () => {
                   className={`px-2.5 py-1 rounded text-xs transition-colors ${
                     isPreviewFinal
                       ? 'bg-rose-600 text-white font-semibold'
-                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                      : 'bg-muted/40 dark:bg-slate-900/60 text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Chặng cuối (Freeze SHA)
                 </button>
               </div>
 
-              <div className="h-4 w-px bg-slate-700 mx-1 hidden sm:block" />
+              <div className="h-4 w-px bg-muted mx-1 hidden sm:block" />
 
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 font-medium">Quyền hạn:</span>
+                <span className="text-muted-foreground font-medium">Quyền hạn:</span>
                 <button
                   type="button"
                   onClick={() => setPreviewRole('TEAM_LEADER')}
                   className={`px-2.5 py-1 rounded text-xs transition-colors ${
                     previewRole === 'TEAM_LEADER'
                       ? 'bg-emerald-600 text-white font-semibold'
-                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                      : 'bg-muted/40 dark:bg-slate-900/60 text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Đội trưởng (TEAM_LEADER)
@@ -287,7 +282,7 @@ export const UIPreviewPage: React.FC = () => {
                   className={`px-2.5 py-1 rounded text-xs transition-colors ${
                     previewRole === 'MEMBER'
                       ? 'bg-amber-600 text-white font-semibold'
-                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                      : 'bg-muted/40 dark:bg-slate-900/60 text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   Thành viên (MEMBER)
@@ -295,8 +290,8 @@ export const UIPreviewPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-slate-700/60">
-              <span className="text-slate-400 font-medium">Trạng thái cổng:</span>
+            <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-border">
+              <span className="text-muted-foreground font-medium">Trạng thái cổng:</span>
               {(['open', 'grace_period', 'upcoming', 'closed'] as CheckpointStatus[]).map((st) => (
                 <button
                   key={st}
@@ -305,7 +300,7 @@ export const UIPreviewPage: React.FC = () => {
                   className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
                     previewWindowStatus === st
                       ? 'bg-[#6366F1] text-white font-semibold'
-                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                      : 'bg-muted/40 dark:bg-slate-900/60 text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {st}
@@ -313,8 +308,8 @@ export const UIPreviewPage: React.FC = () => {
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-slate-700/60">
-              <span className="text-slate-400 font-medium">Trạng thái bài nộp:</span>
+            <div className="flex flex-wrap items-center gap-2 pt-1.5 border-t border-border">
+              <span className="text-muted-foreground font-medium">Trạng thái bài nộp:</span>
               {(
                 [
                   'none',
@@ -332,7 +327,7 @@ export const UIPreviewPage: React.FC = () => {
                   className={`px-2 py-0.5 rounded text-[11px] font-mono transition-colors ${
                     previewSubState === subSt
                       ? 'bg-cyan-600 text-white font-semibold'
-                      : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                      : 'bg-muted/40 dark:bg-slate-900/60 text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   {subSt}
@@ -345,7 +340,7 @@ export const UIPreviewPage: React.FC = () => {
                 className={`ml-auto px-2 py-0.5 rounded text-[11px] transition-colors ${
                   previewGraceApplied
                     ? 'bg-amber-600 text-white font-semibold'
-                    : 'bg-[#0F172A] text-slate-400 hover:text-white'
+                    : 'bg-muted/40 dark:bg-slate-900/60 text-muted-foreground hover:text-foreground'
                 }`}
               >
                 grace_period_applied: {String(previewGraceApplied)}
@@ -364,25 +359,25 @@ export const UIPreviewPage: React.FC = () => {
 
         {/* 7. Bảng hiển thị lịch sử nộp bài (HF-31) */}
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#334155] pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
             <div>
-              <h2 className="text-base font-semibold text-white">
+              <h2 className="text-base font-semibold text-foreground">
                 7. Bảng hiển thị lịch sử nộp bài (HF-31)
               </h2>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-muted-foreground">
                 Demo tích hợp API GET /submissions, sort theo submitted_at giảm dần, cắt ngắn Commit SHA 7 ký tự (cắt đuôi .git), hiển thị link động từ submission_data và nhãn thời gian tự động cập nhật.
               </p>
             </div>
 
             {/* Điều khiển Test các trạng thái của Bảng lịch sử */}
-            <div className="flex items-center gap-1.5 p-1 bg-[#1E293B] rounded-lg border border-[#334155] self-start sm:self-auto text-xs">
+            <div className="flex items-center gap-1.5 p-1 bg-card rounded-lg border border-border self-start sm:self-auto text-xs">
               <button
                 type="button"
                 onClick={() => setPreviewHistoryMode('normal')}
                 className={`px-2.5 py-1 rounded transition-colors ${
                   previewHistoryMode === 'normal'
                     ? 'bg-indigo-600 text-white font-semibold'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Mặc định (3 bản)
@@ -393,7 +388,7 @@ export const UIPreviewPage: React.FC = () => {
                 className={`px-2.5 py-1 rounded transition-colors ${
                   previewHistoryMode === 'error'
                     ? 'bg-rose-600 text-white font-semibold'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Lỗi API 500
@@ -403,8 +398,8 @@ export const UIPreviewPage: React.FC = () => {
                 onClick={() => setPreviewHistoryMode('empty')}
                 className={`px-2.5 py-1 rounded transition-colors ${
                   previewHistoryMode === 'empty'
-                    ? 'bg-slate-700 text-white font-semibold'
-                    : 'text-slate-400 hover:text-white'
+                    ? 'bg-muted text-foreground font-semibold'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Chưa nộp (Rỗng)

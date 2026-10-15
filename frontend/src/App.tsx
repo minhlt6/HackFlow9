@@ -150,7 +150,7 @@ const router = createBrowserRouter([
       {
         path: '/preview-teams',
         element: (
-          <div className="min-h-screen bg-[#060911] text-slate-100 p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-muted/40 dark:bg-slate-900/60 text-foreground p-4 sm:p-6 lg:p-8">
             <TeamsPage />
           </div>
         ),
@@ -158,7 +158,7 @@ const router = createBrowserRouter([
       {
         path: '/preview-checkpoints',
         element: (
-          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-muted/40 dark:bg-slate-900/60 text-foreground p-4 sm:p-6 lg:p-8">
             <CandidateCheckpointsPage />
           </div>
         ),

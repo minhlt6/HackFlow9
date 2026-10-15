@@ -131,18 +131,18 @@ export const CandidateCheckpointsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 text-slate-100 max-w-7xl mx-auto font-['Roboto']">
+    <div className="space-y-6 text-foreground max-w-7xl mx-auto ">
       {/* Tiêu đề trang */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-2">
-          <span className="p-2 rounded-xl bg-[#6366F1]/15 text-[#818CF8] border border-[#6366F1]/30">
+          <span className="p-2 rounded-xl bg-[#6366F1]/15 text-primary border border-[#6366F1]/30">
             <CheckSquare size={22} />
           </span>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-foreground">
               Tiến độ và Nộp bài Checkpoint
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
               Quản lý tiến độ các chặng thi, đóng băng Commit SHA và theo dõi lịch sử bài nộp của đội.
             </p>
           </div>
@@ -150,23 +150,23 @@ export const CandidateCheckpointsPage: React.FC = () => {
       </div>
 
       {isLoading ? (
-        <div className="flex flex-col items-center justify-center p-16 rounded-[16px] bg-[#0F172A] border border-[#334155]">
+        <div className="flex flex-col items-center justify-center p-16 rounded-[16px] bg-muted/40 dark:bg-slate-900/60 border border-border">
           <svg className="animate-spin h-8 w-8 text-[#6366F1] mb-3" fill="none" viewBox="0 0 24 24">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
           </svg>
-          <p className="text-sm text-slate-400">Đang tải tiến trình các chặng thi...</p>
+          <p className="text-sm text-muted-foreground">Đang tải tiến trình các chặng thi...</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* CỘT TRÁI: DANH SÁCH CHECKPOINT (5 CỘT) */}
           <div className="lg:col-span-5 space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold uppercase tracking-wider text-slate-400 flex items-center gap-2">
-                <Layers size={16} className="text-[#818CF8]" />
+              <h2 className="text-sm font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                <Layers size={16} className="text-primary" />
                 <span>Các chặng Checkpoint</span>
               </h2>
-              <span className="text-xs text-slate-500">{checkpoints.length} chặng</span>
+              <span className="text-xs text-muted-foreground">{checkpoints.length} chặng</span>
             </div>
 
             <div className="space-y-3">
@@ -184,8 +184,8 @@ export const CandidateCheckpointsPage: React.FC = () => {
                     onClick={() => handleSelectCheckpoint(cp.id)}
                     className={`p-4 rounded-[14px] border transition-all cursor-pointer relative overflow-hidden ${
                       isSelected
-                        ? 'bg-[#1E293B] border-[#6366F1] shadow-lg shadow-[#6366F1]/10 ring-1 ring-[#6366F1]/50'
-                        : 'bg-[#0F172A] border-[#334155] hover:border-slate-500 hover:bg-[#1E293B]/60'
+                        ? 'bg-card border-[#6366F1] shadow-lg shadow-[#6366F1]/10 ring-1 ring-[#6366F1]/50'
+                        : 'bg-muted/40 dark:bg-slate-900/60 border-border hover:border-slate-500 hover:bg-accent'
                     }`}
                   >
                     {isSelected && (
@@ -195,7 +195,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-xs font-mono font-bold text-[#818CF8]">
+                          <span className="text-xs font-mono font-bold text-primary">
                             Chặng {cp.order || 1}
                           </span>
                           {getStatusBadge(cp.status)}
@@ -220,11 +220,11 @@ export const CandidateCheckpointsPage: React.FC = () => {
                           )}
                         </div>
 
-                        <h3 className="text-sm sm:text-base font-bold text-white truncate pt-1">
+                        <h3 className="text-sm sm:text-base font-bold text-foreground truncate pt-1">
                           {cp.title}
                         </h3>
 
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
+                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                           {cp.description}
                         </p>
                       </div>
@@ -232,15 +232,15 @@ export const CandidateCheckpointsPage: React.FC = () => {
                       <ChevronRight
                         size={18}
                         className={`shrink-0 transition-transform ${
-                          isSelected ? 'text-[#818CF8] translate-x-0.5' : 'text-slate-600'
+                          isSelected ? 'text-primary translate-x-0.5' : 'text-slate-600'
                         }`}
                       />
                     </div>
 
                     {/* Deadline footer */}
-                    <div className="mt-3 pt-2.5 border-t border-[#334155]/60 flex items-center justify-between text-xs text-slate-400">
+                    <div className="mt-3 pt-2.5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
                       <div className="flex items-center gap-1.5 font-mono text-[11px]">
-                        <Clock size={12} className="text-amber-400" />
+                        <Clock size={12} className="text-amber-700 dark:text-amber-400" />
                         <span>Hạn: {new Date(cp.deadline).toLocaleDateString('vi-VN')}</span>
                       </div>
 
@@ -248,10 +248,10 @@ export const CandidateCheckpointsPage: React.FC = () => {
                         <span
                           className={`text-[10px] font-mono ${
                             subMeta?.normalizedStatus === 'sha_verification_failed'
-                              ? 'text-amber-400'
+                              ? 'text-amber-700 dark:text-amber-400'
                               : subMeta?.normalizedStatus === 'invalid'
-                              ? 'text-rose-400'
-                              : 'text-emerald-400'
+                              ? 'text-rose-700 dark:text-rose-400'
+                              : 'text-emerald-700 dark:text-emerald-400'
                           }`}
                         >
                           {cp.latest_submission.commit_sha
@@ -268,20 +268,20 @@ export const CandidateCheckpointsPage: React.FC = () => {
             </div>
 
             {/* Hướng dẫn & Quy định theo chuẩn SRS HF-23 */}
-            <div className="p-4 rounded-[14px] bg-[#0F172A]/70 border border-[#334155] text-xs text-slate-400 space-y-2.5">
-              <div className="flex items-center gap-2 text-slate-300 font-semibold">
-                <Info size={14} className="text-cyan-400" />
+            <div className="p-4 rounded-[14px] bg-muted/40 dark:bg-slate-900/60 border border-border text-xs text-muted-foreground space-y-2.5">
+              <div className="flex items-center gap-2 text-muted-foreground font-semibold">
+                <Info size={14} className="text-sky-700 dark:text-cyan-400" />
                 <span>Quy định nộp bài Checkpoint (SRS HF-23)</span>
               </div>
-              <ul className="list-disc pl-4 space-y-1.5 text-slate-400 leading-relaxed text-[11px]">
+              <ul className="list-disc pl-4 space-y-1.5 text-muted-foreground leading-relaxed text-[11px]">
                 <li>
-                  <strong className="text-slate-300">Chặng tiến độ trung gian:</strong> Nộp tài liệu theo cấu hình động (<code className="text-indigo-300">submission_fields</code>). Không yêu cầu GitHub repo và không khóa Commit SHA để tiếp tục code bình thường.
+                  <strong className="text-muted-foreground">Chặng tiến độ trung gian:</strong> Nộp tài liệu theo cấu hình động (<code className="text-primary">submission_fields</code>). Không yêu cầu GitHub repo và không khóa Commit SHA để tiếp tục code bình thường.
                 </li>
                 <li>
-                  <strong className="text-slate-300">Chặng cuối cùng (Final):</strong> Bắt buộc URL GitHub repository public (bắt đầu bằng <code className="text-indigo-300">https://github.com/</code>). Hệ thống sẽ đóng băng Commit SHA tại thời điểm nộp.
+                  <strong className="text-muted-foreground">Chặng cuối cùng (Final):</strong> Bắt buộc URL GitHub repository public (bắt đầu bằng <code className="text-primary">https://github.com/</code>). Hệ thống sẽ đóng băng Commit SHA tại thời điểm nộp.
                 </li>
                 <li>
-                  <strong className="text-amber-300">Phân quyền:</strong> Chỉ tài khoản có vai trò Đội trưởng (<code className="text-amber-300 font-mono">TEAM_LEADER</code>) mới có quyền bấm nộp bài để tránh xung đột dữ liệu.
+                  <strong className="text-amber-700 dark:text-amber-400">Phân quyền:</strong> Chỉ tài khoản có vai trò Đội trưởng (<code className="text-amber-700 dark:text-amber-400 font-mono">TEAM_LEADER</code>) mới có quyền bấm nộp bài để tránh xung đột dữ liệu.
                 </li>
               </ul>
             </div>
@@ -292,11 +292,11 @@ export const CandidateCheckpointsPage: React.FC = () => {
             {selectedCheckpoint ? (
               <div className="space-y-6">
                 {/* Thẻ Header Checkpoint được chọn */}
-                <div className="p-5 sm:p-6 rounded-[16px] bg-[#0F172A] border border-[#334155] shadow-xl space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#334155]/80 pb-4">
+                <div className="p-5 sm:p-6 rounded-[16px] bg-muted/40 dark:bg-slate-900/60 border border-border shadow-xl space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
                     <div>
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="text-xs font-mono uppercase tracking-wider text-[#818CF8] font-bold">
+                        <span className="text-xs font-mono uppercase tracking-wider text-primary font-bold">
                           Chặng {selectedCheckpoint.order || 1}
                         </span>
                         {getStatusBadge(selectedCheckpoint.status)}
@@ -310,7 +310,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                           </Badge>
                         )}
                       </div>
-                      <h2 className="text-lg sm:text-xl font-bold text-white">
+                      <h2 className="text-lg sm:text-xl font-bold text-foreground">
                         {selectedCheckpoint.title}
                       </h2>
                     </div>
@@ -319,7 +319,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                     {(selectedCheckpoint.status === 'open' ||
                       selectedCheckpoint.status === 'grace_period') && (
                       <div className="flex flex-col sm:items-end shrink-0">
-                        <span className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold mb-1">
+                        <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
                           Thời gian còn lại
                         </span>
                         <CountdownTimer endTime={selectedCheckpoint.deadline} />
@@ -328,29 +328,29 @@ export const CandidateCheckpointsPage: React.FC = () => {
                   </div>
 
                   {/* Mô tả & Yêu cầu */}
-                  <div className="space-y-2 text-xs sm:text-sm text-slate-300">
+                  <div className="space-y-2 text-xs sm:text-sm text-muted-foreground">
                     <p className="leading-relaxed">{selectedCheckpoint.description}</p>
                     {selectedCheckpoint.requirements && (
-                      <div className="p-3.5 rounded-[10px] bg-[#1E293B]/80 border border-[#334155] space-y-1 text-xs">
-                        <span className="text-[#818CF8] font-semibold block uppercase tracking-wider text-[11px]">
+                      <div className="p-3.5 rounded-[10px] bg-card border border-border space-y-1 text-xs">
+                        <span className="text-primary font-semibold block uppercase tracking-wider text-[11px]">
                           Yêu cầu bàn giao:
                         </span>
-                        <p className="text-slate-300">{selectedCheckpoint.requirements}</p>
+                        <p className="text-muted-foreground">{selectedCheckpoint.requirements}</p>
                       </div>
                     )}
                   </div>
 
                   {/* Cảnh báo đặc thù của chặng */}
                   {selectedCheckpoint.is_final_checkpoint ? (
-                    <div className="p-3 rounded-[10px] bg-amber-500/10 border border-amber-500/20 text-xs text-amber-300 flex items-center gap-2">
-                      <AlertTriangle size={15} className="shrink-0 text-amber-400" />
+                    <div className="p-3 rounded-[10px] bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                      <AlertTriangle size={15} className="shrink-0 text-amber-700 dark:text-amber-400" />
                       <span>
                         Đây là chặng cuối cùng: Hệ thống sẽ khóa và đóng băng Commit SHA khi nộp.
                       </span>
                     </div>
                   ) : (
-                    <div className="p-3 rounded-[10px] bg-indigo-500/10 border border-indigo-500/20 text-xs text-indigo-300 flex items-center gap-2">
-                      <Info size={15} className="shrink-0 text-indigo-400" />
+                    <div className="p-3 rounded-[10px] bg-indigo-500/10 border border-indigo-500/20 text-xs text-primary flex items-center gap-2">
+                      <Info size={15} className="shrink-0 text-primary" />
                       <span>
                         Chặng tiến độ: Không yêu cầu GitHub repo và không đóng băng commit, bạn tiếp tục code bình thường.
                       </span>
@@ -358,14 +358,14 @@ export const CandidateCheckpointsPage: React.FC = () => {
                   )}
 
                   {/* Thông tin mốc thời gian */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs text-slate-400 border-t border-[#334155]/60 font-mono">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs text-muted-foreground border-t border-border font-mono">
                     <div className="flex items-center gap-2">
-                      <Calendar size={14} className="text-slate-500" />
+                      <Calendar size={14} className="text-muted-foreground" />
                       <span>Bắt đầu: {new Date(selectedCheckpoint.start_time).toLocaleString('vi-VN')}</span>
                     </div>
                     <div className="flex items-center gap-2 sm:justify-end">
-                      <Clock size={14} className="text-amber-400" />
-                      <span className="text-amber-300">
+                      <Clock size={14} className="text-amber-700 dark:text-amber-400" />
+                      <span className="text-amber-700 dark:text-amber-400">
                         Hạn chót: {new Date(selectedCheckpoint.deadline).toLocaleString('vi-VN')}
                       </span>
                     </div>
@@ -373,14 +373,14 @@ export const CandidateCheckpointsPage: React.FC = () => {
                 </div>
 
                 {/* FORM NỘP BÀI CHECKPOINT (HF-30 & SRS HF-23) */}
-                <div className="p-5 sm:p-6 rounded-[16px] bg-[#0F172A] border border-[#334155] shadow-xl space-y-5">
-                  <div className="border-b border-[#334155] pb-3 flex items-center justify-between flex-wrap gap-2">
+                <div className="p-5 sm:p-6 rounded-[16px] bg-muted/40 dark:bg-slate-900/60 border border-border shadow-xl space-y-5">
+                  <div className="border-b border-border pb-3 flex items-center justify-between flex-wrap gap-2">
                     <div>
-                      <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
-                        <Send size={18} className="text-[#818CF8]" />
+                      <h3 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
+                        <Send size={18} className="text-primary" />
                         <span>Form Nộp bài Checkpoint</span>
                       </h3>
-                      <p className="text-xs text-slate-400 mt-0.5">
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {selectedCheckpoint.is_final_checkpoint
                           ? 'Điền đường dẫn GitHub repo để hệ thống tiến hành kiểm tra và chốt Commit SHA.'
                           : 'Nộp link tài liệu báo cáo tiến độ, wireframe hoặc link demo theo cấu hình.'}
@@ -428,8 +428,8 @@ export const CandidateCheckpointsPage: React.FC = () => {
                 />
               </div>
             ) : (
-              <div className="p-12 text-center rounded-[16px] bg-[#0F172A] border border-[#334155]">
-                <p className="text-slate-400 text-sm">Vui lòng chọn một chặng checkpoint để xem chi tiết.</p>
+              <div className="p-12 text-center rounded-[16px] bg-muted/40 dark:bg-slate-900/60 border border-border">
+                <p className="text-muted-foreground text-sm">Vui lòng chọn một chặng checkpoint để xem chi tiết.</p>
               </div>
             )}
           </div>

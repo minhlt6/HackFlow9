@@ -24,30 +24,30 @@ export const RbacForbiddenModal: React.FC<RbacForbiddenModalProps> = ({
       maxWidth="md"
     >
       <div className="space-y-4 text-center">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-700 dark:text-rose-400">
           <ShieldX size={36} />
         </div>
 
         <div>
-          <h4 className="font-['Righteous'] text-lg text-rose-300">
+          <h4 className="font-semibold tracking-tight text-foreground text-lg text-rose-700 dark:text-rose-400">
             Vi phạm Chính sách Phân quyền RBAC
           </h4>
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-muted-foreground">
             Hệ thống HackFlow ghi nhận yêu cầu không hợp lệ từ vai trò{' '}
-            <span className="font-semibold text-amber-300 uppercase">[{userRole}]</span>
+            <span className="font-semibold text-amber-700 dark:text-amber-400 uppercase">[{userRole}]</span>
           </p>
         </div>
 
-        <div className="rounded-[10px] bg-[#0F172A] border border-[#334155] p-3 text-left text-xs text-slate-300 space-y-2">
-          <div className="flex items-center gap-2 text-rose-400 font-semibold">
+        <div className="rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border p-3 text-left text-xs text-muted-foreground space-y-2">
+          <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400 font-semibold">
             <Lock size={14} />
             <span>Hành động bị chặn:</span>
           </div>
-          <p className="font-mono text-slate-400">{attemptedAction}</p>
+          <p className="font-mono text-muted-foreground">{attemptedAction}</p>
 
-          <div className="pt-2 border-t border-[#334155]/60 flex items-start gap-2 text-amber-400">
+          <div className="pt-2 border-t border-border flex items-start gap-2 text-amber-700 dark:text-amber-400">
             <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-            <p className="text-[11px] text-slate-300 leading-relaxed">
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
               Theo quy chế cuộc thi Hackathon: Cố vấn chuyên môn có trách nhiệm hướng dẫn kỹ thuật nhưng <strong>tuyệt đối không được can thiệp vào kho lưu trữ mã nguồn thí sinh</strong> hoặc <strong>xem trước bảng điểm chấm thi của Hội đồng Giám khảo</strong> nhằm đảm bảo tính bảo mật và công bằng.
             </p>
           </div>

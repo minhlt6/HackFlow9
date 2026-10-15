@@ -133,19 +133,19 @@ const PRESET_TEMPLATES: {
 const getFieldIcon = (type: SubmissionFieldType) => {
   switch (type) {
     case 'repoUrl':
-      return <GitBranch size={13} className="text-indigo-400" />;
+      return <GitBranch size={13} className="text-primary" />;
     case 'demoUrl':
-      return <Globe size={13} className="text-emerald-400" />;
+      return <Globe size={13} className="text-emerald-700 dark:text-emerald-400" />;
     case 'videoUrl':
-      return <Video size={13} className="text-rose-400" />;
+      return <Video size={13} className="text-rose-700 dark:text-rose-400" />;
     case 'slideUrl':
-      return <Presentation size={13} className="text-amber-400" />;
+      return <Presentation size={13} className="text-amber-700 dark:text-amber-400" />;
     case 'figmaUrl':
-      return <Palette size={13} className="text-purple-400" />;
+      return <Palette size={13} className="text-purple-700 dark:text-purple-400" />;
     case 'description':
       return <FileText size={13} className="text-blue-400" />;
     default:
-      return <File size={13} className="text-slate-400" />;
+      return <File size={13} className="text-muted-foreground" />;
   }
 };
 
@@ -214,22 +214,22 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
   };
 
   return (
-    <div className="space-y-4 pt-3 border-t border-[#334155]/80">
+    <div className="space-y-4 pt-3 border-t border-border">
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
-          <ListChecks size={16} className="text-[#818CF8]" />
-          <h4 className="font-['Righteous'] text-sm text-white tracking-wide">
+          <ListChecks size={16} className="text-primary" />
+          <h4 className="font-semibold tracking-tight text-foreground text-sm text-foreground tracking-wide">
             Cấu Hình Yêu Cầu Nộp Bài Cho Thí Sinh
           </h4>
         </div>
-        <p className="text-[11px] text-slate-400">
+        <p className="text-[11px] text-muted-foreground">
           Quy định các liên kết (URL) và trường thông tin mà thí sinh bắt buộc / khuyến nghị nộp tại chặng này.
         </p>
       </div>
 
       {/* Quick Add Buttons */}
-      <div className="space-y-2 p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155]">
-        <span className="text-[11px] font-semibold text-slate-300">
+      <div className="space-y-2 p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border">
+        <span className="text-[11px] font-semibold text-muted-foreground">
           Thêm nhanh hạng mục nộp bài:
         </span>
         <div className="flex flex-wrap gap-2">
@@ -240,9 +240,9 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
                 key={tmpl.type}
                 type="button"
                 onClick={() => handleAddField(tmpl)}
-                className="px-3 py-1.5 rounded-[8px] text-xs font-medium bg-[#1E293B] hover:bg-[#334155] text-slate-200 hover:text-white border border-[#334155] hover:border-[#6366F1]/60 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+                className="px-3 py-1.5 rounded-[8px] text-xs font-medium bg-card hover:bg-accent text-foreground hover:text-foreground border border-border hover:border-[#6366F1]/60 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
               >
-                <Icon size={13} className="text-[#818CF8]" />
+                <Icon size={13} className="text-primary" />
                 <span>+ {tmpl.label}</span>
               </button>
             );
@@ -252,15 +252,15 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
 
       {/* List of Configured Fields */}
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between text-xs text-slate-400">
-          <span className="font-semibold text-slate-200">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="font-semibold text-foreground">
             Danh sách hạng mục bài nộp ({fields.length}):
           </span>
-          <span className="text-[11px] text-slate-400">Thí sinh sẽ điền theo form này khi nộp bài</span>
+          <span className="text-[11px] text-muted-foreground">Thí sinh sẽ điền theo form này khi nộp bài</span>
         </div>
 
         {fields.length === 0 ? (
-          <div className="p-4 rounded-[10px] bg-[#0F172A]/50 border border-dashed border-[#334155] text-center text-xs text-slate-400">
+          <div className="p-4 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-dashed border-border text-center text-xs text-muted-foreground">
             Chưa có hạng mục nào. Bấm các nút phía trên để thêm trường nộp bài.
           </div>
         ) : (
@@ -268,19 +268,19 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
             {fields.map((field, idx) => (
               <div
                 key={field.id}
-                className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-2.5 text-xs transition-colors hover:border-[#6366F1]/40"
+                className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2.5 text-xs transition-colors hover:border-[#6366F1]/40"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1E293B] text-[10px] font-mono text-[#818CF8] font-bold border border-[#334155]">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-card text-[10px] font-mono text-primary font-bold border border-border">
                       #{idx + 1}
                     </span>
-                    <div className="flex items-center gap-1.5 font-medium text-slate-200">
+                    <div className="flex items-center gap-1.5 font-medium text-foreground">
                       {getFieldIcon(field.type)}
-                      <span className="text-slate-200 font-semibold text-xs">
+                      <span className="text-foreground font-semibold text-xs">
                         {getFieldReadableName(field.type)}
                       </span>
-                      <span className="text-slate-500 font-mono text-[10px]">({field.type})</span>
+                      <span className="text-muted-foreground font-mono text-[10px]">({field.type})</span>
                     </div>
                   </div>
 
@@ -292,13 +292,13 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
                         onChange={(e) =>
                           handleUpdateField(field.id, { required: e.target.checked })
                         }
-                        className="rounded border-[#334155] bg-[#1E293B] text-amber-500 focus:ring-amber-500 cursor-pointer"
+                        className="rounded border-border bg-card text-amber-500 focus:ring-amber-500 cursor-pointer"
                       />
                       <span
                         className={
                           field.required
-                            ? 'text-amber-300 font-bold bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30 text-[11px]'
-                            : 'text-slate-400 text-[11px]'
+                            ? 'text-amber-700 dark:text-amber-400 font-bold bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30 text-[11px]'
+                            : 'text-muted-foreground text-[11px]'
                         }
                       >
                         {field.required ? 'Bắt buộc nộp' : 'Tùy chọn'}
@@ -308,7 +308,7 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
                     <button
                       type="button"
                       onClick={() => handleRemoveField(field.id)}
-                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                       title="Xóa trường này"
                     >
                       <Trash2 size={14} />
@@ -318,7 +318,7 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
 
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-start">
                   <div className="md:col-span-5 space-y-1">
-                    <span className="text-[11px] text-slate-400 font-medium">Tên nhãn hiển thị:</span>
+                    <span className="text-[11px] text-muted-foreground font-medium">Tên nhãn hiển thị:</span>
                     <input
                       type="text"
                       value={field.label}
@@ -326,11 +326,11 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
                         handleUpdateField(field.id, { label: e.target.value })
                       }
                       placeholder="Tên nhãn hiển thị"
-                      className="w-full p-2.5 rounded-[8px] bg-[#1E293B] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+                      className="w-full p-2.5 rounded-[8px] bg-card border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
                     />
                   </div>
                   <div className="md:col-span-7 space-y-1">
-                    <span className="text-[11px] text-slate-400 font-medium">Gợi ý / Hướng dẫn điền cho thí sinh:</span>
+                    <span className="text-[11px] text-muted-foreground font-medium">Gợi ý / Hướng dẫn điền cho thí sinh:</span>
                     <input
                       type="text"
                       value={field.description || ''}
@@ -338,7 +338,7 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
                         handleUpdateField(field.id, { description: e.target.value })
                       }
                       placeholder="Hướng dẫn / Gợi ý điền cho thí sinh"
-                      className="w-full p-2.5 rounded-[8px] bg-[#1E293B] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+                      className="w-full p-2.5 rounded-[8px] bg-card border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
                     />
                   </div>
                 </div>
@@ -349,9 +349,9 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
       </div>
 
       {/* Checklist / Criteria Section */}
-      <div className="space-y-2 pt-2 border-t border-[#334155]/60">
-        <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-          <CheckCircle2 size={14} className="text-emerald-400" />
+      <div className="space-y-2 pt-2 border-t border-border">
+        <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+          <CheckCircle2 size={14} className="text-emerald-700 dark:text-emerald-400" />
           <span>Tiêu chí kiểm duyệt & Checklist bài nộp:</span>
         </label>
         <div className="flex gap-2">
@@ -366,7 +366,7 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
               }
             }}
             placeholder="Ví dụ: Báo cáo đặc tả kiến trúc tối thiểu 5 trang, có sơ đồ C4 model..."
-            className="flex-1 p-2.5 rounded-[8px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+            className="flex-1 p-2.5 rounded-[8px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
           />
           <button
             type="button"
@@ -382,14 +382,14 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
             {requirements.map((req, rIdx) => (
               <span
                 key={rIdx}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs bg-[#0F172A] border border-[#334155] text-slate-200"
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-xs bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground"
               >
-                <CheckCircle2 size={12} className="text-emerald-400 shrink-0" />
+                <CheckCircle2 size={12} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
                 <span>{req}</span>
                 <button
                   type="button"
                   onClick={() => handleRemoveReq(rIdx)}
-                  className="text-slate-400 hover:text-rose-400 ml-0.5 cursor-pointer"
+                  className="text-muted-foreground hover:text-rose-400 ml-0.5 cursor-pointer"
                   title="Xóa tiêu chí này"
                 >
                   <X size={12} />
@@ -586,26 +586,21 @@ export const AdminCheckpointsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto'] w-full">
+    <div className="space-y-6  w-full">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#1E293B]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#818CF8]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#6366F1]/20 border border-[#6366F1]/40 text-primary">
               <CheckSquare size={20} />
             </div>
             <h1
-              className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-              style={{
-                background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
+              className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
             >
               Cấu Hình Chặng Nộp & Thời Lượng
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Quản lý các mốc nộp bài bắt buộc, thời lượng làm bài (tính theo số phút) và trọng số điểm chung cuộc.
           </p>
         </div>
@@ -646,15 +641,15 @@ export const AdminCheckpointsPage: React.FC = () => {
       </div>
 
       {alert && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-950/40 border border-emerald-500/40 text-xs sm:text-sm text-emerald-300 flex items-center justify-between shadow-lg shadow-emerald-950/20 animate-in fade-in">
+        <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/40 text-xs sm:text-sm text-emerald-700 dark:text-emerald-400 flex items-center justify-between shadow-lg shadow-emerald-950/20 animate-in fade-in">
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+            <CheckCircle2 size={16} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
             <span>{alert}</span>
           </div>
           <button
             type="button"
             onClick={() => setAlert(null)}
-            className="text-emerald-400 hover:text-emerald-200 text-xs cursor-pointer"
+            className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-200 text-xs cursor-pointer"
           >
             Đóng
           </button>
@@ -664,10 +659,10 @@ export const AdminCheckpointsPage: React.FC = () => {
       {/* Checkpoints Cards */}
       <div className="space-y-4">
         {checkpoints.length === 0 ? (
-          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-10 text-center space-y-3">
-            <CheckSquare size={36} className="mx-auto text-slate-500" />
-            <h3 className="font-bold text-white text-base">Chưa có chặng nộp bài nào</h3>
-            <p className="text-xs text-slate-400 max-w-md mx-auto">
+          <div className="rounded-[16px] border border-border bg-card p-10 text-center space-y-3">
+            <CheckSquare size={36} className="mx-auto text-muted-foreground" />
+            <h3 className="font-bold text-foreground text-base">Chưa có chặng nộp bài nào</h3>
+            <p className="text-xs text-muted-foreground max-w-md mx-auto">
               Hệ thống hiện đang ở trạng thái sạch. Hãy bấm nút "Thêm Chặng Nộp Mới" để thiết lập các mốc nộp bài cho cuộc thi.
             </p>
             <Button variant="primary" onClick={() => setIsAddOpen(true)} className="gap-2 mt-2">
@@ -684,12 +679,12 @@ export const AdminCheckpointsPage: React.FC = () => {
             return (
               <div
                 key={cp.id}
-                className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4 shadow-lg shadow-black/20"
+                className="rounded-[16px] border border-border bg-card p-6 space-y-4 shadow-lg shadow-black/20"
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#334155]">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
                   <div className="flex items-center gap-3">
                     {/* Order & Re-ordering buttons */}
-                    <div className="flex items-center gap-0.5 bg-[#0F172A] border border-[#334155] rounded-[8px] p-0.5 shadow-sm">
+                    <div className="flex items-center gap-0.5 bg-muted/40 dark:bg-slate-900/60 border border-border rounded-[8px] p-0.5 shadow-sm">
                       <button
                         type="button"
                         disabled={idx === 0}
@@ -698,12 +693,12 @@ export const AdminCheckpointsPage: React.FC = () => {
                           setAlert(`Đã chuyển chặng "${cp.title}" lên vị trí #${idx}!`);
                           setTimeout(() => setAlert(null), 2500);
                         }}
-                        className="p-1 rounded-[6px] text-slate-400 hover:text-white hover:bg-[#1E293B] disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                        className="p-1 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all"
                         title={idx === 0 ? 'Đã ở vị trí đầu tiên' : `Di chuyển lên vị trí #${idx}`}
                       >
                         <ArrowUp size={14} />
                       </button>
-                      <div className="flex h-7 px-2 items-center justify-center text-[#818CF8] font-bold text-xs font-mono">
+                      <div className="flex h-7 px-2 items-center justify-center text-primary font-bold text-xs font-mono">
                         #{idx + 1}
                       </div>
                       <button
@@ -714,14 +709,14 @@ export const AdminCheckpointsPage: React.FC = () => {
                           setAlert(`Đã chuyển chặng "${cp.title}" xuống vị trí #${idx + 2}!`);
                           setTimeout(() => setAlert(null), 2500);
                         }}
-                        className="p-1 rounded-[6px] text-slate-400 hover:text-white hover:bg-[#1E293B] disabled:opacity-20 disabled:cursor-not-allowed transition-all"
+                        className="p-1 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all"
                         title={idx === checkpoints.length - 1 ? 'Đã ở vị trí cuối cùng' : `Di chuyển xuống vị trí #${idx + 2}`}
                       >
                         <ArrowDown size={14} />
                       </button>
                     </div>
 
-                    <h3 className="font-['Righteous'] text-lg sm:text-xl text-white">{cp.title}</h3>
+                    <h3 className="font-semibold tracking-tight text-foreground text-lg sm:text-xl text-foreground">{cp.title}</h3>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -751,17 +746,17 @@ export const AdminCheckpointsPage: React.FC = () => {
                   </div>
                 </div>
 
-                <p className="text-xs text-slate-300 leading-relaxed max-w-3xl">
+                <p className="text-xs text-muted-foreground leading-relaxed max-w-3xl">
                   {cp.description}
                 </p>
 
                 {/* Hạng mục yêu cầu nộp bài của thí sinh */}
-                <div className="p-3.5 rounded-[12px] bg-[#0F172A]/70 border border-[#334155]/60 space-y-2.5">
+                <div className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <ListChecks size={14} className="text-[#818CF8]" />
+                    <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                      <ListChecks size={14} className="text-primary" />
                       <span>Hạng mục nộp bài yêu cầu cho Thí sinh:</span>
-                      <span className="text-slate-400 font-normal">
+                      <span className="text-muted-foreground font-normal">
                         ({(cp.submissionFields && cp.submissionFields.length > 0 ? cp.submissionFields : DEFAULT_SUBMISSION_FIELDS).length} hạng mục)
                       </span>
                     </span>
@@ -773,8 +768,8 @@ export const AdminCheckpointsPage: React.FC = () => {
                         key={field.id}
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] text-xs border ${
                           field.required
-                            ? 'bg-[#1E293B] border-amber-500/40 text-amber-200 shadow-sm'
-                            : 'bg-[#1E293B]/60 border-[#334155] text-slate-300'
+                            ? 'bg-card border-amber-500/40 text-amber-700 dark:text-amber-400 shadow-sm'
+                            : 'bg-card border-border text-muted-foreground'
                         }`}
                       >
                         {getFieldIcon(field.type)}
@@ -782,8 +777,8 @@ export const AdminCheckpointsPage: React.FC = () => {
                         <span
                           className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
                             field.required
-                              ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-slate-700/60 text-slate-400'
+                              ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400'
+                              : 'bg-muted text-muted-foreground'
                           }`}
                         >
                           {field.required ? 'Bắt buộc' : 'Tùy chọn'}
@@ -793,11 +788,11 @@ export const AdminCheckpointsPage: React.FC = () => {
                   </div>
 
                   {cp.requirements && cp.requirements.length > 0 && (
-                    <div className="pt-2 border-t border-[#334155]/40 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
-                      <span className="font-medium text-slate-300">Tiêu chí kiểm duyệt:</span>
+                    <div className="pt-2 border-t border-border flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+                      <span className="font-medium text-muted-foreground">Tiêu chí kiểm duyệt:</span>
                       {cp.requirements.map((req, rIdx) => (
                         <span key={rIdx} className="flex items-center gap-1">
-                          <CheckCircle2 size={11} className="text-emerald-400" />
+                          <CheckCircle2 size={11} className="text-emerald-700 dark:text-emerald-400" />
                           <span>{req}</span>
                         </span>
                       ))}
@@ -805,12 +800,12 @@ export const AdminCheckpointsPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex flex-col md:flex-row md:items-center justify-between pt-3 border-t border-[#334155]/60 text-xs text-slate-400 gap-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between pt-3 border-t border-border text-xs text-muted-foreground gap-3">
                   <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <Clock size={14} className="text-[#818CF8]" />
+                      <Clock size={14} className="text-primary" />
                       <span>Thời lượng chặng:</span>
-                      <span className="font-semibold text-white">
+                      <span className="font-semibold text-foreground">
                         {duration} phút ({formatDuration(duration)})
                       </span>
                     </div>
@@ -818,14 +813,14 @@ export const AdminCheckpointsPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span>•</span>
                       {config.isContestStarted ? (
-                        <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
+                        <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                           <span>
                             Đang đếm ngược • Hạn chót: {new Date(cp.deadline).toLocaleTimeString('vi-VN')} {new Date(cp.deadline).toLocaleDateString('vi-VN')}
                           </span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1.5 text-amber-300">
+                        <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
                           <span>Chưa kích hoạt • Tự động tính sau khi phát lệnh bắt đầu</span>
                         </div>
                       )}
@@ -833,9 +828,9 @@ export const AdminCheckpointsPage: React.FC = () => {
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <GitBranch size={14} className="text-emerald-400" />
+                    <GitBranch size={14} className="text-emerald-700 dark:text-emerald-400" />
                     <span>Tỷ lệ hoàn thành:</span>
-                    <span className="font-bold text-emerald-400">
+                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
                       {cpSubmissions.length} / {approvedTeamsCount} đội ({Math.round((cpSubmissions.length / (approvedTeamsCount || 1)) * 100)}%)
                     </span>
                   </div>
@@ -853,7 +848,7 @@ export const AdminCheckpointsPage: React.FC = () => {
         title="Thêm Chặng Nộp Mới & Cấu Hình Yêu Cầu Bài Nộp"
         maxWidth="4xl"
       >
-        <form onSubmit={handleAdd} className="space-y-4 font-['Roboto']">
+        <form onSubmit={handleAdd} className="space-y-4 ">
           {/* Top Row: Title & Weight */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
             <div className="sm:col-span-8">
@@ -879,13 +874,13 @@ export const AdminCheckpointsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-xs">Mô tả yêu cầu chặng *</label>
+            <label className="text-muted-foreground font-medium text-xs">Mô tả yêu cầu chặng *</label>
             <textarea
               rows={2}
               placeholder="Yêu cầu các đội hoàn thiện Repo GitHub, nộp tài liệu kiến trúc..."
               value={newDescription}
               onChange={(e) => setNewDescription(e.target.value)}
-              className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+              className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
               required
             />
           </div>
@@ -893,14 +888,14 @@ export const AdminCheckpointsPage: React.FC = () => {
           {/* Middle Row: Duration & Position side-by-side */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
             {/* Duration in Minutes with Quick Presets */}
-            <div className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-3 flex flex-col justify-between">
+            <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3 flex flex-col justify-between">
               <div>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
-                  <label className="text-slate-200 font-bold text-xs flex items-center gap-1.5">
-                    <Clock size={15} className="text-[#818CF8]" />
+                  <label className="text-foreground font-bold text-xs flex items-center gap-1.5">
+                    <Clock size={15} className="text-primary" />
                     <span>Thời lượng nộp bài (Số phút) *</span>
                   </label>
-                  <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                  <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                     ⏱️ {newDurationMinutes}p = {formatDuration(newDurationMinutes)}
                   </span>
                 </div>
@@ -918,7 +913,7 @@ export const AdminCheckpointsPage: React.FC = () => {
 
                 {/* Quick Presets */}
                 <div className="space-y-1.5 pt-2">
-                  <span className="text-[11px] text-slate-400">Chọn nhanh các mốc:</span>
+                  <span className="text-[11px] text-muted-foreground">Chọn nhanh các mốc:</span>
                   <div className="flex flex-wrap gap-1.5">
                     {durationPresets.map((preset) => (
                       <button
@@ -928,7 +923,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                         className={`px-2 py-1 rounded-[6px] text-[11px] font-medium transition-colors cursor-pointer border ${
                           newDurationMinutes === preset.value
                             ? 'bg-[#6366F1] text-white border-[#6366F1]'
-                            : 'bg-[#1E293B] text-slate-300 border-[#334155] hover:border-slate-400 hover:text-white'
+                            : 'bg-card text-muted-foreground border-border hover:border-slate-400 hover:text-foreground'
                         }`}
                       >
                         {preset.label}
@@ -938,22 +933,22 @@ export const AdminCheckpointsPage: React.FC = () => {
                 </div>
               </div>
 
-              <p className="text-[11px] text-slate-400 leading-relaxed pt-2 border-t border-[#334155]/60">
+              <p className="text-[11px] text-muted-foreground leading-relaxed pt-2 border-t border-border">
                 💡 Hạn chót đóng cổng sẽ tự động tính đúng <strong>{newDurationMinutes} phút</strong> kể từ khi Admin phát lệnh bắt đầu.
               </p>
             </div>
 
             {/* Position Selector */}
-            <div className="flex flex-col justify-between p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-3">
+            <div className="flex flex-col justify-between p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
               <div>
-                <label className="text-slate-200 font-bold text-xs flex items-center gap-1.5 mb-2">
-                  <Sparkles size={14} className="text-[#818CF8]" />
+                <label className="text-foreground font-bold text-xs flex items-center gap-1.5 mb-2">
+                  <Sparkles size={14} className="text-primary" />
                   <span>Vị trí chèn chặng nộp *</span>
                 </label>
                 <select
                   value={insertPosition}
                   onChange={(e) => setInsertPosition(e.target.value)}
-                  className="w-full p-2.5 rounded-[10px] bg-[#1E293B] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+                  className="w-full p-2.5 rounded-[10px] bg-card border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
                 >
                   <option value="end">Chèn vào cuối cùng (Mặc định)</option>
                   <option value="0">Chèn lên đầu tiên (Trước Chặng 1)</option>
@@ -966,7 +961,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                 </select>
               </div>
 
-              <p className="text-[11px] text-slate-400 leading-relaxed pt-2 border-t border-[#334155]/60">
+              <p className="text-[11px] text-muted-foreground leading-relaxed pt-2 border-t border-border">
                 💡 <strong>Cách chèn vào giữa:</strong> Chọn <em>"Chèn vào sau Chặng 1"</em> để đặt vào vị trí số 2, các chặng sau sẽ tự động dời thứ tự.
               </p>
             </div>
@@ -988,7 +983,7 @@ export const AdminCheckpointsPage: React.FC = () => {
           />
 
           {/* Sticky Modal Action Buttons */}
-          <div className="sticky bottom-0 bg-[#1E293B]/95 backdrop-blur-sm -mx-6 -mb-6 px-6 py-4 border-t border-[#334155] flex justify-end gap-3 z-10 rounded-b-[16px]">
+          <div className="sticky bottom-0 bg-card backdrop-blur-sm -mx-6 -mb-6 px-6 py-4 border-t border-border flex justify-end gap-3 z-10 rounded-b-[16px]">
             <Button variant="ghost" type="button" onClick={handleCloseAdd}>
               Hủy
             </Button>
@@ -1006,7 +1001,7 @@ export const AdminCheckpointsPage: React.FC = () => {
         title={`Chỉnh Sửa Chặng & Cấu Hình Yêu Cầu: ${editingCp?.title || ''}`}
         maxWidth="4xl"
       >
-        <form onSubmit={handleSave} className="space-y-4 font-['Roboto']">
+        <form onSubmit={handleSave} className="space-y-4 ">
           {/* Top Row: Title & Weight */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
             <div className="sm:col-span-8">
@@ -1031,24 +1026,24 @@ export const AdminCheckpointsPage: React.FC = () => {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-xs">Mô tả yêu cầu chặng *</label>
+            <label className="text-muted-foreground font-medium text-xs">Mô tả yêu cầu chặng *</label>
             <textarea
               rows={2}
               value={editDescription}
               onChange={(e) => setEditDescription(e.target.value)}
-              className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+              className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
               required
             />
           </div>
 
           {/* Duration in Minutes with Quick Presets */}
-          <div className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-3">
+          <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-              <label className="text-slate-200 font-bold text-xs flex items-center gap-1.5">
-                <Clock size={15} className="text-[#818CF8]" />
+              <label className="text-foreground font-bold text-xs flex items-center gap-1.5">
+                <Clock size={15} className="text-primary" />
                 <span>Thời lượng nộp bài (Điền số phút) *</span>
               </label>
-              <span className="text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+              <span className="text-[11px] font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                 ⏱️ {editDurationMinutes} phút = {formatDuration(editDurationMinutes)}
               </span>
             </div>
@@ -1075,7 +1070,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                       className={`px-2.5 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors cursor-pointer border ${
                         editDurationMinutes === preset.value
                           ? 'bg-[#6366F1] text-white border-[#6366F1]'
-                          : 'bg-[#1E293B] text-slate-300 border-[#334155] hover:border-slate-400 hover:text-white'
+                          : 'bg-card text-muted-foreground border-border hover:border-slate-400 hover:text-foreground'
                       }`}
                     >
                       {preset.label}
@@ -1085,7 +1080,7 @@ export const AdminCheckpointsPage: React.FC = () => {
               </div>
             </div>
 
-            <p className="text-[11px] text-slate-400 leading-relaxed pt-1 border-t border-[#334155]/60">
+            <p className="text-[11px] text-muted-foreground leading-relaxed pt-1 border-t border-border">
               💡 Hạn chót đóng cổng nộp bài sẽ tự động cập nhật đúng <strong>{editDurationMinutes} phút</strong> kể từ khi cuộc thi bắt đầu.
             </p>
           </div>
@@ -1106,7 +1101,7 @@ export const AdminCheckpointsPage: React.FC = () => {
           />
 
           {/* Sticky Modal Action Buttons */}
-          <div className="sticky bottom-0 bg-[#1E293B]/95 backdrop-blur-sm -mx-6 -mb-6 px-6 py-4 border-t border-[#334155] flex justify-end gap-3 z-10 rounded-b-[16px]">
+          <div className="sticky bottom-0 bg-card backdrop-blur-sm -mx-6 -mb-6 px-6 py-4 border-t border-border flex justify-end gap-3 z-10 rounded-b-[16px]">
             <Button variant="ghost" type="button" onClick={handleCloseEdit}>
               Hủy
             </Button>

@@ -57,21 +57,16 @@ export const CandidateTopicsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1
-            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
+            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
           >
             Đăng Ký & Lựa Chọn Đề Tài
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Mỗi đề tài nhánh có giới hạn số lượng đăng ký tối đa. Hệ thống áp dụng cơ chế khóa phân tán bảo vệ suất đăng ký theo thời gian thực.
           </p>
         </div>
@@ -79,7 +74,7 @@ export const CandidateTopicsPage: React.FC = () => {
         <Button
           variant="secondary"
           onClick={() => openRaceCondition('Hệ thống AI Tự Động Phân Loại Bệnh Án')}
-          className="gap-2 border-[#6366F1]/50 text-[#818CF8] hover:bg-[#6366F1]/10"
+          className="gap-2 border-[#6366F1]/50 text-primary hover:bg-[#6366F1]/10"
         >
           <Zap size={16} />
           <span>Mô phỏng Tranh chấp Đề tài</span>
@@ -90,12 +85,12 @@ export const CandidateTopicsPage: React.FC = () => {
         <div
           className={`p-3.5 rounded-[10px] text-xs font-medium border flex items-center justify-between ${
             actionAlert.type === 'success'
-              ? 'bg-emerald-950/40 border-emerald-800 text-emerald-300'
-              : 'bg-rose-950/40 border-rose-800 text-rose-300'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+              : 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400'
           }`}
         >
           <span>{actionAlert.message}</span>
-          <button onClick={() => setActionAlert(null)} className="text-slate-400 hover:text-white">
+          <button onClick={() => setActionAlert(null)} className="text-muted-foreground hover:text-foreground">
             &times;
           </button>
         </div>
@@ -103,16 +98,16 @@ export const CandidateTopicsPage: React.FC = () => {
 
       {/* Current Team Selection Banner */}
       {myTeam && myTeam.subTopicId ? (
-        <div className="rounded-[16px] border border-emerald-500/40 bg-emerald-950/20 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="rounded-[16px] border border-emerald-500/40 bg-emerald-500/10 p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
               <CheckCircle2 size={22} />
             </div>
             <div>
-              <span className="text-[11px] uppercase tracking-wider text-emerald-300 font-semibold block">
+              <span className="text-[11px] uppercase tracking-wider text-emerald-700 dark:text-emerald-400 font-semibold block">
                 Đội của bạn đã đăng ký thành công đề tài:
               </span>
-              <span className="text-base font-bold text-white">
+              <span className="text-base font-bold text-foreground">
                 {majorTopics
                   .flatMap((m) => m.subTopics)
                   .find((s) => s.id === myTeam.subTopicId)?.title}
@@ -125,7 +120,7 @@ export const CandidateTopicsPage: React.FC = () => {
               variant="outline"
               size="sm"
               onClick={handleCancelTopic}
-              className="gap-1.5 border-rose-500/40 text-rose-400 hover:bg-rose-500/10"
+              className="gap-1.5 border-rose-500/40 text-rose-700 dark:text-rose-400 hover:bg-rose-500/10"
             >
               <RotateCcw size={14} />
               <span>Hủy để chọn lại</span>
@@ -133,7 +128,7 @@ export const CandidateTopicsPage: React.FC = () => {
           )}
         </div>
       ) : (
-        <div className="rounded-[12px] border border-amber-500/40 bg-amber-950/20 p-4 text-xs text-amber-300 flex items-center gap-2.5">
+        <div className="rounded-[12px] border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2.5">
           <ShieldAlert size={18} className="shrink-0" />
           <span>
             {myTeam
@@ -149,16 +144,16 @@ export const CandidateTopicsPage: React.FC = () => {
       <div className="space-y-8">
         {majorTopics.map((major) => (
           <div key={major.id} className="space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-[#334155]">
+            <div className="flex items-center justify-between pb-2 border-b border-border">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6366F1]/20 text-[#818CF8] font-bold text-sm">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#6366F1]/20 text-primary font-bold text-sm">
                   <Lightbulb size={18} />
                 </div>
                 <div>
-                  <h3 className="font-['Righteous'] text-xl text-white tracking-wide">
+                  <h3 className="font-semibold tracking-tight text-foreground text-xl text-foreground tracking-wide">
                     {major.name}
                   </h3>
-                  <p className="text-xs text-slate-400">{major.description}</p>
+                  <p className="text-xs text-muted-foreground">{major.description}</p>
                 </div>
               </div>
               <Badge variant="indigo">{major.subTopics.length} đề tài nhánh</Badge>
@@ -178,13 +173,13 @@ export const CandidateTopicsPage: React.FC = () => {
                     key={sub.id}
                     className={`rounded-[14px] border p-5 transition-all flex flex-col justify-between ${
                       isSelectedByMyTeam
-                        ? 'bg-[#1E293B] border-emerald-500 shadow-lg shadow-emerald-500/10'
-                        : 'bg-[#1E293B] border-[#334155] hover:border-[#6366F1]/50'
+                        ? 'bg-card border-emerald-500 shadow-lg shadow-emerald-500/10'
+                        : 'bg-card border-border hover:border-[#6366F1]/50'
                     }`}
                   >
                     <div className="space-y-3">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-bold text-base text-white leading-snug">
+                        <h4 className="font-bold text-base text-foreground leading-snug">
                           {sub.title}
                         </h4>
                         {isSelectedByMyTeam && (
@@ -192,30 +187,30 @@ export const CandidateTopicsPage: React.FC = () => {
                         )}
                       </div>
 
-                      <p className="text-xs text-slate-300 leading-relaxed">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         {sub.description}
                       </p>
 
                       {/* Mentor badge */}
                       {sub.mentorName && (
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                          <GraduationCap size={14} className="text-[#818CF8]" />
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <GraduationCap size={14} className="text-primary" />
                           <span>Cố vấn chuyên môn:</span>
-                          <span className="font-medium text-slate-200">{sub.mentorName}</span>
+                          <span className="font-medium text-foreground">{sub.mentorName}</span>
                         </div>
                       )}
                     </div>
 
                     {/* Quota Progress Bar & Registration */}
-                    <div className="mt-5 pt-4 border-t border-[#334155]/60 space-y-3">
+                    <div className="mt-5 pt-4 border-t border-border space-y-3">
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-slate-400 flex items-center gap-1">
+                        <span className="text-muted-foreground flex items-center gap-1">
                           <Users size={13} />
                           <span>Số lượng đội đã đăng ký</span>
                         </span>
                         <span
                           className={`font-semibold ${
-                            isFull ? 'text-rose-400' : 'text-slate-200'
+                            isFull ? 'text-rose-700 dark:text-rose-400' : 'text-foreground'
                           }`}
                         >
                           {registeredCount} / {quotaCount} đội {isFull && '(ĐÃ ĐẦY)'}
@@ -223,7 +218,7 @@ export const CandidateTopicsPage: React.FC = () => {
                       </div>
 
                       {/* Progress Track */}
-                      <div className="h-1.5 w-full bg-[#0F172A] rounded-full overflow-hidden">
+                      <div className="h-1.5 w-full bg-muted/40 dark:bg-slate-900/60 rounded-full overflow-hidden">
                         <div
                           className={`h-full transition-all duration-300 ${
                             isFull
@@ -243,7 +238,7 @@ export const CandidateTopicsPage: React.FC = () => {
                             variant="secondary"
                             size="sm"
                             disabled
-                            className="w-full justify-center !bg-emerald-950/40 !border-emerald-800 !text-emerald-300"
+                            className="w-full justify-center !bg-emerald-500/10 !border-emerald-500/30 !text-emerald-700 dark:text-emerald-400"
                           >
                             <CheckCircle2 size={15} />
                             <span>Đội của bạn đang giữ đề tài này</span>

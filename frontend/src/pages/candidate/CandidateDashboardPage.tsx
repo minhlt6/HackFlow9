@@ -49,37 +49,32 @@ export const CandidateDashboardPage: React.FC = () => {
   }) || checkpoints[checkpoints.length - 1];
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 lg:p-8">
+      <div className="relative overflow-hidden rounded-[16px] border border-border bg-card p-6 lg:p-8">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#6366F1]/10 blur-3xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#818CF8]">
+              <span className="text-xs font-bold uppercase tracking-wider text-primary">
                 {config.name}
               </span>
-              <span className="text-slate-500">•</span>
+              <span className="text-muted-foreground">•</span>
               <Badge variant="indigo">
                 {currentUser.teamRole === 'leader' ? 'Đội Trưởng' : 'Thành Viên'}
               </Badge>
             </div>
             <h1
-              className="font-['Righteous'] text-2xl sm:text-3xl lg:text-4xl tracking-wide"
-              style={{
-                background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
+              className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl lg:text-4xl tracking-wide"
             >
               Xin chào, {currentUser.fullName}!
             </h1>
-            <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
+            <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
               Bạn đang tham gia cùng đội{' '}
-              <strong className="text-white font-semibold">{myTeam ? myTeam.name : 'Chưa có đội'}</strong>.
+              <strong className="text-foreground font-semibold">{myTeam ? myTeam.name : 'Chưa có đội'}</strong>.
               Hiện tại cuộc thi đang ở{' '}
-              <span className="text-[#818CF8] font-medium">{config.currentPhase}</span>.
+              <span className="text-primary font-medium">{config.currentPhase}</span>.
             </p>
           </div>
 
@@ -162,11 +157,11 @@ export const CandidateDashboardPage: React.FC = () => {
         {/* Left: Topic & Team quick view */}
         <div className="lg:col-span-2 space-y-6">
           {/* Selected Topic Card */}
-          <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
+          <div className="rounded-[14px] border border-border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <Lightbulb size={20} className="text-[#818CF8]" />
-                <h3 className="font-['Righteous'] text-lg text-white">
+                <Lightbulb size={20} className="text-primary" />
+                <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
                   Đề Tài Nghiên Cứu Đã Chọn
                 </h3>
               </div>
@@ -174,20 +169,20 @@ export const CandidateDashboardPage: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <h4 className="text-base font-bold text-white">{selectedTopicTitle}</h4>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <h4 className="text-base font-bold text-foreground">{selectedTopicTitle}</h4>
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 Đề tài áp dụng các thuật toán Trí tuệ nhân tạo để giải quyết bài toán thực tế. Đội thi cần nộp mã nguồn và tài liệu qua từng chặng thi.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-between pt-2 text-xs text-slate-400 border-t border-[#334155]/60 gap-3">
+            <div className="flex flex-wrap items-center justify-between pt-2 text-xs text-muted-foreground border-t border-border gap-3">
               <div className="flex items-center gap-2">
                 <span>Cố vấn phụ trách lĩnh vực:</span>
-                <span className="font-semibold text-white">TS. Lê Quang (Phòng Nghiên Cứu AI)</span>
+                <span className="font-semibold text-foreground">TS. Lê Quang (Phòng Nghiên Cứu AI)</span>
               </div>
               <button
                 onClick={() => navigate('/topics')}
-                className="text-[#818CF8] hover:text-white font-medium flex items-center gap-1"
+                className="text-primary hover:text-foreground font-medium flex items-center gap-1"
               >
                 <span>Xem thông tin chi tiết đề tài</span>
                 <ArrowRight size={14} />
@@ -196,15 +191,15 @@ export const CandidateDashboardPage: React.FC = () => {
           </div>
 
           {/* Checkpoint Milestones Progress Bar */}
-          <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
+          <div className="rounded-[14px] border border-border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <CheckSquare size={20} className="text-amber-400" />
-                <h3 className="font-['Righteous'] text-lg text-white">
+                <CheckSquare size={20} className="text-amber-700 dark:text-amber-400" />
+                <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
                   Các Mốc Checkpoint Bắt Buộc
                 </h3>
               </div>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-muted-foreground">
                 Đã hoàn thành {teamSubmissions.length} trên {checkpoints.length}
               </span>
             </div>
@@ -217,21 +212,21 @@ export const CandidateDashboardPage: React.FC = () => {
                 return (
                   <div
                     key={cp.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-[10px] bg-[#0F172A] border border-[#334155]"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border"
                   >
                     <div className="flex items-center gap-3">
                       <div
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                           isSubmitted
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/40'
+                            : 'bg-muted/60 text-muted-foreground border border-border'
                         }`}
                       >
                         {idx + 1}
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-white">{cp.title}</p>
-                        <p className="text-xs text-slate-400">
+                        <p className="text-sm font-semibold text-foreground">{cp.title}</p>
+                        <p className="text-xs text-muted-foreground">
                           Thời lượng: {cp.durationMinutes || 180} phút • Trọng số: {cp.weight || 20}%
                         </p>
                       </div>
@@ -239,7 +234,7 @@ export const CandidateDashboardPage: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       {isSubmitted ? (
-                        <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-mono">
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 font-mono">
                           <GitBranch size={13} />
                           <span>SHA: {sub?.commitSha.slice(0, 7)}</span>
                         </div>
@@ -257,11 +252,11 @@ export const CandidateDashboardPage: React.FC = () => {
         {/* Right: Announcements & Quick Info */}
         <div className="space-y-6">
           {/* Announcements Card */}
-          <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
+          <div className="rounded-[14px] border border-border bg-card p-6 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <Megaphone size={18} className="text-[#818CF8]" />
-                <h3 className="font-['Righteous'] text-lg text-white">
+                <Megaphone size={18} className="text-primary" />
+                <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
                   Thông Báo Cuộc Thi
                 </h3>
               </div>
@@ -272,14 +267,14 @@ export const CandidateDashboardPage: React.FC = () => {
               {announcements.map((ann) => (
                 <div
                   key={ann.id}
-                  className="rounded-[10px] bg-[#0F172A] border border-[#334155] p-3 text-xs space-y-1.5"
+                  className="rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border p-3 text-xs space-y-1.5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="font-semibold text-white">{ann.title}</span>
-                    <span className="text-[10px] text-slate-400">{ann.createdAt}</span>
+                    <span className="font-semibold text-foreground">{ann.title}</span>
+                    <span className="text-[10px] text-muted-foreground">{ann.createdAt}</span>
                   </div>
-                  <p className="text-slate-300 leading-relaxed">{ann.content}</p>
-                  <span className="text-[10px] text-[#818CF8] font-medium block">
+                  <p className="text-muted-foreground leading-relaxed">{ann.content}</p>
+                  <span className="text-[10px] text-primary font-medium block">
                     {ann.sender}
                   </span>
                 </div>
@@ -288,9 +283,9 @@ export const CandidateDashboardPage: React.FC = () => {
           </div>
 
           {/* Quick Help Card */}
-          <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-6 space-y-3">
-            <h4 className="font-['Righteous'] text-base text-white">Cần Hỗ Trợ Kỹ Thuật?</h4>
-            <p className="text-xs text-slate-300 leading-relaxed">
+          <div className="rounded-[14px] border border-border bg-card p-6 space-y-3">
+            <h4 className="font-semibold tracking-tight text-foreground text-base text-foreground">Cần Hỗ Trợ Kỹ Thuật?</h4>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               Bạn có thể tạo yêu cầu gửi trực tiếp tới các Cố vấn chuyên môn thuộc lĩnh vực của bạn để được hỗ trợ giải đáp thắc mắc về dữ liệu, API hoặc tiêu chí.
             </p>
             <Button

@@ -170,10 +170,10 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     <span
       className={`inline-flex items-center gap-1.5 font-mono font-medium text-sm transition-colors border px-2.5 py-1 rounded-[10px] ${
         timeRemaining.isExpired
-          ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+          ? 'bg-rose-500/15 text-rose-700 dark:text-rose-400 border-rose-500/30'
           : timeRemaining.days === 0 && timeRemaining.hours < 1
-          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30 animate-pulse'
-          : 'bg-[#6366F1]/15 text-[#818CF8] border-[#6366F1]/40'
+          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border-amber-500/30 animate-pulse'
+          : 'bg-[#6366F1]/15 text-primary border-[#6366F1]/40'
       } ${className}`}
       title={timeRemaining.formattedText}
       data-testid="countdown-timer"
@@ -183,10 +183,10 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
           size={15}
           className={`shrink-0 ${
             timeRemaining.isExpired
-              ? 'text-rose-400'
+              ? 'text-rose-700 dark:text-rose-400'
               : timeRemaining.days === 0 && timeRemaining.hours < 1
-              ? 'text-amber-300'
-              : 'text-[#818CF8]'
+              ? 'text-amber-700 dark:text-amber-400'
+              : 'text-primary'
           }`}
         />
       )}
