@@ -6,8 +6,9 @@ import { RejectedAccountPage } from './pages/RejectedAccountPage';
 import { AuthCallback } from './pages/AuthCallback';
 import { TeamsPage } from './pages/TeamsPage';
 import { CandidateDashboardPage } from './pages/candidate/CandidateDashboardPage';
+
 import { CandidateCheckpointsPage } from './pages/candidate/candidateCheckpointsPage';
-import { CandidateTopicsPage } from './pages/candidate/CandidateTopicsPage';
+import { TopicsPage } from './pages/TopicsPage';
 import { CandidateFinalSubmissionPage } from './pages/candidate/CandidateFinalSubmissionPage';
 import { CandidateLeaderboardPage } from './pages/candidate/CandidateLeaderboardPage';
 import { CandidateTicketsPage } from './pages/candidate/CandidateTicketsPage';
@@ -142,7 +143,7 @@ const FallbackRedirect: React.FC = () => {
 
 const router = createBrowserRouter([
   {
-    element: <RootTitleLayout />,
+element: <RootTitleLayout />,
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/auth/callback', element: <AuthCallback /> },
@@ -152,6 +153,14 @@ const router = createBrowserRouter([
         element: (
           <div className="min-h-screen bg-[#060911] text-slate-100 p-4 sm:p-6 lg:p-8">
             <TeamsPage />
+          </div>
+        ),
+      },
+      {
+        path: '/preview-topics',
+        element: (
+          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+            <TopicsPage />
           </div>
         ),
       },
@@ -180,7 +189,7 @@ const router = createBrowserRouter([
               { path: '/', element: <RoleRootPage /> },
               { path: '/dashboard', element: <CandidateDashboardPage /> },
               { path: '/teams', element: <TeamsPage /> },
-              { path: '/topics', element: <CandidateTopicsPage /> },
+              { path: '/topics', element: <TopicsPage /> },
               { path: '/checkpoints', element: <CandidateCheckpointsPage /> },
               { path: '/final-submission', element: <CandidateFinalSubmissionPage /> },
               { path: '/scoreboard', element: <CandidateLeaderboardPage /> },
@@ -219,6 +228,7 @@ const router = createBrowserRouter([
       },
 
       { path: '*', element: <FallbackRedirect /> },
+
     ],
   },
 ]);

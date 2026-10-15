@@ -80,15 +80,19 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-[#0F172A] p-5 rounded-[14px] shadow-lg border border-[#334155] flex items-center justify-between transition-transform hover:-translate-y-0.5">
+        <Link
+          to="/topics"
+          className="bg-[#0F172A] p-5 rounded-[14px] shadow-lg border border-[#334155] flex items-center justify-between transition-all hover:-translate-y-0.5 hover:border-[#6366F1]/50 group"
+        >
           <div>
-            <p className="text-xs sm:text-sm text-slate-400 font-medium">Đề tài đăng ký</p>
+            <p className="text-xs sm:text-sm text-slate-400 font-medium group-hover:text-slate-300">Đề tài đăng ký</p>
             <h3 className="text-2xl font-bold text-white mt-1">18</h3>
+            <span className="text-[11px] text-[#818CF8] mt-1 inline-block">Xem &amp; Chọn đề tài &rarr;</span>
           </div>
-          <div className="w-12 h-12 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-xl flex items-center justify-center">
+          <div className="w-12 h-12 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform">
             <FileText size={22} />
           </div>
-        </div>
+        </Link>
 
         <div className="bg-[#0F172A] p-5 rounded-[14px] shadow-lg border border-[#334155] flex items-center justify-between transition-transform hover:-translate-y-0.5">
           <div>
