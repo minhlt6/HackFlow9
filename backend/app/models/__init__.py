@@ -8,6 +8,7 @@ from app.models.evaluation import RubricCriteria, Evaluation
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
 from app.models.config import HackathonConfig
 from app.models.whitelist import WhitelistEntry
+from app.models.announcement import Announcement, AnnouncementPriority
 
 __all__ = [
     "Base",
@@ -32,5 +33,7 @@ __all__ = [
     "TicketPriority",
     "HackathonConfig",
     "WhitelistEntry",
+    "Announcement",
+    "AnnouncementPriority",
 ]
 
