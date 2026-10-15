@@ -124,8 +124,8 @@ export const MainLayout: React.FC = () => {
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-white truncate">{displayName}</p>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge variant={isApproved ? 'success' : 'warning'} size="sm">
-                    {isApproved ? 'Thí sinh' : 'Chờ duyệt'}
+                  <Badge variant={isApproved ? (user?.team_role === 'TEAM_LEADER' || user?.team_role === 'leader' || !user ? 'indigo' : 'success') : 'warning'} size="sm">
+                    {isApproved ? (user?.team_role === 'TEAM_LEADER' || user?.team_role === 'leader' || !user ? 'Đội trưởng' : 'Thành viên') : 'Chờ duyệt'}
                   </Badge>
                 </div>
               </div>
