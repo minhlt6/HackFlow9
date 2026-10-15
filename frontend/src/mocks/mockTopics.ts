@@ -4,8 +4,7 @@ export const INITIAL_MOCK_TOPICS: Topic[] = [
   {
     id: 'top-01',
     title: 'AI Agent Tự Động Hóa Quy Trình Doanh Nghiệp (Enterprise AI Agents)',
-    description:
-      'Xây dựng các hệ sinh thái AI Agents tự hành, tích hợp khả năng suy luận đa bước (Multi-step Reasoning), gọi công cụ (Function Calling) và truy xuất dữ liệu doanh nghiệp (Enterprise RAG) để tự động hóa các nghiệp vụ phức tạp.',
+    description: '',
     max_teams: 5,
     current_teams: 3,
     remaining_slots: 2,

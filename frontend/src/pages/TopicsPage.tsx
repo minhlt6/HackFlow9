@@ -360,9 +360,6 @@ export const TopicsPage: React.FC = () => {
           <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white">
             Danh Sách Đề Tài Cuộc Thi (Topics)
           </h1>
-          <p className="text-sm text-slate-400 mt-1 max-w-3xl">
-            Lựa chọn bài toán công nghệ và đề tài nghiên cứu cho đội thi của bạn. Mỗi đề tài đều có chỉ tiêu giới hạn số đội đăng ký (Quota).
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
