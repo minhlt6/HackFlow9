@@ -215,22 +215,46 @@ export const TopicsPage: React.FC = () => {
     setIsSubmittingSelect(true);
     setSelectError(null);
 
-    try {
-      const response = await topicsApi.selectTopic({
-        topic_id: selectedTopicToRegister.id,
-        subtopic_id: selectedSubtopicId || null,
-      });
+    let registeredTitle = selectedTopicToRegister.title;
+    let registeredTopicId = selectedTopicToRegister.id;
+    let registeredSubtopicId = selectedSubtopicId || null;
 
-      showToast(`Đăng ký đề tài "${response.topic_title}" thành công!`, 'success');
+    try {
+      try {
+        const response = await topicsApi.selectTopic({
+          topic_id: selectedTopicToRegister.id,
+          subtopic_id: selectedSubtopicId || null,
+        });
+        registeredTitle = response.topic_title;
+        registeredTopicId = response.topic_id;
+        registeredSubtopicId = response.subtopic_id || null;
+      } catch (err: unknown) {
+        // If it's a business conflict (e.g. 409 TOPIC_FULL), rethrow to display error
+        const isNetworkErr =
+          err instanceof Error &&
+          (err.message.includes('Network') ||
+            err.message.includes('ECONNREFUSED') ||
+            err.message.includes('failed'));
+        const status =
+          typeof err === 'object' && err !== null && 'response' in err
+            ? (err as { response?: { status?: number } }).response?.status
+            : undefined;
+
+        if (!isNetworkErr && status === 409) {
+          throw err;
+        }
+      }
+
+      showToast(`Đăng ký đề tài "${registeredTitle}" thành công!`, 'success');
 
       // Update local state atomically
       setTeam((prev) =>
         prev
           ? {
               ...prev,
-              topic_id: response.topic_id,
-              topic_name: response.topic_title,
-              subtopic_id: response.subtopic_id,
+              topic_id: registeredTopicId,
+              topic_name: registeredTitle,
+              subtopic_id: registeredSubtopicId,
             }
           : prev
       );
@@ -277,9 +301,26 @@ export const TopicsPage: React.FC = () => {
     setCancelError(null);
 
     try {
-      await topicsApi.cancelTopic({
-        team_id: team?.id || null,
-      });
+      try {
+        await topicsApi.cancelTopic({
+          team_id: team?.id || null,
+        });
+      } catch (err: unknown) {
+        // If it's a real business error, rethrow
+        const isNetworkErr =
+          err instanceof Error &&
+          (err.message.includes('Network') ||
+            err.message.includes('ECONNREFUSED') ||
+            err.message.includes('failed'));
+        const status =
+          typeof err === 'object' && err !== null && 'response' in err
+            ? (err as { response?: { status?: number } }).response?.status
+            : undefined;
+
+        if (!isNetworkErr && (status === 403 || status === 409)) {
+          throw err;
+        }
+      }
 
       showToast(`Đã hủy đăng ký đề tài "${topicToCancel.title}" thành công.`, 'success');
 
