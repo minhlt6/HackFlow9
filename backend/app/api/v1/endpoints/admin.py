@@ -66,6 +66,10 @@ async def add_to_whitelist(
     entry = await whitelist_repo.add_email(
         db, body.email, added_by=str(current_user.id), note=body.note
     )
+    existing_user = await user_repo.get_by_email(db, body.email)
+    if existing_user and existing_user.approval_status == ApprovalStatus.PENDING.value:
+        existing_user.approval_status = ApprovalStatus.APPROVED.value
+        db.add(existing_user)
     await db.commit()
     await db.refresh(entry)
     data = WhitelistEntryResponse(
@@ -98,6 +102,11 @@ async def bulk_add_whitelist(
     entries = await whitelist_repo.bulk_add(
         db, body.emails, added_by=str(current_user.id), note=body.note
     )
+    for email_str in body.emails:
+        existing_user = await user_repo.get_by_email(db, email_str)
+        if existing_user and existing_user.approval_status == ApprovalStatus.PENDING.value:
+            existing_user.approval_status = ApprovalStatus.APPROVED.value
+            db.add(existing_user)
     await db.commit()
     data = WhitelistBulkAddResponse(
         imported=len(entries),
@@ -166,6 +175,7 @@ async def list_pending_candidates(
 ) -> ApiResponse[List[CandidatePendingResponse]]:
     """BTC xem toàn bộ tài khoản thí sinh đang ở trạng thái PENDING."""
     from sqlalchemy import select
+    from app.api.v1.endpoints.auth import _load_profile_store
     from app.models.user import User as UserModel, UserRole
 
     stmt = (
@@ -174,22 +184,29 @@ async def list_pending_candidates(
             UserModel.role == UserRole.CANDIDATE.value,
             UserModel.approval_status == ApprovalStatus.PENDING.value,
         )
-        .order_by(UserModel.created_at.asc())
+        .order_by(UserModel.created_at.desc())
     )
     result = await db.execute(stmt)
     candidates = result.scalars().all()
+    profile_store = _load_profile_store()
 
-    data = [
-        CandidatePendingResponse(
-            id=str(c.id),
-            email=c.email,
-            full_name=c.full_name,
-            github_username=c.github_username,
-            avatar_url=c.avatar_url,
-            created_at=c.created_at.isoformat() if c.created_at else None,
+    data = []
+    for c in candidates:
+        extra = profile_store.get(str(c.id)) or profile_store.get(c.email.lower()) or {}
+        data.append(
+            CandidatePendingResponse(
+                id=str(c.id),
+                email=c.email,
+                full_name=c.full_name,
+                github_username=c.github_username,
+                avatar_url=c.avatar_url,
+                student_id=extra.get("student_id") if isinstance(extra, dict) else None,
+                school=extra.get("school") if isinstance(extra, dict) else None,
+                phone=extra.get("phone") if isinstance(extra, dict) else None,
+                skills=extra.get("skills") if isinstance(extra, dict) else None,
+                created_at=c.created_at.isoformat() if c.created_at else None,
+            )
         )
-        for c in candidates
-    ]
     return success_response(
         data=data,
         message=f"Có {len(data)} thí sinh đang chờ duyệt.",

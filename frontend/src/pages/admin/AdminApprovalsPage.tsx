@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { axiosClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
@@ -9,6 +9,7 @@ import {
   CheckCircle,
   XCircle,
   Search,
+  RefreshCw,
 } from 'lucide-react';
 
 interface BackendPendingCandidate {
@@ -17,12 +18,17 @@ interface BackendPendingCandidate {
   full_name: string;
   github_username?: string | null;
   avatar_url?: string | null;
+  student_id?: string | null;
+  school?: string | null;
+  phone?: string | null;
+  skills?: string[] | null;
   created_at?: string | null;
 }
 
 export const AdminApprovalsPage: React.FC = () => {
   const { pendingCandidates, approveCandidate, rejectCandidate } = useMockStore();
   const [backendPending, setBackendPending] = useState<User[]>([]);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [rejectingCandidateId, setRejectingCandidateId] = useState<string | null>(null);
@@ -31,30 +37,39 @@ export const AdminApprovalsPage: React.FC = () => {
   );
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchBackendPending = async () => {
-      try {
-        const res = await axiosClient.get<{ data?: BackendPendingCandidate[] }>('/admin/candidates/pending');
-        const list = res.data?.data;
-        if (Array.isArray(list)) {
-          setBackendPending(
-            list.map((c) => ({
-              id: c.id,
-              email: c.email,
-              fullName: c.full_name || c.github_username || c.email,
-              role: 'candidate',
-              approvalStatus: 'pending',
-              githubUsername: c.github_username || undefined,
-              avatarUrl: c.avatar_url || undefined,
-            })),
-          );
-        }
-      } catch {
-        // Fallback to mock pendingCandidates
+  const fetchBackendPending = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      const res = await axiosClient.get<{ data?: BackendPendingCandidate[] }>('/admin/candidates/pending');
+      const list = res.data?.data;
+      if (Array.isArray(list)) {
+        setBackendPending(
+          list.map((c) => ({
+            id: c.id,
+            email: c.email,
+            fullName: c.full_name || c.github_username || c.email,
+            role: 'candidate',
+            approvalStatus: 'pending',
+            githubUsername: c.github_username || undefined,
+            avatarUrl: c.avatar_url || undefined,
+            studentId: c.student_id || undefined,
+            university: c.school || undefined,
+            school: c.school || undefined,
+            phone: c.phone || undefined,
+            skills: Array.isArray(c.skills) ? c.skills : undefined,
+          })),
+        );
       }
-    };
-    void fetchBackendPending();
+    } catch {
+      // Fallback to mock pendingCandidates
+    } finally {
+      setIsRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void fetchBackendPending();
+  }, [fetchBackendPending]);
 
   // Merge real backend pending candidates with mock pending candidates (deduplicating by email)
   const combinedCandidates: User[] = [
@@ -129,7 +144,18 @@ export const AdminApprovalsPage: React.FC = () => {
           </p>
         </div>
 
-        <Badge variant="warning">{combinedCandidates.length} tài khoản đang chờ</Badge>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => void fetchBackendPending()}
+            className="gap-1.5"
+          >
+            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+            <span>Làm mới</span>
+          </Button>
+          <Badge variant="warning">{combinedCandidates.length} tài khoản đang chờ</Badge>
+        </div>
       </div>
 
       {alertMsg && (
@@ -161,7 +187,7 @@ export const AdminApprovalsPage: React.FC = () => {
               <tr>
                 <th className="py-3.5 px-4">Thí sinh</th>
                 <th className="py-3.5 px-4">GitHub Account</th>
-                <th className="py-3.5 px-4 hidden md:table-cell">Đơn vị / Trường</th>
+                <th className="py-3.5 px-4 hidden md:table-cell">Đơn vị / Trường & MSSV</th>
                 <th className="py-3.5 px-4 text-center">Trạng thái</th>
                 <th className="py-3.5 px-4 text-right">Hành động</th>
               </tr>
@@ -201,7 +227,12 @@ export const AdminApprovalsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 hidden md:table-cell text-slate-300">
-                      {cand.university || 'Đại học Thủy Lợi / Bách Khoa'}
+                      <div>{cand.university || cand.school || 'Chưa cập nhật trường'}</div>
+                      {cand.studentId && (
+                        <div className="text-[11px] text-slate-400">
+                          MSSV: {cand.studentId} {cand.phone ? `• SĐT: ${cand.phone}` : ''}
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4 text-center">

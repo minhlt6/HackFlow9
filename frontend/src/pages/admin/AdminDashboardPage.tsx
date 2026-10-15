@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
+import { axiosClient } from '../../api/axiosClient';
 import { StatCard } from '../../components/common/StatCard';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
@@ -32,7 +33,48 @@ export const AdminDashboardPage: React.FC = () => {
   } = useMockStore();
 
   const navigate = useNavigate();
+  const [backendPendingCount, setBackendPendingCount] = useState<number | null>(null);
+  const [backendWhitelistCount, setBackendWhitelistCount] = useState<number | null>(null);
 
+  useEffect(() => {
+    let active = true;
+    axiosClient
+      .get<{ data?: Array<{ email: string }> }>('/admin/candidates/pending')
+      .then((res) => {
+        const list = res.data?.data;
+        if (active && Array.isArray(list)) {
+          const mockExtra = pendingCandidates.filter(
+            (m) => !list.some((r) => r.email.toLowerCase() === m.email.toLowerCase()),
+          ).length;
+          setBackendPendingCount(list.length + mockExtra);
+        }
+      })
+      .catch(() => {
+        // Fallback to mock count
+      });
+
+    axiosClient
+      .get<{ data?: Array<{ email: string }> }>('/admin/whitelist?include_inactive=true')
+      .then((res) => {
+        const list = res.data?.data;
+        if (active && Array.isArray(list)) {
+          const mockExtra = whitelist.filter(
+            (m) => !list.some((r) => r.email.toLowerCase() === m.email.toLowerCase()),
+          ).length;
+          setBackendWhitelistCount(list.length + mockExtra);
+        }
+      })
+      .catch(() => {
+        // Fallback to mock count
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [pendingCandidates, whitelist]);
+
+  const totalPendingCount = backendPendingCount ?? pendingCandidates.length;
+  const totalWhitelistCount = backendWhitelistCount ?? whitelist.length;
   const approvedTeamsCount = teams.filter((t) => t.status === 'approved').length;
   const openTicketsCount = tickets.filter((t) => t.status !== 'resolved').length;
 
@@ -122,7 +164,7 @@ export const AdminDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Tài khoản chờ xét duyệt"
-          value={pendingCandidates.length}
+          value={totalPendingCount}
           subtitle="Sinh viên đăng ký cần phê duyệt"
           icon={<ShieldCheck size={24} />}
           iconColor="amber"
@@ -173,7 +215,7 @@ export const AdminDashboardPage: React.FC = () => {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white text-sm">Duyệt Tài Khoản OAuth</span>
-                  <Badge variant="warning">{pendingCandidates.length} chờ</Badge>
+                  <Badge variant="warning">{totalPendingCount} chờ</Badge>
                 </div>
                 <p className="text-xs text-slate-400">
                   Đối soát sinh viên đăng nhập GitHub với Whitelist trường đại học.
@@ -186,7 +228,7 @@ export const AdminDashboardPage: React.FC = () => {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-white text-sm">Danh Mục Whitelist</span>
-                  <Badge variant="indigo">{whitelist.length} email</Badge>
+                  <Badge variant="indigo">{totalWhitelistCount} email</Badge>
                 </div>
                 <p className="text-xs text-slate-400">
                   Import danh sách sinh viên hợp lệ qua CSV / danh sách văn bản.

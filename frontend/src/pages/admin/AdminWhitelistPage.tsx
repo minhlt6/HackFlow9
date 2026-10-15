@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
+import { axiosClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { Input } from '../../components/Input';
+import type { WhitelistEntry } from '../../types';
 import {
   Plus,
   Upload,
@@ -10,6 +12,14 @@ import {
   CheckCircle2,
   Search,
 } from 'lucide-react';
+
+interface BackendWhitelistItem {
+  id: string;
+  email: string;
+  is_active: boolean;
+  note?: string | null;
+  created_at?: string | null;
+}
 
 export const AdminWhitelistPage: React.FC = () => {
   const {
@@ -20,6 +30,7 @@ export const AdminWhitelistPage: React.FC = () => {
     removeWhitelistEntry,
   } = useMockStore();
 
+  const [backendWhitelist, setBackendWhitelist] = useState<WhitelistEntry[]>([]);
   const [search, setSearch] = useState('');
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
@@ -30,24 +41,69 @@ export const AdminWhitelistPage: React.FC = () => {
   );
   const [alert, setAlert] = useState<string | null>(null);
 
-  const filtered = whitelist.filter(
+  const fetchBackendWhitelist = useCallback(async () => {
+    try {
+      const res = await axiosClient.get<{ data?: BackendWhitelistItem[] }>(
+        '/admin/whitelist?include_inactive=true',
+      );
+      const list = res.data?.data;
+      if (Array.isArray(list)) {
+        setBackendWhitelist(
+          list.map((w) => ({
+            id: w.id,
+            email: w.email,
+            note: w.note || undefined,
+            isActive: w.is_active,
+            addedAt: w.created_at ? w.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+          })),
+        );
+      }
+    } catch {
+      // Fallback to mock whitelist
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchBackendWhitelist();
+  }, [fetchBackendWhitelist]);
+
+  const combinedWhitelist: WhitelistEntry[] = [
+    ...backendWhitelist,
+    ...whitelist.filter(
+      (mockItem) =>
+        !backendWhitelist.some((realItem) => realItem.email.toLowerCase() === mockItem.email.toLowerCase()),
+    ),
+  ];
+
+  const filtered = combinedWhitelist.filter(
     (w) =>
       w.email.toLowerCase().includes(search.toLowerCase()) ||
       (w.note && w.note.toLowerCase().includes(search.toLowerCase())),
   );
 
-  const handleAddSingle = (e: React.FormEvent) => {
+  const handleAddSingle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!singleEmail.trim()) return;
+    const emailClean = singleEmail.trim();
+    const noteClean = singleNote.trim();
+    if (!emailClean) return;
 
-    addWhitelistEntry(singleEmail.trim(), singleNote.trim());
+    addWhitelistEntry(emailClean, noteClean);
     setIsAddOpen(false);
     setSingleEmail('');
-    setAlert(`Đã thêm ${singleEmail} vào Whitelist thành công!`);
+    try {
+      await axiosClient.post('/admin/whitelist', {
+        email: emailClean,
+        note: noteClean || undefined,
+      });
+      await fetchBackendWhitelist();
+    } catch {
+      // Ignore if offline
+    }
+    setAlert(`Đã thêm ${emailClean} vào Whitelist thành công!`);
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleBulkImport = (e: React.FormEvent) => {
+  const handleBulkImport = async (e: React.FormEvent) => {
     e.preventDefault();
     const emails = bulkText
       .split(/[\n,;]+/)
@@ -58,13 +114,44 @@ export const AdminWhitelistPage: React.FC = () => {
 
     const count = bulkImportWhitelist(emails, 'Import danh sách sinh viên hợp lệ');
     setIsBulkOpen(false);
-    setAlert(`Đã import thành công ${count} email mới vào Whitelist!`);
+    try {
+      await axiosClient.post('/admin/whitelist/bulk', {
+        emails,
+        note: 'Import danh sách sinh viên hợp lệ',
+      });
+      await fetchBackendWhitelist();
+    } catch {
+      // Ignore if offline
+    }
+    setAlert(`Đã import thành công ${count || emails.length} email mới vào Whitelist!`);
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleDelete = (id: string, email: string) => {
+  const handleToggleActive = async (item: WhitelistEntry) => {
+    toggleWhitelistActive(item.id);
+    setBackendWhitelist((prev) =>
+      prev.map((w) => (w.id === item.id ? { ...w, isActive: !w.isActive } : w)),
+    );
+    try {
+      if (item.isActive) {
+        await axiosClient.delete(`/admin/whitelist/${item.id}`);
+      } else {
+        await axiosClient.patch(`/admin/whitelist/${item.id}/reactivate`);
+      }
+    } catch {
+      // Ignore if mock-only
+    }
+  };
+
+  const handleDelete = async (id: string, email: string) => {
     if (window.confirm(`Xóa email ${email} khỏi danh sách Whitelist?`)) {
       removeWhitelistEntry(id);
+      setBackendWhitelist((prev) => prev.filter((w) => w.id !== id));
+      try {
+        await axiosClient.delete(`/admin/whitelist/${id}`);
+      } catch {
+        // Ignore if mock-only
+      }
     }
   };
 
@@ -121,7 +208,7 @@ export const AdminWhitelistPage: React.FC = () => {
         </div>
 
         <div className="text-xs text-slate-400">
-          Tổng cộng: <strong className="text-white">{whitelist.length}</strong> email trong danh sách
+          Tổng cộng: <strong className="text-white">{combinedWhitelist.length}</strong> email trong danh sách
         </div>
       </div>
 
@@ -153,7 +240,7 @@ export const AdminWhitelistPage: React.FC = () => {
                   <td className="py-3.5 px-4 hidden sm:table-cell text-slate-400">{item.addedAt}</td>
                   <td className="py-3.5 px-4 text-center">
                     <button
-                      onClick={() => toggleWhitelistActive(item.id)}
+                      onClick={() => void handleToggleActive(item)}
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-colors ${
                         item.isActive
                           ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'

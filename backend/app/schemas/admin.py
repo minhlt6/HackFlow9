@@ -54,6 +54,10 @@ class CandidatePendingResponse(BaseModel):
     full_name: Optional[str] = None
     github_username: Optional[str] = None
     avatar_url: Optional[str] = None
+    student_id: Optional[str] = None
+    school: Optional[str] = None
+    phone: Optional[str] = None
+    skills: Optional[List[str]] = None
     created_at: Optional[str] = None
 
     model_config = {"from_attributes": True}
