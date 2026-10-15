@@ -256,7 +256,18 @@ export const TeamsPage: React.FC = () => {
     }
   };
 
-  const isLeader = true;
+  const currentMember = team?.members.find(
+    (m) =>
+      m.email === currentUser?.email ||
+      m.full_name === 'Nguyễn Văn Minh' ||
+      m.user_id === currentUser?.id
+  );
+  const isLeader = Boolean(
+    currentMember?.role === 'leader' ||
+      (team?.leader_id && team.leader_id === currentUser?.id) ||
+      currentUser?.team_role === 'TEAM_LEADER' ||
+      currentUser?.team_role === 'leader'
+  );
 
   return (
     <div className="space-y-6 font-['Roboto'] max-w-7xl mx-auto">
@@ -587,7 +598,7 @@ export const TeamsPage: React.FC = () => {
 
                             {/* Cột 6: Thao tác có Tooltip */}
                             <td className="py-3.5 px-4 text-right">
-                              {isLeader && !isSelf && (
+                              {isLeader && !isSelf && !isLeaderOfTeam ? (
                                 <div className="flex items-center justify-end gap-1.5">
                                   <button
                                     type="button"
@@ -606,9 +617,10 @@ export const TeamsPage: React.FC = () => {
                                     <UserX size={15} />
                                   </button>
                                 </div>
-                              )}
-                              {isSelf && (
+                              ) : isSelf ? (
                                 <span className="text-[11px] text-slate-500 italic pr-2">Hiện tại</span>
+                              ) : (
+                                <span className="text-[11px] text-slate-500 italic pr-2">—</span>
                               )}
                             </td>
                           </tr>

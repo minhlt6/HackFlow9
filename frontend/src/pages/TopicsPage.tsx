@@ -609,15 +609,15 @@ export const TopicsPage: React.FC = () => {
                     {isSelected ? (
                       <Badge variant="indigo" size="sm">
                         <Check size={11} className="mr-1 inline" />
-                        [ĐÃ CHỌN]
+                        ĐÃ CHỌN
                       </Badge>
                     ) : isFull ? (
                       <Badge variant="danger" size="sm">
-                        [HẾT SLOT]
+                        HẾT SLOT
                       </Badge>
                     ) : (
                       <Badge variant="success" size="sm">
-                        [CÒN SLOT]
+                        CÒN SLOT
                       </Badge>
                     )}
                   </div>
