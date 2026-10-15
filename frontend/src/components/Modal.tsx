@@ -9,6 +9,8 @@ interface ModalProps {
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
   titleClassName?: string;
+  preventBackdropClose?: boolean;
+  hideCloseButton?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -18,10 +20,12 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'md',
   titleClassName,
+  preventBackdropClose = false,
+  hideCloseButton = false,
 }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape' && !preventBackdropClose) onClose();
     };
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -31,7 +35,7 @@ export const Modal: React.FC<ModalProps> = ({
       document.body.style.overflow = 'unset';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, preventBackdropClose]);
 
   if (!isOpen) return null;
 
@@ -54,7 +58,7 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div
         className="fixed inset-0"
-        onClick={onClose}
+        onClick={preventBackdropClose ? undefined : onClose}
         aria-hidden="true"
       />
       <div
@@ -64,14 +68,16 @@ export const Modal: React.FC<ModalProps> = ({
           <h3 className={titleClassName || "font-['Righteous'] text-lg sm:text-xl tracking-wide text-white truncate pr-2"}>
             {title}
           </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Đóng modal"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-[#334155]/60 transition-colors cursor-pointer"
-          >
-            <X size={20} />
-          </button>
+          {!hideCloseButton && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Đóng modal"
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-[#334155]/60 transition-colors cursor-pointer"
+            >
+              <X size={20} />
+            </button>
+          )}
         </div>
         <div className="p-6 overflow-y-auto flex-1 min-h-0 text-slate-200 font-['Roboto']">{children}</div>
       </div>

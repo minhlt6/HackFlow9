@@ -10,13 +10,16 @@ import {
   HelpCircle,
   User,
   LogOut,
-  Bell,
   Menu,
   X,
   Lock,
 } from 'lucide-react';
 import { Badge } from '../components/Badge';
 import { useAuthStore } from '../store/useAuthStore';
+import { NotificationBell } from '../components/NotificationBell';
+import { NotificationBanner } from '../components/NotificationBanner';
+import { UrgentNotificationModal } from '../components/UrgentNotificationModal';
+import { InfoToast } from '../components/InfoToast';
 
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -213,12 +216,7 @@ export const MainLayout: React.FC = () => {
               <span>Live Sync</span>
             </div>
 
-            <button
-              type="button"
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E293B] transition-colors relative"
-            >
-              <Bell size={18} />
-            </button>
+            <NotificationBell />
 
             <div className="flex items-center gap-3 pl-2 border-l border-[#1E293B]">
               <div className="hidden sm:block text-right">
@@ -232,10 +230,17 @@ export const MainLayout: React.FC = () => {
           </div>
         </header>
 
+        {/* Sticky Warning Banner (SRS HF-24) */}
+        <NotificationBanner />
+
         {/* Content Outlet */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-[#080D18]">
           <Outlet />
         </main>
+
+        {/* Urgent Blocking Modal & Info Toast (SRS HF-24) */}
+        <UrgentNotificationModal />
+        <InfoToast />
       </div>
     </div>
   );

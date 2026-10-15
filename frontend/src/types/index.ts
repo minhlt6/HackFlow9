@@ -25,4 +25,6 @@ export interface ApiResponse<T> {
 }
 
 export * from './team';
-export * from './checkpoint';
+export * from './checkpoint';
+export * from './topic';
+export * from './notification';
