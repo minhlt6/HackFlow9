@@ -108,15 +108,17 @@ async def register(
     response_model=ApiResponse[GitHubOAuthUrlResponse],
     summary="Lấy URL chuyển hướng GitHub OAuth 2.0",
 )
-async def get_github_oauth_url() -> ApiResponse[GitHubOAuthUrlResponse]:
+async def get_github_oauth_url(
+    redirect_uri: str | None = None,
+) -> ApiResponse[GitHubOAuthUrlResponse]:
     """
     Tạo URL chuyển hướng người dùng đến trang ủy quyền GitHub OAuth 2.0.
     """
-    url = auth_service.get_github_oauth_url()
+    url = auth_service.get_github_oauth_url(redirect_uri=redirect_uri)
     client_id = settings.GITHUB_CLIENT_ID or "mock-github-client-id"
     return success_response(
         data=GitHubOAuthUrlResponse(url=url, client_id=client_id),
-    message="Lấy liên kết GitHub OAuth thành công.",
+        message="Lấy liên kết GitHub OAuth thành công.",
     )
 
 
@@ -133,7 +135,9 @@ async def github_oauth_callback(
     Đổi authorization code lấy GitHub profile, tự động tạo tài khoản thí sinh
     (approval_status='pending') nếu lần đầu đăng nhập, và cấp JWT Bearer Token.
     """
-    user, token = await auth_service.authenticate_github_code(db, req.code)
+    user, token = await auth_service.authenticate_github_code(
+        db, req.code, redirect_uri=req.redirect_uri
+    )
     return success_response(
         data=TokenResponse(
             access_token=token,

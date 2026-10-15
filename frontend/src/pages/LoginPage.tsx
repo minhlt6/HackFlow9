@@ -158,7 +158,10 @@ export const LoginPage: React.FC = () => {
     setIsLoadingGithub(true);
 
     try {
-      const response = await axiosClient.get<{ url?: string; data?: { url?: string } }>('/auth/github');
+      const redirectUri = `${window.location.origin}/auth/callback`;
+      const response = await axiosClient.get<{ url?: string; data?: { url?: string } }>('/auth/github', {
+        params: { redirect_uri: redirectUri },
+      });
       const authUrl = response.data.data?.url || response.data.url;
 
       if (!authUrl) {

@@ -101,7 +101,11 @@ export const AuthCallback: React.FC = () => {
       processedOAuthCodes.add(code);
 
       try {
-        const response = await axiosClient.post<AuthResponse>('/auth/github/callback', { code });
+        const redirectUri = `${window.location.origin}/auth/callback`;
+        const response = await axiosClient.post<AuthResponse>('/auth/github/callback', {
+          code,
+          redirect_uri: redirectUri,
+        });
         const authData = response.data.data || response.data;
         const token = authData.token || authData.access_token;
         const user = normalizeUser(authData.user);

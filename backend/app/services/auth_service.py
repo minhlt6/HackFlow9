@@ -94,22 +94,22 @@ class AuthService:
         return created_user, token
 
     @staticmethod
-    def get_github_oauth_url() -> str:
+    def get_github_oauth_url(redirect_uri: Optional[str] = None) -> str:
         """
         Generate GitHub OAuth authorization redirect URL.
         """
         client_id = settings.GITHUB_CLIENT_ID or "mock-github-client-id"
-        redirect_uri = settings.GITHUB_REDIRECT_URI
+        target_redirect_uri = (redirect_uri or "").strip() or settings.GITHUB_REDIRECT_URI
         return (
             f"https://github.com/login/oauth/authorize"
             f"?client_id={client_id}"
-            f"&redirect_uri={redirect_uri}"
+            f"&redirect_uri={target_redirect_uri}"
             f"&scope=user:email"
         )
 
     @classmethod
     async def authenticate_github_code(
-        cls, db: AsyncSession, code: str
+        cls, db: AsyncSession, code: str, redirect_uri: Optional[str] = None
     ) -> Tuple[User, str]:
         """
         Exchange GitHub OAuth authorization code for GitHub access token,
@@ -123,6 +123,7 @@ class AuthService:
         github_username: Optional[str] = None
 
         if settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET:
+            target_redirect_uri = (redirect_uri or "").strip() or settings.GITHUB_REDIRECT_URI
             # 1. Exchange code for access token with GitHub
             async with httpx.AsyncClient(timeout=10.0) as client:
                 token_res = await client.post(
@@ -132,7 +133,7 @@ class AuthService:
                         "client_id": settings.GITHUB_CLIENT_ID,
                         "client_secret": settings.GITHUB_CLIENT_SECRET,
                         "code": code,
-                        "redirect_uri": settings.GITHUB_REDIRECT_URI,
+                        "redirect_uri": target_redirect_uri,
                     },
                 )
                 if token_res.status_code != 200:

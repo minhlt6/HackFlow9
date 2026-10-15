@@ -8,4 +8,4 @@ cmds = ["npm install --include=dev"]
 cmds = ["npm run build"]
 
 [start]
-cmd = "npx vite preview --host 0.0.0.0 --port ${PORT:-8080}"
+cmd = "npm run build && npx vite preview --host 0.0.0.0 --port ${PORT:-8080}"

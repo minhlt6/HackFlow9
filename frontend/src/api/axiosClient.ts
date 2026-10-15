@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '');
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/^\/+/, '').replace(/\/+$/, '');
 const configuredBaseUrl = rawBaseUrl
-  ? /^https?:\/\//i.test(rawBaseUrl) || rawBaseUrl.startsWith('/')
+  ? /^https?:\/\//i.test(rawBaseUrl)
     ? rawBaseUrl
     : `https://${rawBaseUrl}`
   : '';

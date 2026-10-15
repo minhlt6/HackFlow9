@@ -46,6 +46,7 @@ class GitHubOAuthUrlResponse(BaseModel):
 class GitHubOAuthCallbackRequest(BaseModel):
     code: str = Field(..., description="Mã xác thực code trả về từ GitHub OAuth redirect")
     state: Optional[str] = Field(None, description="State token chống CSRF")
+    redirect_uri: Optional[str] = Field(None, description="URL callback động của Frontend hiện tại")
 
 
 class ProfileUpdateRequest(BaseModel):
