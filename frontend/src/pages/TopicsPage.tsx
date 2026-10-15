@@ -349,14 +349,6 @@ export const TopicsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="p-1 rounded-lg bg-[#6366F1]/15 text-[#818CF8] border border-[#6366F1]/30">
-              <Lightbulb size={18} />
-            </span>
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#818CF8]">
-              Sprint 4 • Giai đoạn chọn đề tài
-            </span>
-          </div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white">
             Danh Sách Đề Tài Cuộc Thi (Topics)
           </h1>
