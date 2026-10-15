@@ -1,4 +1,6 @@
 import React from 'react';
+import { Card as ShadcnCard } from './ui/card';
+import { cn } from '../lib/utils';
 
 interface CardProps {
   children: React.ReactNode;
@@ -14,13 +16,15 @@ export const Card: React.FC<CardProps> = ({
   hoverEffect = false,
 }) => {
   return (
-    <div
+    <ShadcnCard
       onClick={onClick}
-      className={`rounded-[14px] border border-[#334155] bg-[#1E293B] p-6 text-slate-100 shadow-md transition-all duration-200 ${
-        hoverEffect ? 'hover:border-[#6366F1]/60 hover:shadow-lg hover:shadow-[#6366F1]/5 cursor-pointer' : ''
-      } ${className}`}
+      className={cn(
+        'p-5 transition-colors duration-150',
+        hoverEffect && 'hover:border-primary/50 hover:shadow-card cursor-pointer',
+        className,
+      )}
     >
       {children}
-    </div>
+    </ShadcnCard>
   );
 };

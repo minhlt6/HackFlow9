@@ -1,300 +1,668 @@
-import React, { useState } from 'react';
-import { useMockStore } from '../../store/useMockStore';
-import { Button } from '../../components/Button';
-import { Badge } from '../../components/Badge';
-import { Modal } from '../../components/Modal';
+import React, { useMemo, useState } from 'react';
 import {
   Users,
-  CheckCircle,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Plus,
+  Download,
+  RotateCcw,
+  MoreHorizontal,
   Eye,
+  Edit2,
+  Copy,
+  XCircle,
+  Trash2,
   Crown,
-  Search,
+  GitCommit,
+  SlidersHorizontal,
 } from 'lucide-react';
-import type { Team } from '../../types';
+import { PageHeader } from '../../components/layout/PageHeader';
+import { StatCard } from '../../components/common/StatCard';
+import {
+  DataTable,
+  type DataTableColumn,
+  type DataTableFilter,
+} from '../../components/patterns/DataTable';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
+import {
+  PermissionDeniedState,
+  StatCardsSkeleton,
+} from '../../components/patterns/StateViews';
+import { Button } from '../../components/ui/button';
+import { Badge } from '../../components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from '../../components/ui/dropdown-menu';
+import { TeamFormDialog } from '../../components/admin/TeamFormDialog';
+import { TeamDetailDialog } from '../../components/admin/TeamDetailDialog';
+import {
+  useAdminTeams,
+  type AdminTeamFormValues,
+  type AdminTeamsViewMode,
+} from '../../hooks/useAdminTeams';
+import type { EnrichedAdminTeam } from '../../mocks/adminTeamsMockData';
+import { toast } from '../../store/useToastStore';
+
+const VIEW_MODES: Array<{ id: AdminTeamsViewMode; label: string }> = [
+  { id: 'normal', label: 'Hoạt động chuẩn (12 đội)' },
+  { id: 'loading', label: 'Skeleton Loading' },
+  { id: 'empty', label: 'Empty State' },
+  { id: 'error', label: 'API Error (500)' },
+  { id: 'permission_denied', label: '403 Permission Denied' },
+];
 
 export const AdminTeamsPage: React.FC = () => {
-  const { teams, majorTopics, approveTeamRegistration, rejectTeamRegistration } = useMockStore();
+  const {
+    filteredTeams,
+    majorTopics,
+    metrics,
+    isLoading,
+    isMutating,
+    error,
+    viewMode,
+    setViewMode,
+    searchQuery,
+    setSearchQuery,
+    statusFilter,
+    setStatusFilter,
+    trackFilter,
+    setTrackFilter,
+    complianceFilter,
+    setComplianceFilter,
+    getSubTopicMeta,
+    loadTeams,
+    handleCreateTeam,
+    handleUpdateTeam,
+    handleApproveTeam,
+    handleBulkApprove,
+    handleRejectTeam,
+    handleDeleteTeam,
+    handleResetDemoDataset,
+    handleExportCsv,
+  } = useAdminTeams();
 
-  const [search, setSearch] = useState('');
-  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
-  const [rejectingTeamId, setRejectingTeamId] = useState<string | null>(null);
-  const [rejectReason, setRejectReason] = useState('Đội thi chưa đủ số lượng thành viên tối thiểu theo quy định (tối thiểu 3 thành viên).');
-  const [alert, setAlert] = useState<string | null>(null);
+  // Dialog states
+  const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
+  const [detailTeam, setDetailTeam] = useState<EnrichedAdminTeam | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingTeam, setEditingTeam] = useState<EnrichedAdminTeam | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<EnrichedAdminTeam | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<EnrichedAdminTeam | null>(null);
 
-  const filteredTeams = teams.filter(
-    (t) =>
-      t.name.toLowerCase().includes(search.toLowerCase()) ||
-      (t.leaderName || '').toLowerCase().includes(search.toLowerCase()) ||
-      t.inviteCode.toLowerCase().includes(search.toLowerCase()),
+  const openCreateModal = () => {
+    setEditingTeam(null);
+    setIsFormOpen(true);
+  };
+
+  const openEditModal = (team: EnrichedAdminTeam) => {
+    setEditingTeam(team);
+    setIsFormOpen(true);
+  };
+
+  const handleFormSubmit = async (
+    values: AdminTeamFormValues,
+  ): Promise<boolean> => {
+    if (editingTeam) {
+      return handleUpdateTeam(editingTeam.id, values);
+    }
+    return handleCreateTeam(values);
+  };
+
+  const handleCopyInviteCode = (team: EnrichedAdminTeam) => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      void navigator.clipboard.writeText(team.inviteCode);
+    }
+    toast.info(
+      `Đã sao chép mã mời: ${team.inviteCode}`,
+      `Đội thi: ${team.name}`,
+    );
+  };
+
+  // Filter definitions for DataTable
+  const tableFilters = useMemo<DataTableFilter[]>(
+    () => [
+      {
+        id: 'status',
+        label: 'Trạng thái hồ sơ',
+        value: statusFilter,
+        onChange: setStatusFilter,
+        options: [
+          { label: 'Tất cả trạng thái', value: 'all' },
+          { label: 'Đã phê duyệt (Approved)', value: 'approved' },
+          { label: 'Chờ xét duyệt (Pending)', value: 'pending' },
+          { label: 'Bị từ chối (Rejected)', value: 'rejected' },
+        ],
+      },
+      {
+        id: 'track',
+        label: 'Lĩnh vực đề tài',
+        value: trackFilter,
+        onChange: setTrackFilter,
+        options: [
+          { label: 'Tất cả lĩnh vực', value: 'all' },
+          ...majorTopics.map((m) => ({
+            label: m.title || m.name || m.id,
+            value: m.id,
+          })),
+        ],
+      },
+      {
+        id: 'compliance',
+        label: 'Quy chế thành viên',
+        value: complianceFilter,
+        onChange: setComplianceFilter,
+        options: [
+          { label: 'Tất cả quy mô', value: 'all' },
+          { label: 'Đạt chuẩn (3–5 thành viên)', value: 'compliant' },
+          { label: 'Thiếu thành viên (< 3 người)', value: 'under_quota' },
+        ],
+      },
+    ],
+    [
+      statusFilter,
+      setStatusFilter,
+      trackFilter,
+      setTrackFilter,
+      complianceFilter,
+      setComplianceFilter,
+      majorTopics,
+    ],
   );
 
-  const handleApprove = (teamId: string, teamName: string) => {
-    approveTeamRegistration(teamId);
-    setAlert(`Đã phê duyệt đội thi ${teamName} thành công!`);
-    setTimeout(() => setAlert(null), 3000);
-  };
+  // Column definitions for DataTable
+  const columns = useMemo<DataTableColumn<EnrichedAdminTeam>[]>(
+    () => [
+      {
+        id: 'name',
+        header: 'Đội Thi & Mã Mời',
+        sortable: true,
+        sortAccessor: (row) => row.name,
+        cell: (row) => (
+          <div className="space-y-1 min-w-[180px]">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setDetailTeam(row)}
+                className="font-semibold text-foreground hover:text-primary transition-colors text-left cursor-pointer"
+              >
+                {row.name}
+              </button>
+              {row.averageScore !== null && row.averageScore !== undefined && (
+                <Badge variant="indigo" className="font-mono text-[10px] px-1.5 py-0">
+                  {row.averageScore.toFixed(1)} đ
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono font-medium text-foreground border border-border">
+                {row.inviteCode}
+              </span>
+              {row.latestCommitSha && (
+                <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                  <GitCommit size={11} className="text-primary" />
+                  {row.latestCommitSha.slice(0, 7)}
+                </span>
+              )}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'leader',
+        header: 'Đội Trưởng & Đơn Vị',
+        sortable: true,
+        sortAccessor: (row) => row.leaderName || '',
+        cell: (row) => (
+          <div className="space-y-0.5 min-w-[200px]">
+            <div className="flex items-center gap-1.5 font-medium text-foreground">
+              <Crown size={13} className="text-amber-500 shrink-0" />
+              <span>{row.leaderName}</span>
+            </div>
+            <div className="text-xs text-muted-foreground truncate max-w-[240px]">
+              {row.university}
+            </div>
+          </div>
+        ),
+      },
+      {
+        id: 'topic',
+        header: 'Đề Tài Đăng Ký',
+        sortable: true,
+        sortAccessor: (row) => getSubTopicMeta(row.subTopicId).subTopicTitle,
+        cell: (row) => {
+          const meta = getSubTopicMeta(row.subTopicId);
+          return (
+            <div className="space-y-0.5 max-w-[260px]">
+              <div
+                className="font-medium text-foreground truncate"
+                title={meta.subTopicTitle}
+              >
+                {meta.subTopicTitle}
+              </div>
+              <div className="text-[11px] text-muted-foreground truncate">
+                {meta.majorTopicTitle}
+              </div>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'members',
+        header: 'Quy Mô & Chặng',
+        align: 'center',
+        sortable: true,
+        sortAccessor: (row) => row.memberCount ?? row.members.length,
+        cell: (row) => {
+          const count = row.memberCount ?? row.members.length;
+          const isCompliant = count >= 3 && count <= 5;
+          return (
+            <div className="inline-flex flex-col items-center gap-1">
+              <Badge
+                variant={isCompliant ? 'neutral' : 'warning'}
+                className="font-mono"
+              >
+                {count} / 5 TV
+              </Badge>
+              <span className="font-mono text-[11px] text-muted-foreground">
+                CP: {row.checkpointsCompleted}/{row.totalCheckpoints}
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        id: 'status',
+        header: 'Trạng Thái',
+        align: 'center',
+        sortable: true,
+        sortAccessor: (row) => row.status.toLowerCase(),
+        cell: (row) => {
+          const normalized = row.status.toLowerCase();
+          return (
+            <Badge
+              variant={
+                normalized === 'approved'
+                  ? 'success'
+                  : normalized === 'rejected'
+                  ? 'destructive'
+                  : 'warning'
+              }
+            >
+              {normalized === 'approved'
+                ? 'Đã duyệt'
+                : normalized === 'rejected'
+                ? 'Bị từ chối'
+                : 'Chờ duyệt'}
+            </Badge>
+          );
+        },
+      },
+      {
+        id: 'createdAt',
+        header: 'Ngày Tạo',
+        align: 'center',
+        sortable: true,
+        sortAccessor: (row) => row.createdAt,
+        cell: (row) => (
+          <span className="font-mono text-xs text-muted-foreground">
+            {row.createdAt}
+          </span>
+        ),
+      },
+      {
+        id: 'actions',
+        header: 'Thao Tác',
+        align: 'right',
+        cell: (row) => {
+          const normalized = row.status.toLowerCase();
+          return (
+            <div className="flex items-center justify-end gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setDetailTeam(row)}
+                aria-label={`Xem hồ sơ đội ${row.name}`}
+                title="Xem chi tiết hồ sơ"
+              >
+                <Eye size={15} />
+              </Button>
 
-  const handleConfirmReject = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!rejectingTeamId) return;
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                  aria-label={`Mở menu thao tác cho đội ${row.name}`}
+                >
+                  <MoreHorizontal size={16} />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  <DropdownMenuLabel>Đội: {row.name}</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={() => setDetailTeam(row)}>
+                    <Eye size={14} className="text-muted-foreground" />
+                    <span>Xem chi tiết hồ sơ</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => openEditModal(row)}>
+                    <Edit2 size={14} className="text-muted-foreground" />
+                    <span>Chỉnh sửa thông tin</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => handleCopyInviteCode(row)}>
+                    <Copy size={14} className="text-muted-foreground" />
+                    <span>Sao chép mã mời ({row.inviteCode})</span>
+                  </DropdownMenuItem>
 
-    rejectTeamRegistration(rejectingTeamId, rejectReason);
-    setRejectingTeamId(null);
-    setAlert('Đã từ chối đăng ký của đội thi.');
-    setTimeout(() => setAlert(null), 3000);
-  };
+                  <DropdownMenuSeparator />
 
-  const getSubTopicTitle = (subTopicId?: string) => {
-    if (!subTopicId) return 'Chưa đăng ký';
-    for (const mt of majorTopics) {
-      const sub = mt.subTopics.find((s) => s.id === subTopicId);
-      if (sub) return sub.title;
-    }
-    return 'Chưa đăng ký';
-  };
+                  {normalized !== 'approved' && (
+                    <DropdownMenuItem
+                      onSelect={() => void handleApproveTeam(row)}
+                    >
+                      <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+                      <span className="font-medium text-emerald-700 dark:text-emerald-300">
+                        Phê duyệt đội thi
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+
+                  {normalized !== 'rejected' && (
+                    <DropdownMenuItem onSelect={() => setRejectTarget(row)}>
+                      <XCircle size={14} className="text-amber-600 dark:text-amber-400" />
+                      <span className="font-medium text-amber-700 dark:text-amber-300">
+                        Từ chối đăng ký...
+                      </span>
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    destructive
+                    onSelect={() => setDeleteTarget(row)}
+                  >
+                    <Trash2 size={14} />
+                    <span>Xóa đội thi</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          );
+        },
+      },
+    ],
+    [getSubTopicMeta, handleApproveTeam],
+  );
+
+  const detailTopicMeta = useMemo(
+    () => getSubTopicMeta(detailTeam?.subTopicId),
+    [detailTeam, getSubTopicMeta],
+  );
 
   return (
-    <div className="space-y-6 font-['Roboto']">
-      {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1
-            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
-          >
-            Quản Lý Danh Sách Đội Thi
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
-            Phê duyệt tư cách hợp lệ của các đội thi, quản lý danh sách thành viên và đề tài đăng ký.
-          </p>
+    <div className="space-y-6">
+      {/* Page Header */}
+      <PageHeader
+        title="Quản lý Danh sách Đội thi & Đề tài"
+        description="Kiểm duyệt tư cách hợp lệ của các đội thi, đối soát định biên thành viên (3–5 người), theo dõi kho mã nguồn GitHub và phân bổ đề tài Hackathon."
+        badge={
+          <Badge variant="indigo">
+            {metrics.totalTeams} đội • {metrics.totalParticipants} thí sinh
+          </Badge>
+        }
+        actions={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleExportCsv([])}
+            >
+              <Download size={15} />
+              <span>Xuất CSV</span>
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={openCreateModal}
+            >
+              <Plus size={15} />
+              <span>Tạo đội thi mới</span>
+            </Button>
+          </>
+        }
+      />
+
+      {/* Interactive UI State Inspector Bar for Design System Verification */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-2.5 shadow-xs">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <SlidersHorizontal size={14} className="text-primary" />
+          <span className="font-semibold text-foreground">
+            Chế độ kiểm thử trạng thái giao diện (UI States):
+          </span>
         </div>
 
-        <Badge variant="indigo">{teams.length} đội đăng ký</Badge>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {VIEW_MODES.map((mode) => (
+            <button
+              key={mode.id}
+              type="button"
+              onClick={() => setViewMode(mode.id)}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
+                viewMode === mode.id
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'bg-muted/60 text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+            >
+              {mode.label}
+            </button>
+          ))}
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            onClick={() => void handleResetDemoDataset()}
+          >
+            <RotateCcw size={12} />
+            <span>Khôi phục gốc</span>
+          </Button>
+        </div>
       </div>
 
-      {alert && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300 flex items-center gap-2">
-          <CheckCircle size={15} />
-          <span>{alert}</span>
-        </div>
+      {/* Permission Denied State (403) */}
+      {viewMode === 'permission_denied' ? (
+        <PermissionDeniedState
+          requiredRole="Quản trị viên Hệ thống (System Admin)"
+          currentRole="Giám khảo Chấm thi (Judge — Read-only)"
+          description="Tài khoản của bạn đang ở chế độ mô phỏng phân quyền hạn chế (403 Forbidden). Chỉ Quản trị viên mới có quyền phê duyệt hoặc chỉnh sửa danh sách đội thi."
+          onBack={() => setViewMode('normal')}
+        />
+      ) : (
+        <>
+          {/* KPI Summary Row */}
+          {isLoading ? (
+            <StatCardsSkeleton count={4} />
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard
+                title="Tổng số Đội thi"
+                value={metrics.totalTeams}
+                subtitle={`${metrics.totalParticipants} sinh viên từ các trường ĐH`}
+                icon={<Users size={20} />}
+                iconColor="indigo"
+                onClick={() => setStatusFilter('all')}
+              />
+              <StatCard
+                title="Đội thi Đã phê duyệt"
+                value={metrics.approvedCount}
+                subtitle="Đủ điều kiện nộp bài Checkpoint"
+                icon={<CheckCircle2 size={20} />}
+                iconColor="emerald"
+                onClick={() => setStatusFilter('approved')}
+              />
+              <StatCard
+                title="Hồ sơ Chờ xét duyệt"
+                value={metrics.pendingCount}
+                subtitle="Cần Ban Tổ Chức kiểm tra định biên"
+                icon={<Clock size={20} />}
+                iconColor="amber"
+                onClick={() => setStatusFilter('pending')}
+              />
+              <StatCard
+                title="Từ chối / Thiếu thành viên"
+                value={metrics.rejectedOrFlaggedCount}
+                subtitle="Chưa đạt quy chế 3–5 thành viên"
+                icon={<AlertTriangle size={20} />}
+                iconColor="rose"
+                onClick={() => setStatusFilter('rejected')}
+              />
+            </div>
+          )}
+
+          {/* Reusable DataTable Pattern */}
+          <DataTable<EnrichedAdminTeam>
+            data={filteredTeams}
+            columns={columns}
+            getRowId={(row) => row.id}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            searchPlaceholder="Tìm kiếm theo tên đội, mã mời, đội trưởng, email hoặc trường đại học..."
+            searchMatcher={(row, q) => {
+              const meta = getSubTopicMeta(row.subTopicId);
+              return (
+                row.name.toLowerCase().includes(q) ||
+                row.inviteCode.toLowerCase().includes(q) ||
+                (row.leaderName || '').toLowerCase().includes(q) ||
+                (row.leaderEmail || '').toLowerCase().includes(q) ||
+                (row.university || '').toLowerCase().includes(q) ||
+                meta.subTopicTitle.toLowerCase().includes(q)
+              );
+            }}
+            filters={tableFilters}
+            onResetFilters={() => {
+              setStatusFilter('all');
+              setTrackFilter('all');
+              setComplianceFilter('all');
+            }}
+            defaultSortColumnId="name"
+            defaultSortDirection="asc"
+            defaultPageSize={10}
+            enableRowSelection
+            selectedRowIds={selectedRowIds}
+            onSelectionChange={setSelectedRowIds}
+            bulkActions={(selectedRows, clearSelection) => (
+              <>
+                <Button
+                  type="button"
+                  variant="success"
+                  size="sm"
+                  className="h-7 text-xs"
+                  isLoading={isMutating}
+                  onClick={async () => {
+                    await handleBulkApprove(selectedRows);
+                    clearSelection();
+                  }}
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Duyệt {selectedRows.length} đội đã chọn</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => handleExportCsv(selectedRows)}
+                >
+                  <Download size={13} />
+                  <span>Xuất CSV ({selectedRows.length})</span>
+                </Button>
+              </>
+            )}
+            isLoading={isLoading}
+            error={error}
+            onRetry={() => {
+              setViewMode('normal');
+              void loadTeams();
+            }}
+            emptyTitle="Không tìm thấy đội thi nào phù hợp"
+            emptyDescription="Chưa có đội thi nào khớp với từ khóa tìm kiếm hoặc bộ lọc hiện tại. Hãy thử xóa bộ lọc hoặc tạo mới đội thi."
+            emptyActionLabel="Tạo đội thi mới"
+            onEmptyAction={openCreateModal}
+          />
+        </>
       )}
 
-      {/* Search and Filters */}
-      <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative flex-1 w-full max-w-md">
-          <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Tìm theo tên đội, đội trưởng, mã mời..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 rounded-[10px] bg-[#0F172A] border border-[#334155] text-white text-xs placeholder-slate-400 focus:border-[#6366F1] focus:outline-none"
-          />
-        </div>
-      </div>
+      {/* Create / Edit Team Dialog (react-hook-form + zod) */}
+      <TeamFormDialog
+        open={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        editingTeam={editingTeam}
+        majorTopics={majorTopics}
+        isSubmitting={isMutating}
+        onSubmitForm={handleFormSubmit}
+      />
 
-      {/* Teams Table */}
-      <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-        <div className="overflow-x-auto rounded-[12px] border border-[#334155] bg-[#0F172A]">
-          <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-[#1E293B]/70 border-b border-[#334155] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
-              <tr>
-                <th className="py-3.5 px-4">Tên Đội Thi</th>
-                <th className="py-3.5 px-4">Đội Trưởng</th>
-                <th className="py-3.5 px-4 text-center">Số Thành Viên</th>
-                <th className="py-3.5 px-4 hidden md:table-cell">Đề Tài Đăng Ký</th>
-                <th className="py-3.5 px-4 text-center">Trạng Thái</th>
-                <th className="py-3.5 px-4 text-right">Thao Tác</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#334155]/60 text-slate-200">
-              {filteredTeams.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
-                    <Users className="mx-auto mb-2 opacity-30 text-slate-400" size={32} />
-                    Chưa có đội thi nào trong danh sách.
-                  </td>
-                </tr>
-              ) : (
-                filteredTeams.map((t) => (
-                <tr key={t.id} className="hover:bg-[#1E293B]/40 transition-colors">
-                  <td className="py-3.5 px-4">
-                    <span className="font-bold text-white block">{t.name}</span>
-                    <span className="text-[11px] font-mono text-[#818CF8]">Mã: {t.inviteCode}</span>
-                  </td>
+      {/* Team Details Dialog */}
+      <TeamDetailDialog
+        team={detailTeam}
+        open={Boolean(detailTeam)}
+        onOpenChange={(open) => {
+          if (!open) setDetailTeam(null);
+        }}
+        subTopicTitle={detailTopicMeta.subTopicTitle}
+        majorTopicTitle={detailTopicMeta.majorTopicTitle}
+        onApprove={(team) => void handleApproveTeam(team)}
+        onReject={(team) => setRejectTarget(team)}
+        onEdit={(team) => openEditModal(team)}
+      />
 
-                  <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-1.5 text-white font-medium">
-                      <Crown size={13} className="text-amber-400" />
-                      <span>{t.leaderName}</span>
-                    </div>
-                  </td>
+      {/* Reject Team Confirmation Dialog (with mandatory reason validation) */}
+      <ConfirmDialog
+        open={Boolean(rejectTarget)}
+        onOpenChange={(open) => {
+          if (!open) setRejectTarget(null);
+        }}
+        title={`Từ chối hồ sơ đội thi "${rejectTarget?.name || ''}"`}
+        description="Đội thi bị từ chối sẽ không thể khóa đề tài hoặc nộp bài tại các chặng Checkpoint cho đến khi cập nhật lại hồ sơ hợp lệ."
+        confirmLabel="Xác nhận từ chối"
+        variant="warning"
+        isLoading={isMutating}
+        requireReason
+        reasonLabel="Lý do từ chối hồ sơ"
+        defaultReason="Đội thi chưa đủ số lượng thành viên tối thiểu theo quy chế Hackathon (yêu cầu từ 3 đến 5 thành viên hợp lệ)."
+        minReasonLength={10}
+        onConfirm={async (reason) => {
+          if (!rejectTarget || !reason) return;
+          const ok = await handleRejectTeam(rejectTarget.id, reason);
+          if (ok) setRejectTarget(null);
+        }}
+      />
 
-                  <td className="py-3.5 px-4 text-center">
-                    <span className="px-2.5 py-0.5 rounded-full bg-[#1E293B] border border-[#334155] text-xs font-semibold text-slate-200">
-                      {t.members.length} / 4
-                    </span>
-                  </td>
-
-                  <td className="py-3.5 px-4 hidden md:table-cell text-slate-300 max-w-xs truncate">
-                    {getSubTopicTitle(t.subTopicId)}
-                  </td>
-
-                  <td className="py-3.5 px-4 text-center">
-                    <Badge
-                      variant={
-                        t.status === 'approved'
-                          ? 'success'
-                          : t.status === 'rejected'
-                          ? 'danger'
-                          : 'warning'
-                      }
-                    >
-                      {t.status === 'approved'
-                        ? 'Đã duyệt'
-                        : t.status === 'rejected'
-                        ? 'Bị từ chối'
-                        : 'Chờ duyệt'}
-                    </Badge>
-                  </td>
-
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setSelectedTeam(t)}
-                        className="p-1.5 rounded-md hover:bg-[#334155] text-[#818CF8] hover:text-white transition-colors"
-                        title="Xem chi tiết thành viên"
-                      >
-                        <Eye size={16} />
-                      </button>
-
-                      {t.status !== 'approved' && (
-                        <Button
-                          variant="success"
-                          size="sm"
-                          onClick={() => handleApprove(t.id, t.name)}
-                          className="px-2.5 py-1 text-xs"
-                        >
-                          Duyệt
-                        </Button>
-                      )}
-
-                      {t.status !== 'rejected' && (
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => setRejectingTeamId(t.id)}
-                          className="px-2.5 py-1 text-xs"
-                        >
-                          Từ chối
-                        </Button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              )))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* View Team Details Modal */}
-      <Modal
-        isOpen={Boolean(selectedTeam)}
-        onClose={() => setSelectedTeam(null)}
-        title={`Chi Tiết Đội: ${selectedTeam?.name || ''}`}
-        maxWidth="lg"
-      >
-        {selectedTeam && (
-          <div className="space-y-4 text-xs">
-            <div className="p-3.5 rounded-[10px] bg-[#0F172A] border border-[#334155] space-y-1.5">
-              <div className="flex justify-between">
-                <span className="text-slate-400">Mô tả đội:</span>
-                <span className="text-white font-medium">{selectedTeam.description}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Mã mời:</span>
-                <span className="font-mono text-[#818CF8] font-bold">{selectedTeam.inviteCode}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Đề tài nhánh:</span>
-                <span className="text-emerald-400 font-semibold">{getSubTopicTitle(selectedTeam.subTopicId)}</span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <span className="font-bold text-white uppercase text-[11px] tracking-wider block">
-                Danh sách thành viên ({selectedTeam.members.length} người)
-              </span>
-
-              <div className="space-y-2">
-                {selectedTeam.members.map((m) => (
-                  <div
-                    key={m.id}
-                    className="p-3 rounded-[8px] bg-[#0F172A] border border-[#334155] flex items-center justify-between"
-                  >
-                    <div>
-                      <div className="font-bold text-white flex items-center gap-1.5">
-                        <span>{m.fullName}</span>
-                        {m.id === selectedTeam.leaderId && (
-                          <span className="text-[10px] text-amber-300 bg-amber-500/10 px-1.5 rounded border border-amber-500/30">
-                            Đội Trưởng
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-slate-400 text-[11px]">{m.email}</span>
-                    </div>
-
-                    <div className="text-right">
-                      <span className="font-mono text-[#818CF8] block">@{m.githubUsername || 'user'}</span>
-                      <span className="text-[11px] text-slate-400">{m.university || 'ĐH Bách Khoa'}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex justify-end pt-3">
-              <Button variant="secondary" onClick={() => setSelectedTeam(null)}>
-                Đóng
-              </Button>
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Reject Modal */}
-      <Modal
-        isOpen={Boolean(rejectingTeamId)}
-        onClose={() => setRejectingTeamId(null)}
-        title="Từ Chối Đăng Ký Đội Thi"
-      >
-        <form onSubmit={handleConfirmReject} className="space-y-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-xs">Lý do từ chối *</label>
-            <textarea
-              rows={3}
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
-              required
-            />
-          </div>
-
-          <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" type="button" onClick={() => setRejectingTeamId(null)}>
-              Hủy
-            </Button>
-            <Button variant="danger" type="submit">
-              Xác nhận từ chối
-            </Button>
-          </div>
-        </form>
-      </Modal>
+      {/* Delete Team Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+        title={`Xóa vĩnh viễn đội thi "${deleteTarget?.name || ''}"?`}
+        description="Hành động này sẽ gỡ toàn bộ thông tin đăng ký, mã mời và liên kết thành viên của đội thi khỏi hệ thống. Không thể hoàn tác sau khi xóa."
+        confirmLabel="Xóa đội thi"
+        variant="destructive"
+        isLoading={isMutating}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          const ok = await handleDeleteTeam(deleteTarget);
+          if (ok) setDeleteTarget(null);
+        }}
+      />
     </div>
   );
 };
