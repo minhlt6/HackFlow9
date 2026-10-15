@@ -31,6 +31,28 @@ AsyncSessionLocal = async_sessionmaker(
 )
 
 
+def switch_to_sqlite_fallback() -> None:
+    """
+    Switch the global async engine and session factory to local SQLite (hackflow.db)
+    when the remote PostgreSQL host is unreachable (e.g. IPv6-only Supabase direct URL on IPv4 container).
+    """
+    global engine, AsyncSessionLocal
+    sqlite_url = "sqlite+aiosqlite:///./hackflow.db"
+    engine = create_async_engine(
+        sqlite_url,
+        echo=settings.DEBUG,
+        pool_pre_ping=True,
+    )
+    AsyncSessionLocal.configure(bind=engine)
+    AsyncSessionLocal = async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        autocommit=False,
+        autoflush=False,
+        expire_on_commit=False,
+    )
+
+
 class Base(DeclarativeBase):
     """
     Base class for all SQLAlchemy 2.0 Declarative Models.

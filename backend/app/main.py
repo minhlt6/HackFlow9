@@ -26,12 +26,12 @@ async def _seed_default_accounts() -> None:
     """
     from sqlalchemy import select
     import app.models  # noqa: F401
-    from app.core.database import AsyncSessionLocal, Base
+    import app.core.database as db_module
+    from app.core.database import Base
     from app.core.security import hash_password
     from app.models.user import User
-    from app.models.whitelist import WhitelistEntry
 
-    async with engine.begin() as conn:
+    async with db_module.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
     default_users = [
@@ -46,7 +46,7 @@ async def _seed_default_accounts() -> None:
     ]
     default_pw_hash = hash_password("123456")
 
-    async with AsyncSessionLocal() as session:
+    async with db_module.AsyncSessionLocal() as session:
         for email, full_name, role, approval_status, gh_user in default_users:
             res = await session.execute(select(User).where(User.email == email))
             existing = res.scalar_one_or_none()
@@ -65,17 +65,6 @@ async def _seed_default_accounts() -> None:
             elif existing.hashed_password != default_pw_hash:
                 existing.hashed_password = default_pw_hash
 
-        wl_res = await session.execute(
-            select(WhitelistEntry).where(WhitelistEntry.email == "mle409640@gmail.com")
-        )
-        if not wl_res.scalar_one_or_none():
-            session.add(
-                WhitelistEntry(
-                    email="mle409640@gmail.com",
-                    is_active=True,
-                    note="Phê duyệt mặc định cho tài khoản GitHub OAuth (@minhlt6)",
-                )
-            )
         await session.commit()
 
 
@@ -84,19 +73,29 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     Application lifespan management: executes startup and shutdown routines.
     """
+    import app.core.database as db_module
+
     # Startup
     logger.info(f"Khởi động {settings.PROJECT_NAME} v{settings.VERSION} [{settings.ENVIRONMENT}]")
     try:
         await _seed_default_accounts()
         logger.info("Đã khởi tạo schema cơ sở dữ liệu và tài khoản mặc định thành công.")
     except Exception as exc:
-        logger.warning(f"Bỏ qua bước khởi tạo schema/seed tự động: {exc}")
+        logger.warning(
+            f"Không thể kết nối DATABASE_URL từ xa ({exc}). Tự động chuyển sang SQLite dự phòng (hackflow.db)..."
+        )
+        try:
+            db_module.switch_to_sqlite_fallback()
+            await _seed_default_accounts()
+            logger.info("Đã khởi tạo SQLite dự phòng (hackflow.db) và tài khoản mặc định thành công.")
+        except Exception as fallback_exc:
+            logger.error(f"Lỗi khi khởi tạo SQLite dự phòng: {fallback_exc}")
     logger.info(f"CORS origins cho phép: {settings.CORS_ORIGINS}")
     logger.info(f"Docs UI sẵn sàng tại: http://localhost:8000/docs")
     yield
     # Shutdown
     logger.info("Đang giải phóng tài nguyên và đóng database engine...")
-    await engine.dispose()
+    await db_module.engine.dispose()
     logger.info("Hoàn tất tắt ứng dụng an toàn.")
 
 
