@@ -22,7 +22,7 @@ import { topicsApi, extractApiErrorMessage } from '../api/topicsApi';
 import { teamsApi } from '../api/teamsApi';
 import { useAuthStore } from '../store/useAuthStore';
 import { INITIAL_MOCK_TOPICS } from '../mocks/mockTopics';
-import { mockTeamInTeam } from '../mocks/mockTeams';
+import { getStoredMockTeam, saveStoredMockTeam } from '../mocks/mockTeams';
 import type { Topic, Subtopic } from '../types/topic';
 import type { TeamDetails } from '../types/team';
 
@@ -117,9 +117,9 @@ export const TopicsPage: React.FC = () => {
 
     try {
       const res = await teamsApi.getMyTeam();
-      loadedTeam = res || mockTeamInTeam;
+      loadedTeam = res || getStoredMockTeam();
     } catch {
-      loadedTeam = mockTeamInTeam;
+      loadedTeam = getStoredMockTeam();
     }
 
     setTopics(loadedTopics);
@@ -141,9 +141,9 @@ export const TopicsPage: React.FC = () => {
 
       try {
         const res = await teamsApi.getMyTeam();
-        loadedTeam = res || mockTeamInTeam;
+        loadedTeam = res || getStoredMockTeam();
       } catch {
-        loadedTeam = mockTeamInTeam;
+        loadedTeam = getStoredMockTeam();
       }
 
       if (isMounted) {
@@ -248,16 +248,18 @@ export const TopicsPage: React.FC = () => {
       showToast(`Đăng ký đề tài "${registeredTitle}" thành công!`, 'success');
 
       // Update local state atomically
-      setTeam((prev) =>
-        prev
+      setTeam((prev) => {
+        const updated = prev
           ? {
               ...prev,
               topic_id: registeredTopicId,
               topic_name: registeredTitle,
               subtopic_id: registeredSubtopicId,
             }
-          : prev
-      );
+          : prev;
+        saveStoredMockTeam(updated);
+        return updated;
+      });
 
       // Decrement remaining slot in local topics list
       setTopics((prev) =>
@@ -325,16 +327,18 @@ export const TopicsPage: React.FC = () => {
       showToast(`Đã hủy đăng ký đề tài "${topicToCancel.title}" thành công.`, 'success');
 
       // Update local team state
-      setTeam((prev) =>
-        prev
+      setTeam((prev) => {
+        const updated = prev
           ? {
               ...prev,
               topic_id: null,
               topic_name: null,
               subtopic_id: null,
             }
-          : prev
-      );
+          : prev;
+        saveStoredMockTeam(updated);
+        return updated;
+      });
 
       // Increase remaining slot in local topics list
       setTopics((prev) =>
