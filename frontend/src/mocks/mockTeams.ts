@@ -19,8 +19,8 @@ export const mockTeamInTeam: TeamDetails = {
   min_members: 3,
   max_members: 4,
   leader_id: 'usr-minh-01',
-  topic_id: 'TOPIC_HEALTHCARE_AI',
-  topic_name: 'Ứng dụng LLM & RAG trong Y tế',
+  topic_id: 'top-01',
+  topic_name: 'AI Agent Tự Động Hóa Quy Trình Doanh Nghiệp (Enterprise AI Agents)',
   created_at: '2026-10-05T08:30:00Z',
   members: [
     {
@@ -28,7 +28,7 @@ export const mockTeamInTeam: TeamDetails = {
       user_id: 'usr-minh-01',
       full_name: 'Nguyễn Văn Minh',
       email: 'leader@cybersamurai.team',
-      role: 'member',
+      role: 'leader',
       github_username: 'github_user',
       university: 'Đại học Bách Khoa Hà Nội',
       joined_at: '2026-10-05T08:30:00Z',
