@@ -42,6 +42,29 @@ async def get_current_user(
     return user
 
 
+async def get_optional_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> Optional[User]:
+    """
+    Optional JWT authentication dependency: returns User if a valid Bearer token
+    is provided, or None if unauthenticated.
+    """
+    if not credentials or not credentials.credentials:
+        return None
+    payload = decode_access_token(credentials.credentials)
+    if not payload:
+        return None
+    user_id = payload.get("sub") or payload.get("user_id")
+    if not user_id:
+        return None
+    user = await user_repo.get_by_id(db, str(user_id))
+    if not user or not user.is_active:
+        return None
+    return user
+
+
+
 from typing import List, Optional, Union
 
 

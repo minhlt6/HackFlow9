@@ -1,8 +1,9 @@
 from typing import List, Optional
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Header, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, require_role
+from app.api.deps import get_current_user, get_optional_current_user, require_role
+from app.api.v1.endpoints.submissions import extract_client_ip
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.checkpoint import (
@@ -16,8 +17,10 @@ from app.schemas.checkpoint import (
 )
 from app.schemas.github import VerifyGitHubRepoRequest, VerifyGitHubRepoResponse
 from app.schemas.response import ApiResponse, success_response
+from app.schemas.submission import SubmissionCreateRequest, SubmissionResponse
 from app.services.checkpoint_service import checkpoint_service
 from app.services.github_service import github_service
+from app.services.submission_service import submission_service
 
 router = APIRouter()
 
@@ -30,12 +33,17 @@ router = APIRouter()
 async def list_checkpoints(
     only_active: bool = False,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ) -> ApiResponse[List[CheckpointResponse]]:
     """
     Hiển thị danh sách các mốc nộp bài (Milestones/Checkpoints) kèm thông tin
-    trạng thái time-gated (upcoming, open, grace_period, closed) và số giây còn lại.
+    trạng thái time-gated (upcoming, open, grace_period, closed), số giây còn lại
+    và bài nộp mới nhất của đội thi (nếu đã đăng nhập).
     """
-    checkpoints = await checkpoint_service.list_checkpoints(db, only_active=only_active)
+    user_id = str(current_user.id) if current_user else None
+    checkpoints = await checkpoint_service.list_checkpoints(
+        db, only_active=only_active, user_id=user_id
+    )
     return success_response(
         data=checkpoints,
         message=f"Lấy danh sách checkpoint thành công ({len(checkpoints)} mốc).",
@@ -77,11 +85,15 @@ async def verify_github_repo(
 async def get_checkpoint(
     checkpoint_id: str,
     db: AsyncSession = Depends(get_db),
+    current_user: Optional[User] = Depends(get_optional_current_user),
 ) -> ApiResponse[CheckpointResponse]:
     """
     Lấy thông tin chi tiết một mốc Checkpoint theo UUID.
     """
-    checkpoint = await checkpoint_service.get_checkpoint_by_id(db, checkpoint_id)
+    user_id = str(current_user.id) if current_user else None
+    checkpoint = await checkpoint_service.get_checkpoint_by_id(
+        db, checkpoint_id, user_id=user_id
+    )
     return success_response(
         data=checkpoint,
         message=f"Lấy chi tiết checkpoint '{checkpoint.title}' thành công.",
@@ -139,6 +151,63 @@ async def validate_submission_window(
 
 
 @router.post(
+    "/{checkpoint_id}/submissions",
+    response_model=ApiResponse[SubmissionResponse],
+    summary="Nộp bài cho một Checkpoint cụ thể (Tương thích Frontend HF-30 & SRS HF-23)",
+)
+async def submit_checkpoint_by_path(
+    checkpoint_id: str,
+    request: Request,
+    body: SubmissionCreateRequest,
+    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApiResponse[SubmissionResponse]:
+    """
+    Endpoint nộp bài theo đường dẫn `/checkpoints/{checkpoint_id}/submissions` (HF-30 & HF-34).
+    """
+    client_ip = extract_client_ip(request)
+    submission_res, message = await submission_service.submit_checkpoint(
+        db=db,
+        user=current_user,
+        payload=body,
+        checkpoint_id_override=checkpoint_id,
+        idempotency_key=idempotency_key,
+        client_ip=client_ip,
+    )
+    return success_response(
+        data=submission_res,
+        message=message,
+    )
+
+
+@router.get(
+    "/{checkpoint_id}/submissions",
+    response_model=ApiResponse[List[SubmissionResponse]],
+    summary="Lấy lịch sử bài nộp của một Checkpoint cụ thể (HF-31 & HF-34)",
+)
+async def list_checkpoint_submissions_by_path(
+    checkpoint_id: str,
+    include_history: bool = True,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApiResponse[List[SubmissionResponse]]:
+    """
+    Lấy danh sách bài nộp và lịch sử phiên bản của một Checkpoint cụ thể.
+    """
+    submissions = await submission_service.list_submissions(
+        db=db,
+        user=current_user,
+        checkpoint_id=checkpoint_id,
+        include_history=include_history,
+    )
+    return success_response(
+        data=submissions,
+        message=f"Lấy lịch sử bài nộp thành công ({len(submissions)} bản ghi).",
+    )
+
+
+@router.post(
     "",
     response_model=ApiResponse[CheckpointResponse],
     status_code=status.HTTP_201_CREATED,
@@ -169,12 +238,14 @@ async def update_checkpoint(
     checkpoint_id: str,
     body: CheckpointUpdateRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    admin_user: User = Depends(require_role("admin")),
 ) -> ApiResponse[CheckpointResponse]:
     """
     Ban Tổ Chức (BTC) gia hạn thời gian nộp bài hoặc sửa đổi thông tin Checkpoint.
     """
-    checkpoint = await checkpoint_service.update_checkpoint(db, checkpoint_id, body)
+    checkpoint = await checkpoint_service.update_checkpoint(
+        db, checkpoint_id, body, admin_user_id=str(admin_user.id)
+    )
     return success_response(
         data=checkpoint,
         message=f"Cập nhật checkpoint '{checkpoint.title}' thành công.",
@@ -201,3 +272,4 @@ async def toggle_active_checkpoint(
         data=checkpoint,
         message=f"Đã {state_str} checkpoint '{checkpoint.title}'.",
     )
+

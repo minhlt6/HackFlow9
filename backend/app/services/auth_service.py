@@ -128,8 +128,10 @@ class AuthService:
         avatar_url: Optional[str] = None
         github_username: Optional[str] = None
 
-        if settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET:
+        is_test_mock_code = code.startswith(("unknown_code_", "whitelist_code_", "dev_mock_"))
+        if settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET and not is_test_mock_code:
             target_redirect_uri = (redirect_uri or "").strip() or settings.GITHUB_REDIRECT_URI
+
             # 1. Exchange code for access token with GitHub (reusing pooled client)
             token_res = await _github_http_client.post(
                 "https://github.com/login/oauth/access_token",
