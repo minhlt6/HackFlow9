@@ -140,9 +140,9 @@ export const CandidateCheckpointsPage: React.FC = () => {
           </span>
           <div>
             <h1
-              className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
+              className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide inline-block"
               style={{
-                background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
+                background: 'linear-gradient(90deg, #6366F1 0%, #818CF8 50%, #C7D2FE 100%)',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
               }}
