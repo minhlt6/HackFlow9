@@ -73,28 +73,43 @@ export const TopicsPage: React.FC = () => {
 
   // Determine user team status & permissions
   const isLeader = useMemo(() => {
-    if (!currentUser) return true;
-    if (
-      currentUser.fullName === 'Nguyễn Văn Minh' ||
-      currentUser.email === 'leader@cybersamurai.team' ||
-      currentUser.id === 'usr-minh-01'
-    ) {
-      return true;
+    if (!currentUser) {
+      return typeof window !== 'undefined' && window.location.pathname.startsWith('/preview-');
     }
+
+    if (team?.members && team.members.length > 0) {
+      const myMember = team.members.find(
+        (m) =>
+          m.user_id === currentUser.id ||
+          m.id === currentUser.id ||
+          (m.email && currentUser.email && m.email.toLowerCase() === currentUser.email.toLowerCase())
+      );
+      if (myMember) {
+        return (
+          myMember.role?.toLowerCase() === 'leader' ||
+          Boolean(
+            team.leader_id && (team.leader_id === myMember.user_id || team.leader_id === myMember.id)
+          )
+        );
+      }
+    }
+
     if (team?.leader_id && team.leader_id === currentUser.id) return true;
-    const myMember = team?.members?.find(
-      (m) =>
-        m.id === currentUser.id ||
-        m.user_id === currentUser.id ||
-        m.email === currentUser.email ||
-        m.full_name === currentUser.fullName
-    );
-    if (myMember?.role === 'leader') return true;
     const role = currentUser.team_role?.toUpperCase();
-    if (role === 'TEAM_LEADER' || role === 'LEADER') return true;
-    if (team?.team_name === 'CyberSamurai') return true;
-    return false;
+    return role === 'TEAM_LEADER' || role === 'LEADER';
   }, [currentUser, team]);
+
+  const isDemoTeamUser = useMemo(() => {
+    if (!currentUser) {
+      return typeof window !== 'undefined' && window.location.pathname.startsWith('/preview-');
+    }
+    const email = currentUser.email.toLowerCase();
+    return (
+      email === 'leader@cybersamurai.team' ||
+      email === 'member@cybersamurai.team' ||
+      email === 'member2@cybersamurai.team'
+    );
+  }, [currentUser]);
 
   const hasTeam = Boolean(team && team.id);
   const memberCount = team?.member_count || 0;
@@ -110,22 +125,30 @@ export const TopicsPage: React.FC = () => {
     let loadedTeam: TeamDetails | null;
 
     try {
-      loadedTopics = await topicsApi.getTopics();
+      const remoteTopics = await topicsApi.getTopics();
+      loadedTopics = remoteTopics && remoteTopics.length > 0 ? remoteTopics : INITIAL_MOCK_TOPICS;
     } catch {
       loadedTopics = INITIAL_MOCK_TOPICS;
     }
 
     try {
       const res = await teamsApi.getMyTeam();
-      loadedTeam = res || getStoredMockTeam();
+      loadedTeam = res || (isDemoTeamUser ? getStoredMockTeam() : null);
     } catch {
-      loadedTeam = getStoredMockTeam();
+      loadedTeam = isDemoTeamUser || import.meta.env.DEV ? getStoredMockTeam() : null;
+    }
+
+    if (loadedTeam && loadedTeam.topic_id && !loadedTeam.topic_name) {
+      const matchedTopic = loadedTopics.find((t) => t.id === loadedTeam?.topic_id);
+      if (matchedTopic) {
+        loadedTeam = { ...loadedTeam, topic_name: matchedTopic.title };
+      }
     }
 
     setTopics(loadedTopics);
     setTeam(loadedTeam);
     setIsLoading(false);
-  }, []);
+  }, [isDemoTeamUser]);
 
   useEffect(() => {
     let isMounted = true;
@@ -134,16 +157,24 @@ export const TopicsPage: React.FC = () => {
       let loadedTeam: TeamDetails | null;
 
       try {
-        loadedTopics = await topicsApi.getTopics();
+        const remoteTopics = await topicsApi.getTopics();
+        loadedTopics = remoteTopics && remoteTopics.length > 0 ? remoteTopics : INITIAL_MOCK_TOPICS;
       } catch {
         loadedTopics = INITIAL_MOCK_TOPICS;
       }
 
       try {
         const res = await teamsApi.getMyTeam();
-        loadedTeam = res || getStoredMockTeam();
+        loadedTeam = res || (isDemoTeamUser ? getStoredMockTeam() : null);
       } catch {
-        loadedTeam = getStoredMockTeam();
+        loadedTeam = isDemoTeamUser || import.meta.env.DEV ? getStoredMockTeam() : null;
+      }
+
+      if (loadedTeam && loadedTeam.topic_id && !loadedTeam.topic_name) {
+        const matchedTopic = loadedTopics.find((t) => t.id === loadedTeam?.topic_id);
+        if (matchedTopic) {
+          loadedTeam = { ...loadedTeam, topic_name: matchedTopic.title };
+        }
       }
 
       if (isMounted) {
@@ -157,7 +188,7 @@ export const TopicsPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isDemoTeamUser]);
 
   // Toggle subtopics accordion
   const toggleSubtopics = (topicId: string) => {
@@ -212,6 +243,10 @@ export const TopicsPage: React.FC = () => {
   // Action: Confirm Select Topic
   const handleConfirmSelect = async () => {
     if (!selectedTopicToRegister) return;
+    if (!isLeader) {
+      setSelectError('Chỉ Đội trưởng (Team Leader) mới có quyền đăng ký hoặc hủy chọn đề tài.');
+      return;
+    }
     setIsSubmittingSelect(true);
     setSelectError(null);
 
@@ -229,18 +264,14 @@ export const TopicsPage: React.FC = () => {
         registeredTopicId = response.topic_id;
         registeredSubtopicId = response.subtopic_id || null;
       } catch (err: unknown) {
-        // If it's a business conflict (e.g. 409 TOPIC_FULL), rethrow to display error
-        const isNetworkErr =
-          err instanceof Error &&
-          (err.message.includes('Network') ||
-            err.message.includes('ECONNREFUSED') ||
-            err.message.includes('failed'));
         const status =
           typeof err === 'object' && err !== null && 'response' in err
             ? (err as { response?: { status?: number } }).response?.status
             : undefined;
+        const hasHttpResponse = Boolean(status);
+        const canFallbackDemo = isDemoTeamUser && (status === 404 || status === 403);
 
-        if (!isNetworkErr && status === 409) {
+        if ((hasHttpResponse && !canFallbackDemo) || (!import.meta.env.DEV && !canFallbackDemo)) {
           throw err;
         }
       }
@@ -299,6 +330,10 @@ export const TopicsPage: React.FC = () => {
   // Action: Confirm Cancel Topic
   const handleConfirmCancel = async () => {
     if (!topicToCancel) return;
+    if (!isLeader) {
+      setCancelError('Chỉ Đội trưởng (Team Leader) mới có quyền đăng ký hoặc hủy chọn đề tài.');
+      return;
+    }
     setIsSubmittingCancel(true);
     setCancelError(null);
 
@@ -308,18 +343,14 @@ export const TopicsPage: React.FC = () => {
           team_id: team?.id || null,
         });
       } catch (err: unknown) {
-        // If it's a real business error, rethrow
-        const isNetworkErr =
-          err instanceof Error &&
-          (err.message.includes('Network') ||
-            err.message.includes('ECONNREFUSED') ||
-            err.message.includes('failed'));
         const status =
           typeof err === 'object' && err !== null && 'response' in err
             ? (err as { response?: { status?: number } }).response?.status
             : undefined;
+        const hasHttpResponse = Boolean(status);
+        const canFallbackDemo = isDemoTeamUser && (status === 404 || status === 403);
 
-        if (!isNetworkErr && (status === 403 || status === 409)) {
+        if ((hasHttpResponse && !canFallbackDemo) || (!import.meta.env.DEV && !canFallbackDemo)) {
           throw err;
         }
       }

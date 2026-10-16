@@ -22,6 +22,7 @@ class TeamRepository:
             .where(Team.id == team_id)
             .options(
                 selectinload(Team.members).selectinload(TeamMember.user),
+                selectinload(Team.topic),
             )
         )
         if for_update:
@@ -49,6 +50,7 @@ class TeamRepository:
             .where(Team.invite_code == invite_code.upper().strip())
             .options(
                 selectinload(Team.members).selectinload(TeamMember.user),
+                selectinload(Team.topic),
             )
         )
         if for_update:
@@ -67,6 +69,7 @@ class TeamRepository:
             .where(TeamMember.user_id == user_id)
             .options(
                 selectinload(Team.members).selectinload(TeamMember.user),
+                selectinload(Team.topic),
             )
         )
         result = await db.execute(stmt)

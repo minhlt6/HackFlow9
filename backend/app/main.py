@@ -22,14 +22,16 @@ logger = logging.getLogger("hackflow.main")
 
 async def _seed_default_accounts() -> None:
     """
-    Ensure default demo accounts and whitelist entries exist on fresh deployments (Supabase / SQLite).
+    Ensure default demo accounts, topics, and demo team exist on fresh deployments (Supabase / SQLite).
     """
-    from sqlalchemy import select
+    from sqlalchemy import select, func
     import app.models  # noqa: F401
     import app.core.database as db_module
     from app.core.database import Base
     from app.core.security import hash_password
     from app.models.user import User
+    from app.models.topic import Topic, Subtopic
+    from app.models.team import Team, TeamMember, TeamMemberRole
 
     async with db_module.engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
@@ -39,31 +41,203 @@ async def _seed_default_accounts() -> None:
         ("admin@hackflow.com", "Admin HackFlow", "admin", "approved", "admin-com"),
         ("judge.tech@hackathon.org", "TS. Nguyễn Hoàng Giám Khảo", "judge", "approved", "judge-hf"),
         ("mentor.ai@ailab.org.vn", "ThS. Phạm Cố Vấn AI", "mentor", "approved", "mentor-hf"),
-        ("leader@cybersamurai.team", "Trần Minh Trưởng Nhóm", "candidate", "approved", "leader-cyber"),
-        ("member@cybersamurai.team", "Lê Thu Thành Viên", "candidate", "approved", "member-cyber"),
+        ("leader@cybersamurai.team", "Nguyễn Văn Minh", "candidate", "approved", "leader-cyber"),
+        ("member@cybersamurai.team", "Trần Thị Thảo", "candidate", "approved", "member-cyber"),
+        ("member2@cybersamurai.team", "Hoàng Quốc Việt", "candidate", "approved", "member2-cyber"),
         ("pending@hust.edu.vn", "Vũ Hoàng Chờ Duyệt", "candidate", "pending", "pending-hust"),
         ("rejected@fpt.edu.vn", "Đặng Tuấn Từ Chối", "candidate", "rejected", "rejected-fpt"),
     ]
     default_pw_hash = hash_password("123456")
 
     async with db_module.AsyncSessionLocal() as session:
+        user_by_email: dict[str, User] = {}
         for email, full_name, role, approval_status, gh_user in default_users:
             res = await session.execute(select(User).where(User.email == email))
             existing = res.scalar_one_or_none()
             if not existing:
+                existing = User(
+                    email=email,
+                    full_name=full_name,
+                    hashed_password=default_pw_hash,
+                    role=role,
+                    approval_status=approval_status,
+                    github_username=gh_user,
+                    is_active=True,
+                )
+                session.add(existing)
+                await session.flush()
+            elif existing.hashed_password != default_pw_hash:
+                existing.hashed_password = default_pw_hash
+            user_by_email[email] = existing
+
+        # Seed default topics & subtopics if table is empty
+        topic_count = (await session.execute(select(func.count(Topic.id)))).scalar() or 0
+        if topic_count == 0:
+            default_topics = [
+                (
+                    "top-01",
+                    "AI Agent Tự Động Hóa Quy Trình Doanh Nghiệp (Enterprise AI Agents)",
+                    "Xây dựng các hệ sinh thái AI Agents tự hành, tích hợp khả năng suy luận đa bước (Multi-step Reasoning), gọi công cụ (Function Calling) và truy xuất dữ liệu doanh nghiệp (Enterprise RAG) để tự động hóa các nghiệp vụ phức tạp.",
+                    5,
+                    3,
+                    [
+                        (
+                            "sub-01-a",
+                            "Hệ thống AI Customer Support Agent Đa Kênh với Hybrid Search RAG",
+                            "Tự động xử lý khiếu nại, đối soát thông tin giao dịch và phản hồi khách hàng theo thời gian thực.",
+                            3,
+                            2,
+                        ),
+                        (
+                            "sub-01-b",
+                            "AI Agent Tự Động Đối Soát Hợp Đồng & Thẩm Định Hồ Sơ Pháp Lý",
+                            "Trích xuất điều khoản, kiểm tra rủi ro tuân thủ pháp lý và cảnh báo sai lệch tài chính.",
+                            2,
+                            1,
+                        ),
+                    ],
+                ),
+                (
+                    "top-02",
+                    "DeepTech & Generative AI Trong Y Tế & Chăm Sóc Sức Khỏe",
+                    "Ứng dụng các mô hình thị giác máy tính và học sâu trên dữ liệu ảnh y tế (DICOM/X-quang) kết hợp Large Language Models hỗ trợ bác sĩ sàng lọc tiền lâm sàng.",
+                    5,
+                    5,
+                    [
+                        (
+                            "sub-02-a",
+                            "Sàng Lọc Tổn Thương Phổi Thời Gian Thực Trên Ảnh Chụp X-Quang",
+                            "Mô hình phân vùng tổn thương hỗ trợ bác sĩ chẩn đoán tại trạm y tế tuyến đầu.",
+                            3,
+                            3,
+                        ),
+                        (
+                            "sub-02-b",
+                            "Trợ Lý Ảo Tổng Hợp Bệnh Án & Khuyến Nghị Liều Lượng Thuốc",
+                            "Phân tích tiền sử bệnh nhân, tương tác thuốc và cảnh báo dị ứng tự động.",
+                            2,
+                            2,
+                        ),
+                    ],
+                ),
+                (
+                    "top-03",
+                    "GreenTech & Tối Ưu Năng Lượng Tái Tạo Với AI & IoT",
+                    "Phát triển giải pháp giám sát, phân tích chuỗi thời gian (Time-series) và dự báo phụ tải năng lượng mặt trời, điện gió kết hợp điều khiển biên IoT thông minh.",
+                    5,
+                    1,
+                    [
+                        (
+                            "sub-03-a",
+                            "Dự Báo Sản Lượng Điện Năng Lượng Mặt Trời Bằng Vision & Weather AI",
+                            "Kết hợp ảnh mây vệ tinh và dữ liệu thời tiết để dự báo công suất phát lưới điện.",
+                            3,
+                            1,
+                        ),
+                        (
+                            "sub-03-b",
+                            "Hệ Thống Tối Ưu Tiêu Thụ Điện Tòa Nhà Thông Minh Theo Thời Gian Thực",
+                            "Học tăng cường (RL) điều chỉnh HVAC và chiếu sáng giảm phát thải carbon.",
+                            2,
+                            0,
+                        ),
+                    ],
+                ),
+                (
+                    "top-04",
+                    "FinTech: Phát Hiện Gian Lận Giao Dịch Bằng Đồ Thị Tri Thức (Graph AI)",
+                    "Sử dụng Graph Neural Networks (GNN) và phân tích luồng tiền đa tầng nhằm phát hiện các mẫu hình rửa tiền, tài khoản mạo danh và mạng lưới gian lận thẻ tín dụng.",
+                    4,
+                    4,
+                    [],
+                ),
+                (
+                    "top-05",
+                    "Smart City: Điều Tiết Giao Thông Thông Minh & Edge Vision AI",
+                    "Triển khai các mô hình Object Detection nhẹ chạy trực tiếp trên thiết bị nhúng (Jetson, Raspberry Pi) để đếm lưu lượng, phát hiện sự cố và điều phối tín hiệu đèn.",
+                    6,
+                    2,
+                    [
+                        (
+                            "sub-05-a",
+                            "Tự Động Phát Hiện Tai Nạn & Xe Cứu Hộ Tại Các Nút Giao",
+                            "Ưu tiên luồng xanh cho phương tiện khẩn cấp và cảnh báo va chạm giao thông.",
+                            3,
+                            1,
+                        ),
+                        (
+                            "sub-05-b",
+                            "Thuật Toán Điều Tiết Chu Kỳ Đèn Giao Thông Thích Ứng Mật Độ Xe",
+                            "Giảm thời gian chờ trung bình tại các giao lộ giờ cao điểm bằng Machine Learning.",
+                            3,
+                            1,
+                        ),
+                    ],
+                ),
+            ]
+            for t_id, t_title, t_desc, t_max, t_curr, subs in default_topics:
                 session.add(
-                    User(
-                        email=email,
-                        full_name=full_name,
-                        hashed_password=default_pw_hash,
-                        role=role,
-                        approval_status=approval_status,
-                        github_username=gh_user,
+                    Topic(
+                        id=t_id,
+                        title=t_title,
+                        description=t_desc,
+                        max_teams=t_max,
+                        current_teams=t_curr,
                         is_active=True,
                     )
                 )
-            elif existing.hashed_password != default_pw_hash:
-                existing.hashed_password = default_pw_hash
+                for s_id, s_title, s_desc, s_max, s_curr in subs:
+                    session.add(
+                        Subtopic(
+                            id=s_id,
+                            topic_id=t_id,
+                            title=s_title,
+                            description=s_desc,
+                            max_teams=s_max,
+                            current_teams=s_curr,
+                            is_active=True,
+                        )
+                    )
+            await session.flush()
+
+        # Seed default CyberSamurai team for demo candidate accounts if not exists
+        cs_team_res = await session.execute(select(Team).where(Team.team_name == "CyberSamurai"))
+        cs_team = cs_team_res.scalar_one_or_none()
+        if not cs_team:
+            top01_res = await session.execute(select(Topic).where(Topic.id == "top-01"))
+            has_top01 = top01_res.scalar_one_or_none() is not None
+            cs_team = Team(
+                id="team-cs-01",
+                team_name="CyberSamurai",
+                invite_code="CS2026",
+                topic_id="top-01" if has_top01 else None,
+                subtopic_id="sub-01-a" if has_top01 else None,
+                is_locked=False,
+            )
+            session.add(cs_team)
+            await session.flush()
+
+            demo_members = [
+                ("leader@cybersamurai.team", TeamMemberRole.LEADER.value),
+                ("member@cybersamurai.team", TeamMemberRole.MEMBER.value),
+                ("member2@cybersamurai.team", TeamMemberRole.MEMBER.value),
+            ]
+            for m_email, m_role in demo_members:
+                u = user_by_email.get(m_email)
+                if u:
+                    existing_mem = (
+                        await session.execute(
+                            select(TeamMember).where(TeamMember.user_id == u.id)
+                        )
+                    ).scalar_one_or_none()
+                    if not existing_mem:
+                        session.add(
+                            TeamMember(
+                                team_id=cs_team.id,
+                                user_id=u.id,
+                                role=m_role,
+                            )
+                        )
 
         await session.commit()
 
