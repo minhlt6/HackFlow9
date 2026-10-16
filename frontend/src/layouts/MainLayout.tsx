@@ -341,9 +341,6 @@ export const MainLayout: React.FC = () => {
               <span className="text-xs font-bold tracking-wider text-slate-300 font-mono">
                 {config?.name || 'HACKFLOW AI & DEEPTECH HACKATHON 2026'}
               </span>
-              <span className="text-[11px] text-slate-400 block">
-                {config?.currentPhase || 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng'}
-              </span>
             </div>
           </div>
 
