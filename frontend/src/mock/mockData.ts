@@ -104,7 +104,7 @@ export const mockUsers: Record<string, User> = {
 };
 
 export const initialHackathonConfig: HackathonConfig = {
-  name: 'HackFlow AI & DeepTech Hackathon 2026',
+  name: 'HackFlow AI và DeepTech Hackathon 2026',
   description: 'Sân chơi sáng tạo công nghệ trí tuệ nhân tạo và hệ thống thông minh đột phá dành cho sinh viên xuất sắc toàn quốc.',
   logoUrl: '/hackflow-logo.svg',
   bannerUrl: '/login-background.png',

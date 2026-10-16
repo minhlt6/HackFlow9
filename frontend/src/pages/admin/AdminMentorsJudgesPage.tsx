@@ -164,7 +164,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Quản Lý Hội Đồng Giám Khảo & Cố Vấn
+            Quản Lý Hội Đồng Giám Khảo và Cố Vấn
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Phân bổ chuyên gia chấm thi độc lập và cố vấn chuyên môn hỗ trợ giải đáp kỹ thuật.

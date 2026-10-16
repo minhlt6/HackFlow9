@@ -54,7 +54,7 @@ export const AdminResultsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Tổng Hợp Điểm & Công Bố Kết Quả
+            Tổng Hợp Điểm và Công Bố Kết Quả
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Tổng hợp dữ liệu chấm thi từ Hội đồng Giám khảo theo công thức tính điểm trọng số và điều khiển công bố bảng xếp hạng.

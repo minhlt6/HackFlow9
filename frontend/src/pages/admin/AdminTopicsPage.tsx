@@ -97,7 +97,7 @@ export const AdminTopicsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Quản Lý Đề Tài & Hạn Ngạch Đội
+            Quản Lý Đề Tài và Hạn Ngạch Đội
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Thiết lập danh mục lĩnh vực đề tài lớn, đề tài nhánh và giới hạn số lượng đội thi đăng ký tối đa.

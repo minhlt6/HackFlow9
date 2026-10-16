@@ -602,7 +602,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              Cấu Hình Chặng Nộp & Thời Lượng
+              Cấu Hình Chặng Nộp và Thời Lượng
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-slate-400">

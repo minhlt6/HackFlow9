@@ -742,7 +742,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
       <Modal
         isOpen={isConfirmModalOpen}
         onClose={() => setIsConfirmModalOpen(false)}
-        title="XÁC NHẬN KHÓA BẢNG ĐIỂM CHÍNH THỨC"
+        title="Xác Nhận Khóa Bảng Điểm"
         maxWidth="md"
       >
         <div className="space-y-4 font-['Roboto']">
