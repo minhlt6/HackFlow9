@@ -61,7 +61,7 @@ class AnnouncementRepository:
             priority=priority,
         )
         db.add(announcement)
-        await db.flush()
+        await db.commit()
         await db.refresh(announcement)
         return announcement
 
@@ -76,7 +76,7 @@ class AnnouncementRepository:
             if hasattr(db_obj, field) and value is not None:
                 setattr(db_obj, field, value)
         db.add(db_obj)
-        await db.flush()
+        await db.commit()
         await db.refresh(db_obj)
         return db_obj
 
@@ -87,7 +87,7 @@ class AnnouncementRepository:
     ) -> None:
         """Hard-delete an announcement record."""
         await db.delete(db_obj)
-        await db.flush()
+        await db.commit()
 
 
 announcement_repo = AnnouncementRepository()

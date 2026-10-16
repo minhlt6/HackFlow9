@@ -14,6 +14,8 @@ class AnnouncementPriorityEnum(str, Enum):
 
 class AnnouncementCreate(BaseModel):
     """Schema for creating a new announcement (POST request body)."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     title: str = Field(
         ...,
         min_length=1,
@@ -33,6 +35,8 @@ class AnnouncementCreate(BaseModel):
 
 class AnnouncementUpdate(BaseModel):
     """Schema for updating an announcement (PUT request body). All fields optional."""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     title: Optional[str] = Field(
         None,
         min_length=1,
