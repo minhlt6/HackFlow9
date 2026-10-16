@@ -34,19 +34,18 @@ export const MainLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
   const {
     config,
-        switchPersona,
+    switchPersona,
     updateCurrentUserProfile,
     logout: mockLogout,
   } = useMockStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const navigate = useNavigate();
+  const navigate = useNavigate();
 
   // Synchronize useMockStore persona & profile with the authenticated user from useAuthStore
   useEffect(() => {
     if (!user) return;
 
-    let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected' =
-      'leader';
+    let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected';
 
     if (user.role === 'admin') {
       targetPersona = 'admin';
@@ -54,20 +53,18 @@ export const MainLayout: React.FC = () => {
       targetPersona = 'judge';
     } else if (user.role === 'mentor') {
       targetPersona = 'mentor';
+    } else if (user.approvalStatus === 'pending') {
+      targetPersona = 'pending';
+    } else if (user.approvalStatus === 'rejected') {
+      targetPersona = 'rejected';
+    } else if (
+      user.team_role === 'MEMBER' ||
+      user.team_role === 'member' ||
+      user.email.toLowerCase().includes('member')
+    ) {
+      targetPersona = 'member';
     } else {
-      if (user.approvalStatus === 'pending') {
-        targetPersona = 'pending';
-      } else if (user.approvalStatus === 'rejected') {
-        targetPersona = 'rejected';
-      } else if (
-        user.team_role === 'MEMBER' ||
-        user.team_role === 'member' ||
-        user.email.toLowerCase().includes('member')
-      ) {
-        targetPersona = 'member';
-      } else {
-        targetPersona = 'leader';
-      }
+      targetPersona = 'leader';
     }
 
     switchPersona(targetPersona);
@@ -79,18 +76,7 @@ export const MainLayout: React.FC = () => {
       githubUsername: user.githubUsername,
       avatarUrl: user.avatarUrl,
     });
-  }, [
-    user?.id,
-    user?.role,
-    user?.approvalStatus,
-    user?.fullName,
-    user?.email,
-    user?.githubUsername,
-    user?.avatarUrl,
-    user?.team_role,
-    switchPersona,
-    updateCurrentUserProfile,
-  ]);
+  }, [user, switchPersona, updateCurrentUserProfile]);
 
   const handleLogout = () => {
     logout();
@@ -103,12 +89,7 @@ export const MainLayout: React.FC = () => {
   const displayInitial = displayName.charAt(0).toUpperCase();
 
   const currentRole = user?.role || 'candidate';
-  const isApproved =
-    currentRole !== 'candidate' ||
-    user?.approvalStatus === 'approved' ||
-    user?.fullName === 'Nguyễn Văn Minh' ||
-    user?.email === 'leader@cybersamurai.team' ||
-    !user;
+  const isApproved = currentRole !== 'candidate' || user?.approvalStatus === 'approved';
 
   const candidateMenuGroups = isApproved
     ? [
@@ -360,7 +341,9 @@ export const MainLayout: React.FC = () => {
               <span className="text-xs font-bold tracking-wider text-slate-300 font-mono">
                 {config?.name || 'HACKFLOW AI & DEEPTECH HACKATHON 2026'}
               </span>
-
+              <span className="text-[11px] text-slate-400 block">
+                {config?.currentPhase || 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng'}
+              </span>
             </div>
           </div>
 

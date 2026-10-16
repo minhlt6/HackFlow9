@@ -20,12 +20,15 @@ export const DEFAULT_MOCK_USER: User = {
   team_role: 'TEAM_LEADER',
 };
 
+const isLocalMockAuth =
+  import.meta.env.DEV && import.meta.env.VITE_MOCK_AUTH === 'true';
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      user: DEFAULT_MOCK_USER,
-      token: 'mock-leader-token-2026',
-      isAuthenticated: true,
+      user: isLocalMockAuth ? DEFAULT_MOCK_USER : null,
+      token: isLocalMockAuth ? 'mock-leader-token-2026' : null,
+      isAuthenticated: isLocalMockAuth,
       login: (user, token) => {
         localStorage.setItem('token', token);
         set({ user, token, isAuthenticated: true });
@@ -43,19 +46,30 @@ export const useAuthStore = create<AuthState>()(
       name: 'auth-storage',
       merge: (persistedState, currentState) => {
         const p = persistedState as Partial<AuthState> | undefined;
-        const user = p?.user;
-        if (!user || user.fullName === 'Nguyễn Văn Minh' || user.email === 'leader@cybersamurai.team') {
+
+        // Nếu không bật VITE_MOCK_AUTH mà trong localStorage còn lưu token giả từ bản test cũ,
+        // tự động xóa phiên giả để bảo toàn luồng đăng nhập thật.
+        if (!isLocalMockAuth && p?.token === 'mock-leader-token-2026') {
+          localStorage.removeItem('token');
+          return {
+            ...currentState,
+            user: null,
+            token: null,
+            isAuthenticated: false,
+          };
+        }
+
+        // Chỉ tự động gán user mẫu khi dev chủ động bật VITE_MOCK_AUTH=true ở local
+        if (isLocalMockAuth && !p?.user) {
           return {
             ...currentState,
             ...p,
-            user: {
-              ...(user || DEFAULT_MOCK_USER),
-              approvalStatus: 'approved' as const,
-              team_role: 'TEAM_LEADER' as const,
-            },
+            user: DEFAULT_MOCK_USER,
+            token: 'mock-leader-token-2026',
             isAuthenticated: true,
           };
         }
+
         return { ...currentState, ...p };
       },
     }
