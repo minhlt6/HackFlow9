@@ -394,7 +394,14 @@ export const TopicsPage: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white">
+          <h1
+            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
+            style={{
+              background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}
+          >
             Danh Sách Đề Tài Cuộc Thi (Topics)
           </h1>
         </div>

@@ -57,7 +57,7 @@ export const CandidateLeaderboardPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Bảng Xếp Hạng & Kết Quả Chung Cuộc
+            Bảng Xếp Hạng và Kết Quả Chung Cuộc
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Bảng tổng sắp điểm số của tất cả các đội thi dựa trên thang tiêu chí Rubric đánh giá từ Ban Giám Khảo.

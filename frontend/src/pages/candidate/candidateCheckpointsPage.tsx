@@ -139,7 +139,14 @@ export const CandidateCheckpointsPage: React.FC = () => {
             <CheckSquare size={22} />
           </span>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-white">
+            <h1
+              className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
+              style={{
+                background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+              }}
+            >
               Tiến độ và Nộp bài Checkpoint
             </h1>
             <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
