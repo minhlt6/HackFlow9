@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import admin, auth, checkpoints, example, health, submissions, teams, topics
+from app.api.v1.endpoints import admin, announcements, auth, checkpoints, example, health, submissions, teams, topics
 
 api_router = APIRouter()
 
@@ -18,5 +18,6 @@ api_router.include_router(topics.router, prefix="/topics", tags=["Topics (HF-21)
 # Sprint 2 & 3 modules
 api_router.include_router(checkpoints.router, prefix="/checkpoints", tags=["Checkpoints (HF-32)"])
 api_router.include_router(submissions.router, prefix="/submissions", tags=["Submissions & Audit Log (HF-34)"])
+api_router.include_router(announcements.router, prefix="/announcements", tags=["Announcements (HF-27)"])
 
 
