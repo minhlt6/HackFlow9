@@ -74,6 +74,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/judge': 'Tổng quan Chấm thi',
   '/judge/dashboard': 'Tổng quan Chấm thi',
   '/judge/split-screen': 'Chấm song song',
+  '/judging': 'Không gian Giám khảo Chấm thi (Split-screen)',
   '/judge/topics': 'Đề tài & Đội thi',
   '/judge/results': 'Bảng tổng hợp điểm',
   // Mentor
@@ -176,6 +177,14 @@ element: <RootTitleLayout />,
         path: '/preview-ui',
         element: <UIPreviewPage />,
       },
+      {
+        path: '/preview-judging',
+        element: (
+          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+            <JudgeSplitScreenPage />
+          </div>
+        ),
+      },
 
       {
         element: <MainLayout />,
@@ -213,6 +222,7 @@ element: <RootTitleLayout />,
               { path: '/judge', element: <JudgeDashboardPage /> },
               { path: '/judge/dashboard', element: <JudgeDashboardPage /> },
               { path: '/judge/split-screen', element: <JudgeSplitScreenPage /> },
+              { path: '/judging', element: <JudgeSplitScreenPage /> },
               { path: '/judge/topics', element: <JudgeTopicsPage /> },
               { path: '/judge/results', element: <JudgeResultsPage /> },
 

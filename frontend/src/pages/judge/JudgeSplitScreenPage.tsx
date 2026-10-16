@@ -3,13 +3,13 @@ import { useSearchParams } from 'react-router-dom';
 import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
+import { Modal } from '../../components/Modal';
 import {
   FileCode,
   Video,
   Presentation,
   CheckSquare,
   Save,
-  Send,
   EyeOff,
   GitBranch,
   ExternalLink,
@@ -18,6 +18,10 @@ import {
   CheckCircle2,
   Globe,
   Palette,
+  Lock,
+  FileText,
+  AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 
 export const JudgeSplitScreenPage: React.FC = () => {
@@ -32,6 +36,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
     submissions,
     saveEvaluation,
     config,
+    majorTopics,
   } = useMockStore();
 
   const initialTeamId = searchParams.get('teamId') || teams[0]?.id || '';
@@ -39,6 +44,10 @@ export const JudgeSplitScreenPage: React.FC = () => {
   const [leftTab, setLeftTab] = useState<'code' | 'video' | 'slides' | 'checkpoints'>('code');
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId) || teams[0];
+  const teamSubTopic = majorTopics
+    ?.flatMap((m) => m.subTopics || [])
+    ?.find((s) => s.id === selectedTeam?.subTopicId);
+  const teamTopicTitle = teamSubTopic?.title || 'Chưa cập nhật đề tài';
   const finalSub = finalSubmissions.find((f) => f.teamId === selectedTeam?.id);
   const teamCheckpoints = submissions.filter((s) => s.teamId === selectedTeam?.id);
 
@@ -46,6 +55,10 @@ export const JudgeSplitScreenPage: React.FC = () => {
   const existingEval = evaluations.find(
     (e) => e.teamId === selectedTeam?.id && e.judgeId === currentUser.id,
   );
+
+  // Check if evaluation has been officially submitted & locked (Read-only)
+  const isLocked = Boolean(existingEval && !existingEval.isDraft);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
   // Scores state: Map criterionId -> score (0 to maxScore)
   const [scores, setScores] = useState<Record<string, number>>(() => {
@@ -81,6 +94,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
   }, [selectedTeamId]);
 
   const handleScoreChange = (criterionId: string, value: number, max: number) => {
+    if (isLocked) return;
     const clamped = Math.max(0, Math.min(value, max));
     setScores((prev) => ({ ...prev, [criterionId]: clamped }));
   };
@@ -96,17 +110,17 @@ export const JudgeSplitScreenPage: React.FC = () => {
   const totalWeightedScore = Math.round(((rawWeightedSum / totalWeight) * 100) * 10) / 10;
 
   const handleSaveDraft = () => {
-    if (!selectedTeam) return;
+    if (!selectedTeam || isLocked) return;
     saveEvaluation(
       selectedTeam.id,
       currentUser.id,
       currentUser.fullName,
       scores,
       generalComment,
-      true,
+      true, // isDraft = true
     );
-    setAlert('Đã lưu bản nháp điểm thành công!');
-    setTimeout(() => setAlert(null), 3000);
+    setAlert('Đã lưu bản nháp điểm thành công! Giám khảo vẫn có thể chỉnh sửa tiếp.');
+    setTimeout(() => setAlert(null), 3500);
   };
 
   const handleFinalSubmit = () => {
@@ -117,10 +131,11 @@ export const JudgeSplitScreenPage: React.FC = () => {
       currentUser.fullName,
       scores,
       generalComment,
-      false,
+      false, // isDraft = false -> official lock
     );
-    setAlert(`Đã chốt và nộp điểm chính thức (${totalWeightedScore}đ) cho đội thi!`);
-    setTimeout(() => setAlert(null), 3500);
+    setAlert(`Đã xác nhận khóa và nộp điểm chính thức (${totalWeightedScore}đ) cho đội thi! Bảng điểm chuyển sang chế độ Chỉ đọc (Read-only).`);
+    setIsConfirmModalOpen(false);
+    setTimeout(() => setAlert(null), 4000);
   };
 
   const currentTeamIndex = teams.findIndex((t) => t.id === selectedTeamId);
@@ -235,6 +250,81 @@ export const JudgeSplitScreenPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
         {/* Left Pane: Artifacts & Submissions (6/12) */}
         <div className="lg:col-span-6 rounded-[16px] border border-[#334155] bg-[#1E293B] flex flex-col min-h-0 overflow-hidden">
+          {/* Blind Judging Anonymous Submission Header (SRS HF-36 / HF-39) */}
+          <div className="p-4 bg-[#0B1120] border-b border-[#334155] space-y-2.5 shrink-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                  {config.blindJudgingMode ? 'Mã đội ẩn danh (Blind Judging):' : 'Đội thi được phân công:'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-base font-bold text-white font-mono">
+                    {displayName}
+                  </h4>
+                  {config.blindJudgingMode && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold flex items-center gap-1">
+                      <EyeOff size={10} />
+                      <span>Chấm ẩn danh</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Direct Demo & Repo Buttons */}
+              <div className="flex items-center gap-2">
+                {finalSub?.repoUrl ? (
+                  <a
+                    href={finalSub.repoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-[#818CF8] hover:text-white text-xs font-mono font-medium hover:border-[#6366F1] transition shadow-xs"
+                    title="Truy cập Kho mã nguồn GitHub"
+                  >
+                    <GitBranch size={13} />
+                    <span>Repo</span>
+                    <ExternalLink size={11} />
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-500 font-mono">Chưa có Repo</span>
+                )}
+                {finalSub?.demoVideoUrl ? (
+                  <a
+                    href={finalSub.demoVideoUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 hover:text-white text-xs font-mono font-medium hover:border-emerald-500 transition shadow-xs"
+                    title="Xem sản phẩm Demo trực tuyến / Video"
+                  >
+                    <Globe size={13} />
+                    <span>Demo</span>
+                    <ExternalLink size={11} />
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-500 font-mono">Chưa có Demo</span>
+                )}
+              </div>
+            </div>
+
+            {/* Topic & Frozen Commit SHA */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-2 border-t border-[#1E293B]">
+              <div className="space-y-0.5">
+                <span className="text-slate-400 text-[11px]">Đề tài dự thi:</span>
+                <p className="font-semibold text-slate-200 line-clamp-1">
+                  {teamTopicTitle}
+                </p>
+              </div>
+              <div className="space-y-0.5 sm:text-right">
+                <span className="text-slate-400 text-[11px] flex sm:justify-end items-center gap-1">
+                  <ShieldCheck size={12} className="text-emerald-400" />
+                  <span>Frozen Commit SHA:</span>
+                </span>
+                <p className="font-mono text-emerald-400 font-bold text-xs">
+                  {finalSub?.commitSha || 'd7b1a459e8f2038c'}
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Artifact Tabs Header */}
           <div className="flex items-center border-b border-[#334155] bg-[#0B1120] px-4 pt-2 gap-2 shrink-0 overflow-x-auto">
             <button
@@ -476,16 +566,36 @@ export const JudgeSplitScreenPage: React.FC = () => {
         <div className="lg:col-span-6 rounded-[16px] border border-[#334155] bg-[#1E293B] flex flex-col min-h-0 overflow-hidden">
           <div className="p-4 border-b border-[#334155] bg-[#0B1120] flex items-center justify-between shrink-0">
             <div>
-              <h3 className="font-['Righteous'] text-lg text-white">
-                Bảng Điểm Rubric ({displayName})
-              </h3>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-['Righteous'] text-lg text-white">
+                  Bảng Điểm Rubric ({displayName})
+                </h3>
+                {isLocked ? (
+                  <Badge variant="success">
+                    <Lock size={11} className="mr-1 inline" />
+                    ĐÃ KHÓA (READ-ONLY)
+                  </Badge>
+                ) : existingEval?.isDraft ? (
+                  <Badge variant="warning">
+                    <FileText size={11} className="mr-1 inline" />
+                    BẢN NHÁP
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral">CHƯA CHẤM</Badge>
+                )}
+              </div>
               <p className="text-xs text-slate-400">
-                Chấm điểm theo từng tiêu chuẩn kỹ thuật có trọng số
+                {isLocked
+                  ? 'Bảng điểm chính thức đã được khóa vào hệ thống. Chế độ chỉ đọc.'
+                  : 'Chấm điểm theo từng tiêu chuẩn kỹ thuật có trọng số'}
               </p>
             </div>
-            <span className="font-mono text-xl font-bold text-emerald-400">
-              {totalWeightedScore} <span className="text-xs text-slate-400">/ 100</span>
-            </span>
+            <div className="text-right">
+              <span className="text-[10px] text-slate-400 uppercase tracking-wider block">Tổng điểm:</span>
+              <span className="font-mono text-xl font-bold text-emerald-400">
+                {totalWeightedScore} <span className="text-xs text-slate-400">/ 100</span>
+              </span>
+            </div>
           </div>
 
           {/* Criteria Sliders Body */}
@@ -496,7 +606,11 @@ export const JudgeSplitScreenPage: React.FC = () => {
               return (
                 <div
                   key={c.id}
-                  className="p-3.5 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-2"
+                  className={`p-3.5 rounded-[12px] border space-y-2 transition-colors ${
+                    isLocked
+                      ? 'bg-[#0F172A]/70 border-[#334155]/60'
+                      : 'bg-[#0F172A] border-[#334155]'
+                  }`}
                 >
                   <div className="flex items-center justify-between text-xs">
                     <div>
@@ -511,11 +625,16 @@ export const JudgeSplitScreenPage: React.FC = () => {
                         type="number"
                         min={0}
                         max={c.maxScore}
+                        disabled={isLocked}
                         value={currentScore}
                         onChange={(e) =>
                           handleScoreChange(c.id, Number(e.target.value), c.maxScore)
                         }
-                        className="w-14 h-8 text-center rounded bg-[#1E293B] border border-[#334155] text-white font-bold text-sm focus:border-[#6366F1] focus:outline-none"
+                        className={`w-14 h-8 text-center rounded border font-bold text-sm focus:outline-none transition-colors ${
+                          isLocked
+                            ? 'bg-[#1E293B]/60 border-[#334155]/40 text-slate-300 cursor-not-allowed'
+                            : 'bg-[#1E293B] border-[#334155] text-white focus:border-[#6366F1]'
+                        }`}
                       />
                       <span className="text-slate-400">/ {c.maxScore}</span>
                     </div>
@@ -529,11 +648,16 @@ export const JudgeSplitScreenPage: React.FC = () => {
                     min={0}
                     max={c.maxScore}
                     step={1}
+                    disabled={isLocked}
                     value={currentScore}
                     onChange={(e) =>
                       handleScoreChange(c.id, Number(e.target.value), c.maxScore)
                     }
-                    className="w-full accent-[#6366F1] cursor-pointer"
+                    className={`w-full transition-opacity ${
+                      isLocked
+                        ? 'opacity-30 cursor-not-allowed'
+                        : 'accent-[#6366F1] cursor-pointer'
+                    }`}
                   />
                 </div>
               );
@@ -541,37 +665,138 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
             {/* General Feedback Textarea */}
             <div className="space-y-1.5 pt-2">
-              <label className="text-xs font-semibold text-slate-300">
-                Nhận xét & Góp ý chuyên môn của Giám khảo *
+              <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                <span>Nhận xét & Góp ý chuyên môn của Giám khảo *</span>
+                {isLocked && (
+                  <span className="text-[10px] text-slate-500 font-mono italic">
+                    (Đã khóa - Read-only)
+                  </span>
+                )}
               </label>
               <textarea
                 rows={3}
+                disabled={isLocked}
+                readOnly={isLocked}
                 value={generalComment}
                 onChange={(e) => setGeneralComment(e.target.value)}
                 placeholder="Ghi lại các ưu điểm, nhược điểm và khuyến nghị kỹ thuật dành cho đội thi..."
-                className="w-full p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 placeholder-slate-400 text-xs focus:border-[#6366F1] focus:outline-none"
+                className={`w-full p-3 rounded-[10px] border text-xs focus:outline-none transition-colors ${
+                  isLocked
+                    ? 'bg-[#0F172A]/70 border-[#334155]/40 text-slate-300 cursor-not-allowed'
+                    : 'bg-[#0F172A] border-[#334155] text-slate-100 placeholder-slate-400 focus:border-[#6366F1]'
+                }`}
               />
             </div>
           </div>
 
           {/* Action Footer */}
           <div className="p-4 border-t border-[#334155] bg-[#0B1120] flex items-center justify-between shrink-0 gap-3">
-            <Button variant="secondary" onClick={handleSaveDraft} className="gap-1.5 text-xs">
-              <Save size={14} />
-              <span>Lưu Bản Nháp</span>
-            </Button>
+            {isLocked ? (
+              <div className="w-full flex items-center justify-between">
+                <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold">
+                  <CheckCircle2 size={16} />
+                  <span>Bảng điểm đã được khóa chính thức (Read-only). Điểm số: {totalWeightedScore}đ</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    saveEvaluation(
+                      selectedTeam.id,
+                      currentUser.id,
+                      currentUser.fullName,
+                      scores,
+                      generalComment,
+                      true, // convert back to draft
+                    );
+                    setAlert('Đã mở khóa bảng điểm sang chế độ Bản nháp để chỉnh sửa!');
+                    setTimeout(() => setAlert(null), 3000);
+                  }}
+                  className="text-slate-400 hover:text-amber-300 text-xs"
+                >
+                  Mở khóa sửa lại
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button variant="secondary" onClick={handleSaveDraft} className="gap-1.5 text-xs">
+                  <Save size={14} />
+                  <span>Lưu Bản Nháp</span>
+                </Button>
 
-            <Button
-              variant="primary"
-              onClick={handleFinalSubmit}
-              className="gap-2 px-6 shadow-md shadow-[#6366F1]/25"
-            >
-              <Send size={15} />
-              <span>Xác Nhận Nộp Điểm ({totalWeightedScore}đ)</span>
-            </Button>
+                <Button
+                  variant="primary"
+                  onClick={() => setIsConfirmModalOpen(true)}
+                  className="gap-2 px-6 shadow-md shadow-[#6366F1]/25"
+                >
+                  <Lock size={15} />
+                  <span>Xác Nhận Khóa Bảng Điểm ({totalWeightedScore}đ)</span>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Modal Xác nhận Khóa bảng điểm (AC 3) */}
+      <Modal
+        isOpen={isConfirmModalOpen}
+        onClose={() => setIsConfirmModalOpen(false)}
+        title="XÁC NHẬN KHÓA BẢNG ĐIỂM CHÍNH THỨC"
+        maxWidth="md"
+      >
+        <div className="space-y-4 font-['Roboto']">
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-3">
+            <AlertTriangle size={22} className="shrink-0 text-amber-400 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-sm text-white">Khóa vĩnh viễn bảng điểm chính thức</p>
+              <p className="text-amber-200/90 leading-relaxed text-xs">
+                Sau khi xác nhận khóa, toàn bộ điểm số theo tiêu chí Rubric và nhận xét cho đội thi{' '}
+                <strong className="text-white">{displayName}</strong> sẽ chuyển sang trạng thái{' '}
+                <strong>Chỉ đọc (Read-only)</strong> để bảo đảm tính bảo mật và công bằng.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-xl bg-[#0F172A] border border-[#334155] space-y-2.5 text-xs">
+            <div className="flex justify-between items-center text-slate-300">
+              <span>Đội thi được chấm:</span>
+              <strong className="text-white font-mono text-sm">{displayName}</strong>
+            </div>
+            <div className="flex justify-between items-center text-slate-300">
+              <span>Đề tài:</span>
+              <strong className="text-slate-200">
+                {teamTopicTitle}
+              </strong>
+            </div>
+            <div className="flex justify-between items-center text-slate-300 pt-2 border-t border-[#1E293B]">
+              <span>Tổng điểm quy đổi theo trọng số:</span>
+              <span className="font-['Righteous'] text-xl text-emerald-400 font-mono">
+                {totalWeightedScore} / 100
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button
+              variant="ghost"
+              size="md"
+              onClick={() => setIsConfirmModalOpen(false)}
+            >
+              Hủy bỏ
+            </Button>
+            <Button
+              variant="danger"
+              size="md"
+              onClick={handleFinalSubmit}
+              className="px-5 font-semibold gap-1.5"
+            >
+              <Lock size={15} />
+              <span>Tôi Hiểu, Khóa Bảng Điểm</span>
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };
