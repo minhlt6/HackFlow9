@@ -1937,6 +1937,529 @@
         }
       }
     },
+    "/api/v1/announcements": {
+      "post": {
+        "tags": [
+          "Announcements (HF-27)"
+        ],
+        "summary": "Tạo thông báo mới (Chỉ Admin/BTC)",
+        "description": "Tạo thông báo mới cho cuộc thi.\nYêu cầu quyền Admin/BTC — trả 403 FORBIDDEN nếu không đủ quyền.\nDữ liệu không hợp lệ sẽ trả 422.",
+        "operationId": "create_announcement_api_v1_announcements_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_AnnouncementResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Announcements (HF-27)"
+        ],
+        "summary": "Xem danh sách thông báo (phân trang)",
+        "description": "Lấy danh sách thông báo với phân trang.\nMọi User đã đăng nhập đều có quyền truy cập.\nKết quả sắp xếp theo thời gian tạo giảm dần (mới nhất lên trước).",
+        "operationId": "list_announcements_api_v1_announcements_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Số trang (bắt đầu từ 1)",
+              "default": 1,
+              "title": "Page"
+            },
+            "description": "Số trang (bắt đầu từ 1)"
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "description": "Số bản ghi mỗi trang",
+              "default": 10,
+              "title": "Page Size"
+            },
+            "description": "Số bản ghi mỗi trang"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_AnnouncementPaginationResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/announcements/{announcement_id}": {
+      "put": {
+        "tags": [
+          "Announcements (HF-27)"
+        ],
+        "summary": "Cập nhật thông báo (Chỉ Admin/BTC)",
+        "description": "Cập nhật nội dung thông báo theo ID.\nYêu cầu quyền Admin/BTC — trả 403 nếu không đủ quyền, 404 nếu không tìm thấy.",
+        "operationId": "update_announcement_api_v1_announcements__announcement_id__put",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "announcement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Announcement Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnnouncementUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_AnnouncementResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Announcements (HF-27)"
+        ],
+        "summary": "Xóa thông báo (Chỉ Admin/BTC)",
+        "description": "Xóa thông báo theo ID.\nYêu cầu quyền Admin/BTC — trả 403 nếu không đủ quyền, 404 nếu không tìm thấy.",
+        "operationId": "delete_announcement_api_v1_announcements__announcement_id__delete",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "announcement_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Announcement Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_AnnouncementResponse_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/rubrics": {
+      "get": {
+        "tags": [
+          "Rubrics (HF-42)"
+        ],
+        "summary": "Get active judging rubric criteria (HF-42)",
+        "operationId": "get_rubrics_api_v1_rubrics_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Rubrics (HF-42)"
+        ],
+        "summary": "Configure judging rubric criteria (Admin only, HF-42)",
+        "operationId": "configure_rubrics_api_v1_rubrics_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RubricConfigureRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/evaluations/submissions": {
+      "get": {
+        "tags": [
+          "Evaluations & Blind Judging (HF-42)"
+        ],
+        "summary": "List Final Checkpoint submissions in Blind Judging mode (HF-42)",
+        "operationId": "list_blind_submissions_api_v1_evaluations_submissions_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/evaluations/submissions/{submission_id}": {
+      "get": {
+        "tags": [
+          "Evaluations & Blind Judging (HF-42)"
+        ],
+        "summary": "Get a single Final Checkpoint submission in Blind Judging mode (HF-42)",
+        "operationId": "get_blind_submission_detail_api_v1_evaluations_submissions__submission_id__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Submission Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/evaluations": {
+      "post": {
+        "tags": [
+          "Evaluations & Blind Judging (HF-42)"
+        ],
+        "summary": "Save draft or submit locked evaluation scores (HF-42)",
+        "operationId": "submit_or_save_evaluation_api_v1_evaluations_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EvaluationSubmitRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/evaluations/{submission_id}/judges/{judge_id}/unlock": {
+      "patch": {
+        "tags": [
+          "Evaluations & Blind Judging (HF-42)"
+        ],
+        "summary": "Admin unlocks a locked evaluation for re-assessment (HF-42 / AC-18.3)",
+        "operationId": "unlock_evaluation_api_v1_admin_evaluations__submission_id__judges__judge_id__unlock_patch",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "submission_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Submission Id"
+            }
+          },
+          {
+            "name": "judge_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Judge Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AdminUnlockEvaluationRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/evaluations/assignments": {
+      "post": {
+        "tags": [
+          "Evaluations & Blind Judging (HF-42)"
+        ],
+        "summary": "Admin assigns a judge to specific submissions or teams (US-14 / HF-42)",
+        "operationId": "assign_judge_api_v1_admin_evaluations_assignments_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JudgeAssignmentCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "tags": [
@@ -1959,6 +2482,270 @@
   },
   "components": {
     "schemas": {
+      "AdminUnlockEvaluationRequest": {
+        "properties": {
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason",
+            "default": "Admin unlocked evaluation for re-assessment"
+          }
+        },
+        "type": "object",
+        "title": "AdminUnlockEvaluationRequest",
+        "description": "Optional request body for PATCH /api/v1/admin/evaluations/{submission_id}/judges/{judge_id}/unlock."
+      },
+      "AnnouncementCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Title",
+            "description": "Tiêu đề thông báo"
+          },
+          "content": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Content",
+            "description": "Nội dung thông báo"
+          },
+          "priority": {
+            "$ref": "#/components/schemas/AnnouncementPriorityEnum",
+            "description": "Mức độ ưu tiên: info | warning | urgent",
+            "default": "info"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "content"
+        ],
+        "title": "AnnouncementCreate",
+        "description": "Schema for creating a new announcement (POST request body)."
+      },
+      "AnnouncementPaginationResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AnnouncementResponse"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "page_size": {
+            "type": "integer",
+            "title": "Page Size"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "page",
+          "page_size"
+        ],
+        "title": "AnnouncementPaginationResponse",
+        "description": "Paginated list response for announcements."
+      },
+      "AnnouncementPriorityEnum": {
+        "type": "string",
+        "enum": [
+          "info",
+          "warning",
+          "urgent"
+        ],
+        "title": "AnnouncementPriorityEnum",
+        "description": "Mirror of model enum for schema validation."
+      },
+      "AnnouncementResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "priority": {
+            "type": "string",
+            "title": "Priority"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "content",
+          "priority",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "AnnouncementResponse",
+        "description": "Schema for returning a single announcement."
+      },
+      "AnnouncementUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title",
+            "description": "Tiêu đề thông báo"
+          },
+          "content": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content",
+            "description": "Nội dung thông báo"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnouncementPriorityEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Mức độ ưu tiên: info | warning | urgent"
+          }
+        },
+        "type": "object",
+        "title": "AnnouncementUpdate",
+        "description": "Schema for updating an announcement (PUT request body). All fields optional."
+      },
+      "ApiResponse_AnnouncementPaginationResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnouncementPaginationResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "default": "Success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "type": "object",
+        "title": "ApiResponse[AnnouncementPaginationResponse]"
+      },
+      "ApiResponse_AnnouncementResponse_": {
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "title": "Success",
+            "default": true
+          },
+          "data": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnnouncementResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message",
+            "default": "Success"
+          },
+          "error_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Code"
+          }
+        },
+        "type": "object",
+        "title": "ApiResponse[AnnouncementResponse]"
+      },
       "ApiResponse_CheckpointResponse_": {
         "properties": {
           "success": {
@@ -3836,6 +4623,90 @@
         ],
         "title": "DemoPayload"
       },
+      "EvaluationCriterionScoreInput": {
+        "properties": {
+          "criteria_id": {
+            "type": "string",
+            "title": "Criteria Id"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comment"
+          }
+        },
+        "type": "object",
+        "required": [
+          "criteria_id"
+        ],
+        "title": "EvaluationCriterionScoreInput",
+        "description": "Input score and commentary for a single rubric criterion."
+      },
+      "EvaluationSubmitRequest": {
+        "properties": {
+          "submission_id": {
+            "type": "string",
+            "title": "Submission Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "draft"
+          },
+          "evaluations": {
+            "items": {
+              "$ref": "#/components/schemas/EvaluationCriterionScoreInput"
+            },
+            "type": "array",
+            "title": "Evaluations"
+          },
+          "general_comment": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "General Comment"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "submission_id"
+        ],
+        "title": "EvaluationSubmitRequest",
+        "description": "Request schema for POST /api/v1/evaluations (Judge)."
+      },
       "GitHubOAuthCallbackRequest": {
         "properties": {
           "code": {
@@ -3942,6 +4813,56 @@
           "database"
         ],
         "title": "HealthCheckData"
+      },
+      "JudgeAssignmentCreateRequest": {
+        "properties": {
+          "judge_id": {
+            "type": "string",
+            "title": "Judge Id"
+          },
+          "submission_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Id"
+          },
+          "submission_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submission Ids"
+          },
+          "team_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Team Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "judge_id"
+        ],
+        "title": "JudgeAssignmentCreateRequest",
+        "description": "Request body for assigning a judge to one or more submissions/teams."
       },
       "LoginRequest": {
         "properties": {
@@ -4099,6 +5020,85 @@
           "full_name"
         ],
         "title": "RegisterRequest"
+      },
+      "RubricConfigureRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Name",
+            "default": "HackFlow Final Rubric"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/RubricCriterionInput"
+            },
+            "type": "array",
+            "title": "Criteria"
+          }
+        },
+        "type": "object",
+        "title": "RubricConfigureRequest",
+        "description": "Request schema for POST /api/v1/rubrics (Admin only)."
+      },
+      "RubricCriterionInput": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "max_score": {
+            "type": "number",
+            "title": "Max Score",
+            "default": 10.0
+          },
+          "weight": {
+            "type": "number",
+            "title": "Weight"
+          },
+          "is_required": {
+            "type": "boolean",
+            "title": "Is Required",
+            "default": true
+          },
+          "display_order": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Order"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "weight"
+        ],
+        "title": "RubricCriterionInput",
+        "description": "Input schema for a single rubric criterion when configuring a rubric."
       },
       "SubmissionCreateRequest": {
         "properties": {

@@ -44,6 +44,15 @@ def anyio_backend():
 
 
 @pytest.fixture
+async def db_session():
+    """
+    Async database session fixture for test setup and assertions.
+    """
+    async with TestSessionLocal() as session:
+        yield session
+
+
+@pytest.fixture
 async def client():
     """
     Async HTTP client for testing FastAPI application with in-memory DB override.
@@ -64,3 +73,4 @@ async def client():
     async with AsyncClient(transport=transport, base_url="http://testserver") as ac:
         yield ac
     fastapi_app.dependency_overrides.clear()
+

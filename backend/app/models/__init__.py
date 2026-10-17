@@ -4,7 +4,7 @@ from app.models.user import User, UserRole, ApprovalStatus
 from app.models.team import Team, TeamMember, TeamMemberRole
 from app.models.topic import Topic, Subtopic
 from app.models.checkpoint import Checkpoint, Submission, SubmissionStatus, AuditLog
-from app.models.evaluation import RubricCriteria, Evaluation
+from app.models.evaluation import RubricCriteria, Evaluation, EvaluationStatus, JudgeAssignment
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
 from app.models.config import HackathonConfig
 from app.models.whitelist import WhitelistEntry
@@ -29,6 +29,8 @@ __all__ = [
     "AuditLog",
     "RubricCriteria",
     "Evaluation",
+    "EvaluationStatus",
+    "JudgeAssignment",
     "SupportTicket",
     "TicketStatus",
     "TicketPriority",
@@ -37,5 +39,6 @@ __all__ = [
     "Announcement",
     "AnnouncementPriority",
 ]
+
 
 
