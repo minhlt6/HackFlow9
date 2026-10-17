@@ -61,10 +61,10 @@ export const JudgeSplitScreenPage: React.FC = () => {
   const isLocked = Boolean(existingEval && !existingEval.isDraft);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
 
-  // Scores state: Map criterionId -> score (0 to maxScore)
-  const [scores, setScores] = useState<Record<string, number>>(() => {
+  // Scores state: Map criterionId -> score (0 to maxScore) or '' during typing
+  const [scores, setScores] = useState<Record<string, number | ''>>(() => {
     if (existingEval?.scores) return existingEval.scores;
-    const initial: Record<string, number> = {};
+    const initial: Record<string, number | ''> = {};
     for (const c of rubricCriteria) {
       initial[c.id] = Math.round(c.maxScore * 0.85); // default good score
     }
@@ -83,7 +83,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
       setScores(existingEval.scores);
       setGeneralComment(existingEval.generalComment);
     } else {
-      const initial: Record<string, number> = {};
+      const initial: Record<string, number | ''> = {};
       for (const c of rubricCriteria) {
         initial[c.id] = Math.round(c.maxScore * 0.85);
       }
@@ -100,10 +100,39 @@ export const JudgeSplitScreenPage: React.FC = () => {
     setScores((prev) => ({ ...prev, [criterionId]: clamped }));
   };
 
+  const handleInputChange = (criterionId: string, rawVal: string, max: number) => {
+    if (isLocked) return;
+    if (rawVal === '') {
+      setScores((prev) => ({ ...prev, [criterionId]: '' }));
+      return;
+    }
+    // Remove leading zeros before any digits: e.g. "05" -> "5", "024" -> "24"
+    const sanitized = rawVal.replace(/^0+(?=\d)/, '');
+    const parsed = parseInt(sanitized, 10);
+    if (isNaN(parsed)) {
+      setScores((prev) => ({ ...prev, [criterionId]: 0 }));
+      return;
+    }
+    const clamped = Math.max(0, Math.min(parsed, max));
+    setScores((prev) => ({ ...prev, [criterionId]: clamped }));
+  };
+
+  const handleInputBlur = (criterionId: string) => {
+    if (isLocked) return;
+    setScores((prev) => ({
+      ...prev,
+      [criterionId]:
+        typeof prev[criterionId] === 'number' && !isNaN(prev[criterionId] as number)
+          ? prev[criterionId]
+          : 0,
+    }));
+  };
+
   // Compute weighted total score (out of 100)
   const totalWeight = rubricCriteria.reduce((sum, c) => sum + (c.weight || 0), 0) || 100;
   const rawWeightedSum = rubricCriteria.reduce((sum, c) => {
-    const score = scores[c.id] !== undefined ? scores[c.id] : 0;
+    const rawScore = scores[c.id];
+    const score = typeof rawScore === 'number' && !isNaN(rawScore) ? rawScore : 0;
     const max = c.maxScore > 0 ? c.maxScore : 10;
     const normalized = (Math.max(0, Math.min(score, max)) / max) * c.weight;
     return sum + normalized;
@@ -112,11 +141,16 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
   const handleSaveDraft = () => {
     if (!selectedTeam || isLocked) return;
+    const numericScores: Record<string, number> = {};
+    for (const c of rubricCriteria) {
+      const val = scores[c.id];
+      numericScores[c.id] = typeof val === 'number' && !isNaN(val) ? val : 0;
+    }
     saveEvaluation(
       selectedTeam.id,
       currentUser.id,
       currentUser.fullName,
-      scores,
+      numericScores,
       generalComment,
       true, // isDraft = true
     );
@@ -126,11 +160,16 @@ export const JudgeSplitScreenPage: React.FC = () => {
 
   const handleFinalSubmit = () => {
     if (!selectedTeam) return;
+    const numericScores: Record<string, number> = {};
+    for (const c of rubricCriteria) {
+      const val = scores[c.id];
+      numericScores[c.id] = typeof val === 'number' && !isNaN(val) ? val : 0;
+    }
     saveEvaluation(
       selectedTeam.id,
       currentUser.id,
       currentUser.fullName,
-      scores,
+      numericScores,
       generalComment,
       false, // isDraft = false -> official lock
     );
@@ -635,9 +674,17 @@ export const JudgeSplitScreenPage: React.FC = () => {
                         max={c.maxScore}
                         disabled={isLocked}
                         value={currentScore}
-                        onChange={(e) =>
-                          handleScoreChange(c.id, Number(e.target.value), c.maxScore)
-                        }
+                        onFocus={(e) => {
+                          if (currentScore === 0) {
+                            e.target.select();
+                          }
+                        }}
+                        onChange={(e) => {
+                          const sanitized = e.target.value.replace(/^0+(?=\d)/, '');
+                          e.target.value = sanitized;
+                          handleInputChange(c.id, sanitized, c.maxScore);
+                        }}
+                        onBlur={() => handleInputBlur(c.id)}
                         className={`w-14 h-8 text-center rounded border font-bold text-sm focus:outline-none transition-colors ${
                           isLocked
                             ? 'bg-[#1E293B]/60 border-[#334155]/40 text-slate-300 cursor-not-allowed'
@@ -657,7 +704,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
                     max={c.maxScore}
                     step={1}
                     disabled={isLocked}
-                    value={currentScore}
+                    value={typeof currentScore === 'number' && !isNaN(currentScore) ? currentScore : 0}
                     onChange={(e) =>
                       handleScoreChange(c.id, Number(e.target.value), c.maxScore)
                     }
@@ -709,11 +756,16 @@ export const JudgeSplitScreenPage: React.FC = () => {
                   variant="ghost"
                   size="sm"
                   onClick={() => {
+                    const numericScores: Record<string, number> = {};
+                    for (const c of rubricCriteria) {
+                      const val = scores[c.id];
+                      numericScores[c.id] = typeof val === 'number' && !isNaN(val) ? val : 0;
+                    }
                     saveEvaluation(
                       selectedTeam.id,
                       currentUser.id,
                       currentUser.fullName,
-                      scores,
+                      numericScores,
                       generalComment,
                       true, // convert back to draft
                     );
