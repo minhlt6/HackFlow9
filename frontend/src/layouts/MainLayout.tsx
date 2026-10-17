@@ -339,7 +339,7 @@ export const MainLayout: React.FC = () => {
             </button>
             <div className="hidden sm:block">
               <span className="text-xs font-bold tracking-wider text-slate-300 font-mono">
-                {config?.name || 'HACKFLOW AI & DEEPTECH HACKATHON 2026'}
+                {config?.name?.replace('&', 'VÀ') || 'HACKFLOW AI VÀ DEEPTECH HACKATHON 2026'}
               </span>
             </div>
           </div>

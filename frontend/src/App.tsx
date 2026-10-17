@@ -10,7 +10,6 @@ import { CandidateDashboardPage } from './pages/candidate/CandidateDashboardPage
 import { CandidateCheckpointsPage } from './pages/candidate/candidateCheckpointsPage';
 import { TopicsPage } from './pages/TopicsPage';
 import { CandidateFinalSubmissionPage } from './pages/candidate/CandidateFinalSubmissionPage';
-import { CandidateLeaderboardPage } from './pages/candidate/CandidateLeaderboardPage';
 import { CandidateTicketsPage } from './pages/candidate/CandidateTicketsPage';
 import { CandidateProfilePage } from './pages/candidate/CandidateProfilePage';
 import { UIPreviewPage } from './pages/UIPreviewPage';
@@ -33,9 +32,10 @@ import { AdminConfigPage } from './pages/admin/AdminConfigPage';
 
 // Judge Pages
 import { JudgeDashboardPage } from './pages/judge/JudgeDashboardPage';
-import { JudgeSplitScreenPage } from './pages/judge/JudgeSplitScreenPage';
 import { JudgeTopicsPage } from './pages/judge/JudgeTopicsPage';
 import { JudgeResultsPage } from './pages/judge/JudgeResultsPage';
+import { JudgingWorkspace } from './pages/JudgingWorkspace';
+import { Scoreboard } from './pages/Scoreboard';
 
 // Mentor Pages
 import { MentorDashboardPage } from './pages/mentor/MentorDashboardPage';
@@ -74,6 +74,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/judge': 'Tổng quan Chấm thi',
   '/judge/dashboard': 'Tổng quan Chấm thi',
   '/judge/split-screen': 'Chấm song song',
+  '/judging': 'Không gian Giám khảo Chấm thi (Split-screen)',
   '/judge/topics': 'Đề tài & Đội thi',
   '/judge/results': 'Bảng tổng hợp điểm',
   // Mentor
@@ -176,6 +177,14 @@ element: <RootTitleLayout />,
         path: '/preview-ui',
         element: <UIPreviewPage />,
       },
+      {
+        path: '/preview-judging',
+        element: (
+          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+            <JudgingWorkspace />
+          </div>
+        ),
+      },
 
       {
         element: <MainLayout />,
@@ -192,7 +201,7 @@ element: <RootTitleLayout />,
               { path: '/topics', element: <TopicsPage /> },
               { path: '/checkpoints', element: <CandidateCheckpointsPage /> },
               { path: '/final-submission', element: <CandidateFinalSubmissionPage /> },
-              { path: '/scoreboard', element: <CandidateLeaderboardPage /> },
+              { path: '/scoreboard', element: <Scoreboard /> },
               { path: '/tickets', element: <CandidateTicketsPage /> },
 
               // Admin Routes
@@ -212,7 +221,8 @@ element: <RootTitleLayout />,
               // Judge Routes
               { path: '/judge', element: <JudgeDashboardPage /> },
               { path: '/judge/dashboard', element: <JudgeDashboardPage /> },
-              { path: '/judge/split-screen', element: <JudgeSplitScreenPage /> },
+              { path: '/judge/split-screen', element: <JudgingWorkspace /> },
+              { path: '/judging', element: <JudgingWorkspace /> },
               { path: '/judge/topics', element: <JudgeTopicsPage /> },
               { path: '/judge/results', element: <JudgeResultsPage /> },
 

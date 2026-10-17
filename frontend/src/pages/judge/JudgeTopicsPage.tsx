@@ -20,7 +20,7 @@ export const JudgeTopicsPage: React.FC = () => {
             WebkitTextFillColor: 'transparent',
           }}
         >
-          Tổng Quan Đề Tài & Đội Thi Tham Gia
+          Tổng Quan Đề Tài và Đội Thi Tham Gia
         </h1>
         <p className="text-xs sm:text-sm text-slate-400 mt-1">
           Xem danh mục các đề tài được đăng ký và các đội thi thuộc từng nhánh chuyên môn.
@@ -36,7 +36,9 @@ export const JudgeTopicsPage: React.FC = () => {
             <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
               <div className="flex items-center gap-2.5">
                 <Lightbulb size={20} className="text-[#818CF8]" />
-                <h3 className="font-['Righteous'] text-xl text-white">{m.name}</h3>
+                <h3 className="font-['Righteous'] text-xl text-white">
+                  {(m.name || m.title || '').replace(/\s*&\s*/g, ' và ')}
+                </h3>
               </div>
               <Badge variant="indigo">{m.subTopics.length} nhánh</Badge>
             </div>

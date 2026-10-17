@@ -97,7 +97,7 @@ export const AdminTopicsPage: React.FC = () => {
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Quản Lý Đề Tài & Hạn Ngạch Đội
+            Quản Lý Đề Tài và Hạn Ngạch Đội
           </h1>
           <p className="text-xs sm:text-sm text-slate-400 mt-1">
             Thiết lập danh mục lĩnh vực đề tài lớn, đề tài nhánh và giới hạn số lượng đội thi đăng ký tối đa.
@@ -160,7 +160,9 @@ export const AdminTopicsPage: React.FC = () => {
                     <Lightbulb size={20} />
                   </div>
                   <div>
-                    <h2 className="font-['Righteous'] text-xl text-white">{major.title}</h2>
+                    <h2 className="font-['Righteous'] text-xl text-white">
+                      {(major.title || major.name || '').replace(/\s*&\s*/g, ' và ')}
+                    </h2>
                     <p className="text-xs text-slate-400">{major.description}</p>
                   </div>
                 </div>

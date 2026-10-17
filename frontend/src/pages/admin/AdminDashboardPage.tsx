@@ -101,7 +101,7 @@ export const AdminDashboardPage: React.FC = () => {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              Tổng Quan Cuộc Thi: {config.name}
+              Tổng Quan Cuộc Thi: {config.name?.replace('&', 'và')}
             </h1>
             <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
               Theo dõi tình trạng xác thực tài khoản, tiến độ nộp bài các chặng, xử lý hỗ trợ trực tuyến và vận hành Chế độ chấm ẩn danh.

@@ -104,7 +104,7 @@ export const mockUsers: Record<string, User> = {
 };
 
 export const initialHackathonConfig: HackathonConfig = {
-  name: 'HackFlow AI & DeepTech Hackathon 2026',
+  name: 'HackFlow AI và DeepTech Hackathon 2026',
   description: 'Sân chơi sáng tạo công nghệ trí tuệ nhân tạo và hệ thống thông minh đột phá dành cho sinh viên xuất sắc toàn quốc.',
   logoUrl: '/hackflow-logo.svg',
   bannerUrl: '/login-background.png',
@@ -188,16 +188,16 @@ export const initialPendingCandidates: User[] = [
 export const initialMajorTopics: MajorTopic[] = [
   {
     id: 'major-ai',
-    title: 'Trí tuệ nhân tạo (AI & Data Science)',
-    name: 'Trí tuệ nhân tạo (AI & Data Science)',
-    domain: 'Trí tuệ nhân tạo (AI & Data Science)',
+    title: 'Trí tuệ nhân tạo (AI và Data Science)',
+    name: 'Trí tuệ nhân tạo (AI và Data Science)',
+    domain: 'Trí tuệ nhân tạo (AI và Data Science)',
     description: 'Nghiên cứu ứng dụng thị giác máy tính, xử lý ngôn ngữ tự nhiên và mô hình tạo sinh trong cuộc sống.',
     mentorIds: ['user-mentor-1'],
     subTopics: [
       {
         id: 'sub-ai-01',
         majorTopicId: 'major-ai',
-        title: 'Tối ưu hóa LLM & RAG cho Y tế và Tra cứu Hồ sơ Bệnh án',
+        title: 'Tối ưu hóa LLM và RAG cho Y tế và Tra cứu Hồ sơ Bệnh án',
         description: 'Xây dựng pipeline RAG độ trễ thấp trích xuất thông tin bệnh án từ dữ liệu phi cấu trúc kết hợp xác thực nguồn trích dẫn y khoa.',
         requirements: 'Độ chính xác RAG > 85%, độ trễ < 1.5s, hỗ trợ trích dẫn nguồn văn bản y khoa chính xác.',
         sampleDataUrl: 'https://dataset.hackflow.dev/medical-rag-sample.zip',
@@ -244,9 +244,9 @@ export const initialMajorTopics: MajorTopic[] = [
   },
   {
     id: 'major-iot',
-    title: 'Đô thị Thông minh & IoT Xanh',
-    name: 'Đô thị Thông minh & IoT Xanh',
-    domain: 'Đô thị Thông minh & IoT Xanh',
+    title: 'Đô thị Thông minh và IoT Xanh',
+    name: 'Đô thị Thông minh và IoT Xanh',
+    domain: 'Đô thị Thông minh và IoT Xanh',
     description: 'Hệ thống kết nối vạn vật, cảm biến thông minh và giải pháp đô thị xanh phát thải ròng bằng 0.',
     mentorIds: ['user-mentor-2'],
     subTopics: [
@@ -280,9 +280,9 @@ export const initialMajorTopics: MajorTopic[] = [
   },
   {
     id: 'major-fintech',
-    title: 'Công nghệ Tài chính & Blockchain',
-    name: 'Công nghệ Tài chính & Blockchain',
-    domain: 'Công nghệ Tài chính & Blockchain',
+    title: 'Công nghệ Tài chính và Blockchain',
+    name: 'Công nghệ Tài chính và Blockchain',
+    domain: 'Công nghệ Tài chính và Blockchain',
     description: 'Thanh toán bảo mật cao, định danh số phi tập trung và hợp đồng thông minh.',
     mentorIds: ['user-mentor-3'],
     subTopics: [
@@ -303,9 +303,9 @@ export const initialMajorTopics: MajorTopic[] = [
   },
   {
     id: 'major-health',
-    title: 'Y tế & Chăm sóc Sức khỏe',
-    name: 'Y tế & Chăm sóc Sức khỏe',
-    domain: 'Y tế & Chăm sóc Sức khỏe',
+    title: 'Y tế và Chăm sóc Sức khỏe',
+    name: 'Y tế và Chăm sóc Sức khỏe',
+    domain: 'Y tế và Chăm sóc Sức khỏe',
     description: 'Ứng dụng công nghệ xử lý tín hiệu sinh học, chẩn đoán từ xa và hồ sơ bệnh án điện tử.',
     mentorIds: ['user-mentor-4'],
     subTopics: [
@@ -779,6 +779,22 @@ export const initialEvaluations: TeamEvaluation[] = [
     generalComment: 'Mô hình chạy mượt mà trên Edge. Cần cải thiện thêm khả năng nhận diện trong điều kiện thời tiết mưa gió ban đêm.',
     isDraft: false,
     confirmedAt: '2026-11-16T15:10:00Z',
+  },
+  {
+    id: 'eval-demo-02',
+    teamId: 'team-demo',
+    judgeId: 'user-judge-2',
+    judgeName: 'TS. Vũ Giám Khảo 2',
+    scores: {
+      'crit-innovation': 17,
+      'crit-tech': 24,
+      'crit-feasibility': 16,
+      'crit-presentation': 11,
+    },
+    totalScore: 68,
+    generalComment: 'Mô hình cần kiểm thử thực địa diện rộng hơn trước khi triển khai thương mại.',
+    isDraft: false,
+    confirmedAt: '2026-11-16T15:40:00Z',
   },
   {
     id: 'eval-green-01',
