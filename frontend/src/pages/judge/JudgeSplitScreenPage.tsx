@@ -37,6 +37,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
     saveEvaluation,
     config,
     majorTopics,
+    toggleBlindJudging,
   } = useMockStore();
 
   const initialTeamId = searchParams.get('teamId') || teams[0]?.id || '';
@@ -155,7 +156,7 @@ export const JudgeSplitScreenPage: React.FC = () => {
   };
 
   const displayName = config.blindJudgingMode
-    ? `Đội thi #${(currentTeamIndex + 1).toString().padStart(2, '0')}`
+    ? `ĐỘI-ANON-${(currentTeamIndex + 1).toString().padStart(2, '0')}`
     : selectedTeam?.name;
 
   if (teams.length === 0 || !selectedTeam) {
@@ -209,19 +210,26 @@ export const JudgeSplitScreenPage: React.FC = () => {
               {teams.map((t, idx) => (
                 <option key={t.id} value={t.id}>
                   {config.blindJudgingMode
-                    ? `Đội #${(idx + 1).toString().padStart(2, '0')}`
+                    ? `ĐỘI-ANON-${(idx + 1).toString().padStart(2, '0')}`
                     : `${t.name} (${t.leaderName})`}
                 </option>
               ))}
             </select>
           </div>
 
-          {config.blindJudgingMode && (
-            <Badge variant="warning">
-              <EyeOff size={12} />
-              <span>Chế độ ẩn danh</span>
-            </Badge>
-          )}
+          <button
+            type="button"
+            onClick={toggleBlindJudging}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer border ${
+              config.blindJudgingMode
+                ? 'bg-amber-500/20 border-amber-500/50 text-amber-300 hover:bg-amber-500/30 shadow-xs'
+                : 'bg-[#0F172A] border-[#334155] text-slate-400 hover:text-white hover:border-[#6366F1]'
+            }`}
+            title="Nhấn để bật hoặc tắt Chế độ Chấm ẩn danh (Blind Judging)"
+          >
+            <EyeOff size={13} />
+            <span>{config.blindJudgingMode ? 'Chế độ Ẩn danh: BẬT' : 'Chế độ Ẩn danh: TẮT'}</span>
+          </button>
         </div>
 
         {/* Live Total Score Pill */}
