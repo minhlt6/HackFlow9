@@ -781,6 +781,22 @@ export const initialEvaluations: TeamEvaluation[] = [
     confirmedAt: '2026-11-16T15:10:00Z',
   },
   {
+    id: 'eval-demo-02',
+    teamId: 'team-demo',
+    judgeId: 'user-judge-2',
+    judgeName: 'TS. Vũ Giám Khảo 2',
+    scores: {
+      'crit-innovation': 17,
+      'crit-tech': 24,
+      'crit-feasibility': 16,
+      'crit-presentation': 11,
+    },
+    totalScore: 68,
+    generalComment: 'Mô hình cần kiểm thử thực địa diện rộng hơn trước khi triển khai thương mại.',
+    isDraft: false,
+    confirmedAt: '2026-11-16T15:40:00Z',
+  },
+  {
     id: 'eval-green-01',
     teamId: 'team-green',
     judgeId: 'user-judge-1',

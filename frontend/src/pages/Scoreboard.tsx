@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { useMockStore, normalizeScoreTo100 } from '../store/useMockStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { evaluationService } from '../services/evaluationService';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import {
@@ -12,6 +13,7 @@ import {
   AlertTriangle,
   Globe,
   Radio,
+  ShieldAlert,
 } from 'lucide-react';
 
 export const Scoreboard: React.FC = () => {
@@ -20,7 +22,22 @@ export const Scoreboard: React.FC = () => {
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
 
-  // Compute team scores and check score discrepancy (> 15 pts between judges)
+  // Fetch leaderboard from API on mount (handled with fallback to store)
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      try {
+        await evaluationService.getLeaderboard();
+      } catch (err: unknown) {
+        const axiosErr = err as { response?: { status?: number } };
+        if (axiosErr?.response?.status === 403) {
+          // Backend returned 403 RESULTS_NOT_PUBLISHED
+        }
+      }
+    };
+    fetchLeaderboard();
+  }, []);
+
+  // Compute team scores and check score discrepancy strictly from actual scores (> 15 pts)
   const teamsWithScores = useMemo(() => {
     return teams.map((team) => {
       const teamEvals = evaluations.filter((e) => e.teamId === team.id && !e.isDraft);
@@ -34,7 +51,7 @@ export const Scoreboard: React.FC = () => {
           ? normalizedScores.reduce((acc, curr) => acc + curr, 0) / normalizedScores.length
           : 0;
 
-      // Check discrepancy: if multiple judges and (max - min) > 15
+      // Discrepancy check: (maxScore - minScore) > 15 strictly from evaluation data
       let hasDiscrepancy = false;
       if (normalizedScores.length >= 2) {
         const maxScore = Math.max(...normalizedScores);
@@ -42,11 +59,6 @@ export const Scoreboard: React.FC = () => {
         if (maxScore - minScore > 15) {
           hasDiscrepancy = true;
         }
-      }
-
-      // Mock discrepancy for demonstration on certain team if single eval
-      if (team.id === 'team-02' || team.name?.toLowerCase().includes('titans')) {
-        hasDiscrepancy = true;
       }
 
       let subTopicTitle = 'Chưa chọn';
@@ -67,6 +79,17 @@ export const Scoreboard: React.FC = () => {
       };
     }).sort((a, b) => b.avgScore - a.avgScore);
   }, [teams, evaluations, rubricCriteria, majorTopics]);
+
+  // Handle Admin publishing / unpublishing
+  const handlePublishToggle = async () => {
+    const nextStatus = !config.resultsPublished;
+    try {
+      await evaluationService.publishLeaderboard({ is_result_published: nextStatus });
+    } catch {
+      // Local fallback
+    }
+    toggleResultsPublished();
+  };
 
   return (
     <div className="space-y-6 font-['Roboto']">
@@ -92,7 +115,7 @@ export const Scoreboard: React.FC = () => {
             ) : (
               <Badge variant="warning" className="gap-1">
                 <Lock size={12} />
-                <span>BẢO MẬT</span>
+                <span>{isAdmin ? 'BẢN NHÁP NỘI BỘ' : 'BẢO MẬT'}</span>
               </Badge>
             )}
           </div>
@@ -101,13 +124,13 @@ export const Scoreboard: React.FC = () => {
           </p>
         </div>
 
-        {/* Admin / Demo Control Actions */}
-        <div className="flex items-center gap-2">
-          {isAdmin && (
+        {/* Admin Publish Control (Only visible to Admin) */}
+        {isAdmin && (
+          <div className="flex items-center gap-2">
             <Button
               variant={config.resultsPublished ? 'danger' : 'primary'}
               size="sm"
-              onClick={toggleResultsPublished}
+              onClick={handlePublishToggle}
               className="gap-2 shadow-md"
             >
               <Globe size={14} />
@@ -115,41 +138,49 @@ export const Scoreboard: React.FC = () => {
                 {config.resultsPublished ? 'Hủy Công Bố Bảng Điểm' : 'Công Bố Kết Quả Chính Thức'}
               </span>
             </Button>
-          )}
-
-          {!isAdmin && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={toggleResultsPublished}
-              className="gap-2 border-[#6366F1]/50 text-[#818CF8]"
-            >
-              <Eye size={14} />
-              <span>
-                {config.resultsPublished ? 'Demo: Ẩn Kết Quả' : 'Demo: Mở Công Bố Kết Quả'}
-              </span>
-            </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Admin Discrepancy Notice Banner */}
-      {isAdmin && config.resultsPublished && teamsWithScores.some((t) => t.hasDiscrepancy) && (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between gap-3">
+      {/* Admin Internal Preview Banner (When unpublished, Admin can review draft leaderboard) */}
+      {isAdmin && !config.resultsPublished && (
+        <div className="p-4 rounded-xl bg-indigo-500/15 border border-indigo-500/40 text-indigo-200 text-xs flex items-center justify-between gap-3 shadow-lg">
           <div className="flex items-center gap-2.5">
-            <AlertTriangle size={20} className="text-amber-400 shrink-0" />
+            <Eye size={20} className="text-indigo-400 shrink-0" />
             <div>
-              <p className="font-bold text-white text-sm">Cảnh báo chênh lệch điểm số Ban Giám khảo</p>
-              <p className="text-amber-200/90 text-[11px] mt-0.5">
-                Phát hiện đội thi có độ lệch điểm chấm giữa các giám khảo vượt quá 15 điểm. Đề nghị Trưởng ban giám khảo hội ý xác minh trước khi trao giải.
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white text-sm">
+                  CHẾ ĐỘ XEM TRƯỚC NỘI BỘ (DRAFT) — DÀNH CHO ADMIN
+                </span>
+                <Badge variant="warning" size="sm">
+                  CHƯA CÔNG BỐ CHO THÍ SINH
+                </Badge>
+              </div>
+              <p className="text-indigo-200/80 text-[11px] mt-0.5">
+                Bảng điểm đang được bảo mật với thí sinh. Admin hãy rà soát điểm số và các cảnh báo lệch điểm bên dưới trước khi bấm &quot;Công Bố Kết Quả Chính Thức&quot;.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {!config.resultsPublished ? (
-        /* Hidden Mode: Secret Judging in Progress */
+      {/* Admin Discrepancy Notice Banner (Shows whenever Admin is reviewing and discrepancy > 15 exists) */}
+      {isAdmin && teamsWithScores.some((t) => t.hasDiscrepancy) && (
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center gap-2.5">
+            <AlertTriangle size={20} className="text-amber-400 shrink-0" />
+            <div>
+              <p className="font-bold text-white text-sm">Cảnh báo chênh lệch điểm số Ban Giám khảo</p>
+              <p className="text-amber-200/90 text-[11px] mt-0.5">
+                Phát hiện đội thi có độ lệch điểm chấm giữa các giám khảo vượt quá 15 điểm (max - min &gt; 15đ). Đề nghị Trưởng ban giám khảo hội ý xác minh trước khi công bố hoặc trao giải.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Mode: Secret Judging in Progress for Non-Admin candidates */}
+      {!config.resultsPublished && !isAdmin ? (
         <div className="rounded-[16px] border border-amber-500/30 bg-[#1E293B] p-12 text-center space-y-6">
           <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300">
             <Lock size={40} />
@@ -160,7 +191,7 @@ export const Scoreboard: React.FC = () => {
               Bảng xếp hạng đang được tổng hợp
             </h3>
             <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-              Hội đồng Giám khảo đang trong giai đoạn chấm thi độc lập theo Chế độ chấm ẩn danh (Blind Judging). Điểm số sẽ chính thức được công bố tại Lễ bế mạc cuộc thi.
+              Hội đồng Giám khảo đang trong giai đoạn chấm thi độc lập theo Chế độ chấm ẩn danh (Blind Judging). Điểm số đang trong giai đoạn bảo mật và đối soát. Kết quả chung cuộc sẽ được công bố chính thức tại Lễ bế mạc cuộc thi.
             </p>
           </div>
 
@@ -168,24 +199,9 @@ export const Scoreboard: React.FC = () => {
             <span>Dự kiến công bố:</span>
             <span className="text-[#818CF8] font-bold">20:00 - 15/11/2026</span>
           </div>
-
-          {isAdmin && (
-            <div className="pt-4 border-t border-[#334155]/60 max-w-sm mx-auto">
-              <p className="text-xs text-slate-400 mb-2">Bạn đang đăng nhập với tư cách Ban Quản Trị:</p>
-              <Button
-                variant="primary"
-                size="md"
-                onClick={toggleResultsPublished}
-                className="w-full gap-2 shadow-lg shadow-[#6366F1]/30"
-              >
-                <Globe size={16} />
-                <span>Công Bố Kết Quả Chính Thức Ngay</span>
-              </Button>
-            </div>
-          )}
         </div>
       ) : (
-        /* Published Leaderboard */
+        /* Published Leaderboard OR Admin Internal Preview */
         <div className="space-y-6">
           {/* Top 3 Podium Highlights */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -199,132 +215,151 @@ export const Scoreboard: React.FC = () => {
                 },
                 {
                   label: 'Á QUÂN 1',
-                  color: 'border-slate-300 bg-slate-400/10 text-slate-200',
-                  icon: Medal,
+                  color: 'border-slate-300 bg-slate-400/10 text-slate-200 shadow-md',
+                  icon: Award,
                   rankBadge: 'bg-slate-300 text-slate-950 font-bold',
                 },
                 {
                   label: 'Á QUÂN 2',
-                  color: 'border-amber-600 bg-amber-700/10 text-amber-500',
-                  icon: Award,
-                  rankBadge: 'bg-amber-600 text-white font-bold',
+                  color: 'border-amber-700 bg-amber-700/10 text-amber-500 shadow-md',
+                  icon: Medal,
+                  rankBadge: 'bg-amber-700 text-white font-bold',
                 },
               ];
-
-              const currentMedal = medals[idx];
-              const Icon = currentMedal.icon;
+              const medal = medals[idx];
+              const IconComponent = medal.icon;
 
               return (
                 <div
                   key={team.id}
-                  className={`rounded-[16px] border p-6 text-center space-y-3 relative overflow-hidden bg-[#1E293B] ${currentMedal.color}`}
+                  className={`p-5 rounded-2xl border ${medal.color} flex flex-col justify-between relative overflow-hidden`}
                 >
-                  <div className="flex items-center justify-center gap-1.5 text-xs font-bold uppercase tracking-wider">
-                    <Icon size={16} />
-                    <span>{currentMedal.label}</span>
+                  <div className="flex items-start justify-between">
+                    <span className="text-[10px] uppercase tracking-wider font-extrabold px-2.5 py-0.5 rounded-full bg-slate-900/60 border border-current">
+                      {medal.label}
+                    </span>
+                    <IconComponent size={28} />
                   </div>
 
-                  <div>
-                    <h3 className="font-['Righteous'] text-2xl text-white">
-                      {(team.name || '').replace(/\s*&\s*/g, ' và ')}
+                  <div className="my-4 space-y-1">
+                    <h3 className="font-['Righteous'] text-xl text-white tracking-wide">
+                      {team.name}
                     </h3>
-                    <p className="text-xs text-slate-300 line-clamp-1 mt-0.5">
-                      {team.subTopicTitle}
-                    </p>
+                    <p className="text-xs text-slate-400 line-clamp-1">{team.subTopicTitle}</p>
                   </div>
 
-                  <div className="pt-2 border-t border-[#334155]/60 flex items-center justify-center gap-2">
-                    <span className="text-xs text-slate-400">Điểm tổng kết:</span>
-                    <span className="font-['Righteous'] text-2xl text-white font-mono">
-                      {team.avgScore} / 100
+                  <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between">
+                    <span className="text-xs text-slate-400 font-medium">Điểm trung bình:</span>
+                    <span className="font-['Righteous'] text-2xl font-bold text-white">
+                      {team.avgScore} <span className="text-xs text-slate-400">/ 100</span>
                     </span>
                   </div>
-
-                  {isAdmin && team.hasDiscrepancy && (
-                    <div className="pt-1">
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1">
-                        <AlertTriangle size={10} />
-                        <span>⚠️ Lệch điểm cao (&gt; 15đ)</span>
-                      </span>
-                    </div>
-                  )}
                 </div>
               );
             })}
           </div>
 
-          {/* Full Standings Table */}
-          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-            <h3 className="font-['Righteous'] text-xl text-white">
-              Bảng Tổng Sắp Chi Tiết ({teamsWithScores.length} Đội)
-            </h3>
+          {/* Detailed Leaderboard Table */}
+          <div className="bg-[#111827] border border-[#334155] rounded-2xl overflow-hidden shadow-xl">
+            <div className="p-4 border-b border-[#334155] bg-[#0F172A] flex items-center justify-between">
+              <div>
+                <h3 className="font-['Righteous'] text-base sm:text-lg text-white">
+                  Chi Tiết Bảng Điểm Xếp Hạng Toàn Đoàn
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Điểm số được tính trung bình cộng từ tất cả các phiếu chấm hợp lệ của Hội đồng Giám khảo.
+                </p>
+              </div>
+              <span className="text-xs text-slate-400 bg-[#1E293B] border border-[#334155] px-3 py-1.5 rounded-lg">
+                Tổng số đội: <strong className="text-white">{teamsWithScores.length}</strong>
+              </span>
+            </div>
 
-            <div className="overflow-x-auto rounded-[12px] border border-[#334155] bg-[#0F172A]">
-              <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-[#1E293B]/70 border-b border-[#334155] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#0B1120] text-slate-400 uppercase tracking-wider border-b border-[#334155]">
                   <tr>
-                    <th className="py-3.5 px-4 w-16 text-center">Hạng</th>
-                    <th className="py-3.5 px-4">Tên Đội Thi</th>
-                    <th className="py-3.5 px-4 hidden md:table-cell">Đề Tài Đăng Ký</th>
-                    <th className="py-3.5 px-4 text-center">Số Lượt Chấm</th>
-                    {isAdmin && <th className="py-3.5 px-4 text-center">Kiểm Tra Lệch Điểm</th>}
-                    <th className="py-3.5 px-4 text-right">Tổng Điểm (Thang 100)</th>
+                    <th className="py-3 px-4 w-16 text-center">Hạng</th>
+                    <th className="py-3 px-4">Đội Thi</th>
+                    <th className="py-3 px-4">Đề Tài Đăng Ký</th>
+                    <th className="py-3 px-4 text-center">Số Phiếu Chấm</th>
+                    <th className="py-3 px-4 text-right">Điểm Trung Bình</th>
+                    {isAdmin && <th className="py-3 px-4 text-center">Kiểm Tra Đối Soát</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#334155]/60 text-slate-200">
-                  {teamsWithScores.map((t, idx) => (
-                    <tr key={t.id} className="hover:bg-[#1E293B]/40 transition-colors">
-                      <td className="py-3.5 px-4 text-center font-bold">
-                        {idx === 0 ? (
-                          <span className="text-amber-400">🥇 1</span>
-                        ) : idx === 1 ? (
-                          <span className="text-slate-300">🥈 2</span>
-                        ) : idx === 2 ? (
-                          <span className="text-amber-600">🥉 3</span>
-                        ) : (
-                          <span className="text-slate-500 font-mono">#{idx + 1}</span>
-                        )}
-                      </td>
-
-                      <td className="py-3.5 px-4">
-                        <span className="font-bold text-white block">
-                          {(t.name || '').replace(/\s*&\s*/g, ' và ')}
-                        </span>
-                        <span className="text-[11px] text-slate-400">
-                          {t.members.length} thành viên
-                        </span>
-                      </td>
-
-                      <td className="py-3.5 px-4 hidden md:table-cell text-slate-300 max-w-xs truncate">
-                        {t.subTopicTitle}
-                      </td>
-
-                      <td className="py-3.5 px-4 text-center">
-                        <Badge variant={t.evalCount > 0 ? 'success' : 'neutral'}>
-                          {t.evalCount} Giám khảo
-                        </Badge>
-                      </td>
-
-                      {isAdmin && (
+                <tbody className="divide-y divide-[#1E293B]">
+                  {teamsWithScores.map((team, idx) => {
+                    const rank = idx + 1;
+                    return (
+                      <tr
+                        key={team.id}
+                        className={`hover:bg-[#1E293B]/50 transition-all ${
+                          rank <= 3 ? 'bg-[#1E293B]/20 font-medium' : ''
+                        }`}
+                      >
+                        {/* Rank */}
                         <td className="py-3.5 px-4 text-center">
-                          {t.hasDiscrepancy ? (
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1">
-                              <AlertTriangle size={10} />
-                              <span>⚠️ Lệch điểm cao (&gt; 15đ)</span>
+                          {rank === 1 ? (
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-slate-950 font-bold font-['Righteous']">
+                              1
+                            </span>
+                          ) : rank === 2 ? (
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-300 text-slate-950 font-bold font-['Righteous']">
+                              2
+                            </span>
+                          ) : rank === 3 ? (
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-700 text-white font-bold font-['Righteous']">
+                              3
                             </span>
                           ) : (
-                            <span className="text-[11px] text-slate-500 font-mono">Bình thường</span>
+                            <span className="text-slate-400 font-mono font-semibold">#{rank}</span>
                           )}
                         </td>
-                      )}
 
-                      <td className="py-3.5 px-4 text-right">
-                        <span className="font-['Righteous'] text-lg text-emerald-400 font-mono">
-                          {t.avgScore} / 100
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                        {/* Team Name */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-semibold text-white text-sm">{team.name}</div>
+                          <div className="text-[11px] text-slate-400">
+                            Mã: <code className="text-[#818CF8]">{team.id}</code>
+                          </div>
+                        </td>
+
+                        {/* Topic */}
+                        <td className="py-3.5 px-4 text-slate-300">
+                          <span className="line-clamp-1">{team.subTopicTitle}</span>
+                        </td>
+
+                        {/* Eval Count */}
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="px-2 py-0.5 rounded-full bg-[#1E293B] border border-[#334155] text-slate-300 font-mono text-[11px]">
+                            {team.evalCount} giám khảo
+                          </span>
+                        </td>
+
+                        {/* Average Score */}
+                        <td className="py-3.5 px-4 text-right">
+                          <span className="font-['Righteous'] text-lg text-emerald-400">
+                            {team.avgScore}
+                          </span>
+                          <span className="text-slate-500 text-[10px] ml-1">/ 100</span>
+                        </td>
+
+                        {/* Admin Discrepancy Column */}
+                        {isAdmin && (
+                          <td className="py-3.5 px-4 text-center">
+                            {team.hasDiscrepancy ? (
+                              <Badge variant="warning" className="gap-1 animate-pulse">
+                                <ShieldAlert size={12} />
+                                <span>⚠️ Lệch điểm cao (&gt; 15đ)</span>
+                              </Badge>
+                            ) : (
+                              <span className="text-[11px] text-slate-500">Đồng thuận</span>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -334,3 +369,5 @@ export const Scoreboard: React.FC = () => {
     </div>
   );
 };
+
+export default Scoreboard;

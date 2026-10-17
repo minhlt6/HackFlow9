@@ -1,12 +1,17 @@
 import { axiosClient } from '../api/axiosClient';
 
+export interface EvaluationCriteriaScore {
+  criteria_id: string;
+  score: number;
+  comment?: string;
+}
+
 export interface EvaluationPayload {
-  team_id: string;
-  judge_id?: string;
-  scores: Record<string, number>;
+  submission_id: string;
+  status: 'draft' | 'submitted';
+  evaluations: EvaluationCriteriaScore[];
   general_comment?: string;
-  is_draft: boolean;
-  status?: 'draft' | 'submitted';
+  team_id?: string;
 }
 
 export interface AnonymousSubmission {
@@ -31,6 +36,10 @@ export interface LeaderboardEntry {
   has_discrepancy?: boolean; // Lệch điểm cao (> 15đ) giữa các giám khảo
 }
 
+export interface PublishLeaderboardPayload {
+  is_result_published: boolean;
+}
+
 export const evaluationService = {
   /**
    * Lấy danh mục các tiêu chí Rubric đánh giá từ BTC
@@ -53,6 +62,7 @@ export const evaluationService = {
   /**
    * Gửi điểm đánh giá (Lưu bản nháp hoặc Khóa bảng điểm)
    * POST /api/v1/evaluations
+   * Payload theo SRS HF-36: { submission_id, status: "draft" | "submitted", evaluations: [{ criteria_id, score, comment }], general_comment }
    */
   submitEvaluation: async (payload: EvaluationPayload) => {
     const response = await axiosClient.post('/evaluations', payload);
@@ -69,11 +79,12 @@ export const evaluationService = {
   },
 
   /**
-   * Admin công bố bảng xếp hạng chính thức cho toàn bộ thí sinh
+   * Admin công bố hoặc thu hồi bảng xếp hạng chính thức cho toàn bộ thí sinh
    * PATCH /api/v1/admin/leaderboard/publish
+   * Body theo SRS HF-36: { is_result_published: boolean }
    */
-  publishLeaderboard: async () => {
-    const response = await axiosClient.patch('/admin/leaderboard/publish');
+  publishLeaderboard: async (payload: PublishLeaderboardPayload = { is_result_published: true }) => {
+    const response = await axiosClient.patch('/admin/leaderboard/publish', payload);
     return response.data;
   },
 };
