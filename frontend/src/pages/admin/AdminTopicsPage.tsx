@@ -160,7 +160,9 @@ export const AdminTopicsPage: React.FC = () => {
                     <Lightbulb size={20} />
                   </div>
                   <div>
-                    <h2 className="font-['Righteous'] text-xl text-white">{major.title}</h2>
+                    <h2 className="font-['Righteous'] text-xl text-white">
+                      {(major.title || major.name || '').replace(/\s*&\s*/g, ' và ')}
+                    </h2>
                     <p className="text-xs text-slate-400">{major.description}</p>
                   </div>
                 </div>
