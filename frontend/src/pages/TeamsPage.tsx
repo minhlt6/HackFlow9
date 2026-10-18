@@ -830,11 +830,11 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
                                   <button
                                     type="button"
                                     onClick={() => handleOpenTransferModal(m)}
-                                    className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 transition-colors cursor-pointer"
-                                    title="Chuyển quyền Đội Trưởng"
-                                    aria-label="Chuyển quyền Đội Trưởng"
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 hover:text-amber-200 transition-colors cursor-pointer text-[11px] font-medium"
+                                    title="Chuyển giao vai trò Đội Trưởng cho thành viên này"
                                   >
-                                    <Crown size={13} />
+                                    <Crown size={13} className="shrink-0" />
+                                    <span className="hidden xl:inline">Chuyển quyền</span>
                                   </button>
                                   <button
                                     type="button"
