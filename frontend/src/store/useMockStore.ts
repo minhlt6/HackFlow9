@@ -147,10 +147,15 @@ interface MockStoreState {
 
   // Support Tickets
   tickets: SupportTicket[];
-  createTicket: (title: string, description: string, priority: 'high' | 'medium' | 'low') => { success: boolean; ticket?: SupportTicket };
+  createTicket: (
+    title: string,
+    description: string,
+    priority: 'low' | 'normal' | 'high' | 'urgent' | 'medium',
+    category?: string,
+  ) => { success: boolean; ticket?: SupportTicket };
   claimTicket: (ticketId: string) => void;
   replyTicket: (ticketId: string, content: string) => void;
-  resolveTicket: (ticketId: string) => void;
+  resolveTicket: (ticketId: string, responseText?: string) => void;
   cancelTicket: (ticketId: string) => void;
 
   // Announcements
@@ -1064,7 +1069,7 @@ export const useMockStore = create<MockStoreState>()(
 
       // Tickets
       tickets: initialSupportTickets,
-      createTicket: (title, description, priority) => {
+      createTicket: (title, description, priority, category) => {
         const user = get().currentUser;
         const team = get().teams.find((t) => t.id === user.teamId) || get().teams[0];
         const nextNum = get().tickets.length + 1;
@@ -1081,7 +1086,9 @@ export const useMockStore = create<MockStoreState>()(
           senderName: user.fullName,
           title,
           description,
-          priority,
+          content: description,
+          category: category || 'technical',
+          priority: priority || 'normal',
           status: 'open',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
@@ -1153,11 +1160,16 @@ export const useMockStore = create<MockStoreState>()(
         }));
       },
 
-      resolveTicket: (ticketId) => {
+      resolveTicket: (ticketId, responseText) => {
         set((state) => ({
           tickets: state.tickets.map((t) =>
             t.id === ticketId
-              ? { ...t, status: 'resolved', updatedAt: new Date().toISOString() }
+              ? {
+                  ...t,
+                  status: 'resolved',
+                  response: responseText || t.response || 'Vấn đề đã được hỗ trợ và giải quyết hoàn tất.',
+                  updatedAt: new Date().toISOString(),
+                }
               : t
           ),
         }));
