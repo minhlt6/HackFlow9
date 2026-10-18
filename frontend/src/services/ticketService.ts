@@ -19,8 +19,10 @@ export interface CreateTicketPayload {
 }
 
 export interface UpdateTicketPayload {
-  action?: 'accept' | 'update_response' | 'resolve' | 'close' | 'reopen';
+  action?: 'accept' | 'update_response' | 'resolve' | 'close' | 'reopen' | 'escalate';
   response?: string;
+  note?: string;
+  target_admin_id?: string;
   status?: TicketStatus;
   priority?: TicketPriority;
 }
@@ -87,6 +89,15 @@ export const ticketService = {
   },
 
   /**
+   * Lấy chi tiết một ticket
+   * GET /api/v1/tickets/{id}
+   */
+  getTicketDetail: async (ticketId: string) => {
+    const response = await axiosClient.get(`/tickets/${ticketId}`);
+    return response.data;
+  },
+
+  /**
    * Cập nhật trạng thái / phản hồi ticket (Claim, Resolve, etc.)
    * PATCH /api/v1/tickets/{id}
    */
@@ -96,4 +107,4 @@ export const ticketService = {
   },
 };
 
-export const { createTicket, getMyTickets, getAllTickets, updateTicket } = ticketService;
+export const { createTicket, getMyTickets, getAllTickets, getTicketDetail, updateTicket } = ticketService;

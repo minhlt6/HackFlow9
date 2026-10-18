@@ -218,6 +218,7 @@ export interface SupportTicket {
   mentorName?: string;
   createdAt: string;
   updatedAt?: string;
+  resolvedAt?: string;
   replies?: TicketReply[];
   messages?: TicketMessage[];
 }

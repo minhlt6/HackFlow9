@@ -1,7 +1,13 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useMockStore } from '../store/useMockStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { ticketService, type TicketCategory, type TicketPriority } from '../services/ticketService';
+import {
+  ticketService,
+  type TicketCategory,
+  type TicketPriority,
+  type TicketStatus,
+} from '../services/ticketService';
+import type { SupportTicket } from '../types';
 import { Button } from '../components/Button';
 import { Badge, type BadgeVariant } from '../components/Badge';
 import { Modal } from '../components/Modal';
@@ -20,6 +26,10 @@ import {
   Inbox,
   User,
   Users,
+  RotateCcw,
+  ArrowUpRight,
+  RefreshCw,
+  X,
 } from 'lucide-react';
 
 const CATEGORY_LABELS: Record<string, { label: string; variant: BadgeVariant }> = {
@@ -50,59 +60,213 @@ export const SupportTickets: React.FC = () => {
   const {
     currentUser,
     teams,
-    tickets,
+    tickets: mockTickets,
     createTicket: storeCreateTicket,
     claimTicket: storeClaimTicket,
     replyTicket: storeReplyTicket,
     resolveTicket: storeResolveTicket,
+    closeTicket: storeCloseTicket,
+    reopenTicket: storeReopenTicket,
   } = useMockStore();
 
   const isCandidate = user?.role === 'candidate';
-  const isMentorOrAdmin = user?.role === 'mentor' || user?.role === 'admin';
+  const isMentor = user?.role === 'mentor';
+  const isAdmin = user?.role === 'admin';
+  const isMentorOrAdmin = isMentor || isAdmin;
 
-  // API sync on mount
-  useEffect(() => {
-    const syncApi = async () => {
-      try {
-        if (isCandidate) {
-          await ticketService.getMyTickets();
-        } else {
-          await ticketService.getAllTickets();
-        }
-      } catch {
-        // Fallback to local store silently in demo
-      }
+  // Local state for API Tickets & Refreshing
+  const [apiTickets, setApiTickets] = useState<SupportTicket[] | null>(null);
+  const [isFetchingApi, setIsFetchingApi] = useState(false);
+  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showAlert = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    setAlert({ type, message });
+    setTimeout(() => setAlert(null), 5000);
+  }, []);
+
+  /**
+   * Helper xử lý mã lỗi HTTP từ Backend theo SRS HF-37 Mục 5.7
+   * Trả về true nếu là lỗi HTTP từ server (đã handle & dừng thao tác), false nếu là lỗi mất mạng/offline để fallback mock
+   */
+  const handleApiError = useCallback((err: unknown, defaultMessage: string): boolean => {
+    const axiosErr = err as {
+      response?: {
+        status?: number;
+        data?: {
+          error_code?: string;
+          message?: string;
+        };
+      };
     };
-    syncApi();
-  }, [isCandidate]);
 
-  // Candidate Data & State
+    if (axiosErr?.response && typeof axiosErr.response.status === 'number') {
+      const status = axiosErr.response.status;
+      const errorCode = axiosErr.response.data?.error_code || '';
+      const serverMessage = axiosErr.response.data?.message;
+
+      if (status === 409 && errorCode === 'TICKET_ALREADY_ASSIGNED') {
+        showAlert('Lỗi [409 TICKET_ALREADY_ASSIGNED]: Ticket này đã được Mentor khác tiếp nhận xử lý!', 'error');
+      } else if (status === 409 && errorCode === 'REOPEN_WINDOW_EXPIRED') {
+        showAlert('Lỗi [409 REOPEN_WINDOW_EXPIRED]: Đã quá thời hạn 48 giờ để mở lại ticket. Vui lòng tạo ticket mới!', 'error');
+      } else if (status === 403 && errorCode === 'ACCOUNT_NOT_APPROVED') {
+        showAlert('Lỗi [403 ACCOUNT_NOT_APPROVED]: Tài khoản Thí sinh chưa được phê duyệt, không thể tạo ticket!', 'error');
+      } else if (status === 403 && errorCode === 'FORBIDDEN_ROLE') {
+        showAlert('Lỗi [403 FORBIDDEN_ROLE]: Vai trò của bạn không có quyền thực hiện thao tác này!', 'error');
+      } else if (status === 422 && errorCode === 'MISSING_TICKET_RESPONSE') {
+        showAlert('Lỗi [422 MISSING_TICKET_RESPONSE]: Vui lòng nhập nội dung câu trả lời hướng dẫn trước khi đánh dấu Đã giải quyết!', 'error');
+      } else if (status === 400 && errorCode === 'INVALID_TICKET_TRANSITION') {
+        showAlert('Lỗi [400 INVALID_TICKET_TRANSITION]: Hành động không hợp lệ với trạng thái hiện tại của ticket!', 'error');
+      } else if (status === 404 && errorCode === 'TICKET_NOT_FOUND') {
+        showAlert('Lỗi [404 TICKET_NOT_FOUND]: Không tìm thấy ticket trên hệ thống!', 'error');
+      } else {
+        showAlert(`Lỗi [${status}${errorCode ? ' ' + errorCode : ''}]: ${serverMessage || defaultMessage}`, 'error');
+      }
+      return true;
+    }
+    return false;
+  }, [showAlert]);
+
+  // Đồng bộ dữ liệu lấy từ API vào state
+  const fetchTicketsFromApi = useCallback(async () => {
+    try {
+      setIsFetchingApi(true);
+      const res = isCandidate
+        ? await ticketService.getMyTickets()
+        : await ticketService.getAllTickets();
+
+      const rawItems = res?.data?.items || res?.data || (Array.isArray(res) ? res : null);
+      if (Array.isArray(rawItems)) {
+        const mapped: SupportTicket[] = rawItems.map((item: Record<string, unknown>) => {
+          const id = String(item.id || '');
+          const teamId = String(item.team_id || item.teamId || '');
+          const creatorId = String(item.user_id || item.creatorId || '');
+          const assignedTo = item.assigned_to ? String(item.assigned_to) : null;
+          const assignedMentorId = assignedTo || (item.assignedMentorId ? String(item.assignedMentorId) : null);
+
+          return {
+            id,
+            ticketCode: (item.ticketCode as string) || `#TCK-${id.slice(0, 6).toUpperCase()}`,
+            teamId,
+            teamName:
+              (item.teamName as string) ||
+              teams.find((t) => t.id === teamId)?.name ||
+              'Đội thi',
+            creatorId,
+            creatorName:
+              (item.creatorName as string) ||
+              (creatorId === currentUser.id ? currentUser.fullName : 'Thí sinh'),
+            title: (item.title as string) || '',
+            description: (item.content as string) || (item.description as string) || '',
+            content: (item.content as string) || (item.description as string) || '',
+            category: (item.category as TicketCategory) || 'technical',
+            priority: (item.priority as TicketPriority) || 'normal',
+            status: (item.status as TicketStatus) || 'open',
+            assignedMentorId: assignedMentorId || undefined,
+            assignedMentorName:
+              (item.assignedMentorName as string) ||
+              (assignedMentorId
+                ? assignedMentorId === currentUser.id
+                  ? currentUser.fullName
+                  : 'Cố vấn chuyên môn'
+                : undefined),
+            response: (item.response as string) || undefined,
+            createdAt: (item.created_at as string) || (item.createdAt as string) || new Date().toISOString(),
+            updatedAt: (item.updated_at as string) || (item.updatedAt as string) || new Date().toISOString(),
+            resolvedAt: (item.resolved_at as string) || (item.resolvedAt as string) || undefined,
+            messages: (item.messages as SupportTicket['messages']) || [],
+            replies: (item.replies as SupportTicket['replies']) || [],
+          };
+        });
+        setApiTickets(mapped);
+      }
+    } catch {
+      // Local dev / network offline fallback
+    } finally {
+      setIsFetchingApi(false);
+    }
+  }, [isCandidate, currentUser, teams]);
+
+  useEffect(() => {
+    fetchTicketsFromApi();
+  }, [fetchTicketsFromApi]);
+
+  // Tập dữ liệu vé hỗ trợ hiện hành (kết hợp API và fallback Store)
+  const currentTickets = useMemo(() => {
+    return apiTickets !== null ? apiTickets : mockTickets;
+  }, [apiTickets, mockTickets]);
+
+  // ==========================================
+  // CANDIDATE DATA & FILTERING
+  // ==========================================
   const myTeam = teams.find((t) => t.id === currentUser.teamId) || teams[0];
   const candidateTickets = useMemo(() => {
-    return tickets.filter(
+    return currentTickets.filter(
       (t) => t.teamId === myTeam?.id || t.creatorId === currentUser.id,
     );
-  }, [tickets, myTeam?.id, currentUser.id]);
+  }, [currentTickets, myTeam?.id, currentUser.id]);
 
-  // Candidate Filter
-  const [candidateFilter, setCandidateFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
+  const [candidateFilter, setCandidateFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('all');
   const filteredCandidateTickets = useMemo(() => {
     if (candidateFilter === 'all') return candidateTickets;
     return candidateTickets.filter((t) => t.status === candidateFilter);
   }, [candidateTickets, candidateFilter]);
 
-  // Mentor/Admin Filter & Search State
-  const [mentorStatusFilter, setMentorStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
+  // ==========================================
+  // MENTOR & ADMIN DATA & ISOLATION (SRS HF-37 Mục 4.2)
+  // Mentor chỉ thấy: (status = open && assigned_to = null) HOẶC (assigned_to = current_user.id)
+  // Admin thấy toàn bộ ticket trong hệ thống
+  // ==========================================
+  const mentorAllowedTickets = useMemo(() => {
+    if (isAdmin) return currentTickets;
+    return currentTickets.filter(
+      (t) => (!t.assignedMentorId && t.status === 'open') || t.assignedMentorId === currentUser.id,
+    );
+  }, [currentTickets, isAdmin, currentUser.id]);
+
+  // Tab scope cho Mentor/Admin:
+  // 'unassigned': Chờ tiếp nhận
+  // 'my_assigned': Tôi đang phụ trách
+  // 'all': Toàn bộ hệ thống (dành cho Admin hoặc lọc mở rộng)
+  const [mentorScopeTab, setMentorScopeTab] = useState<'unassigned' | 'my_assigned' | 'all'>(
+    isMentor ? 'unassigned' : 'all',
+  );
+
+  const [mentorStatusFilter, setMentorStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('all');
   const [mentorPriorityFilter, setMentorPriorityFilter] = useState<'all' | 'urgent' | 'high' | 'normal' | 'low'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Số lượng đếm cho các Tab
+  const unassignedCount = useMemo(() => {
+    return currentTickets.filter((t) => !t.assignedMentorId && t.status === 'open').length;
+  }, [currentTickets]);
+
+  const myAssignedCount = useMemo(() => {
+    return currentTickets.filter((t) => t.assignedMentorId === currentUser.id).length;
+  }, [currentTickets, currentUser.id]);
+
+  const allSystemCount = useMemo(() => {
+    return mentorAllowedTickets.length;
+  }, [mentorAllowedTickets]);
+
   const filteredMentorTickets = useMemo(() => {
-    return tickets.filter((t) => {
+    return mentorAllowedTickets.filter((t) => {
+      // 1. Lọc theo Scope Tab
+      if (mentorScopeTab === 'unassigned') {
+        if (t.assignedMentorId || t.status !== 'open') return false;
+      } else if (mentorScopeTab === 'my_assigned') {
+        if (t.assignedMentorId !== currentUser.id) return false;
+      }
+
+      // 2. Lọc theo Trạng thái phụ
       if (mentorStatusFilter !== 'all' && t.status !== mentorStatusFilter) return false;
+
+      // 3. Lọc theo Mức độ ưu tiên
       if (mentorPriorityFilter !== 'all') {
         const p = t.priority === 'medium' ? 'normal' : t.priority;
         if (p !== mentorPriorityFilter) return false;
       }
+
+      // 4. Lọc theo Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = t.title.toLowerCase().includes(q);
@@ -110,23 +274,27 @@ export const SupportTickets: React.FC = () => {
         const matchTeam = t.teamName.toLowerCase().includes(q);
         if (!matchTitle && !matchCode && !matchTeam) return false;
       }
+
       return true;
     });
-  }, [tickets, mentorStatusFilter, mentorPriorityFilter, searchQuery]);
+  }, [mentorAllowedTickets, mentorScopeTab, mentorStatusFilter, mentorPriorityFilter, searchQuery, currentUser.id]);
 
-  // Selection
+  // ==========================================
+  // SELECTION & ACTIVE TICKET DERIVATION
+  // ==========================================
   const activeList = isCandidate ? filteredCandidateTickets : filteredMentorTickets;
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
 
-  // Derive active ticket safely without calling setState in effect
   const effectiveTicketId =
     (selectedTicketId && activeList.some((t) => t.id === selectedTicketId) ? selectedTicketId : null) ||
     activeList[0]?.id ||
     null;
 
-  const activeTicket = tickets.find((t) => t.id === effectiveTicketId);
+  const activeTicket = currentTickets.find((t) => t.id === effectiveTicketId);
 
-  // Create Ticket Modal State & Form Validation
+  // ==========================================
+  // CREATE TICKET MODAL STATE (CANDIDATE)
+  // ==========================================
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState<TicketCategory>('technical');
@@ -137,21 +305,14 @@ export const SupportTickets: React.FC = () => {
   // Mentor Response State
   const [mentorResponseText, setMentorResponseText] = useState('');
   const [replyText, setReplyText] = useState('');
-  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Auto scroll in conversation thread
+  // Cuộn tin nhắn mượt mà
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [activeTicket?.messages?.length, activeTicket?.replies?.length]);
 
-  const showAlert = (message: string, type: 'success' | 'error' = 'success') => {
-    setAlert({ type, message });
-    setTimeout(() => setAlert(null), 4000);
-  };
-
-  // Form Validation per Step 2:
-  // Title >= 5 chars, Description/Content >= 10 chars, Category in enum, Priority in enum
+  // Validate form tạo ticket: Tiêu đề 5–128 ký tự, Nội dung >= 10 ký tự
   const validateCreateForm = (): boolean => {
     const errors: Record<string, string> = {};
     if (!newTitle.trim()) {
@@ -177,16 +338,34 @@ export const SupportTickets: React.FC = () => {
     if (!validateCreateForm()) return;
 
     try {
-      await ticketService.createTicket({
+      const res = await ticketService.createTicket({
         title: newTitle.trim(),
         content: newContent.trim(),
         category: newCategory,
         priority: newPriority,
       });
-    } catch {
-      // Local fallback
+
+      const serverTicket = res?.data || res;
+      storeCreateTicket(newTitle.trim(), newContent.trim(), newPriority, newCategory);
+      await fetchTicketsFromApi();
+
+      if (serverTicket?.id) {
+        setSelectedTicketId(String(serverTicket.id));
+      }
+      setIsCreateOpen(false);
+      setNewTitle('');
+      setNewContent('');
+      setNewCategory('technical');
+      setNewPriority('normal');
+      setFormErrors({});
+      showAlert(`Tạo ticket hỗ trợ thành công! Cố vấn sẽ sớm phản hồi.`);
+      return;
+    } catch (err: unknown) {
+      const handled = handleApiError(err, 'Tạo ticket thất bại');
+      if (handled) return;
     }
 
+    // Local mock fallback
     const res = storeCreateTicket(newTitle.trim(), newContent.trim(), newPriority, newCategory);
     if (res.success && res.ticket) {
       setSelectedTicketId(res.ticket.id);
@@ -200,25 +379,35 @@ export const SupportTickets: React.FC = () => {
     }
   };
 
-  // Mentor Claim Ticket (Step 3)
+  // Mentor Claim Ticket (action: 'accept')
   const handleClaimTicket = async () => {
     if (!activeTicket) return;
     try {
       await ticketService.updateTicket(activeTicket.id, { action: 'accept' });
-    } catch {
-      // Local fallback
+      storeClaimTicket(activeTicket.id);
+      await fetchTicketsFromApi();
+      showAlert(`Bạn đã tiếp nhận xử lý Ticket #${activeTicket.ticketCode || activeTicket.id}!`);
+      return;
+    } catch (err: unknown) {
+      const handled = handleApiError(err, 'Không thể tiếp nhận ticket');
+      if (handled) return;
     }
+
+    // Local mock fallback
     storeClaimTicket(activeTicket.id);
     showAlert(`Bạn đã tiếp nhận xử lý Ticket #${activeTicket.ticketCode || activeTicket.id}!`);
   };
 
-  // Mentor Resolve Ticket with Response Validation (Step 3: 422 MISSING_TICKET_RESPONSE)
+  // Mentor Resolve Ticket (action: 'resolve', validate 422 MISSING_TICKET_RESPONSE)
   const handleResolveTicket = async () => {
     if (!activeTicket) return;
     const finalResponse = mentorResponseText.trim();
 
     if (!finalResponse) {
-      showAlert('Lỗi [422 MISSING_TICKET_RESPONSE]: Vui lòng nhập nội dung câu trả lời hướng dẫn trước khi đánh dấu Đã giải quyết!', 'error');
+      showAlert(
+        'Lỗi [422 MISSING_TICKET_RESPONSE]: Vui lòng nhập nội dung câu trả lời hướng dẫn trước khi đánh dấu Đã giải quyết!',
+        'error',
+      );
       return;
     }
 
@@ -227,22 +416,130 @@ export const SupportTickets: React.FC = () => {
         action: 'resolve',
         response: finalResponse,
       });
-    } catch {
-      // Local fallback
+      storeResolveTicket(activeTicket.id, finalResponse);
+      setMentorResponseText('');
+      await fetchTicketsFromApi();
+      showAlert(`Đã gửi phản hồi và chuyển trạng thái Ticket #${activeTicket.ticketCode || activeTicket.id} sang "Đã giải quyết"!`);
+      return;
+    } catch (err: unknown) {
+      const handled = handleApiError(err, 'Không thể giải quyết ticket');
+      if (handled) return;
     }
 
+    // Local mock fallback
     storeResolveTicket(activeTicket.id, finalResponse);
     setMentorResponseText('');
     showAlert(`Đã gửi phản hồi và chuyển trạng thái Ticket #${activeTicket.ticketCode || activeTicket.id} sang "Đã giải quyết"!`);
   };
 
-  // Chat reply message
-  const handleSendChatReply = (e: React.FormEvent) => {
+  // Chat Reply (SRS HF-37 Mục 3.4: action: 'update_response')
+  const handleSendChatReply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!replyText.trim() || !activeTicket) return;
-    storeReplyTicket(activeTicket.id, replyText.trim());
+    const trimmed = replyText.trim();
+
+    try {
+      await ticketService.updateTicket(activeTicket.id, {
+        action: 'update_response',
+        response: trimmed,
+      });
+      storeReplyTicket(activeTicket.id, trimmed);
+      setReplyText('');
+      await fetchTicketsFromApi();
+      showAlert('Đã gửi phản hồi trao đổi trong ticket thành công!');
+      return;
+    } catch (err: unknown) {
+      const handled = handleApiError(err, 'Không thể gửi tin nhắn trao đổi');
+      if (handled) return;
+    }
+
+    // Local mock fallback
+    storeReplyTicket(activeTicket.id, trimmed);
     setReplyText('');
+    showAlert('Đã gửi phản hồi trao đổi trong ticket thành công!');
   };
+
+  // Candidate Confirm & Close Ticket (action: 'close')
+  const handleCloseTicket = async (ticketId: string) => {
+    try {
+      await ticketService.updateTicket(ticketId, { action: 'close' });
+      storeCloseTicket(ticketId);
+      await fetchTicketsFromApi();
+      showAlert('Đã xác nhận và đóng ticket thành công! Cảm ơn bạn.');
+      return;
+    } catch (err: unknown) {
+      const handled = handleApiError(err, 'Không thể đóng ticket');
+      if (handled) return;
+    }
+
+    // Local mock fallback
+    storeCloseTicket(ticketId);
+    showAlert('Đã xác nhận và đóng ticket thành công! Cảm ơn bạn.');
+  };
+
+  // Candidate Reopen Ticket within 48h (action: 'reopen')
+  const handleReopenTicket = async (ticketId: string) => {
+    if (!activeTicket) return;
+
+    // Validate 48h window nếu là Thí sinh theo SRS HF-37 Mục 3.7 & 5.7
+    if (isCandidate) {
+      const resolvedTimestamp = new Date(
+        activeTicket.resolvedAt || activeTicket.updatedAt || activeTicket.createdAt,
+      ).getTime();
+      const hoursPassed = (Date.now() - resolvedTimestamp) / (1000 * 60 * 60);
+
+      if (hoursPassed > 48) {
+        showAlert(
+          'Lỗi [409 REOPEN_WINDOW_EXPIRED]: Đã quá thời hạn 48 giờ để mở lại ticket. Vui lòng tạo ticket mới!',
+          'error',
+        );
+        return;
+      }
+    }
+
+    try {
+      await ticketService.updateTicket(ticketId, { action: 'reopen' });
+      storeReopenTicket(ticketId);
+      await fetchTicketsFromApi();
+      showAlert('Đã mở lại ticket thành công! Trạng thái chuyển về "Đang xử lý".');
+      return;
+    } catch (err: unknown) {
+      const handled = handleApiError(err, 'Không thể mở lại ticket');
+      if (handled) return;
+    }
+
+    // Local mock fallback
+    storeReopenTicket(ticketId);
+    showAlert('Đã mở lại ticket thành công! Trạng thái chuyển về "Đang xử lý".');
+  };
+
+  // Mentor Escalate to Admin Queue (action: 'escalate' per SRS HF-37 Mục 3.8)
+  const handleEscalateTicket = async () => {
+    if (!activeTicket) return;
+    try {
+      await ticketService.updateTicket(activeTicket.id, {
+        action: 'escalate',
+        note: 'Vấn đề vượt thẩm quyền xử lý chuyên môn của Cố vấn, chuyển giao lên Ban Tổ Chức (Admin).',
+      });
+      showAlert(`Đã chuyển giao Ticket #${activeTicket.ticketCode || activeTicket.id} lên hàng chờ Ban Tổ Chức (Admin)!`);
+      await fetchTicketsFromApi();
+      return;
+    } catch (err: unknown) {
+      const handled = handleApiError(err, 'Không thể chuyển giao ticket');
+      if (handled) return;
+    }
+
+    showAlert(`Đã chuyển giao Ticket #${activeTicket.ticketCode || activeTicket.id} lên hàng chờ Ban Tổ Chức (Admin)!`);
+  };
+
+  // Quyền thao tác Resolve và Claim của Mentor
+  const isAssignedToCurrentMentor = Boolean(activeTicket?.assignedMentorId === currentUser.id || isAdmin);
+  const isAssignedToOtherMentor = Boolean(
+    activeTicket?.assignedMentorId &&
+    activeTicket.assignedMentorId !== currentUser.id &&
+    !isAdmin,
+  );
+  const isUnassignedOpen = Boolean(activeTicket?.status === 'open' && !activeTicket?.assignedMentorId);
 
   return (
     <div className="space-y-6 font-['Roboto']">
@@ -256,10 +553,16 @@ export const SupportTickets: React.FC = () => {
           }`}
         >
           <div className="flex items-center gap-2">
-            {alert.type === 'error' ? <AlertTriangle size={16} className="text-rose-400 shrink-0" /> : <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />}
+            {alert.type === 'error' ? (
+              <AlertTriangle size={16} className="text-rose-400 shrink-0" />
+            ) : (
+              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+            )}
             <span className="font-medium">{alert.message}</span>
           </div>
-          <button onClick={() => setAlert(null)} className="text-slate-400 hover:text-white text-xs">✕</button>
+          <button onClick={() => setAlert(null)} className="text-slate-400 hover:text-white text-xs">
+            ✕
+          </button>
         </div>
       )}
 
@@ -285,25 +588,41 @@ export const SupportTickets: React.FC = () => {
           </div>
           <p className="text-xs sm:text-sm text-slate-400">
             {isCandidate
-              ? 'Gửi yêu cầu hỗ trợ kỹ thuật, thắc mắc đề tài hoặc báo cáo sự cố nộp bài tới Hội đồng Cố vấn chuyên môn.'
-              : 'Quy trình 3 bước chuẩn hóa: Tiếp nhận yêu cầu (Open) → Hướng dẫn giải quyết (In Progress) → Hoàn tất (Resolved).'}
+              ? 'Gửi yêu cầu hỗ trợ kỹ thuật, thắc mắc đề tài hoặc sự cố nộp bài tới Hội đồng Cố vấn chuyên môn.'
+              : 'Quy trình chuẩn hóa: Tiếp nhận yêu cầu (Open) → Hướng dẫn giải quyết (In Progress) → Hoàn tất (Resolved).'}
           </p>
         </div>
 
-        {/* Action Button: Candidate Create Ticket */}
-        {isCandidate && (
+        {/* Action Button: Candidate Create Ticket & Refresh */}
+        <div className="flex items-center gap-2">
           <Button
-            variant="primary"
-            onClick={() => setIsCreateOpen(true)}
-            className="gap-2 shadow-lg shadow-[#6366F1]/25 px-4 py-2"
+            variant="outline"
+            size="sm"
+            onClick={() => fetchTicketsFromApi()}
+            disabled={isFetchingApi}
+            className="gap-1.5 text-xs text-slate-300 border-[#334155] hover:bg-[#1E293B]"
+            title="Đồng bộ danh sách từ máy chủ"
           >
-            <Plus size={16} />
-            <span>Gửi Yêu Cầu Hỗ Trợ Mới</span>
+            <RefreshCw size={13} className={isFetchingApi ? 'animate-spin' : ''} />
+            <span className="hidden sm:inline">Làm mới</span>
           </Button>
-        )}
+
+          {isCandidate && (
+            <Button
+              variant="primary"
+              onClick={() => setIsCreateOpen(true)}
+              className="gap-2 shadow-lg shadow-[#6366F1]/25 px-4 py-2"
+            >
+              <Plus size={16} />
+              <span>Gửi Yêu Cầu Hỗ Trợ Mới</span>
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* CANDIDATE VIEW */}
+      {/* ========================================================== */}
+      {/* CANDIDATE VIEW                                             */}
+      {/* ========================================================== */}
       {isCandidate && (
         <div className="space-y-4">
           {/* Status Filter Tabs */}
@@ -318,281 +637,357 @@ export const SupportTickets: React.FC = () => {
                 { key: 'open', label: 'Chờ tiếp nhận' },
                 { key: 'in_progress', label: 'Đang xử lý' },
                 { key: 'resolved', label: 'Đã giải quyết' },
+                { key: 'closed', label: 'Đã đóng' },
               ] as const
-            ).map((f) => (
+            ).map((tab) => (
               <button
-                key={f.key}
-                onClick={() => setCandidateFilter(f.key)}
+                key={tab.key}
+                onClick={() => setCandidateFilter(tab.key)}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
-                  candidateFilter === f.key
+                  candidateFilter === tab.key
                     ? 'bg-[#6366F1] text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-slate-400 hover:text-white'
                 }`}
               >
-                {f.label}
+                {tab.label}
               </button>
             ))}
           </div>
 
-          {/* Candidate Empty State */}
-          {candidateTickets.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#334155] bg-[#111827]/60 p-12 text-center space-y-4">
-              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#6366F1]/15 text-[#818CF8]">
-                <Inbox size={32} />
-              </div>
-              <div className="space-y-1 max-w-sm mx-auto">
-                <h3 className="text-base font-semibold text-white">Chưa có yêu cầu hỗ trợ nào</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Đội thi của bạn chưa gửi câu hỏi hay báo cáo sự cố nào. Bấm nút bên dưới để nhận trợ giúp từ Mentor!
-                </p>
-              </div>
-              <Button variant="primary" onClick={() => setIsCreateOpen(true)} className="gap-2">
-                <Plus size={15} />
-                <span>Tạo Yêu Cầu Đầu Tiên</span>
-              </Button>
-            </div>
-          ) : (
-            /* Main 2-Column Split View for Candidate */
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[580px]">
-              {/* Left Column: Tickets List (5/12) */}
-              <div className="lg:col-span-5 rounded-2xl border border-[#334155] bg-[#111827] p-4 flex flex-col space-y-3">
-                <div className="flex items-center justify-between pb-2 border-b border-[#1E293B]">
-                  <span className="text-xs font-semibold text-slate-300">
-                    Danh Sách Yêu Cầu ({filteredCandidateTickets.length})
-                  </span>
-                  <span className="text-[11px] text-slate-500">Đội thi: {myTeam?.name}</span>
-                </div>
-
-                <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[520px] pr-1">
-                  {filteredCandidateTickets.length === 0 ? (
-                    <div className="text-center py-8 text-xs text-slate-500">
-                      Không có ticket nào trong mục này.
-                    </div>
-                  ) : (
-                    filteredCandidateTickets.map((t) => {
-                      const isSelected = t.id === activeTicket?.id;
-                      const cat = CATEGORY_LABELS[t.category || 'technical'] || CATEGORY_LABELS.technical;
-                      const prio = PRIORITY_LABELS[t.priority] || PRIORITY_LABELS.normal;
-                      const stat = STATUS_LABELS[t.status] || STATUS_LABELS.open;
-
-                      return (
-                        <div
-                          key={t.id}
-                          onClick={() => setSelectedTicketId(t.id)}
-                          className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
-                            isSelected
-                              ? 'bg-[#1E293B] border-[#6366F1] shadow-md shadow-[#6366F1]/10'
-                              : 'bg-[#0F172A] border-[#1E293B] hover:border-[#334155]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-1.5">
-                            <span className="font-mono text-[11px] text-[#818CF8] font-bold">
-                              {t.ticketCode || t.id}
-                            </span>
-                            <Badge variant={stat.variant} size="sm">
-                              {stat.label}
-                            </Badge>
-                          </div>
-
-                          <h4 className="text-xs font-semibold text-white line-clamp-1 mb-2">
-                            {t.title}
-                          </h4>
-
-                          <div className="flex items-center justify-between text-[11px] text-slate-400">
-                            <div className="flex items-center gap-1.5">
-                              <Badge variant={cat.variant} size="sm">
-                                {cat.label}
-                              </Badge>
-                              <Badge variant={prio.variant} size="sm">
-                                {prio.label}
-                              </Badge>
-                            </div>
-                            <span className="text-[10px] text-slate-500">
-                              {new Date(t.createdAt).toLocaleDateString('vi-VN')}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
+          {/* Main 2-Column Split View for Candidate */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[560px]">
+            {/* Left Column: Ticket List (5/12) */}
+            <div className="lg:col-span-5 rounded-2xl border border-[#334155] bg-[#111827] p-4 flex flex-col space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-[#1E293B]">
+                <span className="text-xs font-semibold text-slate-300">
+                  Danh sách yêu cầu ({filteredCandidateTickets.length})
+                </span>
+                <span className="text-[11px] text-slate-500">Đội: {myTeam?.name}</span>
               </div>
 
-              {/* Right Column: Ticket Detail & Official Response (7/12) */}
-              <div className="lg:col-span-7 rounded-2xl border border-[#334155] bg-[#111827] flex flex-col overflow-hidden">
-                {activeTicket ? (
-                  <>
-                    {/* Detail Header */}
-                    <div className="p-4 border-b border-[#334155] bg-[#0F172A] space-y-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs font-bold text-[#818CF8]">
-                            {activeTicket.ticketCode || activeTicket.id}
+              <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[500px] pr-1">
+                {filteredCandidateTickets.length === 0 ? (
+                  <div className="text-center py-12 text-xs text-slate-500">
+                    <Inbox size={32} className="mx-auto text-slate-600 mb-2 opacity-50" />
+                    Chưa có ticket nào trong danh mục này.
+                  </div>
+                ) : (
+                  filteredCandidateTickets.map((t) => {
+                    const isSelected = t.id === activeTicket?.id;
+                    const cat = CATEGORY_LABELS[t.category || 'technical'] || CATEGORY_LABELS.technical;
+                    const prio = PRIORITY_LABELS[t.priority] || PRIORITY_LABELS.normal;
+                    const stat = STATUS_LABELS[t.status] || STATUS_LABELS.open;
+
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={() => setSelectedTicketId(t.id)}
+                        className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
+                          isSelected
+                            ? 'bg-[#1E293B] border-[#6366F1] shadow-md shadow-[#6366F1]/10'
+                            : 'bg-[#0B1120] border-[#1E293B] hover:border-[#334155]'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-mono text-[11px] font-bold text-[#818CF8]">
+                            {t.ticketCode || t.id}
                           </span>
-                          <Badge variant={STATUS_LABELS[activeTicket.status]?.variant || 'neutral'} size="sm">
-                            {STATUS_LABELS[activeTicket.status]?.label || activeTicket.status}
+                          <Badge variant={stat.variant} size="sm">
+                            {stat.label}
                           </Badge>
                         </div>
-                        <span className="text-xs text-slate-400">
-                          {new Date(activeTicket.createdAt).toLocaleString('vi-VN')}
-                        </span>
-                      </div>
 
-                      <h3 className="text-base font-semibold text-white">
-                        {activeTicket.title}
-                      </h3>
+                        <h4 className="text-xs font-semibold text-white line-clamp-1 mb-1.5">
+                          {t.title}
+                        </h4>
 
-                      <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <Badge variant={CATEGORY_LABELS[activeTicket.category || 'technical']?.variant || 'neutral'}>
-                          {CATEGORY_LABELS[activeTicket.category || 'technical']?.label || 'Chung'}
-                        </Badge>
-                        <Badge variant={PRIORITY_LABELS[activeTicket.priority]?.variant || 'neutral'}>
-                          Mức độ: {PRIORITY_LABELS[activeTicket.priority]?.label || activeTicket.priority}
-                        </Badge>
-                        {activeTicket.assignedMentorName && (
-                          <span className="text-xs text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                            <UserCheck size={12} />
-                            <span>Phụ trách: {activeTicket.assignedMentorName}</span>
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant={cat.variant} size="sm">
+                              {cat.label}
+                            </Badge>
+                            <Badge variant={prio.variant} size="sm">
+                              {prio.label}
+                            </Badge>
+                          </div>
+                          <span className="text-[10px] text-slate-500">
+                            {new Date(t.createdAt).toLocaleTimeString('vi-VN')}
                           </span>
-                        )}
+                        </div>
                       </div>
-                    </div>
-
-                    {/* Detail Content & Official Mentor Response */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#080D18]">
-                      {/* Issue Description */}
-                      <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
-                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-                          Nội dung yêu cầu từ Thí sinh:
-                        </span>
-                        <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
-                          {activeTicket.description || activeTicket.content}
-                        </p>
-                      </div>
-
-                      {/* Official Mentor Response (Per Step 2 Requirement) */}
-                      {activeTicket.response ? (
-                        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                              <CheckCircle2 size={16} />
-                              <span>Phản Hồi và Hướng Dẫn Chính Thức Từ Cố Vấn:</span>
-                            </div>
-                            <Badge variant="success" size="sm">ĐÃ GIẢI QUYẾT</Badge>
-                          </div>
-                          <p className="text-xs text-emerald-100 leading-relaxed whitespace-pre-wrap bg-[#0B1120]/60 p-3 rounded-lg border border-emerald-500/20">
-                            {activeTicket.response}
-                          </p>
-                          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                            <span>Người phản hồi: <strong className="text-white">{activeTicket.assignedMentorName || 'Cố vấn chuyên môn'}</strong></span>
-                            <span>{new Date(activeTicket.updatedAt || activeTicket.createdAt).toLocaleTimeString('vi-VN')}</span>
-                          </div>
-                        </div>
-                      ) : activeTicket.status === 'in_progress' ? (
-                        <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs flex items-center gap-2.5">
-                          <Clock size={16} className="text-indigo-400 animate-spin shrink-0" />
-                          <span>Cố vấn <strong className="text-white">{activeTicket.assignedMentorName || 'chuyên môn'}</strong> đang xử lý yêu cầu của bạn. Phản hồi sẽ sớm hiển thị tại đây.</span>
-                        </div>
-                      ) : (
-                        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-                          <Clock size={16} className="text-amber-400 shrink-0" />
-                          <span>Yêu cầu đang nằm trong hàng đợi tiếp nhận của Hội đồng Cố vấn.</span>
-                        </div>
-                      )}
-
-                      {/* Additional Messages / Chat Thread */}
-                      {activeTicket.messages && activeTicket.messages.length > 1 && (
-                        <div className="space-y-2 pt-2 border-t border-[#1E293B]">
-                          <span className="text-xs font-semibold text-slate-400">Lịch sử trao đổi:</span>
-                          {activeTicket.messages.map((m) => (
-                            <div
-                              key={m.id}
-                              className={`p-3 rounded-xl text-xs ${
-                                m.senderRole === 'mentor'
-                                  ? 'bg-[#1E293B] border border-[#334155] text-slate-200'
-                                  : 'bg-[#0F172A] border border-[#1E293B] text-slate-300'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                                <span className="font-semibold text-white">{m.senderName} ({m.senderRole === 'mentor' ? 'Cố vấn' : 'Thí sinh'})</span>
-                                <span>{new Date(m.sentAt).toLocaleTimeString('vi-VN')}</span>
-                              </div>
-                              <p className="leading-relaxed">{m.content}</p>
-                            </div>
-                          ))}
-                          <div ref={messagesEndRef} />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Chat Input for in_progress tickets */}
-                    {activeTicket.status !== 'resolved' && activeTicket.status !== 'closed' && (
-                      <form onSubmit={handleSendChatReply} className="p-3 border-t border-[#334155] bg-[#0F172A] flex gap-2">
-                        <Input
-                          value={replyText}
-                          onChange={(e) => setReplyText(e.target.value)}
-                          placeholder="Nhập tin nhắn trao đổi thêm với Cố vấn..."
-                          className="text-xs"
-                        />
-                        <Button type="submit" variant="primary" disabled={!replyText.trim()} className="gap-1.5 px-4 shrink-0">
-                          <Send size={14} />
-                          <span>Gửi</span>
-                        </Button>
-                      </form>
-                    )}
-                  </>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
-                    <MessageSquare size={36} className="mb-2 opacity-30" />
-                    <p className="text-xs">Chọn một yêu cầu bên trái để xem nội dung và phản hồi từ Cố vấn.</p>
-                  </div>
+                    );
+                  })
                 )}
               </div>
             </div>
-          )}
+
+            {/* Right Column: Ticket Detail & Official Response (7/12) */}
+            <div className="lg:col-span-7 rounded-2xl border border-[#334155] bg-[#111827] flex flex-col overflow-hidden">
+              {activeTicket ? (
+                <>
+                  {/* Detail Header */}
+                  <div className="p-4 border-b border-[#334155] bg-[#0F172A] space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-[#818CF8]">
+                          {activeTicket.ticketCode || activeTicket.id}
+                        </span>
+                        <Badge variant={STATUS_LABELS[activeTicket.status]?.variant || 'neutral'} size="sm">
+                          {STATUS_LABELS[activeTicket.status]?.label || activeTicket.status}
+                        </Badge>
+                      </div>
+                      <span className="text-xs text-slate-400">
+                        {new Date(activeTicket.createdAt).toLocaleString('vi-VN')}
+                      </span>
+                    </div>
+
+                    <h3 className="text-base font-semibold text-white">
+                      {activeTicket.title}
+                    </h3>
+
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      <Badge variant={CATEGORY_LABELS[activeTicket.category || 'technical']?.variant || 'neutral'}>
+                        {CATEGORY_LABELS[activeTicket.category || 'technical']?.label || 'Chung'}
+                      </Badge>
+                      <Badge variant={PRIORITY_LABELS[activeTicket.priority]?.variant || 'neutral'}>
+                        Mức độ: {PRIORITY_LABELS[activeTicket.priority]?.label || activeTicket.priority}
+                      </Badge>
+                      {activeTicket.assignedMentorName && (
+                        <span className="text-xs text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          <UserCheck size={12} />
+                          <span>Phụ trách: {activeTicket.assignedMentorName}</span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Detail Content & Official Mentor Response */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#080D18]">
+                    {/* Issue Description */}
+                    <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
+                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                        Nội dung yêu cầu từ Thí sinh:
+                      </span>
+                      <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
+                        {activeTicket.description || activeTicket.content}
+                      </p>
+                    </div>
+
+                    {/* Official Mentor Response (Per Step 2 Requirement) */}
+                    {activeTicket.response ? (
+                      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                            <CheckCircle2 size={16} />
+                            <span>Phản Hồi và Hướng Dẫn Chính Thức Từ Cố Vấn:</span>
+                          </div>
+                          <Badge variant="success" size="sm">ĐÃ GIẢI QUYẾT</Badge>
+                        </div>
+                        <p className="text-xs text-emerald-100 leading-relaxed whitespace-pre-wrap bg-[#0B1120]/60 p-3 rounded-lg border border-emerald-500/20">
+                          {activeTicket.response}
+                        </p>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                          <span>Người phản hồi: <strong className="text-white">{activeTicket.assignedMentorName || 'Cố vấn chuyên môn'}</strong></span>
+                          <span>{new Date(activeTicket.updatedAt || activeTicket.createdAt).toLocaleTimeString('vi-VN')}</span>
+                        </div>
+                      </div>
+                    ) : activeTicket.status === 'in_progress' ? (
+                      <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs flex items-center gap-2.5">
+                        <Clock size={16} className="text-indigo-400 animate-spin shrink-0" />
+                        <span>Cố vấn <strong className="text-white">{activeTicket.assignedMentorName || 'chuyên môn'}</strong> đang xử lý yêu cầu của bạn. Phản hồi sẽ sớm hiển thị tại đây.</span>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+                        <Clock size={16} className="text-amber-400 shrink-0" />
+                        <span>Yêu cầu đang nằm trong hàng đợi tiếp nhận của Hội đồng Cố vấn.</span>
+                      </div>
+                    )}
+
+                    {/* Candidate Action Buttons: Close & Reopen (SRS HF-37 Mục 3.6 & 3.7) */}
+                    {activeTicket.status === 'resolved' && (
+                      <div className="p-4 rounded-xl bg-[#0F172A] border border-[#334155] space-y-2.5">
+                        <div className="text-xs text-slate-300">
+                          Vấn đề đã được hướng dẫn xử lý. Bạn có thể xác nhận đóng ticket hoặc mở lại trong vòng 48 giờ nếu cần hỗ trợ thêm:
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleCloseTicket(activeTicket.id)}
+                            className="gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 border-none shadow-md shadow-emerald-600/20"
+                          >
+                            <CheckCircle2 size={13} />
+                            <span>Xác Nhận & Đóng Ticket</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleReopenTicket(activeTicket.id)}
+                            className="gap-1.5 text-xs text-amber-300 border-amber-500/40 hover:bg-amber-500/10"
+                            title="Chỉ áp dụng trong vòng 48 giờ kể từ khi giải quyết"
+                          >
+                            <RotateCcw size={13} />
+                            <span>Mở Lại Ticket (Trong 48h)</span>
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {activeTicket.status === 'closed' && (
+                      <div className="p-3 rounded-xl bg-[#0F172A] border border-[#1E293B] text-xs text-slate-400 flex items-center justify-between">
+                        <span>Ticket này đã được đóng hoàn tất.</span>
+                        {isAdmin && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => handleReopenTicket(activeTicket.id)}
+                            className="gap-1 text-xs"
+                          >
+                            <RotateCcw size={12} />
+                            <span>Admin Mở lại</span>
+                          </Button>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Additional Messages / Chat Thread */}
+                    {activeTicket.messages && activeTicket.messages.length > 1 && (
+                      <div className="space-y-2 pt-2 border-t border-[#1E293B]">
+                        <span className="text-xs font-semibold text-slate-400">Lịch sử trao đổi:</span>
+                        {activeTicket.messages.map((m) => (
+                          <div
+                            key={m.id}
+                            className={`p-3 rounded-xl text-xs ${
+                              m.senderRole === 'mentor'
+                                ? 'bg-[#1E293B] border border-[#334155] text-slate-200'
+                                : 'bg-[#0F172A] border border-[#1E293B] text-slate-300'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                              <span className="font-semibold text-white">
+                                {m.senderName} ({m.senderRole === 'mentor' ? 'Cố vấn' : 'Thí sinh'})
+                              </span>
+                              <span>{new Date(m.sentAt).toLocaleTimeString('vi-VN')}</span>
+                            </div>
+                            <p className="leading-relaxed">{m.content}</p>
+                          </div>
+                        ))}
+                        <div ref={messagesEndRef} />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Candidate Chat Reply Footer */}
+                  {activeTicket.status !== 'resolved' && activeTicket.status !== 'closed' && (
+                    <form onSubmit={handleSendChatReply} className="p-3 bg-[#0F172A] border-t border-[#334155] flex gap-2">
+                      <input
+                        type="text"
+                        value={replyText}
+                        onChange={(e) => setReplyText(e.target.value)}
+                        placeholder="Gửi tin nhắn phản hồi thêm cho Cố vấn..."
+                        className="flex-1 px-3 py-2 text-xs rounded-xl bg-[#080D18] border border-[#334155] text-white placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]"
+                      />
+                      <Button
+                        type="submit"
+                        variant="primary"
+                        disabled={!replyText.trim()}
+                        className="gap-1 px-4 text-xs"
+                      >
+                        <Send size={13} />
+                        <span>Gửi</span>
+                      </Button>
+                    </form>
+                  )}
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 text-xs">
+                  <Inbox size={48} className="text-slate-600 mb-3 opacity-40" />
+                  <p className="font-medium text-slate-400">Chưa chọn ticket nào để xem chi tiết</p>
+                  <p className="text-[11px] text-slate-600 mt-1 max-w-sm">
+                    Chọn một yêu cầu hỗ trợ từ danh sách bên trái hoặc bấm &quot;Gửi Yêu Cầu Hỗ Trợ Mới&quot; để kết nối với Cố vấn.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* MENTOR & ADMIN VIEW */}
+      {/* ========================================================== */}
+      {/* MENTOR & ADMIN VIEW (SRS HF-37 Mục 4.2)                     */}
+      {/* ========================================================== */}
       {isMentorOrAdmin && (
         <div className="space-y-4">
-          {/* Quick Filters Toolbar (Step 3: Status & Priority Filters) */}
-          <div className="p-3 rounded-xl bg-[#111827] border border-[#334155] flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 text-xs">
-            {/* Status Filter */}
-            <div className="flex items-center gap-1 overflow-x-auto">
-              <span className="text-slate-400 font-medium px-2 flex items-center gap-1 shrink-0">
-                <Filter size={12} />
-                <span>Trạng thái:</span>
-              </span>
-              {(
-                [
-                  { key: 'all', label: 'Tất cả' },
-                  { key: 'open', label: 'Chờ nhận (Open)' },
-                  { key: 'in_progress', label: 'Đang xử lý' },
-                  { key: 'resolved', label: 'Đã giải quyết' },
-                ] as const
-              ).map((f) => (
+          {/* Top Mentor Scope Tabs */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-[#111827] border border-[#334155]">
+            <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
+              <button
+                onClick={() => setMentorScopeTab('unassigned')}
+                className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
+                  mentorScopeTab === 'unassigned'
+                    ? 'bg-[#A855F7] text-white shadow-md shadow-[#A855F7]/25'
+                    : 'text-slate-400 hover:text-white bg-[#1E293B]/70'
+                }`}
+              >
+                <span>Chờ tiếp nhận (Open)</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/30 font-mono">
+                  {unassignedCount}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setMentorScopeTab('my_assigned')}
+                className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
+                  mentorScopeTab === 'my_assigned'
+                    ? 'bg-[#A855F7] text-white shadow-md shadow-[#A855F7]/25'
+                    : 'text-slate-400 hover:text-white bg-[#1E293B]/70'
+                }`}
+              >
+                <span>Tôi đang phụ trách</span>
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/30 font-mono">
+                  {myAssignedCount}
+                </span>
+              </button>
+
+              {isAdmin && (
                 <button
-                  key={f.key}
-                  onClick={() => setMentorStatusFilter(f.key)}
-                  className={`px-3 py-1.5 rounded-lg font-medium whitespace-nowrap transition-all ${
-                    mentorStatusFilter === f.key
-                      ? 'bg-[#A855F7] text-white shadow-sm'
-                      : 'text-slate-400 hover:text-white bg-[#1E293B]/60'
+                  onClick={() => setMentorScopeTab('all')}
+                  className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
+                    mentorScopeTab === 'all'
+                      ? 'bg-[#A855F7] text-white shadow-md shadow-[#A855F7]/25'
+                      : 'text-slate-400 hover:text-white bg-[#1E293B]/70'
                   }`}
                 >
-                  {f.label}
+                  <span>Toàn bộ hệ thống</span>
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-black/30 font-mono">
+                    {allSystemCount}
+                  </span>
                 </button>
-              ))}
+              )}
             </div>
 
-            {/* Priority Filter & Search */}
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Quick Filters: Status, Priority & Search */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1 bg-[#1E293B] px-2.5 py-1 rounded-lg border border-[#334155]">
+                <span className="text-slate-400 text-[11px]">Trạng thái:</span>
+                <select
+                  value={mentorStatusFilter}
+                  onChange={(e) => setMentorStatusFilter(e.target.value as typeof mentorStatusFilter)}
+                  className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="open">Chờ nhận</option>
+                  <option value="in_progress">Đang xử lý</option>
+                  <option value="resolved">Đã giải quyết</option>
+                  <option value="closed">Đã đóng</option>
+                </select>
+              </div>
+
               <div className="flex items-center gap-1 bg-[#1E293B] px-2.5 py-1 rounded-lg border border-[#334155]">
                 <span className="text-slate-400 text-[11px]">Ưu tiên:</span>
                 <select
                   value={mentorPriorityFilter}
-                  onChange={(e) => setMentorPriorityFilter(e.target.value as any)}
+                  onChange={(e) => setMentorPriorityFilter(e.target.value as typeof mentorPriorityFilter)}
                   className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
                 >
                   <option value="all">Tất cả mức độ</option>
@@ -610,7 +1005,7 @@ export const SupportTickets: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm kiếm ticket..."
-                  className="pl-8 pr-3 py-1.5 bg-[#1E293B] border border-[#334155] rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#A855F7] w-40 sm:w-48"
+                  className="pl-8 pr-3 py-1.5 bg-[#1E293B] border border-[#334155] rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#A855F7] w-36 sm:w-44"
                 />
               </div>
             </div>
@@ -625,13 +1020,14 @@ export const SupportTickets: React.FC = () => {
                   Hàng Đợi Yêu Cầu Hỗ Trợ ({filteredMentorTickets.length})
                 </span>
                 <span className="text-[11px] text-slate-500">
-                  Cập nhật thời gian thực
+                  {isMentor ? 'Dữ liệu phân quyền Mentor' : 'Quyền Quản trị viên'}
                 </span>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[520px] pr-1">
                 {filteredMentorTickets.length === 0 ? (
                   <div className="text-center py-12 text-xs text-slate-500">
+                    <Inbox size={32} className="mx-auto text-slate-600 mb-2 opacity-50" />
                     Không có ticket nào khớp với bộ lọc hiện tại.
                   </div>
                 ) : (
@@ -648,37 +1044,36 @@ export const SupportTickets: React.FC = () => {
                         className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                           isSelected
                             ? 'bg-[#1E293B] border-[#A855F7] shadow-md shadow-[#A855F7]/10'
-                            : 'bg-[#0F172A] border-[#1E293B] hover:border-[#334155]'
+                            : 'bg-[#0B1120] border-[#1E293B] hover:border-[#334155]'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-mono text-[11px] font-bold text-[#C084FC]">
+                            {t.ticketCode || t.id}
+                          </span>
                           <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-[11px] text-[#C084FC] font-bold">
-                              {t.ticketCode || t.id}
-                            </span>
-                            <span className="text-xs text-slate-400 font-medium truncate max-w-[120px]">
-                              • {t.teamName}
-                            </span>
-                          </div>
-                          <Badge variant={stat.variant} size="sm">
-                            {stat.label}
-                          </Badge>
-                        </div>
-
-                        <h4 className="text-xs font-semibold text-white line-clamp-1 mb-2">
-                          {t.title}
-                        </h4>
-
-                        <div className="flex items-center justify-between text-[11px] text-slate-400">
-                          <div className="flex items-center gap-1.5">
-                            <Badge variant={cat.variant} size="sm">
-                              {cat.label}
+                            <Badge variant={stat.variant} size="sm">
+                              {stat.label}
                             </Badge>
                             <Badge variant={prio.variant} size="sm">
                               {prio.label}
                             </Badge>
                           </div>
-                          <span className="text-[10px] text-slate-500">
+                        </div>
+
+                        <h4 className="text-xs font-semibold text-white line-clamp-1 mb-1">
+                          {t.title}
+                        </h4>
+
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="text-[#818CF8] font-medium truncate">{t.teamName}</span>
+                            <span>•</span>
+                            <Badge variant={cat.variant} size="sm">
+                              {cat.label}
+                            </Badge>
+                          </div>
+                          <span className="text-[10px] text-slate-500 shrink-0">
                             {new Date(t.createdAt).toLocaleTimeString('vi-VN')}
                           </span>
                         </div>
@@ -705,18 +1100,34 @@ export const SupportTickets: React.FC = () => {
                         </Badge>
                       </div>
 
-                      {/* Claim Button for Open Tickets */}
-                      {activeTicket.status === 'open' && (
-                        <Button
-                          variant="primary"
-                          size="sm"
-                          onClick={handleClaimTicket}
-                          className="gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 border-none shadow-md shadow-purple-500/20"
-                        >
-                          <UserCheck size={14} />
-                          <span>Nhận Xử Lý (Claim)</span>
-                        </Button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {/* Escalate button per SRS HF-37 Mục 3.8 */}
+                        {isAssignedToCurrentMentor && activeTicket.status === 'in_progress' && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleEscalateTicket}
+                            className="gap-1 text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
+                            title="Chuyển giao lên hàng chờ Ban Tổ Chức (Admin)"
+                          >
+                            <ArrowUpRight size={13} />
+                            <span>Chuyển Admin</span>
+                          </Button>
+                        )}
+
+                        {/* Claim Button for Open Tickets */}
+                        {isUnassignedOpen && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={handleClaimTicket}
+                            className="gap-1.5 bg-gradient-to-r from-purple-600 to-indigo-600 border-none shadow-md shadow-purple-500/20"
+                          >
+                            <UserCheck size={14} />
+                            <span>Nhận Xử Lý (Claim)</span>
+                          </Button>
+                        )}
+                      </div>
                     </div>
 
                     <h3 className="text-base font-semibold text-white">
@@ -730,7 +1141,7 @@ export const SupportTickets: React.FC = () => {
                       </span>
                       <span className="flex items-center gap-1 text-slate-300 bg-[#1E293B] px-2.5 py-1 rounded-lg border border-[#334155]">
                         <User size={12} className="text-[#818CF8]" />
-                        <span>Người gửi: <strong>{activeTicket.creatorName || activeTicket.senderName || 'Thí sinh'}</strong></span>
+                        <span>Người gửi: <strong>{activeTicket.creatorName || 'Thí sinh'}</strong></span>
                       </span>
                       <Badge variant={CATEGORY_LABELS[activeTicket.category || 'technical']?.variant || 'neutral'}>
                         {CATEGORY_LABELS[activeTicket.category || 'technical']?.label || 'Chung'}
@@ -738,12 +1149,18 @@ export const SupportTickets: React.FC = () => {
                       <Badge variant={PRIORITY_LABELS[activeTicket.priority]?.variant || 'neutral'}>
                         {PRIORITY_LABELS[activeTicket.priority]?.label || activeTicket.priority}
                       </Badge>
+                      {activeTicket.assignedMentorName && (
+                        <span className="text-xs text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          <UserCheck size={12} />
+                          <span>Mentor phụ trách: {activeTicket.assignedMentorName}</span>
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Body: Issue Description & Mentor Response Editor */}
                   <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#080D18]">
-                    {/* Original Problem Content */}
+                    {/* Problem Content */}
                     <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
                       <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                         Chi tiết vấn đề Thí sinh phản ánh:
@@ -753,8 +1170,8 @@ export const SupportTickets: React.FC = () => {
                       </p>
                     </div>
 
-                    {/* If Already Resolved: Show Official Response */}
-                    {activeTicket.status === 'resolved' && (
+                    {/* Official Response Banner if already resolved */}
+                    {activeTicket.response && (
                       <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
                         <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
                           <CheckCircle2 size={16} />
@@ -766,41 +1183,74 @@ export const SupportTickets: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Step 3: Mentor Resolution Form (Visible if open or in_progress) */}
+                    {/* Resolution Form: STRICT RBAC (SRS HF-37 Mục 4.2b) */}
                     {activeTicket.status !== 'resolved' && activeTicket.status !== 'closed' && (
-                      <div className="p-4 rounded-xl bg-[#111827] border border-[#334155] space-y-3">
-                        <div className="flex items-center justify-between">
-                          <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                            <MessageSquare size={14} className="text-[#A855F7]" />
-                            <span>Khung Hướng Dẫn Giải Quyết (Response):</span>
-                          </label>
-                          <span className="text-[11px] text-amber-400 font-medium">
-                            * Bắt buộc trước khi đánh dấu Đã giải quyết
-                          </span>
-                        </div>
+                      <>
+                        {/* Case 1: Ticket open unassigned */}
+                        {isUnassignedOpen && (
+                          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+                              <span>Ticket này đang ở trạng thái <strong>Chờ tiếp nhận</strong>. Bạn cần bấm &quot;Nhận Xử Lý (Claim)&quot; để phụ trách trước khi giải quyết.</span>
+                            </div>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={handleClaimTicket}
+                              className="shrink-0 text-xs bg-gradient-to-r from-purple-600 to-indigo-600 border-none"
+                            >
+                              Nhận Xử Lý Ngay
+                            </Button>
+                          </div>
+                        )}
 
-                        <textarea
-                          rows={4}
-                          value={mentorResponseText}
-                          onChange={(e) => setMentorResponseText(e.target.value)}
-                          placeholder="Nhập nội dung hướng dẫn chuyên môn, giải pháp kỹ thuật cụ thể hoặc hướng khắc phục sự cố cho đội thi..."
-                          className="w-full p-3 rounded-xl bg-[#0B1120] border border-[#334155] text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-[#A855F7] leading-relaxed"
-                        />
+                        {/* Case 2: Ticket assigned to another Mentor */}
+                        {isAssignedToOtherMentor && (
+                          <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-slate-300 flex items-center gap-2.5">
+                            <UserCheck size={16} className="text-[#818CF8] shrink-0" />
+                            <span>
+                              Ticket này hiện đang do <strong>{activeTicket.assignedMentorName}</strong> phụ trách. Chỉ Mentor được phân công hoặc Admin mới có quyền gửi phản hồi và giải quyết.
+                            </span>
+                          </div>
+                        )}
 
-                        <div className="flex items-center justify-between pt-1">
-                          <span className="text-[11px] text-slate-400">
-                            Thí sinh sẽ nhận được phản hồi này ngay lập tức trên trang /tickets.
-                          </span>
-                          <Button
-                            variant="primary"
-                            onClick={handleResolveTicket}
-                            className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 border-none shadow-lg shadow-emerald-500/25 px-5"
-                          >
-                            <CheckCircle size={15} />
-                            <span>Gửi Phản Hồi và Đánh Dấu Đã Giải Quyết</span>
-                          </Button>
-                        </div>
-                      </div>
+                        {/* Case 3: Assigned to current Mentor (or Admin) -> Show Response Editor */}
+                        {isAssignedToCurrentMentor && (
+                          <div className="p-4 rounded-xl bg-[#111827] border border-[#334155] space-y-3">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                                <MessageSquare size={14} className="text-[#A855F7]" />
+                                <span>Khung Hướng Dẫn Giải Quyết (Response):</span>
+                              </label>
+                              <span className="text-[11px] text-amber-400 font-medium">
+                                * Bắt buộc trước khi đánh dấu Đã giải quyết
+                              </span>
+                            </div>
+
+                            <textarea
+                              rows={4}
+                              value={mentorResponseText}
+                              onChange={(e) => setMentorResponseText(e.target.value)}
+                              placeholder="Nhập nội dung hướng dẫn chuyên môn, giải pháp kỹ thuật cụ thể hoặc hướng khắc phục sự cố cho đội thi..."
+                              className="w-full p-3 rounded-xl bg-[#0B1120] border border-[#334155] text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-[#A855F7] leading-relaxed"
+                            />
+
+                            <div className="flex items-center justify-between pt-1">
+                              <span className="text-[11px] text-slate-400">
+                                Thí sinh sẽ nhận được phản hồi này ngay lập tức trên trang /tickets.
+                              </span>
+                              <Button
+                                variant="primary"
+                                onClick={handleResolveTicket}
+                                className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 border-none shadow-lg shadow-emerald-500/25 px-5"
+                              >
+                                <CheckCircle size={15} />
+                                <span>Gửi Phản Hồi và Đánh Dấu Đã Giải Quyết</span>
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
 
                     {/* Ongoing Messages */}
@@ -817,7 +1267,9 @@ export const SupportTickets: React.FC = () => {
                             }`}
                           >
                             <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                              <span className="font-semibold text-white">{m.senderName} ({m.senderRole === 'mentor' ? 'Cố vấn' : 'Thí sinh'})</span>
+                              <span className="font-semibold text-white">
+                                {m.senderName} ({m.senderRole === 'mentor' ? 'Cố vấn' : 'Thí sinh'})
+                              </span>
                               <span>{new Date(m.sentAt).toLocaleTimeString('vi-VN')}</span>
                             </div>
                             <p className="leading-relaxed">{m.content}</p>
@@ -828,9 +1280,12 @@ export const SupportTickets: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500">
-                  <MessageSquare size={36} className="mb-2 opacity-30" />
-                  <p className="text-xs">Chọn một ticket từ danh sách bên trái để xem chi tiết và phản hồi hướng dẫn.</p>
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 text-xs">
+                  <Inbox size={48} className="text-slate-600 mb-3 opacity-40" />
+                  <p className="font-medium text-slate-400">Chưa chọn ticket nào để xử lý</p>
+                  <p className="text-[11px] text-slate-600 mt-1 max-w-sm">
+                    Chọn một yêu cầu từ danh sách bên trái để xem nội dung vướng mắc và tiếp nhận hướng dẫn đội thi.
+                  </p>
                 </div>
               )}
             </div>
@@ -838,35 +1293,28 @@ export const SupportTickets: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL: Thí sinh Gửi Yêu Cầu Hỗ Trợ Mới (Step 2) */}
+      {/* ========================================================== */}
+      {/* CANDIDATE CREATE TICKET MODAL                              */}
+      {/* ========================================================== */}
       <Modal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title="Gửi Yêu Cầu Hỗ Trợ Kỹ Thuật Mới"
-        maxWidth="lg"
+        title="Gửi Yêu Cầu Hỗ Trợ Kỹ Thuật (Helpdesk Ticket)"
       >
-        <form onSubmit={handleCreateSubmit} className="space-y-4 font-['Roboto']">
-          <p className="text-xs text-slate-400">
-            Điền đầy đủ thông tin vướng mắc của đội thi để Hội đồng Cố vấn tiếp nhận và hỗ trợ nhanh chóng nhất.
-          </p>
-
-          {/* Title Field (>= 5 chars) */}
+        <form onSubmit={handleCreateSubmit} className="space-y-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
               <span>Tiêu đề yêu cầu <strong className="text-rose-400">*</strong></span>
-              <span className="text-[10px] text-slate-500">Tối thiểu 5 ký tự</span>
+              <span className="text-[10px] text-slate-500">5 – 128 ký tự</span>
             </label>
-            <input
-              type="text"
+            <Input
               value={newTitle}
               onChange={(e) => {
                 setNewTitle(e.target.value);
                 if (formErrors.title) setFormErrors((prev) => ({ ...prev, title: '' }));
               }}
-              placeholder="VD: Không thể đẩy commit SHA lên hệ thống CI/CD"
-              className={`w-full px-3 py-2 text-xs rounded-xl bg-[#0F172A] border ${
-                formErrors.title ? 'border-rose-500' : 'border-[#334155]'
-              } text-white placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]`}
+              placeholder="Tóm tắt ngắn gọn vấn đề (Ví dụ: Lỗi runner CI/CD chặng 2...)"
+              className="text-xs"
             />
             {formErrors.title && (
               <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-0.5">
@@ -878,7 +1326,6 @@ export const SupportTickets: React.FC = () => {
 
           {/* Category & Priority Selectors */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Category Field */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-300">
                 Danh mục vấn đề <strong className="text-rose-400">*</strong>
@@ -896,7 +1343,6 @@ export const SupportTickets: React.FC = () => {
               </select>
             </div>
 
-            {/* Priority Field */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-300">
                 Mức độ ưu tiên <strong className="text-rose-400">*</strong>
@@ -928,9 +1374,7 @@ export const SupportTickets: React.FC = () => {
                 if (formErrors.content) setFormErrors((prev) => ({ ...prev, content: '' }));
               }}
               placeholder="Mô tả cụ thể thông báo lỗi, các bước tái hiện, liên kết log hoặc câu hỏi chuyên môn cần Cố vấn hỗ trợ..."
-              className={`w-full p-3 text-xs rounded-xl bg-[#0F172A] border ${
-                formErrors.content ? 'border-rose-500' : 'border-[#334155]'
-              } text-white placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1] leading-relaxed`}
+              className="w-full p-3 rounded-xl bg-[#0F172A] border border-[#334155] text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1] leading-relaxed"
             />
             {formErrors.content && (
               <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-0.5">
@@ -940,13 +1384,22 @@ export const SupportTickets: React.FC = () => {
             )}
           </div>
 
-          {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#334155]">
-            <Button variant="ghost" type="button" onClick={() => setIsCreateOpen(false)}>
-              Hủy Bỏ
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsCreateOpen(false)}
+              className="text-xs text-slate-400 border-[#334155]"
+            >
+              <X size={14} className="mr-1" />
+              <span>Hủy Bỏ</span>
             </Button>
-            <Button variant="primary" type="submit" className="gap-2 px-5">
-              <Send size={15} />
+            <Button
+              type="submit"
+              variant="primary"
+              className="text-xs bg-[#6366F1] hover:bg-[#4F46E5] shadow-lg shadow-[#6366F1]/20 px-5"
+            >
+              <Send size={14} className="mr-1.5" />
               <span>Gửi Yêu Cầu Hỗ Trợ</span>
             </Button>
           </div>

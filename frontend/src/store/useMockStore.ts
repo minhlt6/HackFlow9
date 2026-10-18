@@ -156,6 +156,8 @@ interface MockStoreState {
   claimTicket: (ticketId: string) => void;
   replyTicket: (ticketId: string, content: string) => void;
   resolveTicket: (ticketId: string, responseText?: string) => void;
+  closeTicket: (ticketId: string) => void;
+  reopenTicket: (ticketId: string) => void;
   cancelTicket: (ticketId: string) => void;
 
   // Announcements
@@ -1168,6 +1170,35 @@ export const useMockStore = create<MockStoreState>()(
                   ...t,
                   status: 'resolved',
                   response: responseText || t.response || 'Vấn đề đã được hỗ trợ và giải quyết hoàn tất.',
+                  resolvedAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString(),
+                }
+              : t
+          ),
+        }));
+      },
+
+      closeTicket: (ticketId) => {
+        set((state) => ({
+          tickets: state.tickets.map((t) =>
+            t.id === ticketId
+              ? {
+                  ...t,
+                  status: 'closed',
+                  updatedAt: new Date().toISOString(),
+                }
+              : t
+          ),
+        }));
+      },
+
+      reopenTicket: (ticketId) => {
+        set((state) => ({
+          tickets: state.tickets.map((t) =>
+            t.id === ticketId
+              ? {
+                  ...t,
+                  status: 'in_progress',
                   updatedAt: new Date().toISOString(),
                 }
               : t
