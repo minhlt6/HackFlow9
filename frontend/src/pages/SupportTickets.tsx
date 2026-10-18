@@ -26,7 +26,7 @@ const CATEGORY_LABELS: Record<string, { label: string; variant: BadgeVariant }> 
   technical: { label: 'Lỗi Kỹ thuật / CI/CD', variant: 'purple' },
   topic_clarification: { label: 'Giải đáp Đề tài', variant: 'cyan' },
   submission_issue: { label: 'Vấn đề Nộp bài', variant: 'warning' },
-  account_team: { label: 'Tài khoản & Đội thi', variant: 'indigo' },
+  account_team: { label: 'Tài khoản và Đội thi', variant: 'indigo' },
   other: { label: 'Vấn đề khác', variant: 'neutral' },
 };
 
@@ -277,7 +277,7 @@ export const SupportTickets: React.FC = () => {
                 WebkitTextFillColor: 'transparent',
               }}
             >
-              {isCandidate ? 'Hỗ Trợ Kỹ Thuật Trực Tuyến' : 'Tiếp Nhận & Xử Lý Yêu Cầu Hỗ Trợ'}
+              {isCandidate ? 'Hỗ Trợ Kỹ Thuật Trực Tuyến' : 'Tiếp Nhận và Xử Lý Yêu Cầu Hỗ Trợ'}
             </h1>
             <Badge variant={isCandidate ? 'primary' : 'purple'} size="sm">
               {isCandidate ? 'GÓC NHÌN THÍ SINH' : 'GÓC NHÌN MENTOR / ADMIN'}
@@ -476,7 +476,7 @@ export const SupportTickets: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
                               <CheckCircle2 size={16} />
-                              <span>Phản Hồi & Hướng Dẫn Chính Thức Từ Cố Vấn:</span>
+                              <span>Phản Hồi và Hướng Dẫn Chính Thức Từ Cố Vấn:</span>
                             </div>
                             <Badge variant="success" size="sm">ĐÃ GIẢI QUYẾT</Badge>
                           </div>
@@ -797,7 +797,7 @@ export const SupportTickets: React.FC = () => {
                             className="gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 border-none shadow-lg shadow-emerald-500/25 px-5"
                           >
                             <CheckCircle size={15} />
-                            <span>Gửi Phản Hồi & Đánh Dấu Đã Giải Quyết</span>
+                            <span>Gửi Phản Hồi và Đánh Dấu Đã Giải Quyết</span>
                           </Button>
                         </div>
                       </div>
@@ -891,7 +891,7 @@ export const SupportTickets: React.FC = () => {
                 <option value="technical">Kỹ thuật (Lỗi hệ thống / CI/CD)</option>
                 <option value="topic_clarification">Đề tài (Giải đáp yêu cầu)</option>
                 <option value="submission_issue">Nộp bài (Sự cố nộp bài)</option>
-                <option value="account_team">Đội thi (Tài khoản & Ghép đội)</option>
+                <option value="account_team">Đội thi (Tài khoản và Ghép đội)</option>
                 <option value="other">Khác (Vấn đề phát sinh khác)</option>
               </select>
             </div>
