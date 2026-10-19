@@ -34,6 +34,10 @@ class TicketUpdate(BaseModel):
     """Schema for updating a support ticket (PATCH /tickets/{id})."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    action: Optional[str] = Field(
+        default=None,
+        description="Hành động theo SRS HF-37: accept | update_response | resolve | close | reopen | escalate",
+    )
     status: Optional[TicketStatus] = Field(
         default=None,
         description="Trạng thái xử lý: open | in_progress | resolved | closed",
@@ -41,6 +45,14 @@ class TicketUpdate(BaseModel):
     response: Optional[str] = Field(
         default=None,
         description="Nội dung phản hồi từ Mentor hoặc BTC/Admin",
+    )
+    note: Optional[str] = Field(
+        default=None,
+        description="Ghi chú chuyển giao (escalate) lên Admin",
+    )
+    target_admin_id: Optional[str] = Field(
+        default=None,
+        description="ID Admin nhận chuyển giao trực tiếp",
     )
     assigned_to: Optional[str] = Field(
         default=None,

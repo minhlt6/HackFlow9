@@ -88,19 +88,40 @@ async def list_all_tickets(
     )
 
 
+@router.get(
+    "/{ticket_id}",
+    response_model=ApiResponse[TicketResponse],
+    summary="Xem chi tiết một ticket hỗ trợ (Candidate/Mentor/Admin)",
+)
+async def get_ticket_detail(
+    ticket_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_roles(UserRole.CANDIDATE, UserRole.MENTOR, UserRole.ADMIN)),
+) -> ApiResponse[TicketResponse]:
+    """
+    Xem chi tiết một ticket hỗ trợ (Judge bị chặn 403 FORBIDDEN_ROLE, Candidate chỉ xem được ticket của mình/đội mình).
+    """
+    ticket = await support_service.get_ticket_detail(db, ticket_id, current_user)
+    return success_response(
+        data=TicketResponse.model_validate(ticket),
+        message="Lấy chi tiết ticket thành công.",
+    )
+
+
 @router.patch(
     "/{ticket_id}",
     response_model=ApiResponse[TicketResponse],
-    summary="Cập nhật / phản hồi ticket hỗ trợ (Mentor/Admin)",
+    summary="Cập nhật / phản hồi ticket hỗ trợ (Mentor/Admin hoặc Candidate close/reopen)",
 )
 async def update_ticket(
     ticket_id: str,
     body: TicketUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_roles(UserRole.MENTOR, UserRole.ADMIN)),
+    current_user: User = Depends(require_roles(UserRole.MENTOR, UserRole.ADMIN, UserRole.CANDIDATE)),
 ) -> ApiResponse[TicketResponse]:
     """
     Mentor hoặc Admin cập nhật trạng thái, phân công, hoặc nhập nội dung phản hồi ticket.
+    - Hỗ trợ cả truyền trực tiếp `status` (HF-40) lẫn truyền `action` (`accept`, `resolve`, `update_response`, `close`, `reopen`, `escalate` theo SRS HF-37 / Frontend HF-47).
     - Chuyển sang 'in_progress' và chưa có người xử lý -> Tự động gán cho Mentor/Admin hiện tại.
     - Chuyển sang 'resolved' -> Bắt buộc phải có nội dung phản hồi (response).
     """

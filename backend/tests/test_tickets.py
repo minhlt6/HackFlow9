@@ -290,3 +290,81 @@ async def test_mentor_and_admin_list_and_update_ticket(client: AsyncClient):
     )
     assert not_found_resp.status_code == 404
     assert not_found_resp.json()["error_code"] == "TICKET_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_ticket_detail_and_action_workflow(client: AsyncClient):
+    """Test GET /tickets/{id} and action-based PATCH (accept, resolve, close) for Frontend HF-47 compatibility."""
+    async with TestSessionLocal() as session:
+        cand, cand_token = await create_user_with_token(
+            session, "cand_action@org.dev", "Cand Action"
+        )
+        other_cand, other_cand_token = await create_user_with_token(
+            session, "other_cand@org.dev", "Other Cand"
+        )
+        mentor, mentor_token = await create_user_with_token(
+            session, "mentor_action@org.dev", "Mentor Action", role=UserRole.MENTOR.value
+        )
+        mentor_id = mentor.id
+
+    create_resp = await client.post(
+        "/api/v1/tickets",
+        headers={"Authorization": f"Bearer {cand_token}"},
+        json={
+            "title": "Lỗi không truy cập được database",
+            "content": "Connection refused khi kết nối PostgreSQL port 5432",
+        },
+    )
+    ticket_id = create_resp.json()["data"]["id"]
+
+    # Owner can view detail
+    detail_resp = await client.get(
+        f"/api/v1/tickets/{ticket_id}",
+        headers={"Authorization": f"Bearer {cand_token}"},
+    )
+    assert detail_resp.status_code == 200
+    assert detail_resp.json()["data"]["id"] == ticket_id
+
+    # Other candidate cannot view detail
+    other_detail_resp = await client.get(
+        f"/api/v1/tickets/{ticket_id}",
+        headers={"Authorization": f"Bearer {other_cand_token}"},
+    )
+    assert other_detail_resp.status_code == 403
+
+    # Candidate cannot call accept action
+    cand_accept_resp = await client.patch(
+        f"/api/v1/tickets/{ticket_id}",
+        headers={"Authorization": f"Bearer {cand_token}"},
+        json={"action": "accept"},
+    )
+    assert cand_accept_resp.status_code == 403
+
+    # Mentor accepts via action="accept"
+    accept_resp = await client.patch(
+        f"/api/v1/tickets/{ticket_id}",
+        headers={"Authorization": f"Bearer {mentor_token}"},
+        json={"action": "accept"},
+    )
+    assert accept_resp.status_code == 200
+    assert accept_resp.json()["data"]["status"] == "in_progress"
+    assert accept_resp.json()["data"]["assigned_to"] == mentor_id
+
+    # Mentor resolves via action="resolve"
+    resolve_resp = await client.patch(
+        f"/api/v1/tickets/{ticket_id}",
+        headers={"Authorization": f"Bearer {mentor_token}"},
+        json={"action": "resolve", "response": "Đã mở lại port 5432 trên firewall."},
+    )
+    assert resolve_resp.status_code == 200
+    assert resolve_resp.json()["data"]["status"] == "resolved"
+
+    # Candidate closes their resolved ticket via action="close"
+    close_resp = await client.patch(
+        f"/api/v1/tickets/{ticket_id}",
+        headers={"Authorization": f"Bearer {cand_token}"},
+        json={"action": "close"},
+    )
+    assert close_resp.status_code == 200
+    assert close_resp.json()["data"]["status"] == "closed"
+
