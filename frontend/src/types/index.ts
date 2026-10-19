@@ -207,14 +207,18 @@ export interface SupportTicket {
   senderName?: string;
   title: string;
   description: string;
-  priority: 'high' | 'medium' | 'low';
+  content?: string;
+  category?: 'technical' | 'topic_clarification' | 'submission_issue' | 'account_team' | 'other' | string;
+  priority: 'low' | 'normal' | 'high' | 'urgent' | 'medium';
   status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  response?: string;
   assignedMentorId?: string;
   assignedMentorName?: string;
   mentorId?: string;
   mentorName?: string;
   createdAt: string;
   updatedAt?: string;
+  resolvedAt?: string;
   replies?: TicketReply[];
   messages?: TicketMessage[];
 }

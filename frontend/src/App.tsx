@@ -10,7 +10,6 @@ import { CandidateDashboardPage } from './pages/candidate/CandidateDashboardPage
 import { CandidateCheckpointsPage } from './pages/candidate/candidateCheckpointsPage';
 import { TopicsPage } from './pages/TopicsPage';
 import { CandidateFinalSubmissionPage } from './pages/candidate/CandidateFinalSubmissionPage';
-import { CandidateTicketsPage } from './pages/candidate/CandidateTicketsPage';
 import { CandidateProfilePage } from './pages/candidate/CandidateProfilePage';
 import { UIPreviewPage } from './pages/UIPreviewPage';
 import { MainLayout } from './layouts/MainLayout';
@@ -36,10 +35,10 @@ import { JudgeTopicsPage } from './pages/judge/JudgeTopicsPage';
 import { JudgeResultsPage } from './pages/judge/JudgeResultsPage';
 import { JudgingWorkspace } from './pages/JudgingWorkspace';
 import { Scoreboard } from './pages/Scoreboard';
+import { SupportTickets } from './pages/SupportTickets';
 
 // Mentor Pages
 import { MentorDashboardPage } from './pages/mentor/MentorDashboardPage';
-import { MentorTicketsPage } from './pages/mentor/MentorTicketsPage';
 import { MentorTeamsPage } from './pages/mentor/MentorTeamsPage';
 import { MentorCheckpointsPage } from './pages/mentor/MentorCheckpointsPage';
 
@@ -185,6 +184,14 @@ element: <RootTitleLayout />,
           </div>
         ),
       },
+      {
+        path: '/preview-tickets',
+        element: (
+          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+            <SupportTickets />
+          </div>
+        ),
+      },
 
       {
         element: <MainLayout />,
@@ -202,7 +209,7 @@ element: <RootTitleLayout />,
               { path: '/checkpoints', element: <CandidateCheckpointsPage /> },
               { path: '/final-submission', element: <CandidateFinalSubmissionPage /> },
               { path: '/scoreboard', element: <Scoreboard /> },
-              { path: '/tickets', element: <CandidateTicketsPage /> },
+              { path: '/tickets', element: <SupportTickets /> },
 
               // Admin Routes
               { path: '/admin', element: <AdminDashboardPage /> },
@@ -229,7 +236,7 @@ element: <RootTitleLayout />,
               // Mentor Routes
               { path: '/mentor', element: <MentorDashboardPage /> },
               { path: '/mentor/dashboard', element: <MentorDashboardPage /> },
-              { path: '/mentor/tickets', element: <MentorTicketsPage /> },
+              { path: '/mentor/tickets', element: <SupportTickets /> },
               { path: '/mentor/teams', element: <MentorTeamsPage /> },
               { path: '/mentor/checkpoints', element: <MentorCheckpointsPage /> },
             ],
