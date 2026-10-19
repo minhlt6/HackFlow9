@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     evaluations,
     example,
     health,
+    leaderboard,
     rubrics,
     submissions,
     teams,
@@ -42,6 +43,15 @@ api_router.include_router(
     prefix="/admin/evaluations",
     tags=["Evaluations & Blind Judging (HF-42)"],
 )
+api_router.include_router(
+    leaderboard.router, prefix="/leaderboard", tags=["Leaderboard & Results (HF-43)"]
+)
+api_router.include_router(
+    leaderboard.admin_leaderboard_router,
+    prefix="/admin/leaderboard",
+    tags=["Leaderboard & Results (HF-43)"],
+)
+
 
 
 

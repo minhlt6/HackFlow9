@@ -2460,6 +2460,85 @@
         ]
       }
     },
+    "/api/v1/leaderboard": {
+      "get": {
+        "tags": [
+          "Leaderboard & Results (HF-43)"
+        ],
+        "summary": "Get competition leaderboard (Draft for Admin, Published for all, HF-43)",
+        "operationId": "get_leaderboard_api_v1_leaderboard_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/leaderboard/publish": {
+      "patch": {
+        "tags": [
+          "Leaderboard & Results (HF-43)"
+        ],
+        "summary": "Publish or unpublish the official competition leaderboard (Admin only, HF-43)",
+        "operationId": "publish_leaderboard_api_v1_admin_leaderboard_publish_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PublishLeaderboardRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse_Dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/": {
       "get": {
         "tags": [
@@ -4978,6 +5057,37 @@
           "user"
         ],
         "title": "ProfileUpdateResponse"
+      },
+      "PublishLeaderboardRequest": {
+        "properties": {
+          "is_result_published": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Result Published",
+            "default": true
+          },
+          "unpublish": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unpublish",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PublishLeaderboardRequest",
+        "description": "Request body for PATCH /api/v1/admin/leaderboard/publish (HF-43 / SRS HF-36)."
       },
       "RegisterRequest": {
         "properties": {

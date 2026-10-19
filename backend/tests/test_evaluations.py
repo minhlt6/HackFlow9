@@ -635,3 +635,344 @@ async def test_judge_assignment_restriction(
     )
     assert res_assigned_ok.status_code == 200
     assert res_assigned_ok.json()["data"]["total_score"] == 95.0
+
+
+@pytest.mark.asyncio
+async def test_leaderboard_aggregation_discrepancy_warning_and_draft_isolation(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """
+    HF-43 Step 1 & Step 3 (UAT-S4-07 & UAT-S4-09):
+    - Only submitted evaluations are aggregated; draft evaluations are ignored.
+    - Calculates final_score = round(mean(S_{j,s}), 2), max_spread, std_dev.
+    - Flags has_discrepancy = True (HIGH_DISCREPANCY_WARNING) when max_spread > 15.0 or std_dev > 10.0.
+    - Blocks Candidate/Mentor/Judge with 403 RESULTS_NOT_PUBLISHED when is_result_published == False.
+    - Allows Admin to view full DRAFT leaderboard with judge_scores and discrepancy warning.
+    """
+    admin = await _create_user(db_session, "admin_lb@hackflow.tech", "Admin LB", UserRole.ADMIN)
+    judge1 = await _create_user(db_session, "j1_lb@hackflow.tech", "Judge One", UserRole.JUDGE)
+    judge2 = await _create_user(db_session, "j2_lb@hackflow.tech", "Judge Two", UserRole.JUDGE)
+    judge3_draft = await _create_user(db_session, "j3_lb@hackflow.tech", "Judge Three", UserRole.JUDGE)
+    mentor = await _create_user(db_session, "mentor_lb@hackflow.tech", "Mentor LB", UserRole.MENTOR)
+    leader1 = await _create_user(db_session, "leader1_lb@hackflow.tech", "Leader One", UserRole.CANDIDATE)
+    leader2 = await _create_user(db_session, "leader2_lb@hackflow.tech", "Leader Two", UserRole.CANDIDATE)
+
+    sub_alpha = await _seed_final_submission(db_session, leader1, team_name="AlphaNova")
+    sub_byte = await _seed_final_submission(db_session, leader2, team_name="ByteCraft")
+
+    res_rubric = await client.post(
+        "/api/v1/rubrics",
+        headers=_auth_headers(admin),
+        json={
+            "name": "Leaderboard Rubric",
+            "criteria": [
+                {"title": "Technical", "max_score": 100, "weight": 0.6, "is_required": True, "display_order": 1},
+                {"title": "Innovation", "max_score": 100, "weight": 0.4, "is_required": True, "display_order": 2},
+            ],
+        },
+    )
+    assert res_rubric.status_code == 201
+    c_tech, c_inno = [c["id"] for c in res_rubric.json()["data"]["criteria"]]
+
+    # AlphaNova: Judge 1 = 90.0, Judge 2 = 88.0 -> final_score = 89.0, max_spread = 2.0, std_dev = 1.0 (no discrepancy)
+    await client.post(
+        "/api/v1/evaluations",
+        headers=_auth_headers(judge1),
+        json={
+            "submission_id": sub_alpha.id,
+            "status": "submitted",
+            "evaluations": [
+                {"criteria_id": c_tech, "score": 90},
+                {"criteria_id": c_inno, "score": 90},
+            ],
+        },
+    )
+    await client.post(
+        "/api/v1/evaluations",
+        headers=_auth_headers(judge2),
+        json={
+            "submission_id": sub_alpha.id,
+            "status": "submitted",
+            "evaluations": [
+                {"criteria_id": c_tech, "score": 88},
+                {"criteria_id": c_inno, "score": 88},
+            ],
+        },
+    )
+    # Judge 3 saves a DRAFT of 10.0 on AlphaNova -> must NOT affect final_score!
+    await client.post(
+        "/api/v1/evaluations",
+        headers=_auth_headers(judge3_draft),
+        json={
+            "submission_id": sub_alpha.id,
+            "status": "draft",
+            "evaluations": [
+                {"criteria_id": c_tech, "score": 10},
+                {"criteria_id": c_inno, "score": 10},
+            ],
+        },
+    )
+
+    # ByteCraft: Judge 1 = 92.0, Judge 2 = 71.0 -> final_score = 81.5, max_spread = 21.0 (> 15.0), std_dev = 10.5 (> 10.0)
+    await client.post(
+        "/api/v1/evaluations",
+        headers=_auth_headers(judge1),
+        json={
+            "submission_id": sub_byte.id,
+            "status": "submitted",
+            "evaluations": [
+                {"criteria_id": c_tech, "score": 92},
+                {"criteria_id": c_inno, "score": 92},
+            ],
+        },
+    )
+    await client.post(
+        "/api/v1/evaluations",
+        headers=_auth_headers(judge2),
+        json={
+            "submission_id": sub_byte.id,
+            "status": "submitted",
+            "evaluations": [
+                {"criteria_id": c_tech, "score": 71},
+                {"criteria_id": c_inno, "score": 71},
+            ],
+        },
+    )
+
+    # Candidate, Mentor, and Judge cannot view unpublished leaderboard -> 403 RESULTS_NOT_PUBLISHED
+    for non_admin in (leader1, mentor, judge1):
+        res_403 = await client.get("/api/v1/leaderboard", headers=_auth_headers(non_admin))
+        assert res_403.status_code == 403
+        assert res_403.json()["error_code"] == "RESULTS_NOT_PUBLISHED"
+
+    # Admin views DRAFT leaderboard -> 200 OK with full metrics
+    res_admin = await client.get("/api/v1/leaderboard", headers=_auth_headers(admin))
+    assert res_admin.status_code == 200
+    lb_data = res_admin.json()["data"]
+    assert lb_data["is_result_published"] is False
+    assert lb_data["status"] == "DRAFT"
+
+    board = lb_data["leaderboard"]
+    assert len(board) == 2
+
+    # Rank 1: AlphaNova (89.0)
+    assert board[0]["rank"] == 1
+    assert board[0]["team_name"] == "AlphaNova"
+    assert board[0]["final_score"] == 89.0
+    assert board[0]["eval_count"] == 2
+    assert board[0]["max_spread"] == 2.0
+    assert board[0]["std_dev"] == 1.0
+    assert board[0]["has_discrepancy"] is False
+    assert board[0]["warning_code"] is None
+    assert len(board[0]["judge_scores"]) == 2
+
+    # Rank 2: ByteCraft (81.5) -> HIGH_DISCREPANCY_WARNING
+    assert board[1]["rank"] == 2
+    assert board[1]["team_name"] == "ByteCraft"
+    assert board[1]["final_score"] == 81.5
+    assert board[1]["max_spread"] == 21.0
+    assert board[1]["std_dev"] == 10.5
+    assert board[1]["has_discrepancy"] is True
+    assert board[1]["warning_code"] == "HIGH_DISCREPANCY_WARNING"
+
+
+@pytest.mark.asyncio
+async def test_leaderboard_three_level_tie_breaker_ranking(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """
+    HF-43 Step 2 (UAT-S4-08): 3-Level Tie-breaker verification when final_score is tied:
+    1. Highest-weight criterion average score DESC
+    2. Judge score standard deviation (std_dev) ASC
+    3. Final Checkpoint submission timestamp (submitted_at) ASC
+    """
+    admin = await _create_user(db_session, "admin_tie@hackflow.tech", "Admin Tie", UserRole.ADMIN)
+    judge1 = await _create_user(db_session, "j1_tie@hackflow.tech", "Judge 1", UserRole.JUDGE)
+    judge2 = await _create_user(db_session, "j2_tie@hackflow.tech", "Judge 2", UserRole.JUDGE)
+
+    l_a = await _create_user(db_session, "la@hackflow.tech", "Leader A", UserRole.CANDIDATE)
+    l_b = await _create_user(db_session, "lb@hackflow.tech", "Leader B", UserRole.CANDIDATE)
+    l_c = await _create_user(db_session, "lc@hackflow.tech", "Leader C", UserRole.CANDIDATE)
+    l_d = await _create_user(db_session, "ld@hackflow.tech", "Leader D", UserRole.CANDIDATE)
+
+    sub_a = await _seed_final_submission(db_session, l_a, team_name="Team_A_TopCriterionWinner")
+    sub_b = await _seed_final_submission(db_session, l_b, team_name="Team_B_LowStdDevWinner")
+    sub_c = await _seed_final_submission(db_session, l_c, team_name="Team_C_HighStdDevEarly")
+    sub_d = await _seed_final_submission(db_session, l_d, team_name="Team_D_HighStdDevLate")
+
+    now = datetime.now(timezone.utc)
+    sub_c.submitted_at = now - timedelta(hours=3)
+    sub_d.submitted_at = now - timedelta(hours=1)
+    await db_session.commit()
+
+    # Rubric: Core Tech (weight=0.6, max=100) + Pitch (weight=0.4, max=100)
+    res_rubric = await client.post(
+        "/api/v1/rubrics",
+        headers=_auth_headers(admin),
+        json={
+            "name": "Tie-Breaker Rubric",
+            "criteria": [
+                {"title": "Core Tech", "max_score": 100, "weight": 0.6, "is_required": True, "display_order": 1},
+                {"title": "Pitch", "max_score": 100, "weight": 0.4, "is_required": True, "display_order": 2},
+            ],
+        },
+    )
+    c_core, c_pitch = [c["id"] for c in res_rubric.json()["data"]["criteria"]]
+
+    # All 4 teams achieve exact same final_score = 80.0!
+    # Team A: Core Tech = 90, Pitch = 65 -> 90*0.6 + 65*0.4 = 54 + 26 = 80.0 (top_criteria_score = 90.0)
+    for j in (judge1, judge2):
+        await client.post(
+            "/api/v1/evaluations",
+            headers=_auth_headers(j),
+            json={
+                "submission_id": sub_a.id,
+                "status": "submitted",
+                "evaluations": [
+                    {"criteria_id": c_core, "score": 90},
+                    {"criteria_id": c_pitch, "score": 65},
+                ],
+            },
+        )
+
+    # Team B: Core Tech = 80, Pitch = 80 from both judges -> final_score = 80.0, top_criteria_score = 80.0, std_dev = 0.0
+    for j in (judge1, judge2):
+        await client.post(
+            "/api/v1/evaluations",
+            headers=_auth_headers(j),
+            json={
+                "submission_id": sub_b.id,
+                "status": "submitted",
+                "evaluations": [
+                    {"criteria_id": c_core, "score": 80},
+                    {"criteria_id": c_pitch, "score": 80},
+                ],
+            },
+        )
+
+    # Team C & Team D: Both have final_score = 80.0, top_criteria_score = 80.0, AND std_dev = 4.0
+    # (Judge 1 gives Core=80, Pitch=90 -> 84.0; Judge 2 gives Core=80, Pitch=70 -> 76.0; mean=80.0, std_dev=4.0)
+    # Team C submitted 2 hours earlier than Team D!
+    for sub in (sub_c, sub_d):
+        await client.post(
+            "/api/v1/evaluations",
+            headers=_auth_headers(judge1),
+            json={
+                "submission_id": sub.id,
+                "status": "submitted",
+                "evaluations": [
+                    {"criteria_id": c_core, "score": 80},
+                    {"criteria_id": c_pitch, "score": 90},
+                ],
+            },
+        )
+        await client.post(
+            "/api/v1/evaluations",
+            headers=_auth_headers(judge2),
+            json={
+                "submission_id": sub.id,
+                "status": "submitted",
+                "evaluations": [
+                    {"criteria_id": c_core, "score": 80},
+                    {"criteria_id": c_pitch, "score": 70},
+                ],
+            },
+        )
+
+    res_lb = await client.get("/api/v1/leaderboard", headers=_auth_headers(admin))
+    assert res_lb.status_code == 200
+    board = res_lb.json()["data"]["leaderboard"]
+    assert [item["team_name"] for item in board] == [
+        "Team_A_TopCriterionWinner",
+        "Team_B_LowStdDevWinner",
+        "Team_C_HighStdDevEarly",
+        "Team_D_HighStdDevLate",
+    ]
+    assert [item["rank"] for item in board] == [1, 2, 3, 4]
+
+
+@pytest.mark.asyncio
+async def test_publish_leaderboard_lifecycle_and_audit_log(
+    client: AsyncClient, db_session: AsyncSession
+):
+    """
+    HF-43 Step 4 (UAT-S4-10):
+    - PATCH /api/v1/admin/leaderboard/publish transitions DRAFT -> PUBLISHED and logs LEADERBOARD_PUBLISHED.
+    - Re-publishing when already published returns 409 RESULTS_ALREADY_PUBLISHED.
+    - Candidate can view published leaderboard (without private judge_scores or has_discrepancy).
+    """
+    admin = await _create_user(db_session, "admin_pub@hackflow.tech", "Admin Pub", UserRole.ADMIN)
+    judge = await _create_user(db_session, "judge_pub@hackflow.tech", "Judge Pub", UserRole.JUDGE)
+    candidate = await _create_user(db_session, "cand_pub@hackflow.tech", "Candidate Pub", UserRole.CANDIDATE)
+
+    sub = await _seed_final_submission(db_session, candidate, team_name="OmegaChampion")
+    res_rubric = await client.post(
+        "/api/v1/rubrics",
+        headers=_auth_headers(admin),
+        json={
+            "name": "Publish Rubric",
+            "criteria": [
+                {"title": "Overall", "max_score": 10, "weight": 1.0, "is_required": True, "display_order": 1}
+            ],
+        },
+    )
+    c_id = res_rubric.json()["data"]["criteria"][0]["id"]
+
+    await client.post(
+        "/api/v1/evaluations",
+        headers=_auth_headers(judge),
+        json={
+            "submission_id": sub.id,
+            "status": "submitted",
+            "evaluations": [{"criteria_id": c_id, "score": 9.5}],
+        },
+    )
+
+    # 1. Candidate cannot publish leaderboard -> 403 FORBIDDEN
+    res_cand_pub = await client.patch(
+        "/api/v1/admin/leaderboard/publish",
+        headers=_auth_headers(candidate),
+        json={"is_result_published": True},
+    )
+    assert res_cand_pub.status_code == 403
+
+    # 2. Admin publishes leaderboard -> 200 OK
+    res_pub = await client.patch(
+        "/api/v1/admin/leaderboard/publish",
+        headers=_auth_headers(admin),
+        json={"is_result_published": True},
+    )
+    assert res_pub.status_code == 200
+    pub_data = res_pub.json()["data"]
+    assert pub_data["is_result_published"] is True
+    assert pub_data["status"] == "PUBLISHED"
+    assert pub_data["published_at"] is not None
+
+    # Verify AuditLog(action="LEADERBOARD_PUBLISHED")
+    audit_stmt = select(AuditLog).where(AuditLog.action == "LEADERBOARD_PUBLISHED")
+    audit_log = (await db_session.execute(audit_stmt)).scalar_one_or_none()
+    assert audit_log is not None
+    assert audit_log.user_id == admin.id
+
+    # 3. Calling publish again without unpublish flag -> 409 RESULTS_ALREADY_PUBLISHED
+    res_dup = await client.patch(
+        "/api/v1/admin/leaderboard/publish",
+        headers=_auth_headers(admin),
+        json={"is_result_published": True},
+    )
+    assert res_dup.status_code == 409
+    assert res_dup.json()["error_code"] == "RESULTS_ALREADY_PUBLISHED"
+
+    # 4. Candidate can now view published leaderboard -> 200 OK, public fields only
+    res_cand_lb = await client.get("/api/v1/leaderboard", headers=_auth_headers(candidate))
+    assert res_cand_lb.status_code == 200
+    cand_data = res_cand_lb.json()["data"]
+    assert cand_data["is_result_published"] is True
+    assert cand_data["status"] == "PUBLISHED"
+    entry = cand_data["leaderboard"][0]
+    assert entry["rank"] == 1
+    assert entry["team_name"] == "OmegaChampion"
+    assert entry["final_score"] == 95.0
+    assert "judge_scores" not in entry
+    assert "has_discrepancy" not in entry
+
