@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.core.security import decode_access_token
-from app.models.user import ApprovalStatus, User
+from app.models.user import ApprovalStatus, User, UserRole
 from app.repositories.user_repo import user_repo
 
 security_scheme = HTTPBearer(auto_error=False)
@@ -85,6 +85,62 @@ def require_role(allowed_roles: Union[List[str], str]):
         return user
 
     return role_checker
+
+
+def require_roles(*allowed_roles: Union[List[Union[str, UserRole]], str, UserRole]):
+    """
+    Role-Based Access Control (RBAC) dependency factory supporting multiple positional roles or lists.
+    Verifies that the current user has one of the required roles.
+    Returns HTTP 403 FORBIDDEN if the role is insufficient.
+    """
+    flat_roles: List[str] = []
+    for r in allowed_roles:
+        if isinstance(r, (list, tuple, set)):
+            for item in r:
+                flat_roles.append(item.value if hasattr(item, "value") else str(item))
+        else:
+            flat_roles.append(r.value if hasattr(r, "value") else str(r))
+
+    async def role_checker(user: User = Depends(get_current_user)) -> User:
+        user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+        if user_role not in flat_roles:
+            raise ForbiddenException(
+                message=f"Truy cập trái phép. Chức năng yêu cầu vai trò: {', '.join(flat_roles)}.",
+                error_code="FORBIDDEN_ROLE",
+            )
+        return user
+
+    return role_checker
+
+
+async def require_approved_candidate(
+    user: User = Depends(get_current_user),
+) -> User:
+    """
+    Dependency ensuring that the user has CANDIDATE role and is APPROVED.
+    """
+    user_role = user.role.value if hasattr(user.role, "value") else str(user.role)
+    if user_role != UserRole.CANDIDATE.value:
+        raise ForbiddenException(
+            message="Chức năng chỉ dành cho thí sinh (Candidate).",
+            error_code="FORBIDDEN_ROLE",
+        )
+    user_status = (
+        user.approval_status.value
+        if hasattr(user.approval_status, "value")
+        else str(user.approval_status)
+    )
+    if user_status != ApprovalStatus.APPROVED.value:
+        status_vn = (
+            "Đang chờ phê duyệt (PENDING)"
+            if user_status == ApprovalStatus.PENDING.value
+            else "Bị từ chối (REJECTED)"
+        )
+        raise ForbiddenException(
+            message=f"Tài khoản chưa được kích hoạt tham gia thi đấu. Trạng thái: {status_vn}.",
+            error_code="ACCOUNT_NOT_APPROVED",
+        )
+    return user
 
 
 def require_approved():
