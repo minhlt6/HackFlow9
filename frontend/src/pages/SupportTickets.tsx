@@ -55,6 +55,10 @@ const STATUS_LABELS: Record<string, { label: string; variant: BadgeVariant }> = 
   closed: { label: 'Đã đóng', variant: 'neutral' },
 };
 
+// Số giờ đã trôi qua kể từ thời điểm cho trước (dùng cho kiểm tra hạn mở lại 48h - SRS HF-37 Mục 3.7)
+const getHoursSince = (isoTime: string): number =>
+  (Date.now() - new Date(isoTime).getTime()) / (1000 * 60 * 60);
+
 export const SupportTickets: React.FC = () => {
   const { user } = useAuthStore();
   const {
@@ -187,7 +191,8 @@ export const SupportTickets: React.FC = () => {
   }, [isCandidate, currentUser, teams]);
 
   useEffect(() => {
-    fetchTicketsFromApi();
+    // Defer to a microtask so setState inside fetchTicketsFromApi is not called synchronously in the effect body
+    void Promise.resolve().then(fetchTicketsFromApi);
   }, [fetchTicketsFromApi]);
 
   // Tập dữ liệu vé hỗ trợ hiện hành (kết hợp API và fallback Store)
@@ -483,10 +488,9 @@ export const SupportTickets: React.FC = () => {
 
     // Validate 48h window nếu là Thí sinh theo SRS HF-37 Mục 3.7 & 5.7
     if (isCandidate) {
-      const resolvedTimestamp = new Date(
+      const hoursPassed = getHoursSince(
         activeTicket.resolvedAt || activeTicket.updatedAt || activeTicket.createdAt,
-      ).getTime();
-      const hoursPassed = (Date.now() - resolvedTimestamp) / (1000 * 60 * 60);
+      );
 
       if (hoursPassed > 48) {
         showAlert(
