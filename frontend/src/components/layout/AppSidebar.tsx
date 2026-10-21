@@ -19,8 +19,6 @@ import {
   LogOut,
   X,
   Lock,
-  PanelLeftClose,
-  PanelLeftOpen,
   ChevronLeft,
   ChevronRight,
   Terminal,
@@ -227,7 +225,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           mobileOpen ? 'w-64 translate-x-0 shadow-xl' : 'w-64 -translate-x-full',
         )}
       >
-        {/* Right-edge Interactive Drag Resizer + Quick Collapse Handle (Desktop) */}
+        {/* Right-edge Interactive Drag Resizer (Desktop) */}
         <div
           role="separator"
           aria-orientation="vertical"
@@ -249,13 +247,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           />
         </div>
 
-        {/* Floating Quick Expand/Collapse Pill on Sidebar Edge */}
+        {/* Single Quick Expand/Collapse Pill on Header Divider Line */}
         <button
           type="button"
           onClick={onToggleCollapse}
           aria-label={collapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
           title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
-          className="hidden lg:flex absolute top-16 -right-3 z-50 h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors cursor-pointer"
+          className="hidden lg:flex absolute top-[44px] -right-3 z-50 h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors cursor-pointer"
         >
           {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
         </button>
@@ -422,17 +420,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         </div>
 
         {/* Sidebar Footer */}
-        <div className="p-2.5 border-t border-sidebar-border space-y-1.5">
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            aria-label={collapsed ? 'Mở rộng thanh bên' : 'Thu gọn thanh bên'}
-            className="hidden lg:flex w-full items-center justify-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
-          >
-            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-            {!collapsed && <span className="truncate">Thu gọn menu</span>}
-          </button>
-
+        <div className="p-2.5 border-t border-sidebar-border">
           <button
             type="button"
             onClick={onLogout}
