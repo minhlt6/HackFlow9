@@ -178,6 +178,7 @@ class CheckpointService:
         cls,
         checkpoint: Checkpoint,
         now: Optional[datetime] = None,
+        latest_submission: Optional[dict] = None,
     ) -> CheckpointResponse:
         info = cls.calculate_time_gate_info(checkpoint, now)
         return CheckpointResponse(
@@ -197,6 +198,7 @@ class CheckpointService:
             time_remaining_seconds=info["time_remaining_seconds"],
             time_until_start_seconds=info["time_until_start_seconds"],
             server_time=info["server_time"],
+            latest_submission=latest_submission,
             created_at=checkpoint.created_at,
             updated_at=checkpoint.updated_at,
         )
@@ -231,20 +233,61 @@ class CheckpointService:
         db: AsyncSession,
         only_active: bool = False,
         now: Optional[datetime] = None,
+        user_id: Optional[str] = None,
     ) -> List[CheckpointResponse]:
         checkpoints = await checkpoint_repo.get_all(db, only_active=only_active)
-        return [self.build_checkpoint_response(cp, now) for cp in checkpoints]
+        submissions_by_cp: dict = {}
+        if user_id:
+            from app.repositories.team_repo import team_repo
+            from app.repositories.submission_repo import submission_repo
+            from app.services.submission_service import submission_service
+
+            membership = await team_repo.get_user_membership(db, str(user_id))
+            if membership:
+                team_subs = await submission_repo.list_submissions(
+                    db, team_id=str(membership.team_id)
+                )
+                for sub in team_subs:
+                    submissions_by_cp[str(sub.checkpoint_id)] = (
+                        submission_service.build_submission_response(sub).model_dump(mode="json")
+                    )
+
+        return [
+            self.build_checkpoint_response(
+                cp, now, latest_submission=submissions_by_cp.get(str(cp.id))
+            )
+            for cp in checkpoints
+        ]
 
     async def get_checkpoint_by_id(
         self,
         db: AsyncSession,
         checkpoint_id: str,
         now: Optional[datetime] = None,
+        user_id: Optional[str] = None,
     ) -> CheckpointResponse:
         cp = await checkpoint_repo.get_by_id(db, checkpoint_id)
         if not cp:
             raise NotFoundException(message=f"Không tìm thấy checkpoint với ID '{checkpoint_id}'.")
-        return self.build_checkpoint_response(cp, now)
+
+        latest_sub = None
+        if user_id:
+            from app.repositories.team_repo import team_repo
+            from app.repositories.submission_repo import submission_repo
+            from app.services.submission_service import submission_service
+
+            membership = await team_repo.get_user_membership(db, str(user_id))
+            if membership:
+                sub = await submission_repo.get_by_team_and_checkpoint(
+                    db, team_id=str(membership.team_id), checkpoint_id=str(cp.id)
+                )
+                if sub:
+                    latest_sub = submission_service.build_submission_response(sub).model_dump(
+                        mode="json"
+                    )
+
+        return self.build_checkpoint_response(cp, now, latest_submission=latest_sub)
+
 
     async def get_time_gated_status(
         self,
@@ -354,10 +397,14 @@ class CheckpointService:
         db: AsyncSession,
         checkpoint_id: str,
         data: CheckpointUpdateRequest,
+        admin_user_id: Optional[str] = None,
     ) -> CheckpointResponse:
         cp = await checkpoint_repo.get_by_id(db, checkpoint_id)
         if not cp:
             raise NotFoundException(message=f"Không tìm thấy checkpoint với ID '{checkpoint_id}'.")
+
+        old_deadline = ensure_utc(cp.deadline)
+        old_start = ensure_utc(cp.start_time)
 
         update_fields = {}
         if data.title is not None:
@@ -389,8 +436,8 @@ class CheckpointService:
                 False, list(cp.submission_fields)
             )
 
-        new_start = ensure_utc(data.start_time) if data.start_time is not None else ensure_utc(cp.start_time)
-        new_deadline = ensure_utc(data.deadline) if data.deadline is not None else ensure_utc(cp.deadline)
+        new_start = ensure_utc(data.start_time) if data.start_time is not None else old_start
+        new_deadline = ensure_utc(data.deadline) if data.deadline is not None else old_deadline
 
         if new_deadline <= new_start:
             raise BadRequestException(message="Hạn chót (deadline) phải diễn ra sau thời điểm mở cổng (start_time).")
@@ -401,9 +448,37 @@ class CheckpointService:
             update_fields["deadline"] = new_deadline
 
         updated_cp = await checkpoint_repo.update(db, cp, **update_fields)
+
+        # Ghi Audit Log khi Admin gia hạn deadline hoặc cập nhật checkpoint (UAT-CP-13)
+        from app.repositories.submission_repo import submission_repo
+
+        is_deadline_extended = data.deadline is not None and new_deadline > old_deadline
+        audit_action = (
+            "CHECKPOINT_DEADLINE_EXTENDED"
+            if is_deadline_extended
+            else "CHECKPOINT_UPDATED"
+        )
+        await submission_repo.create_audit_log(
+            db=db,
+            user_id=admin_user_id,
+            team_id=None,
+            checkpoint_id=str(updated_cp.id),
+            submission_id=None,
+            action=audit_action,
+            status="updated",
+            late_grace_period=False,
+            details={
+                "old_deadline": old_deadline.isoformat(),
+                "new_deadline": new_deadline.isoformat(),
+                "is_deadline_extended": is_deadline_extended,
+                "updated_fields": list(update_fields.keys()),
+            },
+        )
+
         await db.commit()
         await db.refresh(updated_cp)
         return self.build_checkpoint_response(updated_cp)
+
 
     async def toggle_active(
         self,

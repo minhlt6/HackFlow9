@@ -118,6 +118,21 @@ class UnprocessableEntityException(AppException):
         )
 
 
+class ValidationException(AppException):
+    def __init__(
+        self,
+        message: str = "Validation error",
+        data: Optional[Any] = None,
+        error_code: Optional[str] = None,
+    ):
+        super().__init__(
+            message=message,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            data=data,
+            error_code=error_code,
+        )
+
+
 class ServiceUnavailableException(AppException):
     def __init__(
         self,

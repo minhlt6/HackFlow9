@@ -84,10 +84,15 @@ class CheckpointResponse(BaseModel):
     time_remaining_seconds: int = Field(0, description="Số giây còn lại đến deadline chính thức (0 nếu đã quá hạn)")
     time_until_start_seconds: int = Field(0, description="Số giây đếm ngược đến lúc mở cổng (0 nếu đã mở)")
     server_time: datetime = Field(..., description="Thời gian hiện tại của Server chuẩn UTC")
+    latest_submission: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Bài nộp mới nhất của đội thi hiện tại cho mốc checkpoint này (nếu có)",
+    )
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
 
 
 class CheckpointTimeGatedStatusResponse(BaseModel):

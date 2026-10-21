@@ -36,6 +36,7 @@ import {
   mockCreateTeamApi,
   mockJoinTeamApi,
 } from '../mocks/mockTeams';
+import { teamsApi } from '../api/teamsApi';
 import type { TeamDetails, TeamMember } from '../types/team';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMockStore } from '../store/useMockStore';
@@ -73,7 +74,7 @@ export const TeamsPage: React.FC = () => {
   const removeTeamMemberInStore = useMockStore((state) => state.removeTeamMember);
 
   // State dữ liệu đội thi
-  const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
+const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   const [previewMode, setPreviewMode] = useState<PreviewMode>('in_team');
   const [isDevOpen, setIsDevOpen] = useState<boolean>(false);
 
@@ -101,6 +102,33 @@ export const TeamsPage: React.FC = () => {
       // ignore storage errors
     }
   };
+
+  // Đồng bộ thông tin đội thi khi mở trang hoặc khi có cập nhật đề tài
+  useEffect(() => {
+    let isMounted = true;
+    const loadTeam = async () => {
+      try {
+        const remoteTeam = await teamsApi.getMyTeam();
+        if (isMounted && remoteTeam) {
+          setTeam(remoteTeam);
+          return;
+        }
+      } catch {
+        // Fallback local
+      }
+    };
+    void loadTeam();
+
+    const handleTeamUpdate = () => {
+      setTeam(loadInitialTeam());
+    };
+    window.addEventListener('hackflow_team_updated', handleTeamUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('hackflow_team_updated', handleTeamUpdate);
+    };
+  }, []);
+
 
   // Loading & Error states
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -392,7 +420,7 @@ export const TeamsPage: React.FC = () => {
       {toast && (
         <div
           role="alert"
-          className={`fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-white font-medium border text-sm animate-in fade-in slide-in-from-top-3 duration-200 ${
+          className={`fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-foreground font-medium border text-sm animate-in fade-in slide-in-from-top-3 duration-200 ${
             toast.type === 'success'
               ? 'bg-emerald-600/95 border-emerald-400/40 shadow-emerald-950/40'
               : toast.type === 'error'
@@ -962,44 +990,68 @@ export const TeamsPage: React.FC = () => {
                   <Lightbulb size={16} className="text-amber-700 dark:text-amber-400" />
                   <span>Đề Tài Thi Đấu</span>
                 </h4>
-                <Badge variant="primary" size="sm">
-                  Đã Đăng Ký
-                </Badge>
+                {team?.topic_id || team?.topic_name ? (
+                  <Badge variant="primary" size="sm">
+                    Đã Đăng Ký
+                  </Badge>
+                ) : (
+                  <Badge variant="neutral" size="sm">
+                    Chưa Đăng Ký
+                  </Badge>
+                )}
               </div>
 
-              <div className="space-y-2 text-xs">
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">
-                    Đề tài nghiên cứu
-                  </span>
-                  <p className="font-semibold text-foreground text-sm mt-0.5">
-                    {team.topic_name || 'Ứng dụng LLM & RAG trong Y tế'}
-                  </p>
-                </div>
+              {team?.topic_id || team?.topic_name ? (
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">
+                      Đề tài nghiên cứu
+                    </span>
+                    <p className="font-semibold text-foreground text-sm mt-0.5">
+                      {team.topic_name}
+                    </p>
+                  </div>
 
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">
-                    Lĩnh vực dự thi
-                  </span>
-                  <p className="text-muted-foreground mt-0.5">Healthcare AI &amp; Big Data Analysis</p>
-                </div>
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">
+                      Lĩnh vực dự thi
+                    </span>
+                    <p className="text-muted-foreground mt-0.5">Trí Tuệ Nhân Tạo &amp; Tự Động Hóa Doanh Nghiệp</p>
+                  </div>
 
-                <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">
-                    Mentor hướng dẫn
-                  </span>
-                  <p className="text-primary font-medium mt-0.5">TS. Trần Hoàng Nam (AI Lab)</p>
+                  <div>
+                    <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block">
+                      Trạng thái chỉ tiêu
+                    </span>
+                    <p className="text-emerald-700 dark:text-emerald-400 font-medium mt-0.5">Hợp lệ • Đã giữ slot thành công</p>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-2 text-xs py-1">
+                  <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-400">
+                    <p className="font-semibold text-xs flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
+                      <AlertCircle size={14} className="text-amber-700 dark:text-amber-400" />
+                      <span>Chưa đăng ký đề tài thi đấu</span>
+                    </p>
+                    <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">
+                      Đội của bạn hiện chưa chọn đề tài. Hãy truy cập danh mục để chọn đề tài nghiên cứu phù hợp trước khi hết slot.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="pt-2">
                 <Button
-                  variant="secondary"
+                  variant={team?.topic_id || team?.topic_name ? 'secondary' : 'primary'}
                   size="sm"
                   onClick={() => navigate('/topics')}
                   className="w-full justify-center text-xs gap-1.5 cursor-pointer"
                 >
-                  <span>Xem tài liệu &amp; Đổi đề tài</span>
+                  <span>
+                    {team?.topic_id || team?.topic_name
+                      ? 'Xem tài liệu & Đổi đề tài'
+                      : 'Chọn đề tài ngay'}
+                  </span>
                   <ArrowRight size={13} />
                 </Button>
               </div>

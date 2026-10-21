@@ -18,11 +18,15 @@ export type SubmissionStatus =
 
 export type CheckpointErrorCode =
   | 'FORBIDDEN_NOT_TEAM_LEADER'
+  | 'ACCOUNT_NOT_APPROVED'
+  | 'INVALID_CHECKPOINT_STATUS'
   | 'CHECKPOINT_NOT_OPEN'
   | 'CHECKPOINT_INACTIVE'
   | 'DEADLINE_EXCEEDED'
   | 'MISSING_REQUIRED_FIELD'
   | 'GITHUB_REPO_INACCESSIBLE'
+  | 'INVALID_GITHUB_URL'
+  | 'GITHUB_REPO_EMPTY'
   | 'GITHUB_API_UNAVAILABLE';
 
 export interface SubmissionFieldConfig {
@@ -80,11 +84,15 @@ export interface CheckpointWithSubmission extends Checkpoint {
 }
 
 /**
- * Bảng ánh xạ mã lỗi chuẩn từ Backend (Mục 5 SRS HF-23) sang thông báo tiếng Việt rõ ràng
+ * Bảng ánh xạ mã lỗi chuẩn từ Backend (Mục 5 SRS HF-23 & Mục 2 HF-35) sang thông báo tiếng Việt rõ ràng
  */
 export const SRS_HF23_ERROR_MESSAGES: Record<string, string> = {
   FORBIDDEN_NOT_TEAM_LEADER:
     'Chỉ Đội trưởng (TEAM_LEADER) mới có quyền nộp hoặc cập nhật bài thi cho đội (Mã lỗi: 403 FORBIDDEN_NOT_TEAM_LEADER).',
+  ACCOUNT_NOT_APPROVED:
+    'Tài khoản của bạn chưa được Ban tổ chức phê duyệt (APPROVED) để thực hiện nộp bài (Mã lỗi: 403 ACCOUNT_NOT_APPROVED).',
+  INVALID_CHECKPOINT_STATUS:
+    'Cổng nộp bài cho chặng thi này chưa mở hoặc đang tạm khóa bởi Ban tổ chức (Mã lỗi: 400 INVALID_CHECKPOINT_STATUS).',
   CHECKPOINT_NOT_OPEN:
     'Cổng nộp bài cho chặng thi này hiện chưa đến giờ mở hoặc đã bị khóa (Mã lỗi: 403 CHECKPOINT_NOT_OPEN).',
   CHECKPOINT_INACTIVE:
@@ -95,9 +103,14 @@ export const SRS_HF23_ERROR_MESSAGES: Record<string, string> = {
     'Thiếu trường dữ liệu bắt buộc theo cấu hình của chặng thi. Vui lòng kiểm tra và điền đầy đủ các mục có dấu * (Mã lỗi: 422 MISSING_REQUIRED_FIELD).',
   GITHUB_REPO_INACCESSIBLE:
     'Không thể truy cập kho mã nguồn GitHub. Repository đang để ở chế độ Private hoặc đường dẫn URL không tồn tại — vui lòng mở Public repository và kiểm tra lại URL (Mã lỗi: 422 GITHUB_REPO_INACCESSIBLE).',
+  INVALID_GITHUB_URL:
+    'Đường dẫn GitHub repository không đúng định dạng chuẩn https://github.com/{owner}/{repo} (Mã lỗi: 422 INVALID_GITHUB_URL).',
+  GITHUB_REPO_EMPTY:
+    'Kho mã nguồn GitHub hiện đang rỗng (chưa có commit nào). Vui lòng push code lên repository trước khi nộp bài (Mã lỗi: 422 GITHUB_REPO_EMPTY).',
   GITHUB_API_UNAVAILABLE:
     'GitHub API đang tạm thời gián đoạn sau 3 lần thử lại (503). Hệ thống đã ghi nhận thời điểm nộp bài hợp lệ của đội và chuyển sang trạng thái chờ Ban tổ chức xác minh Commit SHA thủ công (Mã lỗi: 503 GITHUB_API_UNAVAILABLE).',
 };
+
 
 /**
  * Lấy danh sách trường nộp bài hiệu lực theo cấu hình động `checkpoint.submission_fields` (SRS HF-23).

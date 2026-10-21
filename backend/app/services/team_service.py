@@ -74,6 +74,13 @@ class TeamService:
         else:
             status = "INCOMPLETE"
 
+        leader_id = next(
+            (m.user_id for m in members_resp if m.role == "leader"),
+            members_resp[0].user_id if members_resp else None,
+        )
+        topic_obj = team.__dict__.get("topic")
+        topic_name = topic_obj.title if topic_obj else None
+
         return TeamResponse(
             id=str(team.id),
             team_name=team.team_name,
@@ -83,7 +90,9 @@ class TeamService:
             member_count=member_count,
             min_members=3,
             max_members=5,
+            leader_id=leader_id,
             topic_id=str(team.topic_id) if team.topic_id else None,
+            topic_name=topic_name,
             subtopic_id=str(team.subtopic_id) if team.subtopic_id else None,
             members=members_resp,
             created_at=team.created_at,

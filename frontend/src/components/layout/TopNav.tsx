@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Menu,
-  Bell,
   EyeOff,
   Sun,
   Moon,
@@ -28,7 +27,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '../ui/dropdown-menu';
-import { Badge } from '../ui/badge';
+import { NotificationBell } from '../NotificationBell';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useMockStore } from '../../store/useMockStore';
@@ -51,6 +50,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   announcements: 'Phát thông báo',
   config: 'Cấu hình cuộc thi',
   'split-screen': 'Chấm song song',
+  judging: 'Chấm thi',
   'final-submission': 'Nộp bài chung cuộc',
   scoreboard: 'Bảng xếp hạng',
   tickets: 'Hỗ trợ trực tuyến',
@@ -73,13 +73,11 @@ export const TopNav: React.FC<TopNavProps> = ({
   contestName,
   currentPhase,
   blindJudgingMode,
-  announcements,
   displayName,
   displayEmail,
   avatarUrl,
   onOpenMobileMenu,
 }) => {
-  const [showAnnouncements, setShowAnnouncements] = useState(false);
   const { theme, toggleTheme } = useThemeStore();
   const { user, login } = useAuthStore();
   const { switchPersona } = useMockStore();
@@ -247,62 +245,8 @@ export const TopNav: React.FC<TopNavProps> = ({
           {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
         </button>
 
-        {/* Announcements Popover */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowAnnouncements((prev) => !prev)}
-            aria-label="Thông báo hệ thống"
-            aria-expanded={showAnnouncements}
-            className="relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-colors cursor-pointer"
-            title="Thông báo từ Ban Tổ Chức"
-          >
-            <Bell size={15} />
-            {announcements.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-primary ring-2 ring-card" />
-            )}
-          </button>
-
-          {showAnnouncements && (
-            <div
-              role="dialog"
-              aria-label="Thông báo từ Ban Tổ Chức"
-              className="absolute right-0 mt-2 w-80 sm:w-96 rounded-lg border border-border bg-popover p-4 text-popover-foreground shadow-elevated z-50"
-            >
-              <div className="flex items-center justify-between pb-2.5 border-b border-border">
-                <span className="text-sm font-semibold text-foreground">
-                  Thông Báo Ban Tổ Chức
-                </span>
-                <Badge variant="indigo">{announcements.length} tin</Badge>
-              </div>
-              <div className="mt-3 space-y-2 max-h-72 overflow-y-auto pr-1">
-                {announcements.length === 0 ? (
-                  <p className="py-4 text-center text-xs text-muted-foreground">
-                    Chưa có thông báo mới.
-                  </p>
-                ) : (
-                  announcements.map((ann) => (
-                    <div
-                      key={ann.id}
-                      className="rounded-md bg-muted/60 border border-border p-3 text-xs space-y-1"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-foreground">{ann.title}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground shrink-0">
-                          {ann.createdAt}
-                        </span>
-                      </div>
-                      <p className="text-muted-foreground leading-relaxed">{ann.content}</p>
-                      <div className="text-[10px] text-primary font-medium pt-0.5">
-                        Người gửi: {ann.sender || 'Ban Tổ Chức'}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Notification Bell (SRS HF-24) */}
+        <NotificationBell />
 
         {/* User Profile Pill */}
         <div className="flex items-center gap-2.5 pl-2 border-l border-border">

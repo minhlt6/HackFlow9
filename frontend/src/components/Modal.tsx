@@ -15,6 +15,8 @@ interface ModalProps {
   children: React.ReactNode;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl';
   titleClassName?: string;
+  preventBackdropClose?: boolean;
+  hideCloseButton?: boolean;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -24,6 +26,8 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   maxWidth = 'md',
   titleClassName,
+  preventBackdropClose = false,
+  hideCloseButton = false,
 }) => {
   const maxWidthClass = {
     sm: 'max-w-sm',
@@ -37,8 +41,12 @@ export const Modal: React.FC<ModalProps> = ({
   }[maxWidth];
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className={cn(maxWidthClass)}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => !open && onClose()}
+      preventBackdropClose={preventBackdropClose}
+    >
+      <DialogContent className={cn(maxWidthClass)} hideCloseButton={hideCloseButton}>
         <DialogHeader>
           <DialogTitle className={cn(titleClassName)}>{title}</DialogTitle>
         </DialogHeader>

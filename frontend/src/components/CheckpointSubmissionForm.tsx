@@ -657,7 +657,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
             }
             disabled={isFormLocked || isSubmitting || !isTeamLeader}
             {...register('note')}
-            className="w-full px-4 py-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] text-sm resize-none disabled:opacity-50 disabled:bg-[#0B1120]"
+            className="w-full px-4 py-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1] text-sm resize-none disabled:opacity-50 disabled:bg-muted"
           />
           {errors.note && (
             <span className="text-xs text-rose-700 dark:text-rose-400 mt-1 block">{errors.note.message}</span>

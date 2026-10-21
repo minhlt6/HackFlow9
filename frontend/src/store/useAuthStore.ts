@@ -11,12 +11,24 @@ interface AuthState {
   updateUser: (updatedUser: Partial<User>) => void;
 }
 
+export const DEFAULT_MOCK_USER: User = {
+  id: 'usr-minh-01',
+  email: 'leader@cybersamurai.team',
+  fullName: 'Nguyễn Văn Minh',
+  role: 'candidate',
+  approvalStatus: 'approved',
+  team_role: 'TEAM_LEADER',
+};
+
+const isLocalMockAuth =
+  import.meta.env.DEV && import.meta.env.VITE_MOCK_AUTH === 'true';
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
-      user: null,
-      token: null,
-      isAuthenticated: false,
+      user: isLocalMockAuth ? DEFAULT_MOCK_USER : null,
+      token: isLocalMockAuth ? 'mock-leader-token-2026' : null,
+      isAuthenticated: isLocalMockAuth,
       login: (user, token) => {
         localStorage.setItem('token', token);
         set({ user, token, isAuthenticated: true });
@@ -32,6 +44,34 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      merge: (persistedState, currentState) => {
+        const p = persistedState as Partial<AuthState> | undefined;
+
+        // Nếu không bật VITE_MOCK_AUTH mà trong localStorage còn lưu token giả từ bản test cũ,
+        // tự động xóa phiên giả để bảo toàn luồng đăng nhập thật.
+        if (!isLocalMockAuth && p?.token === 'mock-leader-token-2026') {
+          localStorage.removeItem('token');
+          return {
+            ...currentState,
+            user: null,
+            token: null,
+            isAuthenticated: false,
+          };
+        }
+
+        // Chỉ tự động gán user mẫu khi dev chủ động bật VITE_MOCK_AUTH=true ở local
+        if (isLocalMockAuth && !p?.user) {
+          return {
+            ...currentState,
+            ...p,
+            user: DEFAULT_MOCK_USER,
+            token: 'mock-leader-token-2026',
+            isAuthenticated: true,
+          };
+        }
+
+        return { ...currentState, ...p };
+      },
     }
   )
 );

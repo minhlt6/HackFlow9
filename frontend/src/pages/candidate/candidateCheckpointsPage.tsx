@@ -139,7 +139,9 @@ export const CandidateCheckpointsPage: React.FC = () => {
             <CheckSquare size={22} />
           </span>
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-foreground">
+            <h1
+              className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide inline-block"
+            >
               Tiến độ và Nộp bài Checkpoint
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">

@@ -151,7 +151,7 @@ export const CandidateTopicsPage: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="font-semibold tracking-tight text-foreground text-xl text-foreground tracking-wide">
-                    {major.name}
+                    {(major.name || major.title || '').replace(/\s*&\s*/g, ' và ')}
                   </h3>
                   <p className="text-xs text-muted-foreground">{major.description}</p>
                 </div>

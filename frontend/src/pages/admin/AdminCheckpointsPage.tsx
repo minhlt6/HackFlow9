@@ -597,7 +597,7 @@ export const AdminCheckpointsPage: React.FC = () => {
             <h1
               className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
             >
-              Cấu Hình Chặng Nộp & Thời Lượng
+              Cấu Hình Chặng Nộp và Thời Lượng
             </h1>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground">

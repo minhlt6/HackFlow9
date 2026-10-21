@@ -6,11 +6,10 @@ import { RejectedAccountPage } from './pages/RejectedAccountPage';
 import { AuthCallback } from './pages/AuthCallback';
 import { TeamsPage } from './pages/TeamsPage';
 import { CandidateDashboardPage } from './pages/candidate/CandidateDashboardPage';
+
 import { CandidateCheckpointsPage } from './pages/candidate/candidateCheckpointsPage';
-import { CandidateTopicsPage } from './pages/candidate/CandidateTopicsPage';
+import { TopicsPage } from './pages/TopicsPage';
 import { CandidateFinalSubmissionPage } from './pages/candidate/CandidateFinalSubmissionPage';
-import { CandidateLeaderboardPage } from './pages/candidate/CandidateLeaderboardPage';
-import { CandidateTicketsPage } from './pages/candidate/CandidateTicketsPage';
 import { CandidateProfilePage } from './pages/candidate/CandidateProfilePage';
 import { UIPreviewPage } from './pages/UIPreviewPage';
 import { MainLayout } from './layouts/MainLayout';
@@ -32,13 +31,14 @@ import { AdminConfigPage } from './pages/admin/AdminConfigPage';
 
 // Judge Pages
 import { JudgeDashboardPage } from './pages/judge/JudgeDashboardPage';
-import { JudgeSplitScreenPage } from './pages/judge/JudgeSplitScreenPage';
 import { JudgeTopicsPage } from './pages/judge/JudgeTopicsPage';
 import { JudgeResultsPage } from './pages/judge/JudgeResultsPage';
+import { JudgingWorkspace } from './pages/JudgingWorkspace';
+import { Scoreboard } from './pages/Scoreboard';
+import { SupportTickets } from './pages/SupportTickets';
 
 // Mentor Pages
 import { MentorDashboardPage } from './pages/mentor/MentorDashboardPage';
-import { MentorTicketsPage } from './pages/mentor/MentorTicketsPage';
 import { MentorTeamsPage } from './pages/mentor/MentorTeamsPage';
 import { MentorCheckpointsPage } from './pages/mentor/MentorCheckpointsPage';
 
@@ -73,6 +73,7 @@ const ROUTE_TITLES: Record<string, string> = {
   '/judge': 'Tổng quan Chấm thi',
   '/judge/dashboard': 'Tổng quan Chấm thi',
   '/judge/split-screen': 'Chấm song song',
+  '/judging': 'Không gian Giám khảo Chấm thi (Split-screen)',
   '/judge/topics': 'Đề tài & Đội thi',
   '/judge/results': 'Bảng tổng hợp điểm',
   // Mentor
@@ -150,15 +151,23 @@ const router = createBrowserRouter([
       {
         path: '/preview-teams',
         element: (
-          <div className="min-h-screen bg-muted/40 dark:bg-slate-900/60 text-foreground p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
             <TeamsPage />
+          </div>
+        ),
+      },
+      {
+        path: '/preview-topics',
+        element: (
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
+            <TopicsPage />
           </div>
         ),
       },
       {
         path: '/preview-checkpoints',
         element: (
-          <div className="min-h-screen bg-muted/40 dark:bg-slate-900/60 text-foreground p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
             <CandidateCheckpointsPage />
           </div>
         ),
@@ -166,6 +175,22 @@ const router = createBrowserRouter([
       {
         path: '/preview-ui',
         element: <UIPreviewPage />,
+      },
+      {
+        path: '/preview-judging',
+        element: (
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
+            <JudgingWorkspace />
+          </div>
+        ),
+      },
+      {
+        path: '/preview-tickets',
+        element: (
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
+            <SupportTickets />
+          </div>
+        ),
       },
 
       {
@@ -180,11 +205,11 @@ const router = createBrowserRouter([
               { path: '/', element: <RoleRootPage /> },
               { path: '/dashboard', element: <CandidateDashboardPage /> },
               { path: '/teams', element: <TeamsPage /> },
-              { path: '/topics', element: <CandidateTopicsPage /> },
+              { path: '/topics', element: <TopicsPage /> },
               { path: '/checkpoints', element: <CandidateCheckpointsPage /> },
               { path: '/final-submission', element: <CandidateFinalSubmissionPage /> },
-              { path: '/scoreboard', element: <CandidateLeaderboardPage /> },
-              { path: '/tickets', element: <CandidateTicketsPage /> },
+              { path: '/scoreboard', element: <Scoreboard /> },
+              { path: '/tickets', element: <SupportTickets /> },
 
               // Admin Routes
               { path: '/admin', element: <AdminDashboardPage /> },
@@ -203,14 +228,15 @@ const router = createBrowserRouter([
               // Judge Routes
               { path: '/judge', element: <JudgeDashboardPage /> },
               { path: '/judge/dashboard', element: <JudgeDashboardPage /> },
-              { path: '/judge/split-screen', element: <JudgeSplitScreenPage /> },
+              { path: '/judge/split-screen', element: <JudgingWorkspace /> },
+              { path: '/judging', element: <JudgingWorkspace /> },
               { path: '/judge/topics', element: <JudgeTopicsPage /> },
               { path: '/judge/results', element: <JudgeResultsPage /> },
 
               // Mentor Routes
               { path: '/mentor', element: <MentorDashboardPage /> },
               { path: '/mentor/dashboard', element: <MentorDashboardPage /> },
-              { path: '/mentor/tickets', element: <MentorTicketsPage /> },
+              { path: '/mentor/tickets', element: <SupportTickets /> },
               { path: '/mentor/teams', element: <MentorTeamsPage /> },
               { path: '/mentor/checkpoints', element: <MentorCheckpointsPage /> },
             ],

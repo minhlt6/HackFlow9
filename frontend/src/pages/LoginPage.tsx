@@ -4,7 +4,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { axiosClient } from '../api/axiosClient';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMockStore } from '../store/useMockStore';
-import { mockUsers } from '../mock/mockData';
 import { Button } from '../components/Button';
 import type { ApprovalStatus, User, UserRole } from '../types';
 
@@ -43,19 +42,7 @@ const IDENTIFIER_ALIASES: Record<string, string> = {
   user: 'leader@cybersamurai.team',
   member: 'member@cybersamurai.team',
   pending: 'pending@hust.edu.vn',
-  'newbie.candidate@hust.edu.vn': 'pending@hust.edu.vn',
   rejected: 'rejected@fpt.edu.vn',
-  'spammer@random.com': 'rejected@fpt.edu.vn',
-};
-
-const MOCK_FALLBACK_USERS: Record<string, User> = {
-  'admin@hackflow.dev': mockUsers.admin,
-  'judge.tech@hackathon.org': mockUsers.judge,
-  'mentor.ai@ailab.org.vn': mockUsers.mentor,
-  'leader@cybersamurai.team': mockUsers.leader,
-  'member@cybersamurai.team': mockUsers.member,
-  'pending@hust.edu.vn': { ...mockUsers.pending, email: 'pending@hust.edu.vn' },
-  'rejected@fpt.edu.vn': { ...mockUsers.rejected, email: 'rejected@fpt.edu.vn' },
 };
 
 const normalizeAuthResponse = (response: AuthResponse): { user: User; token: string } | null => {
@@ -93,6 +80,60 @@ const redirectForUser = (user: User): string => {
     mentor: '/mentor/dashboard',
     candidate: '/dashboard',
   }[user.role];
+};
+
+const LOCAL_DEV_DEMO_USERS: Record<string, User> = {
+  'admin@hackflow.dev': {
+    id: 'usr-admin-01',
+    email: 'admin@hackflow.dev',
+    fullName: 'BTC HackFlow Administrator',
+    role: 'admin',
+    approvalStatus: 'approved',
+  },
+  'judge.tech@hackathon.org': {
+    id: 'usr-judge-01',
+    email: 'judge.tech@hackathon.org',
+    fullName: 'TS. Nguyễn Hoàng Giám Khảo',
+    role: 'judge',
+    approvalStatus: 'approved',
+  },
+  'mentor.ai@ailab.org.vn': {
+    id: 'usr-mentor-01',
+    email: 'mentor.ai@ailab.org.vn',
+    fullName: 'ThS. Phạm Cố Vấn AI',
+    role: 'mentor',
+    approvalStatus: 'approved',
+  },
+  'leader@cybersamurai.team': {
+    id: 'usr-minh-01',
+    email: 'leader@cybersamurai.team',
+    fullName: 'Nguyễn Văn Minh',
+    role: 'candidate',
+    approvalStatus: 'approved',
+    team_role: 'TEAM_LEADER',
+  },
+  'member@cybersamurai.team': {
+    id: 'usr-thao-02',
+    email: 'member@cybersamurai.team',
+    fullName: 'Trần Thị Thảo',
+    role: 'candidate',
+    approvalStatus: 'approved',
+    team_role: 'MEMBER',
+  },
+  'pending@hust.edu.vn': {
+    id: 'usr-pending-01',
+    email: 'pending@hust.edu.vn',
+    fullName: 'Vũ Hoàng Chờ Duyệt',
+    role: 'candidate',
+    approvalStatus: 'pending',
+  },
+  'rejected@fpt.edu.vn': {
+    id: 'usr-rejected-01',
+    email: 'rejected@fpt.edu.vn',
+    fullName: 'Đặng Tuấn Từ Chối',
+    role: 'candidate',
+    approvalStatus: 'rejected',
+  },
 };
 
 const syncMockStoreWithUser = (user: User) => {
@@ -181,14 +222,23 @@ export const LoginPage: React.FC = () => {
       useAuthStore.getState().login(auth.user, auth.token);
       syncMockStoreWithUser(auth.user);
       navigate(redirectForUser(auth.user), { replace: true });
-    } catch {
-      const fallbackUser = MOCK_FALLBACK_USERS[userClean];
-      if (fallbackUser && passClean === '123456') {
-        useAuthStore.getState().login(fallbackUser, `mock-jwt-${fallbackUser.id}`);
-        syncMockStoreWithUser(fallbackUser);
-        navigate(redirectForUser(fallbackUser), { replace: true });
+    } catch (err: unknown) {
+      // Chỉ ở môi trường DEV local khi không bật Backend (Network Error), hỗ trợ đăng nhập tài khoản demo
+      // Trên Production (Railway), luôn bắt buộc xác thực qua Backend thật.
+      const hasHttpResponse =
+        typeof err === 'object' &&
+        err !== null &&
+        'response' in err &&
+        Boolean((err as { response?: { status?: number } }).response?.status);
+
+      const devFallbackUser = LOCAL_DEV_DEMO_USERS[userClean];
+      if (import.meta.env.DEV && !hasHttpResponse && devFallbackUser && passClean === '123456') {
+        useAuthStore.getState().login(devFallbackUser, `dev-local-token-${devFallbackUser.id}`);
+        syncMockStoreWithUser(devFallbackUser);
+        navigate(redirectForUser(devFallbackUser), { replace: true });
         return;
       }
+
       setErrorMessage('Tài khoản hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.');
     } finally {
       setIsLoading(false);

@@ -63,7 +63,9 @@ class TeamResponse(BaseModel):
     member_count: int
     min_members: int = 3
     max_members: int = 5
+    leader_id: Optional[str] = None
     topic_id: Optional[str] = None
+    topic_name: Optional[str] = None
     subtopic_id: Optional[str] = None
     members: List[TeamMemberResponse] = []
     created_at: Optional[datetime] = None

@@ -1,0 +1,92 @@
+name: HackFlow9 CI/CD Pipeline
+
+on:
+  push:
+    branches: [master, main, develop]
+  pull_request:
+    branches: [master, main, develop]
+  workflow_dispatch:
+
+# Hủy các lần chạy CI cũ trên cùng một nhánh khi có commit mới được đẩy lên
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # JOB 1: BACKEND CI — Kiểm thử API, Nghiệp vụ & Database (FastAPI + Pytest)
+  # ============================================================================
+  backend-ci:
+    name: Backend CI (FastAPI & Pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: 1. Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: 2. Thiết lập Python 3.12 & bộ nhớ đệm (Cache pip)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 3. Cài đặt thư viện Backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 4. Chạy bộ kiểm thử tự động (Unit & Integration Tests)
+        env:
+          ENVIRONMENT: testing
+          DEBUG: "false"
+          DATABASE_URL: sqlite+aiosqlite:///./test_ci.db
+          SECRET_KEY: ci-test-secret-key-minimum-32-characters-long
+          GITHUB_CLIENT_ID: ""
+          GITHUB_CLIENT_SECRET: ""
+        run: |
+          pytest -v --tb=short
+
+  # ============================================================================
+  # JOB 2: FRONTEND CI — Kiểm tra kiểu dữ liệu TypeScript & Đóng gói Vite Build
+  # ============================================================================
+  frontend-ci:
+    name: Frontend CI (TypeScript & Vite Build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: 1. Checkout mã nguồn
+        uses: actions/checkout@v4
+
+      - name: 2. Thiết lập Node.js 22 & bộ nhớ đệm (Cache npm)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 3. Cài đặt thư viện Frontend
+        run: npm ci
+
+      - name: 4. Kiểm tra kiểu dữ liệu TypeScript & Đóng gói Production
+        env:
+          VITE_API_BASE_URL: https://hackflow9-production.up.railway.app
+        run: npm run build
+
+  # ============================================================================
+  # JOB 3: QUALITY GATE — Xác nhận toàn bộ CI thành công để cho phép Deploy
+  # ============================================================================
+  quality-gate:
+    name: CI Quality Gate
+    needs: [backend-ci, frontend-ci]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Xác nhận vượt qua toàn bộ bài kiểm thử
+        run: |
+          echo "✅ Backend CI (FastAPI & Pytest) và Frontend CI (TypeScript & Vite Build) đã hoàn tất thành công!"

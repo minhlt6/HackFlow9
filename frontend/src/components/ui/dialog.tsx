@@ -7,6 +7,7 @@ export interface DialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: React.ReactNode;
+  preventBackdropClose?: boolean;
 }
 
 const DialogContext = React.createContext<{
@@ -17,10 +18,15 @@ const DialogContext = React.createContext<{
   onOpenChange: () => undefined,
 });
 
-export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) => {
+export const Dialog: React.FC<DialogProps> = ({
+  open,
+  onOpenChange,
+  children,
+  preventBackdropClose = false,
+}) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
+      if (e.key === 'Escape' && !preventBackdropClose) {
         onOpenChange(false);
       }
     };
@@ -32,7 +38,7 @@ export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) 
       document.body.style.overflow = '';
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [open, onOpenChange]);
+  }, [open, onOpenChange, preventBackdropClose]);
 
   if (!open) return null;
 
@@ -46,7 +52,7 @@ export const Dialog: React.FC<DialogProps> = ({ open, onOpenChange, children }) 
         >
           <div
             className="fixed inset-0 bg-slate-950/60 backdrop-blur-[2px] transition-opacity"
-            onClick={() => onOpenChange(false)}
+            onClick={preventBackdropClose ? undefined : () => onOpenChange(false)}
             aria-hidden="true"
           />
           {children}

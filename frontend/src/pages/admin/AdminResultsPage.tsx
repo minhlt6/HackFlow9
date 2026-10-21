@@ -49,7 +49,7 @@ export const AdminResultsPage: React.FC = () => {
           <h1
             className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
           >
-            Tổng Hợp Điểm & Công Bố Kết Quả
+            Tổng Hợp Điểm và Công Bố Kết Quả
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Tổng hợp dữ liệu chấm thi từ Hội đồng Giám khảo theo công thức tính điểm trọng số và điều khiển công bố bảng xếp hạng.

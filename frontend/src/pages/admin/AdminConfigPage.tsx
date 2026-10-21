@@ -201,7 +201,7 @@ export const AdminConfigPage: React.FC = () => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                placeholder="Ví dụ: HackFlow AI & DeepTech Hackathon 2026"
+                placeholder="Ví dụ: HackFlow AI và DeepTech Hackathon 2026"
               />
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -3,6 +3,9 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { AppSidebar } from '../components/layout/AppSidebar';
 import { TopNav } from '../components/layout/TopNav';
 import { Toaster } from '../components/ui/toast';
+import { NotificationBanner } from '../components/NotificationBanner';
+import { UrgentNotificationModal } from '../components/UrgentNotificationModal';
+import { InfoToast } from '../components/InfoToast';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMockStore } from '../store/useMockStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -54,20 +57,18 @@ export const MainLayout: React.FC = () => {
       targetPersona = 'judge';
     } else if (user.role === 'mentor') {
       targetPersona = 'mentor';
+    } else if (user.approvalStatus === 'pending') {
+      targetPersona = 'pending';
+    } else if (user.approvalStatus === 'rejected') {
+      targetPersona = 'rejected';
+    } else if (
+      user.team_role === 'MEMBER' ||
+      user.team_role === 'member' ||
+      user.email.toLowerCase().includes('member')
+    ) {
+      targetPersona = 'member';
     } else {
-      if (user.approvalStatus === 'pending') {
-        targetPersona = 'pending';
-      } else if (user.approvalStatus === 'rejected') {
-        targetPersona = 'rejected';
-      } else if (
-        user.team_role === 'MEMBER' ||
-        user.team_role === 'member' ||
-        user.email.toLowerCase().includes('member')
-      ) {
-        targetPersona = 'member';
-      } else {
-        targetPersona = 'leader';
-      }
+      targetPersona = 'leader';
     }
 
     switchPersona(targetPersona);
@@ -119,10 +120,13 @@ export const MainLayout: React.FC = () => {
         )}
       >
         <TopNav
-          contestName={config?.name || 'HackFlow AI & DeepTech Hackathon 2026'}
+          contestName={
+            config?.name?.replace('&', 'và') ||
+            'HackFlow AI và DeepTech Hackathon 2026'
+          }
           currentPhase={
             config?.currentPhase ||
-            'Giai đoạn 3: Thực thi dự án & Nộp bài các chặng'
+            'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng'
           }
           blindJudgingMode={config?.blindJudgingMode}
           announcements={announcements}
@@ -132,6 +136,9 @@ export const MainLayout: React.FC = () => {
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
         />
 
+        {/* Warning Top Banner (SRS HF-24) */}
+        <NotificationBanner />
+
         <main className="flex-1 p-4 sm:p-6 lg:p-8 bg-background">
           <div className="mx-auto w-full max-w-[1440px]">
             <Outlet />
@@ -139,6 +146,9 @@ export const MainLayout: React.FC = () => {
         </main>
       </div>
 
+      {/* Blocking Urgent Modal, Info Toast & Design System Toaster */}
+      <UrgentNotificationModal />
+      <InfoToast />
       <Toaster />
     </div>
   );

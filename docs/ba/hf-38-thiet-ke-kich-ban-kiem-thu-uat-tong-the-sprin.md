@@ -1,0 +1,91 @@
+---
+id: "HF-38"
+title: "Thiết kế Kịch bản Kiểm thử UAT Tổng thể Sprint 4 (Judging, Blind Mode & Tickets)"
+status: "Done"
+assignee: "Phuong ly Dinh"
+priority: "P0"
+deadline: "2026-10-20"
+notion_url: "https://app.notion.com/p/HF-38-Thi-t-k-K-ch-b-n-Ki-m-th-UAT-T-ng-th-Sprint-4-Judging-Blind-Mode-Tickets-3f91caaa7e85814abb24cc67b0b61780"
+last_edited: "20:56:00 20/10/2026"
+pulled_at: "20:56:40 20/10/2026"
+---
+
+# HF-38 — Thiết kế Kịch bản Kiểm thử UAT Tổng thể Sprint 4 (Judging, Blind Mode & Tickets)
+
+| | |
+|---|---|
+| **Status** | Done |
+| **Assignee** | Phuong ly Dinh |
+| **Sprint** | — |
+| **Ưu tiên** | P0 |
+| **Hạn hoàn thành** | 2026-10-20 |
+| **Cập nhật** | 20:56:00 20/10/2026 |
+| **Notion** | [Mở trang](https://app.notion.com/p/HF-38-Thi-t-k-K-ch-b-n-Ki-m-th-UAT-T-ng-th-Sprint-4-Judging-Blind-Mode-Tickets-3f91caaa7e85814abb24cc67b0b61780) |
+
+---
+
+## 🎯 Mục tiêu công việc
+Xây dựng bộ Kịch bản Kiểm thử Chấp nhận Người dùng (UAT Test Cases) toàn diện cho các phân hệ Sprint 4 dựa sát trên đặc tả SRS HF-36 (Chấm thi Rubric, Blind Judging, Cảnh báo lệch điểm, Bảng xếp hạng) và HF-37 (Helpdesk Ticket & Phân quyền Mentor).
+
+## 🛠️ Các bước thực hiện chi tiết (Step-by-step Guide)
+1. Bước 1 — Thiết lập cấu trúc Bảng Test Case chuẩn: Tạo bảng gồm 7 cột: Mã TC | Phân hệ | Tên kịch bản | Vai trò (Role) | Tiền điều kiện (Given) | Các bước thực hiện (When) | Kết quả mong đợi (Then - HTTP Status, Error Code & Hiển thị UI).
+1. Bước 2 — Viết nhóm kịch bản Cấu hình Rubric & Blind Judging (UAT-S4-01 đến UAT-S4-06, bám sát SRS HF-36): (1) Admin tạo bộ tiêu chí có tổng trọng số = 1.00 (201 Created); (2) Admin tạo bộ tiêu chí có tổng trọng số != 1.00 -> chặn lỗi 400 CRITERIA_WEIGHT_INVALID; (3) Giám khảo mở /judging (GET /api/v1/evaluations/submissions) -> kiểm tra Blind Judging chỉ hiện anonymous_team_code (VD: Team #8F9A), tuyệt đối không lộ team_name hay tên thành viên; (4) Giám khảo lưu nháp (status: "draft") khi mới chấm 1 phần -> 200 OK; (5) Giám khảo nhập điểm vượt max_score (422 SCORE_OUT_OF_RANGE) hoặc khóa điểm khi bỏ trống tiêu chí bắt buộc (422 MISSING_RUBRIC_CRITERIA_SCORE); (6) Giám khảo cố sửa điểm sau khi đã khóa (status: "submitted") -> chặn lỗi 409 EVALUATION_ALREADY_LOCKED.
+1. Bước 3 — Viết nhóm kịch bản Cảnh báo lệch điểm & Công bố Bảng xếp hạng (UAT-S4-07 đến UAT-S4-10): (1) Hai giám khảo chấm lệch > 15.0 điểm (VD: 92.0 và 70.0) hoặc độ lệch chuẩn > 10.0 -> hệ thống bật cờ has_discrepancy = true (HIGH_DISCREPANCY_WARNING) cho Admin; (2) Hai đội bằng điểm nhau -> hệ thống xếp hạng theo quy tắc Tie-breaker 3 cấp (Tiêu chí trọng số cao nhất -> Độ lệch chuẩn thấp hơn -> Thời gian nộp Final Checkpoint sớm hơn); (3) Khi is_result_published = false, Thí sinh vào /scoreboard bị chặn 403 RESULTS_NOT_PUBLISHED; (4) Admin gọi PATCH /api/v1/admin/leaderboard/publish -> chuyển sang PUBLISHED, Thí sinh xem được Top 3 Podium.
+1. Bước 4 — Viết nhóm kịch bản Helpdesk Ticket & Phân quyền Mentor (UAT-S4-11 đến UAT-S4-15): (1) Thí sinh tạo ticket mới -> Đội khác gọi GET /api/v1/tickets/me không thấy ticket này; (2) Mentor nhận xử lý (in_progress) và gửi phản hồi (resolved); (3) Mentor cố gọi API chấm điểm GET /api/v1/evaluations/submissions hoặc POST /api/v1/evaluations -> chặn cứng 403 FORBIDDEN.
+
+## ✅ Acceptance Criteria (Tiêu chí nghiệm thu)
+- [x] Trình bày dạng Bảng (Table) chuẩn với tối thiểu 15 kịch bản UAT bao phủ đầy đủ Positive & Negative Cases của Sprint 4.
+- [x] Bao phủ đầy đủ nhóm kịch bản Giám khảo (Rubric, Blind Judging, Draft vs Submitted, 422/409) và nhóm kịch bản BTC (Cảnh báo lệch điểm > 15.0, Tie-breaker, Publish Leaderboard).
+- [x] Bao phủ nhóm kịch bản Mentor & Thí sinh (Tạo ticket, phản hồi ticket, cô lập dữ liệu đội thi và chặn 403 khi Mentor truy cập luồng chấm điểm).
+> **📌** 💡 Lưu ý kỹ thuật: Đảm bảo các mã lỗi trong cột Kết quả mong đợi khớp chính xác 100% với đặc tả SRS HF-36 (CRITERIA_WEIGHT_INVALID, SCORE_OUT_OF_RANGE, MISSING_RUBRIC_CRITERIA_SCORE, EVALUATION_ALREADY_LOCKED, RESULTS_NOT_PUBLISHED).
+
+## 
+
+## Nhóm A — Cấu hình Rubric, Blind Judging và quản lý phiếu chấm
+
+| Mã TC | Phân hệ | Tên kịch bản | Vai trò (Role) | Tiền điều kiện (Given) | Các bước thực hiện (When) | Kết quả mong đợi (Then - HTTP Status, Error Code & Hiển thị UI) |
+| --- | --- | --- | --- | --- | --- | --- |
+| UAT-S4-01 | HF-36 — Rubric | Tạo bộ Rubric hợp lệ có tổng trọng số bằng 1.00 | admin | Admin đã đăng nhập; các tiêu chí có tên, max_score > 0; tổng trọng số bằng 1.00. | 1. Mở giao diện cấu hình Rubric.  2. Nhập các tiêu chí: Ý tưởng (0.40), Kỹ thuật (0.35), Trình bày (0.25).  3. Gọi POST /api/v1/rubrics với payload chứa danh sách tiêu chí. | HTTP 201 Created. Bộ Rubric được tạo thành công; tổng trọng số hiển thị 100%; danh sách tiêu chí và trọng số khớp dữ liệu đã nhập. |
+| UAT-S4-02 | HF-36 — Rubric | Từ chối bộ Rubric có tổng trọng số khác 1.00 | admin | Admin đã đăng nhập; tổng trọng số các tiêu chí bằng 0.90 hoặc 1.10. | 1. Nhập bộ Rubric có tổng trọng số không hợp lệ.  2. Gọi POST /api/v1/rubrics. | HTTP 400 Bad Request, error_code: CRITERIA_WEIGHT_INVALID. Không tạo bộ Rubric không hợp lệ. UI thông báo tổng trọng số phải bằng 100% và cho phép Admin chỉnh sửa. |
+| UAT-S4-03 | HF-36 — Blind Judging | Giám khảo xem bài nộp và xác minh dữ liệu đã được ẩn danh | judge | Giám khảo đã đăng nhập và được phân công ít nhất một bài nộp Final Checkpoint. | 1. Truy cập /judging.  2. Gọi GET /api/v1/evaluations/submissions.  3. Kiểm tra response API và giao diện chi tiết bài nộp. | HTTP 200 OK. Chỉ trả về bài nộp thuộc phạm vi được phân công. UI hiển thị mã ẩn danh, ví dụ Team #8F9A, tiêu đề đề tài và các liên kết bài thi được phép xem. Không trả về team_name, tên thành viên hoặc thông tin định danh thí sinh trong dữ liệu dành cho giám khảo. |
+| UAT-S4-04 | HF-36 — Evaluation | Lưu nháp phiếu chấm khi mới chấm một phần tiêu chí | judge | Giám khảo được phân công; Rubric hợp lệ; phiếu chấm đang ở trạng thái draft. | 1. Mở bài nộp được phân công.  2. Chỉ nhập điểm cho một số tiêu chí.  3. Gọi POST /api/v1/evaluations với dữ liệu điểm đã nhập và status: "draft".  4. Tải lại phiếu chấm. | HTTP 200 OK. Điểm đã nhập được lưu; trạng thái vẫn là draft. UI cho phép tiếp tục chỉnh sửa và không bắt buộc hoàn thành toàn bộ tiêu chí khi chỉ lưu nháp. |
+| UAT-S4-05 | HF-36 — Validation điểm | Chặn điểm vượt giới hạn và chặn khóa phiếu còn thiếu tiêu chí bắt buộc | judge | Giám khảo được phân công; phiếu chấm đang ở trạng thái draft; mỗi tiêu chí có max_score xác định. | Nhánh A: Nhập điểm lớn hơn max_score hoặc nhỏ hơn 0, sau đó gửi yêu cầu lưu điểm.  Nhánh B: Bỏ trống một tiêu chí bắt buộc rồi gửi yêu cầu với status: "submitted". | Nhánh A: HTTP 422 Unprocessable Entity, error_code: SCORE_OUT_OF_RANGE; điểm không hợp lệ không được lưu, UI đánh dấu trường lỗi. Nhánh B: HTTP 422 Unprocessable Entity, error_code: MISSING_RUBRIC_CRITERIA_SCORE; phiếu không được khóa, vẫn ở draft, UI thông báo tiêu chí còn thiếu. |
+| UAT-S4-06 | HF-36 — Evaluation | Chặn sửa phiếu chấm sau khi đã khóa | judge | Phiếu chấm đã ở trạng thái submitted; điểm và nhận xét đã được lưu. | 1. Mở phiếu chấm đã khóa.  2. Thử thay đổi điểm hoặc nhận xét. 3. Gửi yêu cầu cập nhật phiếu chấm qua API. | HTTP 409 Conflict, error_code: EVALUATION_ALREADY_LOCKED. Backend không thay đổi dữ liệu đã khóa. UI hiển thị phiếu ở chế độ chỉ đọc. |
+| UAT-S4-23 | HF-36 — Evaluation Unlock | Admin mở khóa phiếu chấm đã submitted và kiểm tra lý do bắt buộc | admin | Phiếu chấm tồn tại, có trạng thái submitted; Admin có quyền quản trị chấm thi. | Nhánh A: Gọi POST /api/v1/admin/evaluations/{evaluation_id}/unlock với payload {"reason":"Yêu cầu rà soát lại điểm do phát hiện sai sót."}.  Nhánh B: Gọi cùng endpoint với payload {"reason":" "} hoặc thiếu trường reason. | Nhánh A: Nếu API unlock được triển khai theo contract, trả về thành công 200 OK; phiếu chuyển từ submitted về draft; ghi Audit Log gồm người thực hiện, phiếu chấm, lý do và thời điểm. UI cho phép chỉnh sửa lại phiếu. Nhánh B: HTTP 422 Unprocessable Entity, error_code: UNLOCK_REASON_REQUIRED; trạng thái vẫn là submitted, không ghi nhận mở khóa thành công. |
+
+
+## Nhóm B — Cảnh báo lệch điểm và công bố bảng xếp hạng
+
+| Mã TC | Phân hệ | Tên kịch bản | Vai trò (Role) | Tiền điều kiện (Given) | Các bước thực hiện (When) | Kết quả mong đợi (Then - HTTP Status, Error Code & Hiển thị UI) |
+| --- | --- | --- | --- | --- | --- | --- |
+| UAT-S4-07 | HF-36 — Discrepancy | Phát hiện chênh lệch điểm lớn giữa hai giám khảo | admin | Cùng một bài nộp có hai phiếu chấm submitted; điểm tổng lần lượt là 92.0 và 70.0 trên thang 100. | 1. Hoàn tất hai phiếu chấm.  2. Mở Dashboard tổng hợp điểm.  3. Kiểm tra has_discrepancy và cảnh báo. | Quá trình tổng hợp điểm thành công. max(S) - min(S) = 22.0 > 15.0, do đó has_discrepancy = true. Với hai điểm 92.0 và 70.0, độ lệch chuẩn dân số là 11.0, cũng lớn hơn 10.0. UI Admin hiển thị HIGH_DISCREPANCY_WARNING và đánh dấu bài nộp cần rà soát. Đây là cảnh báo nghiệp vụ, không phải lỗi HTTP nếu API tổng hợp thành công. |
+| UAT-S4-08 | HF-36 — Leaderboard | Xếp hạng hai đội bằng điểm theo Tie-breaker ba cấp | admin | Hai đội có cùng tổng điểm; phiếu chấm đã hoàn tất; điểm tiêu chí, độ lệch chuẩn và thời gian nộp Final Checkpoint có sẵn. | 1. Mở bảng xếp hạng nội bộ.  2. Kiểm tra lần lượt: (a) điểm ở tiêu chí cốt lõi có trọng số cao nhất; (b) độ lệch chuẩn giữa giám khảo; (c) thời gian nộp Final Checkpoint.  3. Đối chiếu thứ hạng do hệ thống tạo. | HTTP 200 OK khi truy vấn thành công. Hệ thống áp dụng theo thứ tự: (1) điểm cao hơn ở tiêu chí cốt lõi có trọng số lớn nhất; (2) độ lệch chuẩn thấp hơn; (3) thời gian nộp Final Checkpoint sớm hơn. Chỉ xét cấp tiếp theo nếu cấp trước chưa phân định được thứ hạng. |
+| UAT-S4-09 | HF-36 — Leaderboard | Chặn thí sinh xem bảng xếp hạng trước khi công bố | candidate | is_result_published = false; thí sinh đã đăng nhập hợp lệ. | 1. Truy cập /scoreboard.  2. Gọi GET /api/v1/leaderboard.  3. Kiểm tra response và UI. | HTTP 403 Forbidden, error_code: RESULTS_NOT_PUBLISHED. Không trả về điểm, thứ hạng hoặc dữ liệu nội bộ. UI hiển thị thông báo kết quả chưa được công bố. |
+| UAT-S4-10 | HF-36 — Leaderboard | Admin công bố kết quả và thí sinh xem Top 3 Podium | admin, sau đó candidate | Bảng xếp hạng đã được tính toán; dữ liệu bắt buộc đầy đủ; kết quả đang ở trạng thái DRAFT. | 1. Admin gọi PATCH /api/v1/admin/leaderboard/publish theo payload của API contract.  2. Xác nhận trạng thái công bố.  3. Đăng nhập bằng Candidate và mở /scoreboard. | API công bố thành công; trạng thái chuyển từ DRAFT sang PUBLISHED, is_result_published = true. Candidate xem được tên đội, tổng điểm và thứ hạng đã công bố. UI hiển thị Top 3 Podium đúng thứ tự; không lộ dữ liệu nội bộ chỉ dành cho Admin. |
+
+
+## Nhóm C — Helpdesk Ticket và phân quyền Mentor
+
+| Mã TC | Phân hệ | Tên kịch bản | Vai trò (Role) | Tiền điều kiện (Given) | Các bước thực hiện (When) | Kết quả mong đợi (Then - HTTP Status, Error Code & Hiển thị UI) |
+| --- | --- | --- | --- | --- | --- | --- |
+| UAT-S4-11 | HF-37 — Ticket | Thí sinh tạo ticket hỗ trợ hợp lệ | candidate | Candidate đã được duyệt và đăng nhập; dữ liệu tạo ticket hợp lệ. | 1. Mở mục hỗ trợ.  2. Nhập title, content, category, priority.  3. Gọi POST /api/v1/tickets với payload đã nhập. | HTTP 201 Created. Ticket được tạo với user_id là người gửi, status = open, assigned_to = NULL; các trường nội dung hợp lệ được lưu. UI thông báo tạo thành công và hiển thị ticket mới trong danh sách của thí sinh. |
+| UAT-S4-12 | HF-37 — Ticket Isolation | Đội khác không xem được ticket của đội đã tạo yêu cầu | candidate | Candidate A thuộc Đội A đã tạo ticket gắn với Đội A. Candidate B thuộc Đội B và không có quyền truy cập ticket đó. | 1. Đăng nhập bằng Candidate B.  2. Gọi GET /api/v1/tickets/me.  3. Thử gọi GET /api/v1/tickets/{ticket_id_A}. | GET /api/v1/tickets/me trả về HTTP 200 OK nhưng không chứa ticket của Đội A. Truy cập ticket ngoài phạm vi bị từ chối bằng 403 FORBIDDEN_ROLE theo contract đề xuất cho phân hệ. Không để lộ tiêu đề, nội dung hoặc thông tin đội khác. Nếu codebase chuẩn hóa việc che giấu tài nguyên bằng 404, cần chốt và áp dụng thống nhất. |
+| UAT-S4-13 | HF-37 — Ticket Workflow | Mentor nhận xử lý và gửi phản hồi hoàn tất ticket | mentor | Ticket đang open, assigned_to = NULL; Mentor đã đăng nhập và có quyền nhận ticket. | 1. Gọi PATCH /api/v1/tickets/{ticket_id} với payload {"action":"accept"}.  2. Kiểm tra ticket đã được gán cho Mentor và chuyển sang in_progress.  3. Gọi PATCH /api/v1/tickets/{ticket_id} với payload {"action":"resolve","response":"Đã kiểm tra và hướng dẫn thí sinh khắc phục lỗi thành công."}. | Sau accept: HTTP 200 OK, assigned_to = current_user.id, status = in_progress. Sau resolve: HTTP 200 OK, status = resolved, nội dung phản hồi được lưu. UI hiển thị đúng người phụ trách, trạng thái và phản hồi đã gửi. |
+| UAT-S4-14 | HF-37 — RBAC Mentor | Chặn Mentor truy cập API chấm điểm và danh sách bài nộp | mentor | Mentor đã đăng nhập nhưng không có quyền chấm thi. | 1. Gọi GET /api/v1/evaluations/submissions.  2. Gọi POST /api/v1/evaluations với payload chấm điểm hợp lệ. 3. Kiểm tra response và trạng thái dữ liệu. | Cả hai yêu cầu bị từ chối với HTTP 403 Forbidden, error_code: FORBIDDEN_ROLE (hoặc FORBIDDEN nếu đó là mã đã được chuẩn hóa trong codebase). Không trả về danh sách bài nộp, repository URL, điểm hoặc nhận xét; không tạo/cập nhật phiếu chấm. UI không hiển thị dữ liệu chấm thi cho Mentor. |
+| UAT-S4-15 | HF-37 — RBAC Judge | Chặn Judge truy cập Helpdesk Ticket | judge | Judge đã đăng nhập hợp lệ; tài khoản chỉ có quyền chấm thi. | 1. Gọi GET /api/v1/tickets. 2. Gọi GET /api/v1/tickets/me.  3. Thử gọi PATCH /api/v1/tickets/{ticket_id}. | Tất cả yêu cầu bị từ chối với HTTP 403 Forbidden, error_code: FORBIDDEN_ROLE. Không trả về dữ liệu ticket và không thay đổi trạng thái hoặc phản hồi. |
+| UAT-S4-19 | HF-37 — Ticket Validation | Chặn Mentor hoàn tất ticket khi phản hồi rỗng | mentor | Ticket đang ở in_progress và được phân công cho Mentor hiện tại. | Gọi PATCH /api/v1/tickets/{ticket_id} với payload {"action":"resolve","response":" "}. Có thể chạy thêm biến thể không truyền response hoặc truyền chuỗi rỗng. | HTTP 422 Unprocessable Entity, error_code: MISSING_TICKET_RESPONSE. Ticket vẫn ở in_progress; không ghi nhận hoàn tất xử lý. UI yêu cầu Mentor nhập phản hồi có nội dung trước khi hoàn tất. |
+| UAT-S4-20 | HF-37 — Ticket Concurrency | Ngăn hai Mentor cùng nhận một ticket | mentor | Ticket ban đầu open, assigned_to = NULL. Mentor A và Mentor B cùng có quyền xem ticket chờ xử lý. | 1. Mentor A gọi PATCH /api/v1/tickets/{ticket_id} với {"action":"accept"} và nhận thành công.  2. Sau đó Mentor B gọi cùng endpoint với {"action":"accept"}.  3. Kiểm tra assigned_to trong cơ sở dữ liệu/API. | Mentor A nhận thành công với HTTP 200 OK. Yêu cầu của Mentor B bị từ chối với HTTP 409 Conflict, error_code: TICKET_ALREADY_ASSIGNED. assigned_to vẫn là Mentor A; không bị ghi đè. Backend xử lý thao tác nhận ticket theo cách nguyên tử để tránh race condition. |
+| UAT-S4-21 | HF-37 — Ticket Escalation | Mentor chuyển ticket vượt thẩm quyền lên Admin | mentor | Ticket đang in_progress và được phân công cho Mentor hiện tại. | 1. Gọi PATCH /api/v1/tickets/{ticket_id} với payload {"action":"escalate","note":"Vấn đề cần quyền quản trị hệ thống nên vượt thẩm quyền của Mentor."}. 2. Kiểm tra assigned_to, trạng thái và Audit Log. 3. Đăng nhập Admin và mở danh sách ticket. | HTTP 200 OK nếu chuyển giao thành công. Ticket được đưa vào hàng chờ Admin (assigned_to = NULL) hoặc gán cho Admin nhận xử lý nếu payload có target_admin_id; trạng thái tiếp tục in_progress. Audit Log ghi nhận người chuyển, lý do, người nhận nếu có và thời điểm. Ticket xuất hiện trong danh sách Admin. |
+| UAT-S4-22 | HF-37 — Ticket Close/Reopen | Thí sinh đóng ticket đã giải quyết hoặc mở lại trong 48 giờ | candidate, admin | Ticket do Candidate tạo và đã chuyển sang resolved; hệ thống có thời điểm resolved_at đáng tin cậy. | Nhánh A: Candidate gọi PATCH /api/v1/tickets/{ticket_id} với {"action":"close"}. Nhánh B: Candidate gọi PATCH /api/v1/tickets/{ticket_id} với {"action":"reopen"} trong vòng 48 giờ.  Nhánh C: Candidate gọi {"action":"reopen"} sau 48 giờ. Nhánh D: Admin gọi {"action":"reopen"} với ticket resolved hoặc closed. | A: 200 OK, trạng thái chuyển sang closed. B: 200 OK, trạng thái chuyển sang in_progress. C: 409 Conflict, error_code: REOPEN_WINDOW_EXPIRED; trạng thái không đổi. D: 200 OK nếu thao tác hợp lệ; Admin được mở lại ticket bất kỳ lúc nào. Mọi thay đổi trạng thái được ghi Audit Log. |
+
+
+## Nhóm D — Kiểm thử bổ sung về phân quyền, dữ liệu biên và cô lập thông tin
+
+| Mã TC | Phân hệ | Tên kịch bản | Vai trò (Role) | Tiền điều kiện (Given) | Các bước thực hiện (When) | Kết quả mong đợi (Then - HTTP Status, Error Code & Hiển thị UI) |
+| --- | --- | --- | --- | --- | --- | --- |
+| UAT-S4-16 | HF-36 — RBAC Evaluation | Giám khảo không xem hoặc chấm bài nộp ngoài phạm vi phân công | judge | Judge A được phân công bài nộp A nhưng không được phân công bài nộp B. | 1. Gọi GET /api/v1/evaluations/submissions.  2. Thử gọi API đánh giá bài nộp B bằng ID của bài đó. | Danh sách chỉ chứa bài được phân công. Yêu cầu truy cập/chấm bài B bị từ chối với HTTP 403 Forbidden, error_code: FORBIDDEN_NOT_ASSIGNED_JUDGE. Không tiết lộ thông tin hoặc điểm của bài ngoài phạm vi. |
+| UAT-S4-17 | HF-37 — Ticket Validation | Chặn tạo ticket khi thiếu danh mục hoặc mức ưu tiên không hợp lệ | candidate | Candidate đã được duyệt và đăng nhập. | Nhánh A: Gọi POST /api/v1/tickets nhưng thiếu category.  Nhánh B: Gọi endpoint với priority ngoài các giá trị low, normal, high, urgent. | Nhánh A: HTTP 422, error_code: INVALID_TICKET_CATEGORY. Nhánh B: HTTP 422, error_code: INVALID_TICKET_PRIORITY. Không tạo ticket. UI yêu cầu người dùng sửa trường dữ liệu không hợp lệ. |
+| UAT-S4-18 | HF-37 — Ticket RBAC | Chặn Candidate chưa được duyệt tạo ticket | candidate | Tài khoản đang ở trạng thái chưa được duyệt, ví dụ PENDING hoặc REJECTED. | Gọi POST /api/v1/tickets với payload hợp lệ về mặt cấu trúc. | HTTP 403 Forbidden, error_code: ACCOUNT_NOT_APPROVED. Không tạo bản ghi ticket. UI thông báo tài khoản chưa được duyệt và không cho tiếp tục gửi yêu cầu hỗ trợ. |
+
+---
+*Kéo từ Notion lúc 20:56:40 20/10/2026 bởi notion-module*

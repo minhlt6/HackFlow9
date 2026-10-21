@@ -92,7 +92,7 @@ export const AdminTopicsPage: React.FC = () => {
           <h1
             className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
           >
-            Quản Lý Đề Tài & Hạn Ngạch Đội
+            Quản Lý Đề Tài và Hạn Ngạch Đội
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Thiết lập danh mục lĩnh vực đề tài lớn, đề tài nhánh và giới hạn số lượng đội thi đăng ký tối đa.
@@ -155,7 +155,9 @@ export const AdminTopicsPage: React.FC = () => {
                     <Lightbulb size={20} />
                   </div>
                   <div>
-                    <h2 className="font-semibold tracking-tight text-foreground text-xl text-foreground">{major.title}</h2>
+                    <h2 className="font-semibold tracking-tight text-foreground text-xl text-foreground">
+                      {(major.title || major.name || '').replace(/\s*&\s*/g, ' và ')}
+                    </h2>
                     <p className="text-xs text-muted-foreground">{major.description}</p>
                   </div>
                 </div>

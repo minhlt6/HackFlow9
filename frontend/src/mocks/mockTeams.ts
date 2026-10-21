@@ -5,6 +5,35 @@ import type { TeamDetails, CreateTeamPayload, JoinTeamPayload } from '../types/t
  */
 export const mockTeamNoTeam: TeamDetails | null = null;
 
+export const MOCK_TEAM_STORAGE_KEY = 'hackflow_team_details_v2';
+
+export const getStoredMockTeam = (): TeamDetails => {
+  try {
+    const raw = localStorage.getItem(MOCK_TEAM_STORAGE_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch {
+    // fallback
+  }
+  return mockTeamInTeam;
+};
+
+export const saveStoredMockTeam = (team: TeamDetails | null): void => {
+  try {
+    if (team) {
+      localStorage.setItem(MOCK_TEAM_STORAGE_KEY, JSON.stringify(team));
+    } else {
+      localStorage.removeItem(MOCK_TEAM_STORAGE_KEY);
+    }
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('hackflow_team_updated', { detail: team }));
+    }
+  } catch {
+    // ignore
+  }
+};
+
 /**
  * Mock trạng thái 2: Đã vào đội thi (Khớp 100% demo Leader: CyberSamurai - CS2026 - 3 thành viên)
  */
@@ -19,8 +48,8 @@ export const mockTeamInTeam: TeamDetails = {
   min_members: 3,
   max_members: 4,
   leader_id: 'usr-minh-01',
-  topic_id: 'TOPIC_HEALTHCARE_AI',
-  topic_name: 'Ứng dụng LLM & RAG trong Y tế',
+  topic_id: 'top-01',
+  topic_name: 'AI Agent Tự Động Hóa Quy Trình Doanh Nghiệp (Enterprise AI Agents)',
   created_at: '2026-10-05T08:30:00Z',
   members: [
     {
@@ -95,10 +124,16 @@ export const fetchMockTeam = async (
     throw new Error('Không thể kết nối đến máy chủ. Vui lòng thử lại sau.');
   }
   if (mode === 'in_team') {
-    return mockTeamInTeam;
+    return getStoredMockTeam();
   }
   if (mode === 'full') {
-    return mockTeamFull;
+    const current = getStoredMockTeam();
+    return {
+      ...mockTeamFull,
+      topic_id: current.topic_id,
+      topic_name: current.topic_name,
+      subtopic_id: current.subtopic_id,
+    };
   }
   return mockTeamNoTeam;
 };

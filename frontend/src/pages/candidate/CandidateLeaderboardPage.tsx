@@ -50,9 +50,9 @@ export const CandidateLeaderboardPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1
-            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
+            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide inline-block"
           >
-            Bảng Xếp Hạng & Kết Quả Chung Cuộc
+            Bảng Xếp Hạng và Kết Quả Chung Cuộc
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Bảng tổng sắp điểm số của tất cả các đội thi dựa trên thang tiêu chí Rubric đánh giá từ Ban Giám Khảo.

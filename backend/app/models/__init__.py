@@ -3,11 +3,12 @@ from app.models.base import BaseModel, TimestampMixin, UUIDMixin
 from app.models.user import User, UserRole, ApprovalStatus
 from app.models.team import Team, TeamMember, TeamMemberRole
 from app.models.topic import Topic, Subtopic
-from app.models.checkpoint import Checkpoint, Submission, SubmissionStatus
-from app.models.evaluation import RubricCriteria, Evaluation
+from app.models.checkpoint import Checkpoint, Submission, SubmissionStatus, AuditLog
+from app.models.evaluation import RubricCriteria, Evaluation, EvaluationStatus, JudgeAssignment
 from app.models.support import SupportTicket, TicketStatus, TicketPriority
 from app.models.config import HackathonConfig
 from app.models.whitelist import WhitelistEntry
+from app.models.announcement import Announcement, AnnouncementPriority
 
 __all__ = [
     "Base",
@@ -25,12 +26,19 @@ __all__ = [
     "Checkpoint",
     "Submission",
     "SubmissionStatus",
+    "AuditLog",
     "RubricCriteria",
     "Evaluation",
+    "EvaluationStatus",
+    "JudgeAssignment",
     "SupportTicket",
     "TicketStatus",
     "TicketPriority",
     "HackathonConfig",
     "WhitelistEntry",
+    "Announcement",
+    "AnnouncementPriority",
 ]
+
+
 
