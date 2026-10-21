@@ -31,27 +31,11 @@ export const AdminMentorsJudgesPage: React.FC = () => {
   }>>([
     {
       id: 'judge-1',
-      name: 'PGS. TS. Trần Giám Khảo',
+      name: 'TS. Nguyễn Hoàng Giám Khảo',
       email: 'judge.tech@hackathon.org',
-      specialization: 'AI Architecture & Production Readiness (Trưởng ban)',
-      assignedCount: 3,
-      avatar: 'T',
-    },
-    {
-      id: 'judge-2',
-      name: 'GS. TS. Alan Vance',
-      email: 'alan.vance@techuniv.edu.vn',
-      specialization: 'Trí tuệ nhân tạo & Khoa học dữ liệu',
-      assignedCount: 3,
-      avatar: 'A',
-    },
-    {
-      id: 'judge-3',
-      name: 'Dr. Sarah Connor',
-      email: 'sarah.connor@mit.edu',
-      specialization: 'Cybersecurity & Ethical AI',
-      assignedCount: 3,
-      avatar: 'S',
+      specialization: 'AI Architecture & System Evaluation',
+      assignedCount: 0,
+      avatar: 'N',
     },
   ]);
 
@@ -65,35 +49,11 @@ export const AdminMentorsJudgesPage: React.FC = () => {
   }>>([
     {
       id: 'mentor-1',
-      name: 'TS. Nguyễn Văn Hướng Dẫn',
+      name: 'ThS. Phạm Cố Vấn AI',
       email: 'mentor.ai@ailab.org.vn',
-      topic: 'AI trong Y tế và LLM RAG',
-      openTickets: 1,
-      avatar: 'N',
-    },
-    {
-      id: 'mentor-2',
-      name: 'ThS. Trần Thị Thông Minh',
-      email: 'thongminh.tran@iotlab.org',
-      topic: 'Đô thị Thông minh và IoT Xanh',
-      openTickets: 1,
-      avatar: 'T',
-    },
-    {
-      id: 'mentor-3',
-      name: 'Kỹ sư Lê Bảo Mật',
-      email: 'baomat.le@fintech.io',
-      topic: 'Công nghệ Tài chính và Blockchain',
+      topic: 'AI, Cloud & System Architecture',
       openTickets: 0,
-      avatar: 'L',
-    },
-    {
-      id: 'mentor-4',
-      name: 'Bác sĩ Vũ Trí Tuệ',
-      email: 'tritue.vu@medtech.vn',
-      topic: 'Y tế và Chăm sóc Sức khỏe',
-      openTickets: 0,
-      avatar: 'V',
+      avatar: 'P',
     },
   ]);
 

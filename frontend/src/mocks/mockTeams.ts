@@ -5,7 +5,7 @@ import type { TeamDetails, CreateTeamPayload, JoinTeamPayload } from '../types/t
  */
 export const mockTeamNoTeam: TeamDetails | null = null;
 
-export const MOCK_TEAM_STORAGE_KEY = 'hackflow_team_details_v2';
+export const MOCK_TEAM_STORAGE_KEY = 'hackflow_team_details_clean_v1';
 
 export const getStoredMockTeam = (): TeamDetails => {
   try {
@@ -16,7 +16,7 @@ export const getStoredMockTeam = (): TeamDetails => {
   } catch {
     // fallback
   }
-  return mockTeamInTeam;
+  return null as unknown as TeamDetails;
 };
 
 export const saveStoredMockTeam = (team: TeamDetails | null): void => {

@@ -5,7 +5,7 @@ import {
 } from '../mocks/adminTeamsMockData';
 import type { ApiResponse, Team } from '../types';
 
-const STORAGE_KEY = 'hackflow_admin_teams_v2';
+const STORAGE_KEY = 'hackflow_admin_teams_clean_v1';
 
 export interface AdminTeamUpsertPayload {
   name: string;
@@ -28,7 +28,7 @@ function loadPersistedAdminTeams(): EnrichedAdminTeam[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as EnrichedAdminTeam[];
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }

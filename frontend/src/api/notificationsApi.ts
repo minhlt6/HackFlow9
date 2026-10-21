@@ -5,48 +5,9 @@ import type {
   NotificationUnreadCountResponse,
 } from '../types/notification';
 
-const NOTIFICATIONS_STORAGE_KEY = 'hackflow_notifications_v1';
+const NOTIFICATIONS_STORAGE_KEY = 'hackflow_notifications_clean_v1';
 
-const INITIAL_MOCK_NOTIFICATIONS: AppNotification[] = [
-  {
-    id: 'notif-urgent-01',
-    type: 'URGENT',
-    title: 'Xác nhận quan trọng: Quy định đóng băng Commit SHA',
-    content:
-      'Hệ thống ghi nhận thời hạn nộp bài chặng hiện tại đang áp dụng cơ chế đóng băng Commit SHA từ GitHub. Vui lòng đảm bảo repository ở chế độ Public và kiểm tra kỹ mã commit trước khi hoàn tất nộp bài.',
-    target_scope: 'ALL',
-    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    is_read: false,
-    is_dismissed: false,
-    action_label: 'Tôi đã hiểu và đồng ý',
-  },
-  {
-    id: 'notif-warning-01',
-    type: 'WARNING',
-    title: 'Nhắc nhở thời hạn: Checkpoint 2 sắp đóng cổng nộp bài',
-    content:
-      'Cổng nộp bài Checkpoint 2 sẽ chính thức đóng trong thời gian tới. Các đội thi vui lòng hoàn tất tài liệu hệ thống và link demo để tránh quá hạn.',
-    target_scope: 'ALL',
-    created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    is_read: false,
-    is_dismissed: false,
-    action_url: '/checkpoints',
-    action_label: 'Xem chặng thi',
-  },
-  {
-    id: 'notif-info-01',
-    type: 'INFO',
-    title: 'Danh sách đề tài Hackathon 2026 đã chính thức mở',
-    content:
-      'Ban tổ chức đã mở cổng đăng ký đề tài cho các đội thi hợp lệ (từ 3 thành viên trở lên). Đội trưởng hãy nhanh chóng đăng ký đề tài phù hợp với năng lực của đội mình.',
-    target_scope: 'ALL',
-    created_at: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    is_read: false,
-    is_dismissed: false,
-    action_url: '/topics',
-    action_label: 'Đến trang đề tài',
-  },
-];
+const INITIAL_MOCK_NOTIFICATIONS: AppNotification[] = [];
 
 const getStoredNotifications = (): AppNotification[] => {
   try {

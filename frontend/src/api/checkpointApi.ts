@@ -7,139 +7,16 @@ import type {
 } from '../types/checkpoint';
 
 // Mock data ban đầu nếu backend chưa triển khai endpoint Checkpoint (theo chuẩn SRS HF-23)
-const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
-  {
-    id: 'cp-01',
-    order: 1,
-    title: 'Checkpoint 1: Đăng ký Ý tưởng & Wireframe Kiến trúc',
-    description: 'Nộp tài liệu đặc tả ý tưởng sản phẩm, phân tích yêu cầu BA và sơ đồ Wireframe Figma.',
-    start_time: '2026-10-01T00:00:00.000Z',
-    deadline: '2026-10-08T23:59:59.000Z',
-    requirements: 'Tài liệu PRD/SRS và link Figma hoặc Wireframe sơ bộ.',
-    is_active: false,
-    is_final_checkpoint: false, // Chặng tiến độ trung gian: không bắt buộc repo, không đóng băng SHA
-    grace_period_seconds: 5,
-    status: 'closed',
-    is_open: false,
-    can_submit: false,
-    submission_fields: [
-      {
-        field_key: 'demo_url',
-        field_label: 'Link Tài liệu PRD/SRS & Wireframe Figma',
-        required: true,
-        apply_sha_freeze: false,
-      },
-    ],
-    latest_submission: {
-      id: 'sub-01-v2',
-      checkpoint_id: 'cp-01',
-      team_id: 'team-01',
-      repo_url: null,
-      demo_url: 'https://figma.com/@cybersamurai/hackflow',
-      commit_sha: null, // Chặng trung gian không đóng băng SHA
-      status: 'evaluated',
-      grace_period_applied: false,
-      submitted_at: '2026-10-08T21:15:30.000Z',
-      feedback: 'Ý tưởng rõ ràng, wireframe đáp ứng đầy đủ luồng người dùng chính.',
-      note: 'Bản cập nhật bổ sung User Flow và sơ đồ cấu trúc dữ liệu',
-    },
-  },
-  {
-    id: 'cp-02',
-    order: 2,
-    title: 'Checkpoint 2: Prototype & System Architecture (Đang mở)',
-    description: 'Nộp báo cáo tiến độ khung hệ thống (Frontend + Backend skeleton), tài liệu API hoặc Prototype.',
-    start_time: '2026-10-09T00:00:00.000Z',
-    deadline: new Date(Date.now() + (2 * 24 * 3600 + 4 * 3600) * 1000).toISOString(),
-    requirements: 'Link báo cáo tiến độ, tài liệu kiến trúc hoặc link demo (Không bắt buộc GitHub và không đóng băng SHA).',
-    is_active: true,
-    is_final_checkpoint: false, // Chặng tiến độ trung gian: ẩn ô GitHub Repo nếu không yêu cầu
-    grace_period_seconds: 5,
-    status: 'open',
-    is_open: true,
-    can_submit: true,
-    submission_fields: [
-      {
-        field_key: 'demo_url',
-        field_label: 'Link Báo cáo tiến độ / Kiến trúc hệ thống / Prototype',
-        required: true,
-        apply_sha_freeze: false,
-      },
-      {
-        field_key: 'presentation_pdf',
-        field_label: 'Link Slide thuyết trình tiến độ (PDF / Google Slides)',
-        required: false,
-        apply_sha_freeze: false,
-      },
-    ],
-    latest_submission: null,
-  },
-  {
-    id: 'cp-03',
-    order: 3,
-    title: 'Checkpoint 3: MVP Hoàn chỉnh & Video Pitch Deck (Chặng cuối)',
-    description: 'Nộp phiên bản sản phẩm hoàn thiện, đường dẫn Live Demo và Slide thuyết trình. Hệ thống sẽ khóa và đóng băng Commit SHA tại thời điểm nộp.',
-    start_time: new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
-    deadline: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
-    requirements: 'Mã nguồn đầy đủ các tính năng cam kết trên GitHub repository public. Hệ thống sẽ ghi nhận Commit HEAD tại thời điểm nộp bài.',
-    is_active: true,
-    is_final_checkpoint: true, // Chặng cuối cùng: Bắt buộc GitHub repo & đóng băng Commit SHA
-    grace_period_seconds: 5,
-    status: 'upcoming',
-    is_open: false,
-    can_submit: false,
-    submission_fields: [
-      {
-        field_key: 'repo_url',
-        field_label: 'GitHub Repository URL',
-        required: true,
-        apply_sha_freeze: true,
-      },
-      {
-        field_key: 'demo_url',
-        field_label: 'Link Live Demo / Video Pitch Deck',
-        required: false,
-        apply_sha_freeze: false,
-      },
-    ],
-    latest_submission: null,
-  },
-];
+const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [];
 
 // Cờ môi trường dev mock: Chỉ kích hoạt mock khi có cờ VITE_USE_MOCK=true (HF-31 Lỗi 1)
 const USE_DEV_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
 // Mock lịch sử nộp bài chỉ dùng khi bật cờ dev mock
-export const INITIAL_MOCK_SUBMISSION_HISTORY: Submission[] = [
-  {
-    id: 'sub-01-v2',
-    checkpoint_id: 'cp-01',
-    team_id: 'team-01',
-    repo_url: null,
-    demo_url: 'https://figma.com/@cybersamurai/hackflow',
-    commit_sha: null,
-    status: 'evaluated',
-    grace_period_applied: false,
-    submitted_at: '2026-10-08T21:15:30.000Z',
-    feedback: 'Ý tưởng rõ ràng, wireframe đáp ứng đầy đủ luồng người dùng chính.',
-    note: 'Bản cập nhật bổ sung User Flow và sơ đồ cấu trúc dữ liệu',
-  },
-  {
-    id: 'sub-01-v1',
-    checkpoint_id: 'cp-01',
-    team_id: 'team-01',
-    repo_url: null,
-    demo_url: 'https://figma.com/@cybersamurai/hackflow-draft',
-    commit_sha: null,
-    status: 'submitted',
-    grace_period_applied: false,
-    submitted_at: '2026-10-05T14:20:00.000Z',
-    note: 'Bản thảo ý tưởng sơ bộ và khung sườn Wireframe',
-  },
-];
+export const INITIAL_MOCK_SUBMISSION_HISTORY: Submission[] = [];
 
-const LOCAL_STORAGE_SUBMISSIONS_KEY = 'hackflow_checkpoint_submissions';
-const LOCAL_STORAGE_HISTORY_KEY = 'hackflow_checkpoint_submission_history';
+const LOCAL_STORAGE_SUBMISSIONS_KEY = 'hackflow_checkpoint_submissions_clean_v1';
+const LOCAL_STORAGE_HISTORY_KEY = 'hackflow_checkpoint_submission_history_clean_v1';
 
 function getStoredSubmissions(): Record<string, Submission> {
   try {
@@ -183,7 +60,7 @@ export const checkpointApi = {
   getCheckpoints: async (): Promise<CheckpointWithSubmission[]> => {
     try {
       const response = await axiosClient.get<ApiResponse<CheckpointWithSubmission[]>>('/checkpoints');
-      if (response.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
+      if (response.data && Array.isArray(response.data.data)) {
         return response.data.data;
       }
     } catch {
