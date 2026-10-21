@@ -20,6 +20,7 @@ import {
   X,
 } from 'lucide-react';
 import { Badge } from '../Badge';
+import { Button } from '../ui/button';
 
 interface InitialRoleTodoBannerProps {
   role: 'candidate' | 'admin' | 'judge' | 'mentor';
@@ -40,13 +41,11 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
 
-  // Find candidate's team
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
 
-  // Define tasks based on role
   let title = '';
   let roleBadge = '';
-  let roleIcon = <Sparkles size={20} className="text-[#818CF8]" />;
+  let roleIcon = <Sparkles size={18} className="text-primary" />;
   let subtitle = '';
 
   interface TodoItem {
@@ -62,9 +61,9 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
   let items: TodoItem[] = [];
 
   if (role === 'candidate') {
-    title = 'Lộ Trình Nhiệm Vụ Bắt Buộc Cho Thí Sinh';
+    title = 'Lộ trình nhiệm vụ bắt buộc cho Thí sinh';
     roleBadge = 'Bắt buộc hoàn thành';
-    roleIcon = <GraduationCap size={20} className="text-[#818CF8]" />;
+    roleIcon = <GraduationCap size={18} className="text-primary" />;
     subtitle = 'Vui lòng hoàn thành 3 bước thiết lập ban đầu để kích hoạt toàn bộ quyền thi đấu';
 
     const isStep1Done = Boolean(currentUser.studentId && currentUser.school && currentUser.phone);
@@ -79,7 +78,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Bổ sung mã số sinh viên, trường đại học và kỹ năng chuyên môn của bạn.',
         isCompleted: isStep1Done,
         actionLabel: isStep1Done ? 'Đã hoàn thành' : 'Điền hồ sơ ngay',
-        icon: <UserCheck size={16} className="text-[#818CF8]" />,
+        icon: <UserCheck size={15} className="text-primary" />,
       },
       {
         id: 'cand-team',
@@ -88,7 +87,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Tạo đội thi mới hoặc nhập mã mời (ví dụ: HF2026) để gia nhập đội.',
         isCompleted: isStep2Done,
         actionLabel: isStep2Done ? `Đã vào đội ${myTeam?.name}` : 'Ghép đội ngay',
-        icon: <Users size={16} className="text-indigo-400" />,
+        icon: <Users size={15} className="text-primary" />,
       },
       {
         id: 'cand-pledge',
@@ -97,13 +96,13 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Đọc thể lệ cuộc thi, cam kết bản quyền mã nguồn và chấp thuận chấm ẩn danh.',
         isCompleted: isStep3Done,
         actionLabel: isStep3Done ? 'Đã ký cam kết' : 'Ký cam kết ngay',
-        icon: <FileCheck size={16} className="text-emerald-400" />,
+        icon: <FileCheck size={15} className="text-emerald-600 dark:text-emerald-400" />,
       },
     ];
   } else if (role === 'admin') {
-    title = 'Nhiệm Vụ Khởi Tạo & Vận Hành Cuộc Thi';
+    title = 'Nhiệm vụ Khởi tạo & Vận hành Cuộc thi';
     roleBadge = 'Dành cho Ban Quản trị';
-    roleIcon = <ShieldCheck size={20} className="text-amber-400" />;
+    roleIcon = <ShieldCheck size={18} className="text-amber-600 dark:text-amber-400" />;
     subtitle = 'Kiểm tra và chuẩn hóa các thông số kỹ thuật trước khi mở cổng nộp bài cho thí sinh';
 
     const totalWeight = rubricCriteria.reduce((sum, c) => sum + c.weight, 0);
@@ -117,7 +116,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Kiểm tra tên cuộc thi, quy chế và các hạn chót đóng cổng bài nộp.',
         isCompleted: true,
         actionLabel: 'Xem cấu hình',
-        icon: <ShieldCheck size={16} className="text-amber-400" />,
+        icon: <ShieldCheck size={15} className="text-amber-600 dark:text-amber-400" />,
       },
       {
         id: 'adm-rubric',
@@ -126,7 +125,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: `Đảm bảo tổng trọng số đạt chính xác 100% (Hiện tại: ${totalWeight.toFixed(1)}%).`,
         isCompleted: isWeightBalanced,
         actionLabel: isWeightBalanced ? 'Đã cân bằng 100%' : 'Cân bằng ngay',
-        icon: <Scale size={16} className="text-emerald-400" />,
+        icon: <Scale size={15} className="text-emerald-600 dark:text-emerald-400" />,
       },
       {
         id: 'adm-security',
@@ -135,13 +134,13 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Kích hoạt chế độ mã hóa danh tính thí sinh khi Ban Giám khảo chấm thi.',
         isCompleted: true,
         actionLabel: 'Kiểm tra bảo mật',
-        icon: <ShieldCheck size={16} className="text-indigo-400" />,
+        icon: <ShieldCheck size={15} className="text-primary" />,
       },
     ];
   } else if (role === 'judge') {
-    title = 'Hướng Dẫn Nghiệp Vụ Ban Giám Khảo';
+    title = 'Hướng dẫn Nghiệp vụ Ban Giám khảo';
     roleBadge = 'Dành cho Hội đồng Giám khảo';
-    roleIcon = <Scale size={20} className="text-emerald-400" />;
+    roleIcon = <Scale size={18} className="text-emerald-600 dark:text-emerald-400" />;
     subtitle = 'Chuẩn bị quy trình đánh giá công tâm, chính xác theo khung tiêu chí Rubric';
 
     const isJudgePledged = Boolean(pledgedUsers[currentUser.id]);
@@ -154,7 +153,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Kiểm tra thông tin học hàm, học vị và đơn vị công tác của chuyên gia.',
         isCompleted: true,
         actionLabel: 'Xem hồ sơ',
-        icon: <GraduationCap size={16} className="text-cyan-400" />,
+        icon: <GraduationCap size={15} className="text-sky-600 dark:text-sky-400" />,
       },
       {
         id: 'jdg-nda',
@@ -163,7 +162,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Bảo mật ý tưởng dự án và cam kết từ chối chấm đội có học viên quen biết.',
         isCompleted: isJudgePledged,
         actionLabel: isJudgePledged ? 'Đã ký cam kết' : 'Ký cam kết ngay',
-        icon: <FileCheck size={16} className="text-emerald-400" />,
+        icon: <FileCheck size={15} className="text-emerald-600 dark:text-emerald-400" />,
       },
       {
         id: 'jdg-rubric',
@@ -172,13 +171,13 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Làm quen màn hình đối chiếu mã nguồn GitHub, video demo và bảng điểm.',
         isCompleted: true,
         actionLabel: 'Xem hướng dẫn',
-        icon: <BookOpen size={16} className="text-purple-400" />,
+        icon: <BookOpen size={15} className="text-primary" />,
       },
     ];
   } else if (role === 'mentor') {
-    title = 'Hướng Dẫn Dành Cho Cố Vấn Chuyên Môn';
+    title = 'Hướng dẫn dành cho Cố vấn Chuyên môn';
     roleBadge = 'Dành cho Cố vấn chuyên môn';
-    roleIcon = <GraduationCap size={20} className="text-cyan-400" />;
+    roleIcon = <GraduationCap size={18} className="text-sky-600 dark:text-sky-400" />;
     subtitle = 'Đồng hành và hỗ trợ giải đáp kỹ thuật cho các đội thi trong suốt cuộc thi';
 
     items = [
@@ -189,7 +188,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Kiểm tra lĩnh vực chuyên môn hỗ trợ và các đề tài thuộc lĩnh vực phụ trách.',
         isCompleted: true,
         actionLabel: 'Xem lĩnh vực',
-        icon: <UserCheck size={16} className="text-cyan-400" />,
+        icon: <UserCheck size={15} className="text-sky-600 dark:text-sky-400" />,
       },
       {
         id: 'men-sla',
@@ -198,59 +197,58 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         description: 'Tiếp nhận vé hỗ trợ trong 30 phút và tuân thủ nguyên tắc định hướng kỹ thuật.',
         isCompleted: true,
         actionLabel: 'Xem quy chế',
-        icon: <HelpCircle size={16} className="text-indigo-400" />,
+        icon: <HelpCircle size={15} className="text-primary" />,
       },
     ];
   }
 
   const completedCount = items.filter((i) => i.isCompleted).length;
   const progressPercent = Math.round((completedCount / items.length) * 100);
-
   const isAllMandatoryDone = completedCount === items.length;
-
   const isAllDone = !!onboardingCompletedUsers[currentUser.id] || isAllMandatoryDone;
-
-  // Find first unfinished mandatory step
   const firstUnfinished = items.find((i) => !i.isCompleted) || items[0];
 
-  // Khi đã hoàn thành toàn bộ lộ trình nhiệm vụ, mặc định ẩn đi (hiển thị thanh trạng thái thu gọn)
   if (isAllDone && !isExpanded) {
     if (isDismissed) return null;
 
     return (
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-[14px] bg-[#1E293B]/70 border border-emerald-500/25 shadow-lg backdrop-blur-sm transition-all duration-300">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 rounded-lg bg-card border border-border shadow-xs transition-all">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-500/12 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 size={16} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-white">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold text-foreground">
                 {title}
               </span>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                <CheckCircle2 size={10} />
+              <Badge variant="success">
                 Đã hoàn tất ({completedCount}/{items.length})
-              </span>
+              </Badge>
             </div>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Bạn đã hoàn thành các bước thiết lập ban đầu. Lộ trình được mặc định thu gọn để tối ưu không gian làm việc.
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Các bước thiết lập ban đầu đã hoàn tất. Lộ trình được thu gọn để tối ưu không gian làm việc.
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs"
             onClick={() => setIsExpanded(true)}
-            className="px-3 py-1.5 rounded-[8px] text-xs font-semibold text-[#818CF8] hover:text-white bg-[#6366F1]/10 hover:bg-[#6366F1]/20 border border-[#6366F1]/30 flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <span>Xem chi tiết lộ trình</span>
-            <ChevronDown size={14} />
-          </button>
+            <ChevronDown size={13} />
+          </Button>
           <button
+            type="button"
             onClick={() => setIsDismissed(true)}
-            className="p-1.5 rounded-[8px] text-slate-400 hover:text-white hover:bg-[#334155] transition-colors cursor-pointer"
+            className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
             title="Ẩn thông báo này"
+            aria-label="Ẩn thông báo này"
           >
             <X size={15} />
           </button>
@@ -260,68 +258,68 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
   }
 
   return (
-    <div className="rounded-[16px] border border-[#6366F1]/40 bg-gradient-to-br from-[#1E293B] via-[#1E293B]/95 to-[#162033] p-5 lg:p-6 shadow-xl relative overflow-hidden transition-all duration-300">
-      {/* Decorative Glow */}
-      <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-[#6366F1]/10 blur-2xl pointer-events-none" />
-
+    <div className="rounded-lg border border-border bg-card p-5 shadow-card transition-all">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#334155]/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#6366F1]/15 border border-[#6366F1]/30">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 border border-primary/20">
             {roleIcon}
           </div>
           <div>
-            <div className="flex items-center gap-2.5">
-              <h3 className="font-['Righteous'] text-lg sm:text-xl text-white tracking-wide">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base font-semibold text-foreground">
                 {title}
               </h3>
-              <Badge variant={isAllDone ? 'success' : 'warning'} className="text-[10px]">
+              <Badge variant={isAllDone ? 'success' : 'warning'}>
                 {roleBadge}
               </Badge>
             </div>
-            <p className="text-xs text-slate-300 mt-0.5">{subtitle}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{subtitle}</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3 self-end sm:self-center">
           <div className="text-right">
-            <span className="text-xs font-semibold text-slate-200">
-              Tiến độ: <span className="text-[#818CF8] font-bold">{completedCount}/{items.length}</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              Tiến độ:{' '}
+              <span className="text-foreground font-mono font-semibold">
+                {completedCount}/{items.length}
+              </span>
             </span>
-            <div className="w-28 sm:w-36 h-2 rounded-full bg-[#0F172A] border border-[#334155] overflow-hidden mt-1">
+            <div className="w-28 sm:w-36 h-1.5 rounded-full bg-muted overflow-hidden mt-1">
               <div
-                className="h-full bg-gradient-to-r from-[#6366F1] to-emerald-400 transition-all duration-500 rounded-full"
+                className="h-full bg-primary transition-all duration-300 rounded-full"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
           </div>
 
-          {/* Primary Action Button to Open Wizard */}
-          <button
+          <Button
+            type="button"
+            variant={isAllDone ? 'outline' : 'primary'}
+            size="sm"
             onClick={() => openWizardAtStep(firstUnfinished.stepNum)}
-            className={`px-3 py-1.5 rounded-[8px] text-xs font-bold flex items-center gap-1.5 shadow-md transition-all cursor-pointer ${
-              isAllDone
-                ? 'bg-[#1E293B] hover:bg-[#334155] text-emerald-400 border border-emerald-500/40'
-                : 'bg-[#6366F1] hover:bg-[#4F46E5] text-white shadow-[#6366F1]/25 ring-2 ring-[#6366F1]/30 animate-pulse'
-            }`}
           >
             <span>{isAllDone ? 'Xem lại thiết lập' : `Làm Bước ${firstUnfinished.stepNum}`}</span>
             <ArrowRight size={14} />
-          </button>
+          </Button>
 
           {isAllDone ? (
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => setIsExpanded(false)}
-              className="px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-[#0F172A] border border-[#334155] hover:border-slate-500 flex items-center gap-1.5 transition-colors cursor-pointer"
               title="Thu gọn và ẩn lộ trình"
             >
               <span>Thu gọn</span>
               <ChevronUp size={14} />
-            </button>
+            </Button>
           ) : (
             <button
+              type="button"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#334155]/60 transition-colors"
+              className="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               title={isCollapsed ? 'Mở rộng danh sách' : 'Thu gọn'}
             >
               {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
@@ -332,53 +330,52 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
 
       {/* Body: Checklist Items */}
       {!isCollapsed && (
-        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3 animate-in fade-in duration-200">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
           {items.map((item) => {
             const isDone = item.isCompleted;
 
             return (
               <div
                 key={item.id}
-                className={`p-3.5 rounded-[12px] border transition-all flex flex-col justify-between gap-3 ${
+                className={`p-3.5 rounded-lg border transition-all flex flex-col justify-between gap-3 ${
                   isDone
-                    ? 'bg-[#0F172A]/40 border-emerald-500/30 text-slate-300'
-                    : 'bg-[#0F172A]/80 border-[#334155] hover:border-[#6366F1]/50 text-white'
+                    ? 'bg-muted/30 border-border text-muted-foreground'
+                    : 'bg-card border-primary/30 text-foreground'
                 }`}
               >
-                <div className="flex items-start gap-3">
+                <div className="flex items-start gap-2.5">
                   <div className="mt-0.5 shrink-0">
                     {isDone ? (
-                      <CheckCircle2 size={18} className="text-emerald-400" />
+                      <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />
                     ) : (
-                      <Circle size={18} className="text-amber-400 animate-pulse" />
+                      <Circle size={16} className="text-amber-500" />
                     )}
                   </div>
 
                   <div className="space-y-1">
                     <div className="flex items-center gap-1.5">
                       {item.icon}
-                      <span className={`text-xs font-bold ${isDone ? 'text-emerald-300' : 'text-white'}`}>
+                      <span className="text-xs font-semibold text-foreground">
                         {item.title}
                       </span>
                     </div>
-                    <p className="text-[11px] text-slate-400 leading-relaxed">
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
                       {item.description}
                     </p>
                   </div>
                 </div>
 
                 <div className="self-end pt-1">
-                  <button
+                  <Button
+                    type="button"
+                    variant={isDone ? 'outline' : 'primary'}
+                    size="sm"
+                    className="h-7 text-[11px] px-2.5"
                     onClick={() => openWizardAtStep(item.stepNum)}
-                    className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-[8px] transition-all cursor-pointer ${
-                      isDone
-                        ? 'text-slate-400 hover:text-white bg-[#1E293B] border border-[#334155]'
-                        : 'text-white bg-[#6366F1] hover:bg-[#4F46E5] shadow-sm shadow-[#6366F1]/30'
-                    }`}
                   >
                     <span>{item.actionLabel || 'Thực hiện bước này'}</span>
                     <ArrowRight size={12} />
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
@@ -387,14 +384,15 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
       )}
 
       {role === 'candidate' && (
-        <div className="mt-3.5 p-3 rounded-[10px] bg-[#0F172A]/70 border border-[#334155]/60 flex items-center justify-between text-xs text-slate-300">
+        <div className="mt-3.5 p-3 rounded-md bg-muted/50 border border-border flex items-center justify-between text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
-            <Lightbulb size={16} className="text-amber-400 shrink-0" />
+            <Lightbulb size={15} className="text-amber-500 shrink-0" />
             <span>
-              <strong>Đăng ký đề tài thi đấu:</strong> Đội của bạn có thể thảo luận và đăng ký đề tài bất cứ lúc nào tại mục{' '}
+              <strong className="text-foreground">Đăng ký đề tài thi đấu:</strong> Đội của bạn có thể thảo luận và đăng ký đề tài bất cứ lúc nào tại mục{' '}
               <button
+                type="button"
                 onClick={() => navigate('/topics')}
-                className="text-[#818CF8] hover:text-white font-semibold underline cursor-pointer"
+                className="text-primary hover:underline font-semibold cursor-pointer"
               >
                 Chọn đề tài
               </button>{' '}

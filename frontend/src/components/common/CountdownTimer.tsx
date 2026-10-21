@@ -61,25 +61,25 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   if (!contestActive) {
     return (
       <div
-        className={`rounded-[16px] border border-amber-500/30 bg-gradient-to-r from-[#1E293B] via-[#1E293B]/95 to-[#162033] p-5 lg:p-6 shadow-xl relative overflow-hidden font-['Roboto'] ${className}`}
+        className={`rounded-[16px] border border-amber-500/30 bg-card p-5 lg:p-6 shadow-xl relative overflow-hidden  ${className}`}
       >
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 border border-amber-500/30">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
               <Clock size={24} className="animate-pulse" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h4 className="font-['Righteous'] text-lg sm:text-xl text-white tracking-wide">
+                <h4 className="font-semibold tracking-tight text-foreground text-lg sm:text-xl text-foreground tracking-wide">
                   Cuộc Thi Chưa Bắt Đầu
                 </h4>
                 <Badge variant="warning" className="text-[10px]">
                   Chờ phát lệnh
                 </Badge>
               </div>
-              <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-1 max-w-xl leading-relaxed">
                 Đồng hồ đếm ngược đến hạn chót nộp bài sẽ <strong>chính thức bắt đầu chạy</strong> khi Ban Quản Trị phát lệnh mở màn cuộc thi.
               </p>
             </div>
@@ -94,10 +94,10 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
             ].map((item, index) => (
               <React.Fragment key={item.label}>
                 <div className="flex flex-col items-center">
-                  <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-[10px] bg-[#0F172A] border border-[#334155] text-lg sm:text-xl font-bold font-mono text-slate-400 shadow-inner">
+                  <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-lg sm:text-xl font-bold font-mono text-muted-foreground shadow-inner">
                     {item.value}
                   </div>
-                  <span className="mt-1 text-[10px] font-semibold tracking-wider text-slate-400">
+                  <span className="mt-1 text-[10px] font-semibold tracking-wider text-muted-foreground">
                     {item.label}
                   </span>
                 </div>
@@ -113,32 +113,32 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   // WHEN CONTEST IS ACTIVE (COUNTDOWN RUNNING)
   return (
     <div
-      className={`rounded-[16px] border border-emerald-500/40 bg-gradient-to-r from-[#1E293B] via-[#1E293B]/95 to-[#162033] p-5 lg:p-6 shadow-xl relative overflow-hidden font-['Roboto'] ${className}`}
+      className={`rounded-[16px] border border-emerald-500/40 bg-card p-5 lg:p-6 shadow-xl relative overflow-hidden  ${className}`}
     >
       <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
             <Clock size={24} className="animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h4 className="font-['Righteous'] text-lg sm:text-xl text-white tracking-wide">
+              <h4 className="font-semibold tracking-tight text-foreground text-lg sm:text-xl text-foreground tracking-wide">
                 {title}
               </h4>
               <Badge variant="success" className="text-[10px]">
                 Đang diễn ra
               </Badge>
             </div>
-            <p className="text-xs text-slate-300 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               {subtitle || `Hạn nộp chính thức: ${new Date(targetDate).toLocaleString('vi-VN')}`}
             </p>
           </div>
         </div>
 
         {timeLeft.isExpired ? (
-          <div className="rounded-full bg-rose-500/20 border border-rose-500/40 px-5 py-2 text-xs font-bold text-rose-300">
+          <div className="rounded-full bg-rose-500/20 border border-rose-500/40 px-5 py-2 text-xs font-bold text-rose-700 dark:text-rose-400">
             ĐÃ KẾT THÚC HẠN NỘP
           </div>
         ) : (
@@ -151,10 +151,10 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
             ].map((item, index) => (
               <React.Fragment key={item.label}>
                 <div className="flex flex-col items-center">
-                  <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-[10px] bg-[#0F172A] border border-[#334155] text-xl sm:text-2xl font-bold font-mono text-emerald-400 shadow-inner">
+                  <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-xl sm:text-2xl font-bold font-mono text-emerald-700 dark:text-emerald-400 shadow-inner">
                     {item.value}
                   </div>
-                  <span className="mt-1 text-[10px] font-semibold tracking-wider text-slate-400">
+                  <span className="mt-1 text-[10px] font-semibold tracking-wider text-muted-foreground">
                     {item.label}
                   </span>
                 </div>

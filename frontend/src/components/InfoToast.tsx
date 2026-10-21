@@ -37,7 +37,7 @@ export const InfoToast: React.FC = () => {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-[#0F172A] border border-[#334155] rounded-xl p-4 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300 font-['Roboto'] flex gap-3 items-start"
+      className="fixed bottom-6 right-6 z-50 max-w-sm w-full bg-muted/40 dark:bg-slate-900/60 border border-border rounded-xl p-4 shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-5 duration-300  flex gap-3 items-start"
     >
       <div className="w-8 h-8 rounded-lg bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5">
         <Info size={18} />
@@ -45,19 +45,19 @@ export const InfoToast: React.FC = () => {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-1">
-          <h5 className="text-xs font-semibold text-white truncate">
+          <h5 className="text-xs font-semibold text-foreground truncate">
             {infoToast.title}
           </h5>
           <button
             type="button"
             onClick={handleDismiss}
             aria-label="Đóng thông báo"
-            className="text-slate-400 hover:text-white p-0.5 rounded transition-colors cursor-pointer"
+            className="text-muted-foreground hover:text-foreground p-0.5 rounded transition-colors cursor-pointer"
           >
             <X size={14} />
           </button>
         </div>
-        <p className="text-[11px] text-slate-300 mt-1 line-clamp-2 leading-relaxed">
+        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">
           {infoToast.content}
         </p>
 
@@ -65,7 +65,7 @@ export const InfoToast: React.FC = () => {
           <button
             type="button"
             onClick={handleAction}
-            className="mt-2 text-xs text-[#818CF8] hover:text-[#a5b4fc] font-medium flex items-center gap-1 cursor-pointer transition-colors"
+            className="mt-2 text-xs text-primary hover:text-[#a5b4fc] font-medium flex items-center gap-1 cursor-pointer transition-colors"
           >
             <span>{infoToast.action_label || 'Xem ngay'}</span>
             <ExternalLink size={12} />

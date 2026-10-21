@@ -68,7 +68,10 @@ export const AdminApprovalsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    void fetchBackendPending();
+    const timer = window.setTimeout(() => {
+      void fetchBackendPending();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchBackendPending]);
 
   // Merge real backend pending candidates with mock pending candidates (deduplicating by email)
@@ -125,21 +128,16 @@ export const AdminApprovalsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1
-            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
+            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
           >
             Phê Duyệt Tài Khoản Thí Sinh
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Xác thực danh sách sinh viên đăng nhập lần đầu qua GitHub OAuth trước khi cấp quyền truy cập hệ thống.
           </p>
         </div>
@@ -159,31 +157,31 @@ export const AdminApprovalsPage: React.FC = () => {
       </div>
 
       {alertMsg && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
           <CheckCircle size={15} />
           <span>{alertMsg}</span>
         </div>
       )}
 
       {/* Filter and Search Bar */}
-      <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-4 flex flex-col sm:flex-row items-center gap-3">
+      <div className="rounded-[14px] border border-border bg-card p-4 flex flex-col sm:flex-row items-center gap-3">
         <div className="relative flex-1 w-full">
-          <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
+          <Search size={16} className="absolute left-3.5 top-3 text-muted-foreground" />
           <input
             type="text"
             placeholder="Tìm theo tên, email, GitHub username..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 rounded-[10px] bg-[#0F172A] border border-[#334155] text-white text-xs placeholder-slate-400 focus:border-[#6366F1] focus:outline-none"
+            className="w-full h-10 pl-10 pr-4 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs placeholder:text-muted-foreground focus:border-[#6366F1] focus:outline-none"
           />
         </div>
       </div>
 
       {/* Candidates Table */}
-      <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-        <div className="overflow-x-auto rounded-[12px] border border-[#334155] bg-[#0F172A]">
+      <div className="rounded-[16px] border border-border bg-card p-6 space-y-4">
+        <div className="overflow-x-auto rounded-[12px] border border-border bg-muted/40 dark:bg-slate-900/60">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-[#1E293B]/70 border-b border-[#334155] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+            <thead className="bg-card border-b border-border text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3.5 px-4">Thí sinh</th>
                 <th className="py-3.5 px-4">GitHub Account</th>
@@ -192,16 +190,16 @@ export const AdminApprovalsPage: React.FC = () => {
                 <th className="py-3.5 px-4 text-right">Hành động</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#334155]/60 text-slate-200">
+            <tbody className="divide-y divide-border text-foreground">
               {filteredCandidates.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 text-xs italic">
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground text-xs italic">
                     Không có tài khoản nào đang chờ phê duyệt.
                   </td>
                 </tr>
               ) : (
                 filteredCandidates.map((cand) => (
-                  <tr key={cand.id} className="hover:bg-[#1E293B]/40 transition-colors">
+                  <tr key={cand.id} className="hover:bg-accent transition-colors">
                     <td className="py-3.5 px-4">
                       <div className="flex items-center gap-3">
                         {cand.avatarUrl ? (
@@ -211,25 +209,25 @@ export const AdminApprovalsPage: React.FC = () => {
                             className="h-9 w-9 rounded-full object-cover border border-[#6366F1]/30"
                           />
                         ) : (
-                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6366F1]/20 text-[#818CF8] font-bold text-xs">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#6366F1]/20 text-primary font-bold text-xs">
                             {cand.fullName.charAt(0)}
                           </div>
                         )}
                         <div>
-                          <span className="font-bold text-white block">{cand.fullName}</span>
-                          <span className="text-[11px] text-slate-400">{cand.email}</span>
+                          <span className="font-bold text-foreground block">{cand.fullName}</span>
+                          <span className="text-[11px] text-muted-foreground">{cand.email}</span>
                         </div>
                       </div>
                     </td>
 
-                    <td className="py-3.5 px-4 font-mono text-[#818CF8]">
+                    <td className="py-3.5 px-4 font-mono text-primary">
                       @{cand.githubUsername || cand.email.split('@')[0] || 'github_user'}
                     </td>
 
-                    <td className="py-3.5 px-4 hidden md:table-cell text-slate-300">
+                    <td className="py-3.5 px-4 hidden md:table-cell text-muted-foreground">
                       <div>{cand.university || cand.school || 'Chưa cập nhật trường'}</div>
                       {cand.studentId && (
-                        <div className="text-[11px] text-slate-400">
+                        <div className="text-[11px] text-muted-foreground">
                           MSSV: {cand.studentId} {cand.phone ? `• SĐT: ${cand.phone}` : ''}
                         </div>
                       )}
@@ -276,17 +274,17 @@ export const AdminApprovalsPage: React.FC = () => {
         title="Từ Chối Phê Duyệt Tài Khoản"
       >
         <form onSubmit={handleConfirmReject} className="space-y-4">
-          <p className="text-xs text-slate-300">
+          <p className="text-xs text-muted-foreground">
             Vui lòng nhập lý do từ chối. Thí sinh sẽ nhìn thấy thông báo này khi đăng nhập vào hệ thống.
           </p>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-slate-300 font-medium text-xs">Lý do từ chối *</label>
+            <label className="text-muted-foreground font-medium text-xs">Lý do từ chối *</label>
             <textarea
               rows={3}
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
-              className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none"
+              className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
               required
             />
           </div>

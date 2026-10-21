@@ -92,8 +92,8 @@ export const RaceConditionModal: React.FC<RaceConditionModalProps> = ({
       maxWidth="2xl"
     >
       <div className="space-y-4">
-        <div className="rounded-[10px] bg-[#0F172A] border border-[#334155] p-4 text-xs text-slate-300 space-y-2">
-          <div className="flex items-center gap-2 text-[#818CF8] font-semibold text-sm">
+        <div className="rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border p-4 text-xs text-muted-foreground space-y-2">
+          <div className="flex items-center gap-2 text-primary font-semibold text-sm">
             <ShieldAlert size={18} />
             <span>Cơ chế bảo vệ dữ liệu theo tài liệu kỹ thuật HackFlow</span>
           </div>
@@ -102,14 +102,14 @@ export const RaceConditionModal: React.FC<RaceConditionModalProps> = ({
           </p>
         </div>
 
-        <div className="rounded-[10px] bg-[#1E293B] border border-[#334155] p-3 text-sm">
-          <span className="text-slate-400">Đề tài đang tranh chấp:</span>{' '}
-          <span className="text-white font-semibold">{subTopicTitle}</span>
+        <div className="rounded-[10px] bg-card border border-border p-3 text-sm">
+          <span className="text-muted-foreground">Đề tài đang tranh chấp:</span>{' '}
+          <span className="text-foreground font-semibold">{subTopicTitle}</span>
         </div>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               Nhật ký giao dịch thời gian thực
             </span>
             {logs.length > 0 && (
@@ -119,9 +119,9 @@ export const RaceConditionModal: React.FC<RaceConditionModalProps> = ({
             )}
           </div>
 
-          <div className="h-56 overflow-y-auto rounded-[10px] bg-[#0B1120] border border-[#334155] p-3 font-mono text-xs space-y-2.5">
+          <div className="h-56 overflow-y-auto rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border p-3 font-mono text-xs space-y-2.5">
             {logs.length === 0 ? (
-              <div className="h-full flex items-center justify-center text-slate-500 italic">
+              <div className="h-full flex items-center justify-center text-muted-foreground italic">
                 Nhấn &quot;Bắt đầu mô phỏng&quot; để gửi đồng thời 2 yêu cầu đăng ký...
               </div>
             ) : (
@@ -130,10 +130,10 @@ export const RaceConditionModal: React.FC<RaceConditionModalProps> = ({
                   key={idx}
                   className={`p-2 rounded border ${
                     log.status === 'success'
-                      ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200'
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
                       : log.status === 'conflict'
-                      ? 'bg-rose-950/40 border-rose-800/60 text-rose-200'
-                      : 'bg-indigo-950/40 border-indigo-800/60 text-indigo-200'
+                      ? 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400'
+                      : 'bg-indigo-500/10 border-indigo-500/30 text-primary'
                   }`}
                 >
                   <div className="flex items-center justify-between font-bold">
@@ -141,9 +141,9 @@ export const RaceConditionModal: React.FC<RaceConditionModalProps> = ({
                       [{log.time}] {log.team}
                     </span>
                     <span className="flex items-center gap-1 text-[11px]">
-                      {log.status === 'success' && <CheckCircle2 size={13} className="text-emerald-400" />}
-                      {log.status === 'conflict' && <XCircle size={13} className="text-rose-400" />}
-                      {log.status === 'pending' && <RefreshCw size={13} className="animate-spin text-indigo-400" />}
+                      {log.status === 'success' && <CheckCircle2 size={13} className="text-emerald-700 dark:text-emerald-400" />}
+                      {log.status === 'conflict' && <XCircle size={13} className="text-rose-700 dark:text-rose-400" />}
+                      {log.status === 'pending' && <RefreshCw size={13} className="animate-spin text-primary" />}
                       {log.action}
                     </span>
                   </div>

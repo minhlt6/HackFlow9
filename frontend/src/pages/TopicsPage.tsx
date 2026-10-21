@@ -401,7 +401,7 @@ export const TopicsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 text-slate-100 font-['Roboto']">
+    <div className="space-y-6 text-foreground ">
       {/* Toast Feedback */}
       {feedbackToast && (
         <div
@@ -409,14 +409,14 @@ export const TopicsPage: React.FC = () => {
           aria-live="polite"
           className={`fixed top-20 right-6 z-50 px-4 py-3 rounded-xl border shadow-xl flex items-center gap-3 backdrop-blur-md animate-in slide-in-from-top-3 duration-200 text-sm font-medium ${
             feedbackToast.type === 'success'
-              ? 'bg-emerald-950/90 text-emerald-200 border-emerald-500/40'
-              : 'bg-rose-950/90 text-rose-200 border-rose-500/40'
+              ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/40'
+              : 'bg-rose-500/10 text-rose-700 dark:text-rose-400 border-rose-500/40'
           }`}
         >
           {feedbackToast.type === 'success' ? (
-            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+            <CheckCircle2 size={18} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
           ) : (
-            <AlertTriangle size={18} className="text-rose-400 shrink-0" />
+            <AlertTriangle size={18} className="text-rose-700 dark:text-rose-400 shrink-0" />
           )}
           <span>{feedbackToast.message}</span>
         </div>
@@ -426,12 +426,7 @@ export const TopicsPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1
-            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide inline-block"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #818CF8 50%, #C7D2FE 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
+            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide inline-block"
           >
             Danh Sách Đề Tài Cuộc Thi (Topics)
           </h1>
@@ -443,7 +438,7 @@ export const TopicsPage: React.FC = () => {
             size="sm"
             onClick={loadData}
             isLoading={isLoading}
-            className="text-slate-400 hover:text-white"
+            className="text-muted-foreground hover:text-foreground"
           >
             <RefreshCw size={14} />
             <span>Làm mới</span>
@@ -453,22 +448,22 @@ export const TopicsPage: React.FC = () => {
 
       {/* Banner 1: Đề tài đội thi đang chọn (nếu đã chọn) */}
       {currentSelectedTopic && (
-        <div className="p-5 rounded-2xl bg-gradient-to-r from-[#1E1B4B]/80 via-[#0F172A] to-[#1E1B4B]/80 border border-[#6366F1]/50 shadow-xl relative overflow-hidden">
+        <div className="p-5 rounded-2xl bg-primary/5 dark:bg-indigo-950/50 border border-[#6366F1]/50 shadow-xl relative overflow-hidden">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
             <div className="space-y-1.5 min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
                   <CheckCircle2 size={13} />
                   <span>ĐÃ CHỌN ĐỀ TÀI CHÍNH THỨC</span>
                 </span>
-                <span className="text-xs text-slate-400">
-                  Đội thi: <strong className="text-white">{team?.team_name || 'Đội của bạn'}</strong>
+                <span className="text-xs text-muted-foreground">
+                  Đội thi: <strong className="text-foreground">{team?.team_name || 'Đội của bạn'}</strong>
                 </span>
               </div>
-              <h2 className="text-lg sm:text-xl font-bold text-white truncate">
+              <h2 className="text-lg sm:text-xl font-bold text-foreground truncate">
                 {currentSelectedTopic.title}
               </h2>
-              <p className="text-xs sm:text-sm text-slate-300 line-clamp-2">
+              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                 {currentSelectedTopic.description}
               </p>
             </div>
@@ -485,7 +480,7 @@ export const TopicsPage: React.FC = () => {
                   <span>Hủy chọn đề tài</span>
                 </Button>
               ) : (
-                <span className="text-xs text-slate-400 italic bg-[#1E293B] px-3 py-1.5 rounded-lg border border-[#334155]">
+                <span className="text-xs text-muted-foreground italic bg-card px-3 py-1.5 rounded-lg border border-border">
                   Chỉ Đội trưởng mới có quyền hủy đề tài
                 </span>
               )}
@@ -496,14 +491,14 @@ export const TopicsPage: React.FC = () => {
 
       {/* Banner 2: Cảnh báo điều kiện đội thi */}
       {!hasTeam ? (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-amber-200">
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-amber-700 dark:text-amber-400">
           <div className="flex items-center gap-3">
-            <AlertTriangle size={20} className="text-amber-400 shrink-0" />
+            <AlertTriangle size={20} className="text-amber-700 dark:text-amber-400 shrink-0" />
             <div className="text-xs sm:text-sm">
-              <p className="font-semibold text-amber-300">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">
                 Bạn chưa tham gia đội thi nào
               </p>
-              <p className="text-amber-200/80 mt-0.5">
+              <p className="text-amber-700 dark:text-amber-400 mt-0.5">
                 Bạn cần tạo hoặc gia nhập đội thi trước khi tiến hành chọn đề tài.
               </p>
             </div>
@@ -516,14 +511,14 @@ export const TopicsPage: React.FC = () => {
           </Link>
         </div>
       ) : !isTeamValid ? (
-        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-amber-200">
+        <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-amber-700 dark:text-amber-400">
           <div className="flex items-center gap-3">
-            <Users size={20} className="text-amber-400 shrink-0" />
+            <Users size={20} className="text-amber-700 dark:text-amber-400 shrink-0" />
             <div className="text-xs sm:text-sm">
-              <p className="font-semibold text-amber-300">
+              <p className="font-semibold text-amber-700 dark:text-amber-400">
                 Đội thi chưa đủ điều kiện tối thiểu ({memberCount}/3 thành viên)
               </p>
-              <p className="text-amber-200/80 mt-0.5">
+              <p className="text-amber-700 dark:text-amber-400 mt-0.5">
                 Theo quy định của cuộc thi, đội thi cần tối thiểu 3 thành viên để Đội trưởng có thể đăng ký đề tài.
               </p>
             </div>
@@ -539,13 +534,13 @@ export const TopicsPage: React.FC = () => {
         <div className="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center gap-2.5 text-xs text-blue-200">
           <ShieldCheck size={16} className="text-blue-400 shrink-0" />
           <span>
-            Bạn đang tham gia với tư cách <strong>Thành viên</strong> đội <strong className="text-white">{team?.team_name}</strong>. Thao tác đăng ký hoặc hủy chọn đề tài chỉ dành riêng cho <strong>Đội trưởng</strong>.
+            Bạn đang tham gia với tư cách <strong>Thành viên</strong> đội <strong className="text-foreground">{team?.team_name}</strong>. Thao tác đăng ký hoặc hủy chọn đề tài chỉ dành riêng cho <strong>Đội trưởng</strong>.
           </span>
         </div>
       ) : null}
 
       {/* Filter and Search Controls */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-[#0B1120] p-3 rounded-2xl border border-[#1E293B]">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/40 dark:bg-slate-900/60 p-3 rounded-2xl border border-border">
         {/* Tabs */}
         <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
           <button
@@ -554,7 +549,7 @@ export const TopicsPage: React.FC = () => {
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               filterTab === 'all'
                 ? 'bg-[#6366F1] text-white shadow-xs'
-                : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
           >
             Tất cả ({topics.length})
@@ -565,7 +560,7 @@ export const TopicsPage: React.FC = () => {
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               filterTab === 'available'
                 ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
           >
             Còn Slot ({topics.filter((t) => t.remaining_slots > 0).length})
@@ -576,7 +571,7 @@ export const TopicsPage: React.FC = () => {
             className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
               filterTab === 'full'
                 ? 'bg-rose-600 text-white shadow-xs'
-                : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
           >
             Hết Slot ({topics.filter((t) => t.remaining_slots === 0).length})
@@ -588,7 +583,7 @@ export const TopicsPage: React.FC = () => {
               className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                 filterTab === 'selected'
                   ? 'bg-indigo-600 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-white hover:bg-[#1E293B]'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
               }`}
             >
               Đã chọn (1)
@@ -600,20 +595,20 @@ export const TopicsPage: React.FC = () => {
         <div className="relative w-full sm:w-72">
           <Search
             size={15}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none"
           />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Tìm theo tên đề tài..."
-            className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#1E293B] border border-[#334155] rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-[#6366F1] transition-colors"
+            className="w-full pl-9 pr-3 py-1.5 text-xs bg-card border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#6366F1] transition-colors"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
             >
               &times;
             </button>
@@ -627,30 +622,30 @@ export const TopicsPage: React.FC = () => {
           {[1, 2, 3].map((n) => (
             <div
               key={n}
-              className="rounded-2xl border border-[#334155] bg-[#1E293B]/50 p-6 h-64 animate-pulse space-y-4"
+              className="rounded-2xl border border-border bg-card p-6 h-64 animate-pulse space-y-4"
             >
-              <div className="h-6 bg-[#334155] rounded-md w-3/4" />
-              <div className="h-4 bg-[#334155] rounded-md w-full" />
-              <div className="h-4 bg-[#334155] rounded-md w-5/6" />
-              <div className="h-2 bg-[#334155] rounded-full w-full mt-6" />
+              <div className="h-6 bg-muted rounded-md w-3/4" />
+              <div className="h-4 bg-muted rounded-md w-full" />
+              <div className="h-4 bg-muted rounded-md w-5/6" />
+              <div className="h-2 bg-muted rounded-full w-full mt-6" />
             </div>
           ))}
         </div>
       ) : fetchError ? (
-        <div className="p-8 text-center rounded-2xl bg-[#0F172A] border border-[#334155] space-y-3">
-          <AlertTriangle size={32} className="mx-auto text-amber-400" />
-          <p className="text-sm text-slate-300">{fetchError}</p>
+        <div className="p-8 text-center rounded-2xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
+          <AlertTriangle size={32} className="mx-auto text-amber-700 dark:text-amber-400" />
+          <p className="text-sm text-muted-foreground">{fetchError}</p>
           <Button variant="secondary" size="sm" onClick={loadData}>
             Thử tải lại
           </Button>
         </div>
       ) : filteredTopics.length === 0 ? (
-        <div className="p-12 text-center rounded-2xl bg-[#0F172A] border border-[#334155] space-y-2">
-          <Lightbulb size={36} className="mx-auto text-slate-400 opacity-40" />
-          <h3 className="text-base font-semibold text-white">
+        <div className="p-12 text-center rounded-2xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2">
+          <Lightbulb size={36} className="mx-auto text-muted-foreground opacity-40" />
+          <h3 className="text-base font-semibold text-foreground">
             Không tìm thấy đề tài nào
           </h3>
-          <p className="text-xs text-slate-400">
+          <p className="text-xs text-muted-foreground">
             Hãy thử tìm kiếm với từ khóa khác hoặc chuyển bộ lọc trạng thái.
           </p>
         </div>
@@ -680,16 +675,16 @@ export const TopicsPage: React.FC = () => {
                 key={topic.id}
                 className={`flex flex-col justify-between rounded-2xl transition-all duration-200 relative overflow-hidden ${
                   isSelected
-                    ? 'border-[#6366F1] bg-gradient-to-b from-[#1E293B] to-[#1E1B4B]/30 shadow-lg shadow-[#6366F1]/10'
+                    ? 'border-[#6366F1] bg-primary/5 dark:bg-indigo-950/30 shadow-lg shadow-[#6366F1]/10'
                     : isFull
-                    ? 'border-[#334155]/60 bg-[#0F172A]/80 opacity-90'
-                    : 'border-[#334155] bg-[#0F172A] hover:border-[#6366F1]/40'
+                    ? 'border-border bg-muted/40 dark:bg-slate-900/60 opacity-90'
+                    : 'border-border bg-muted/40 dark:bg-slate-900/60 hover:border-[#6366F1]/40'
                 }`}
               >
                 {/* Top header badge */}
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
-                    <span className="text-[11px] font-mono font-semibold text-slate-400">
+                    <span className="text-[11px] font-mono font-semibold text-muted-foreground">
                       ID: {topic.id}
                     </span>
 
@@ -711,24 +706,24 @@ export const TopicsPage: React.FC = () => {
                   </div>
 
                   {/* Title & Description */}
-                  <h3 className="font-bold text-white text-base leading-snug line-clamp-2">
+                  <h3 className="font-bold text-foreground text-base leading-snug line-clamp-2">
                     {topic.title}
                   </h3>
-                  <p className="text-xs text-slate-400 mt-2 line-clamp-3 leading-relaxed">
+                  <p className="text-xs text-muted-foreground mt-2 line-clamp-3 leading-relaxed">
                     {topic.description || 'Chưa có mô tả chi tiết cho đề tài này.'}
                   </p>
 
                   {/* Quota Progress */}
-                  <div className="mt-4 pt-3 border-t border-[#1E293B] space-y-1.5">
+                  <div className="mt-4 pt-3 border-t border-border space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-medium">Chỉ tiêu (Quota):</span>
+                      <span className="text-muted-foreground font-medium">Chỉ tiêu (Quota):</span>
                       <span className="font-bold font-mono">
                         {topic.current_teams}/{topic.max_teams} đội{' '}
                         <span
                           className={
                             isFull
-                              ? 'text-rose-400 text-[11px]'
-                              : 'text-emerald-400 text-[11px]'
+                              ? 'text-rose-700 dark:text-rose-400 text-[11px]'
+                              : 'text-emerald-700 dark:text-emerald-400 text-[11px]'
                           }
                         >
                           ({topic.remaining_slots} slot còn lại)
@@ -736,7 +731,7 @@ export const TopicsPage: React.FC = () => {
                       </span>
                     </div>
 
-                    <div className="w-full bg-[#1E293B] h-2 rounded-full overflow-hidden">
+                    <div className="w-full bg-card h-2 rounded-full overflow-hidden">
                       <div
                         className={`h-full rounded-full transition-all duration-300 ${progressColor}`}
                         style={{ width: `${quotaPercent}%` }}
@@ -746,13 +741,13 @@ export const TopicsPage: React.FC = () => {
 
                   {/* Subtopics Accordion */}
                   {subtopicsCount > 0 && (
-                    <div className="mt-3 pt-2 border-t border-[#1E293B]">
+                    <div className="mt-3 pt-2 border-t border-border">
                       <button
                         type="button"
                         onClick={() => toggleSubtopics(topic.id)}
-                        className="w-full flex items-center justify-between text-xs text-slate-400 hover:text-slate-200 transition-colors py-1 cursor-pointer"
+                        className="w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground transition-colors py-1 cursor-pointer"
                       >
-                        <span className="font-medium text-[#818CF8]">
+                        <span className="font-medium text-primary">
                           {subtopicsCount} đề tài nhánh (Subtopics)
                         </span>
                         {isSubExpanded ? (
@@ -767,18 +762,18 @@ export const TopicsPage: React.FC = () => {
                           {topic.subtopics.map((sub: Subtopic) => (
                             <div
                               key={sub.id}
-                              className="p-2.5 rounded-lg bg-[#1E293B]/70 border border-[#334155]/60 text-xs space-y-1"
+                              className="p-2.5 rounded-lg bg-card border border-border text-xs space-y-1"
                             >
                               <div className="flex items-center justify-between gap-1">
-                                <span className="font-medium text-slate-200 truncate">
+                                <span className="font-medium text-foreground truncate">
                                   {sub.title}
                                 </span>
-                                <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                                <span className="text-[10px] font-mono text-muted-foreground shrink-0">
                                   {sub.current_teams}/{sub.max_teams}
                                 </span>
                               </div>
                               {sub.description && (
-                                <p className="text-[11px] text-slate-400 line-clamp-2">
+                                <p className="text-[11px] text-muted-foreground line-clamp-2">
                                   {sub.description}
                                 </p>
                               )}
@@ -791,7 +786,7 @@ export const TopicsPage: React.FC = () => {
                 </div>
 
                 {/* Footer Action Buttons */}
-                <div className="mt-5 pt-3 border-t border-[#1E293B]">
+                <div className="mt-5 pt-3 border-t border-border">
                   {isSelected ? (
                     isLeader ? (
                       <Button
@@ -804,7 +799,7 @@ export const TopicsPage: React.FC = () => {
                         <span>Hủy chọn đề tài này</span>
                       </Button>
                     ) : (
-                      <div className="py-1.5 text-center text-xs text-emerald-400 font-semibold bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                      <div className="py-1.5 text-center text-xs text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-500/10 border border-emerald-500/20 rounded-full">
                         Đội của bạn đã chọn đề tài này
                       </div>
                     )
@@ -886,27 +881,27 @@ export const TopicsPage: React.FC = () => {
       >
         {selectedTopicToRegister && (
           <div className="space-y-4">
-            <div className="p-4 rounded-xl bg-[#0F172A] border border-[#334155] space-y-2">
-              <span className="text-[11px] font-semibold text-[#818CF8] uppercase tracking-wider">
+            <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2">
+              <span className="text-[11px] font-semibold text-primary uppercase tracking-wider">
                 Đề tài đăng ký:
               </span>
-              <h4 className="text-base font-bold text-white">
+              <h4 className="text-base font-bold text-foreground">
                 {selectedTopicToRegister.title}
               </h4>
-              <p className="text-xs text-slate-300 leading-relaxed">
+              <p className="text-xs text-muted-foreground leading-relaxed">
                 {selectedTopicToRegister.description}
               </p>
-              <div className="flex items-center gap-3 pt-2 text-xs text-slate-400">
+              <div className="flex items-center gap-3 pt-2 text-xs text-muted-foreground">
                 <span>
                   Quota còn lại:{' '}
-                  <strong className="text-emerald-400">
+                  <strong className="text-emerald-700 dark:text-emerald-400">
                     {selectedTopicToRegister.remaining_slots} slot
                   </strong>
                 </span>
                 <span>•</span>
                 <span>
                   Đội thi:{' '}
-                  <strong className="text-white">
+                  <strong className="text-foreground">
                     {team?.team_name || 'Đội của bạn'}
                   </strong>
                 </span>
@@ -917,7 +912,7 @@ export const TopicsPage: React.FC = () => {
             {selectedTopicToRegister.subtopics &&
               selectedTopicToRegister.subtopics.length > 0 && (
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-slate-300 block">
+                  <label className="text-xs font-semibold text-muted-foreground block">
                     Chọn bài toán nhánh (Subtopic) phù hợp với định hướng của đội:
                   </label>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
@@ -932,8 +927,8 @@ export const TopicsPage: React.FC = () => {
                             isSubChecked
                               ? 'border-[#6366F1] bg-[#6366F1]/10'
                               : isSubFull
-                              ? 'border-[#334155]/50 bg-[#0F172A]/50 opacity-60 cursor-not-allowed'
-                              : 'border-[#334155] bg-[#0F172A] hover:border-[#6366F1]/50'
+                              ? 'border-border bg-muted/40 dark:bg-slate-900/60 opacity-60 cursor-not-allowed'
+                              : 'border-border bg-muted/40 dark:bg-slate-900/60 hover:border-[#6366F1]/50'
                           }`}
                         >
                           <input
@@ -947,21 +942,21 @@ export const TopicsPage: React.FC = () => {
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-1">
-                              <p className="text-xs font-semibold text-white">
+                              <p className="text-xs font-semibold text-foreground">
                                 {sub.title}
                               </p>
                               <span
                                 className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                                   isSubFull
-                                    ? 'bg-rose-500/20 text-rose-300'
-                                    : 'bg-emerald-500/20 text-emerald-300'
+                                    ? 'bg-rose-500/20 text-rose-700 dark:text-rose-400'
+                                    : 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-400'
                                 }`}
                               >
                                 {isSubFull ? 'Hết slot' : `${sub.remaining_slots} slot`}
                               </span>
                             </div>
                             {sub.description && (
-                              <p className="text-[11px] text-slate-400 mt-0.5">
+                              <p className="text-[11px] text-muted-foreground mt-0.5">
                                 {sub.description}
                               </p>
                             )}
@@ -975,14 +970,14 @@ export const TopicsPage: React.FC = () => {
 
             {/* Error Message */}
             {selectError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertTriangle size={15} className="shrink-0 text-rose-400" />
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0 text-rose-700 dark:text-rose-400" />
                 <span>{selectError}</span>
               </div>
             )}
 
             {/* Confirmation actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#334155]">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
               <Button
                 variant="ghost"
                 size="md"
@@ -1018,20 +1013,20 @@ export const TopicsPage: React.FC = () => {
         {topicToCancel && (
           <div className="space-y-4">
             <div className="flex items-start gap-3 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30">
-              <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 shrink-0">
+              <div className="p-2 rounded-lg bg-rose-500/20 text-rose-700 dark:text-rose-400 shrink-0">
                 <AlertTriangle size={20} />
               </div>
-              <div className="text-xs text-slate-200 space-y-1">
-                <p className="font-semibold text-rose-300 text-sm">
+              <div className="text-xs text-foreground space-y-1">
+                <p className="font-semibold text-rose-700 dark:text-rose-400 text-sm">
                   Bạn có chắc chắn muốn hủy đề tài này không?
                 </p>
-                <p className="text-slate-300">
+                <p className="text-muted-foreground">
                   Đề tài:{' '}
-                  <strong className="text-white">
+                  <strong className="text-foreground">
                     {topicToCancel.title}
                   </strong>
                 </p>
-                <p className="text-slate-400 leading-relaxed pt-1">
+                <p className="text-muted-foreground leading-relaxed pt-1">
                   Sau khi hủy, slot sẽ được giải phóng ngay lập tức cho các đội thi khác đăng ký. Đội của bạn có thể đăng ký một đề tài khác nếu còn trong thời hạn quy định.
                 </p>
               </div>
@@ -1039,14 +1034,14 @@ export const TopicsPage: React.FC = () => {
 
             {/* Error Message */}
             {cancelError && (
-              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-                <AlertTriangle size={15} className="shrink-0 text-rose-400" />
+              <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-xs flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0 text-rose-700 dark:text-rose-400" />
                 <span>{cancelError}</span>
               </div>
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#334155]">
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-border">
               <Button
                 variant="ghost"
                 size="md"

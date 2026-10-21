@@ -163,7 +163,7 @@ interface MockStoreState {
   // Announcements
   announcements: Announcement[];
   addAnnouncement: (title: string, content: string, isPinned?: boolean) => void;
-  broadcastAnnouncement: (title: string, content: string, targetRole?: any) => void;
+  broadcastAnnouncement: (title: string, content: string, targetRole?: 'all' | 'candidates' | 'judges' | 'mentors') => void;
   deleteAnnouncement: (id: string) => void;
 
   // Reset
@@ -195,7 +195,7 @@ const getInitialTabSession = () => {
     if (sessionPersona && mockUsers[sessionPersona]) {
       return {
         currentUser: mockUsers[sessionPersona],
-        activeRolePersona: sessionPersona as any,
+        activeRolePersona: sessionPersona as MockStoreState['activeRolePersona'],
         isAuthenticated: sessionAuth === 'true',
       };
     }
@@ -204,11 +204,11 @@ const getInitialTabSession = () => {
     if (localPersona && mockUsers[localPersona]) {
       return {
         currentUser: mockUsers[localPersona],
-        activeRolePersona: localPersona as any,
+        activeRolePersona: localPersona as MockStoreState['activeRolePersona'],
         isAuthenticated: localAuth === 'true',
       };
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
   return {
@@ -411,7 +411,7 @@ export const useMockStore = create<MockStoreState>()(
         }));
       },
 
-      rejectCandidate: (userId, _reason) => {
+      rejectCandidate: (userId) => {
         set((state) => ({
           pendingCandidates: state.pendingCandidates.filter((c) => c.id !== userId),
         }));
@@ -642,7 +642,7 @@ export const useMockStore = create<MockStoreState>()(
         if (!team) return { success: false, message: 'Đội thi không tồn tại.' };
 
         // Find the subtopic
-        let targetSubTopic: any = null;
+        let targetSubTopic: MockStoreState['majorTopics'][number]['subTopics'][number] | null = null;
         for (const major of get().majorTopics) {
           const sub = major.subTopics.find((s) => s.id === subTopicId);
           if (sub) {
@@ -653,10 +653,13 @@ export const useMockStore = create<MockStoreState>()(
 
         if (!targetSubTopic) return { success: false, message: 'Đề tài không tồn tại.' };
 
-        if (targetSubTopic.currentTeams >= targetSubTopic.maxTeamsQuota) {
+        const targetCurTeams = targetSubTopic.currentTeams ?? targetSubTopic.registeredTeamsCount ?? 0;
+        const targetMaxQuota = targetSubTopic.maxTeamsQuota ?? targetSubTopic.quota ?? 3;
+
+        if (targetCurTeams >= targetMaxQuota) {
           return {
             success: false,
-            message: `Đề tài "${targetSubTopic.title}" đã đạt giới hạn tối đa ${targetSubTopic.maxTeamsQuota} đội. Vui lòng chọn đề tài khác.`,
+            message: `Đề tài "${targetSubTopic.title}" đã đạt giới hạn tối đa ${targetMaxQuota} đội. Vui lòng chọn đề tài khác.`,
           };
         }
 
@@ -675,7 +678,7 @@ export const useMockStore = create<MockStoreState>()(
                 ...sub,
                 currentTeams: newCount,
                 registeredTeamsCount: newCount,
-                status: (newCount < maxQuota ? 'OPEN' : 'CLOSED') as any,
+                status: (newCount < maxQuota ? 'OPEN' : 'CLOSED') as 'OPEN' | 'CLOSED',
               };
             }
             if (sub.id === subTopicId) {
@@ -684,7 +687,7 @@ export const useMockStore = create<MockStoreState>()(
                 ...sub,
                 currentTeams: newCount,
                 registeredTeamsCount: newCount,
-                status: (newCount >= maxQuota ? 'CLOSED' : 'OPEN') as any,
+                status: (newCount >= maxQuota ? 'CLOSED' : 'OPEN') as 'OPEN' | 'CLOSED',
               };
             }
             return sub;
@@ -714,7 +717,7 @@ export const useMockStore = create<MockStoreState>()(
                 ...sub,
                 currentTeams: newCount,
                 registeredTeamsCount: newCount,
-                status: 'OPEN' as any,
+                status: 'OPEN' as const,
               };
             }
             return sub;
@@ -768,7 +771,7 @@ export const useMockStore = create<MockStoreState>()(
                   ...s,
                   maxTeamsQuota: newQuota,
                   quota: newQuota,
-                  status: (cur >= newQuota ? 'CLOSED' : 'OPEN') as any,
+                  status: (cur >= newQuota ? 'CLOSED' : 'OPEN') as 'OPEN' | 'CLOSED',
                 };
               }
               return s;
@@ -938,7 +941,7 @@ export const useMockStore = create<MockStoreState>()(
           const remainingTarget = Math.max(0, 100 - clampedWeight);
           const currentSum = existing.reduce((sum, c) => sum + c.weight, 0);
 
-          let updatedExisting: RubricCriteria[] = [];
+          let updatedExisting: RubricCriteria[];
           if (currentSum === 0 || remainingTarget === 0) {
             updatedExisting = existing.map((c) => ({ ...c, weight: 0 }));
           } else {
@@ -1279,7 +1282,7 @@ export const useMockStore = create<MockStoreState>()(
           const tabPersona = sessionStorage.getItem('hackflow_session_persona');
           const tabAuth = sessionStorage.getItem('hackflow_session_auth');
           if (tabPersona && mockUsers[tabPersona]) {
-            state.activeRolePersona = tabPersona as any;
+            state.activeRolePersona = tabPersona as MockStoreState['activeRolePersona'];
             state.currentUser = mockUsers[tabPersona];
             state.isAuthenticated = tabAuth === 'true';
           }

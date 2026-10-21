@@ -546,25 +546,25 @@ export const SupportTickets: React.FC = () => {
   const isUnassignedOpen = Boolean(activeTicket?.status === 'open' && !activeTicket?.assignedMentorId);
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Toast Alert */}
       {alert && (
         <div
           className={`p-3.5 rounded-xl border text-xs flex items-center justify-between shadow-lg transition-all ${
             alert.type === 'error'
-              ? 'bg-rose-950/80 border-rose-500/50 text-rose-200'
-              : 'bg-emerald-950/80 border-emerald-500/50 text-emerald-200'
+              ? 'bg-rose-500/10 border-rose-500/50 text-rose-700 dark:text-rose-400'
+              : 'bg-emerald-500/10 border-emerald-500/50 text-emerald-700 dark:text-emerald-400'
           }`}
         >
           <div className="flex items-center gap-2">
             {alert.type === 'error' ? (
-              <AlertTriangle size={16} className="text-rose-400 shrink-0" />
+              <AlertTriangle size={16} className="text-rose-700 dark:text-rose-400 shrink-0" />
             ) : (
-              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+              <CheckCircle2 size={16} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
             )}
             <span className="font-medium">{alert.message}</span>
           </div>
-          <button onClick={() => setAlert(null)} className="text-slate-400 hover:text-white text-xs">
+          <button onClick={() => setAlert(null)} className="text-muted-foreground hover:text-foreground text-xs">
             ✕
           </button>
         </div>
@@ -575,22 +575,15 @@ export const SupportTickets: React.FC = () => {
         <div>
           <div className="flex items-center gap-2.5 mb-1">
             <h1
-              className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide inline-block"
-              style={{
-                background: isCandidate
-                  ? 'linear-gradient(90deg, #6366F1 0%, #818CF8 50%, #C7D2FE 100%)'
-                  : 'linear-gradient(90deg, #A855F7 0%, #C084FC 50%, #F3E8FF 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
+              className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide inline-block"
+              >
               {isCandidate ? 'Hỗ Trợ Kỹ Thuật Trực Tuyến' : 'Tiếp Nhận và Xử Lý Yêu Cầu Hỗ Trợ'}
             </h1>
             <Badge variant={isCandidate ? 'primary' : 'purple'} size="sm">
               {isCandidate ? 'GÓC NHÌN THÍ SINH' : 'GÓC NHÌN MENTOR / ADMIN'}
             </Badge>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             {isCandidate
               ? 'Gửi yêu cầu hỗ trợ kỹ thuật, thắc mắc đề tài hoặc sự cố nộp bài tới Hội đồng Cố vấn chuyên môn.'
               : 'Quy trình chuẩn hóa: Tiếp nhận yêu cầu (Open) → Hướng dẫn giải quyết (In Progress) → Hoàn tất (Resolved).'}
@@ -604,7 +597,7 @@ export const SupportTickets: React.FC = () => {
             size="sm"
             onClick={() => fetchTicketsFromApi()}
             disabled={isFetchingApi}
-            className="gap-1.5 text-xs text-slate-300 border-[#334155] hover:bg-[#1E293B]"
+            className="gap-1.5 text-xs text-muted-foreground border-border hover:bg-accent"
             title="Đồng bộ danh sách từ máy chủ"
           >
             <RefreshCw size={13} className={isFetchingApi ? 'animate-spin' : ''} />
@@ -630,8 +623,8 @@ export const SupportTickets: React.FC = () => {
       {isCandidate && (
         <div className="space-y-4">
           {/* Status Filter Tabs */}
-          <div className="flex items-center bg-[#1E293B] p-1 rounded-xl border border-[#334155] text-xs w-fit">
-            <span className="px-2 text-slate-400 hidden sm:flex items-center gap-1">
+          <div className="flex items-center bg-card p-1 rounded-xl border border-border text-xs w-fit">
+            <span className="px-2 text-muted-foreground hidden sm:flex items-center gap-1">
               <Filter size={12} />
               <span>Trạng thái:</span>
             </span>
@@ -650,7 +643,7 @@ export const SupportTickets: React.FC = () => {
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all ${
                   candidateFilter === tab.key
                     ? 'bg-[#6366F1] text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {tab.label}
@@ -661,17 +654,17 @@ export const SupportTickets: React.FC = () => {
           {/* Main 2-Column Split View for Candidate */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[560px]">
             {/* Left Column: Ticket List (5/12) */}
-            <div className="lg:col-span-5 rounded-2xl border border-[#334155] bg-[#111827] p-4 flex flex-col space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-[#1E293B]">
-                <span className="text-xs font-semibold text-slate-300">
+            <div className="lg:col-span-5 rounded-2xl border border-border bg-[#111827] p-4 flex flex-col space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <span className="text-xs font-semibold text-muted-foreground">
                   Danh sách yêu cầu ({filteredCandidateTickets.length})
                 </span>
-                <span className="text-[11px] text-slate-500">Đội: {myTeam?.name}</span>
+                <span className="text-[11px] text-muted-foreground">Đội: {myTeam?.name}</span>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[500px] pr-1">
                 {filteredCandidateTickets.length === 0 ? (
-                  <div className="text-center py-12 text-xs text-slate-500">
+                  <div className="text-center py-12 text-xs text-muted-foreground">
                     <Inbox size={32} className="mx-auto text-slate-600 mb-2 opacity-50" />
                     Chưa có ticket nào trong danh mục này.
                   </div>
@@ -688,12 +681,12 @@ export const SupportTickets: React.FC = () => {
                         onClick={() => setSelectedTicketId(t.id)}
                         className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                           isSelected
-                            ? 'bg-[#1E293B] border-[#6366F1] shadow-md shadow-[#6366F1]/10'
-                            : 'bg-[#0B1120] border-[#1E293B] hover:border-[#334155]'
+                            ? 'bg-card border-[#6366F1] shadow-md shadow-[#6366F1]/10'
+                            : 'bg-muted/40 dark:bg-slate-900/60 border-border hover:border-primary/40'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <span className="font-mono text-[11px] font-bold text-[#818CF8]">
+                          <span className="font-mono text-[11px] font-bold text-primary">
                             {t.ticketCode || t.id}
                           </span>
                           <Badge variant={stat.variant} size="sm">
@@ -701,11 +694,11 @@ export const SupportTickets: React.FC = () => {
                           </Badge>
                         </div>
 
-                        <h4 className="text-xs font-semibold text-white line-clamp-1 mb-1.5">
+                        <h4 className="text-xs font-semibold text-foreground line-clamp-1 mb-1.5">
                           {t.title}
                         </h4>
 
-                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                           <div className="flex items-center gap-1.5">
                             <Badge variant={cat.variant} size="sm">
                               {cat.label}
@@ -714,7 +707,7 @@ export const SupportTickets: React.FC = () => {
                               {prio.label}
                             </Badge>
                           </div>
-                          <span className="text-[10px] text-slate-500">
+                          <span className="text-[10px] text-muted-foreground">
                             {new Date(t.createdAt).toLocaleTimeString('vi-VN')}
                           </span>
                         </div>
@@ -726,26 +719,26 @@ export const SupportTickets: React.FC = () => {
             </div>
 
             {/* Right Column: Ticket Detail & Official Response (7/12) */}
-            <div className="lg:col-span-7 rounded-2xl border border-[#334155] bg-[#111827] flex flex-col overflow-hidden">
+            <div className="lg:col-span-7 rounded-2xl border border-border bg-[#111827] flex flex-col overflow-hidden">
               {activeTicket ? (
                 <>
                   {/* Detail Header */}
-                  <div className="p-4 border-b border-[#334155] bg-[#0F172A] space-y-2">
+                  <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-[#818CF8]">
+                        <span className="font-mono text-xs font-bold text-primary">
                           {activeTicket.ticketCode || activeTicket.id}
                         </span>
                         <Badge variant={STATUS_LABELS[activeTicket.status]?.variant || 'neutral'} size="sm">
                           {STATUS_LABELS[activeTicket.status]?.label || activeTicket.status}
                         </Badge>
                       </div>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-muted-foreground">
                         {new Date(activeTicket.createdAt).toLocaleString('vi-VN')}
                       </span>
                     </div>
 
-                    <h3 className="text-base font-semibold text-white">
+                    <h3 className="text-base font-semibold text-foreground">
                       {activeTicket.title}
                     </h3>
 
@@ -757,7 +750,7 @@ export const SupportTickets: React.FC = () => {
                         Mức độ: {PRIORITY_LABELS[activeTicket.priority]?.label || activeTicket.priority}
                       </Badge>
                       {activeTicket.assignedMentorName && (
-                        <span className="text-xs text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        <span className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                           <UserCheck size={12} />
                           <span>Phụ trách: {activeTicket.assignedMentorName}</span>
                         </span>
@@ -766,13 +759,13 @@ export const SupportTickets: React.FC = () => {
                   </div>
 
                   {/* Detail Content & Official Mentor Response */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#080D18]">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/40 dark:bg-slate-900/60">
                     {/* Issue Description */}
-                    <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1.5">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         Nội dung yêu cầu từ Thí sinh:
                       </span>
-                      <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
+                      <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
                         {activeTicket.description || activeTicket.content}
                       </p>
                     </div>
@@ -781,36 +774,36 @@ export const SupportTickets: React.FC = () => {
                     {activeTicket.response ? (
                       <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                          <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 text-xs font-bold">
                             <CheckCircle2 size={16} />
                             <span>Phản Hồi và Hướng Dẫn Chính Thức Từ Cố Vấn:</span>
                           </div>
                           <Badge variant="success" size="sm">ĐÃ GIẢI QUYẾT</Badge>
                         </div>
-                        <p className="text-xs text-emerald-100 leading-relaxed whitespace-pre-wrap bg-[#0B1120]/60 p-3 rounded-lg border border-emerald-500/20">
+                        <p className="text-xs text-emerald-100 leading-relaxed whitespace-pre-wrap bg-muted/40 dark:bg-slate-900/60 p-3 rounded-lg border border-emerald-500/20">
                           {activeTicket.response}
                         </p>
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                          <span>Người phản hồi: <strong className="text-white">{activeTicket.assignedMentorName || 'Cố vấn chuyên môn'}</strong></span>
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-1">
+                          <span>Người phản hồi: <strong className="text-foreground">{activeTicket.assignedMentorName || 'Cố vấn chuyên môn'}</strong></span>
                           <span>{new Date(activeTicket.updatedAt || activeTicket.createdAt).toLocaleTimeString('vi-VN')}</span>
                         </div>
                       </div>
                     ) : activeTicket.status === 'in_progress' ? (
-                      <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs flex items-center gap-2.5">
-                        <Clock size={16} className="text-indigo-400 animate-spin shrink-0" />
-                        <span>Cố vấn <strong className="text-white">{activeTicket.assignedMentorName || 'chuyên môn'}</strong> đang xử lý yêu cầu của bạn. Phản hồi sẽ sớm hiển thị tại đây.</span>
+                      <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 text-primary text-xs flex items-center gap-2.5">
+                        <Clock size={16} className="text-primary animate-spin shrink-0" />
+                        <span>Cố vấn <strong className="text-foreground">{activeTicket.assignedMentorName || 'chuyên môn'}</strong> đang xử lý yêu cầu của bạn. Phản hồi sẽ sớm hiển thị tại đây.</span>
                       </div>
                     ) : (
-                      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-                        <Clock size={16} className="text-amber-400 shrink-0" />
+                      <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs flex items-center gap-2">
+                        <Clock size={16} className="text-amber-700 dark:text-amber-400 shrink-0" />
                         <span>Yêu cầu đang nằm trong hàng đợi tiếp nhận của Hội đồng Cố vấn.</span>
                       </div>
                     )}
 
                     {/* Candidate Action Buttons: Close & Reopen (SRS HF-37 Mục 3.6 & 3.7) */}
                     {activeTicket.status === 'resolved' && (
-                      <div className="p-4 rounded-xl bg-[#0F172A] border border-[#334155] space-y-2.5">
-                        <div className="text-xs text-slate-300">
+                      <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2.5">
+                        <div className="text-xs text-muted-foreground">
                           Vấn đề đã được hướng dẫn xử lý. Bạn có thể xác nhận đóng ticket hoặc mở lại trong vòng 48 giờ nếu cần hỗ trợ thêm:
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
@@ -827,7 +820,7 @@ export const SupportTickets: React.FC = () => {
                             variant="outline"
                             size="sm"
                             onClick={() => handleReopenTicket(activeTicket.id)}
-                            className="gap-1.5 text-xs text-amber-300 border-amber-500/40 hover:bg-amber-500/10"
+                            className="gap-1.5 text-xs text-amber-700 dark:text-amber-400 border-amber-500/40 hover:bg-amber-500/10"
                             title="Chỉ áp dụng trong vòng 48 giờ kể từ khi giải quyết"
                           >
                             <RotateCcw size={13} />
@@ -838,7 +831,7 @@ export const SupportTickets: React.FC = () => {
                     )}
 
                     {activeTicket.status === 'closed' && (
-                      <div className="p-3 rounded-xl bg-[#0F172A] border border-[#1E293B] text-xs text-slate-400 flex items-center justify-between">
+                      <div className="p-3 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-xs text-muted-foreground flex items-center justify-between">
                         <span>Ticket này đã được đóng hoàn tất.</span>
                         {isAdmin && (
                           <Button
@@ -856,19 +849,19 @@ export const SupportTickets: React.FC = () => {
 
                     {/* Additional Messages / Chat Thread */}
                     {activeTicket.messages && activeTicket.messages.length > 1 && (
-                      <div className="space-y-2 pt-2 border-t border-[#1E293B]">
-                        <span className="text-xs font-semibold text-slate-400">Lịch sử trao đổi:</span>
+                      <div className="space-y-2 pt-2 border-t border-border">
+                        <span className="text-xs font-semibold text-muted-foreground">Lịch sử trao đổi:</span>
                         {activeTicket.messages.map((m) => (
                           <div
                             key={m.id}
                             className={`p-3 rounded-xl text-xs ${
                               m.senderRole === 'mentor'
-                                ? 'bg-[#1E293B] border border-[#334155] text-slate-200'
-                                : 'bg-[#0F172A] border border-[#1E293B] text-slate-300'
+                                ? 'bg-card border border-border text-foreground'
+                                : 'bg-muted/40 dark:bg-slate-900/60 border border-border text-muted-foreground'
                             }`}
                           >
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                              <span className="font-semibold text-white">
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                              <span className="font-semibold text-foreground">
                                 {m.senderName} ({m.senderRole === 'mentor' ? 'Cố vấn' : 'Thí sinh'})
                               </span>
                               <span>{new Date(m.sentAt).toLocaleTimeString('vi-VN')}</span>
@@ -883,13 +876,13 @@ export const SupportTickets: React.FC = () => {
 
                   {/* Candidate Chat Reply Footer */}
                   {activeTicket.status !== 'resolved' && activeTicket.status !== 'closed' && (
-                    <form onSubmit={handleSendChatReply} className="p-3 bg-[#0F172A] border-t border-[#334155] flex gap-2">
+                    <form onSubmit={handleSendChatReply} className="p-3 bg-muted/40 dark:bg-slate-900/60 border-t border-border flex gap-2">
                       <input
                         type="text"
                         value={replyText}
                         onChange={(e) => setReplyText(e.target.value)}
                         placeholder="Gửi tin nhắn phản hồi thêm cho Cố vấn..."
-                        className="flex-1 px-3 py-2 text-xs rounded-xl bg-[#080D18] border border-[#334155] text-white placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]"
+                        className="flex-1 px-3 py-2 text-xs rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1]"
                       />
                       <Button
                         type="submit"
@@ -904,9 +897,9 @@ export const SupportTickets: React.FC = () => {
                   )}
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 text-xs">
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground text-xs">
                   <Inbox size={48} className="text-slate-600 mb-3 opacity-40" />
-                  <p className="font-medium text-slate-400">Chưa chọn ticket nào để xem chi tiết</p>
+                  <p className="font-medium text-muted-foreground">Chưa chọn ticket nào để xem chi tiết</p>
                   <p className="text-[11px] text-slate-600 mt-1 max-w-sm">
                     Chọn một yêu cầu hỗ trợ từ danh sách bên trái hoặc bấm &quot;Gửi Yêu Cầu Hỗ Trợ Mới&quot; để kết nối với Cố vấn.
                   </p>
@@ -923,14 +916,14 @@ export const SupportTickets: React.FC = () => {
       {isMentorOrAdmin && (
         <div className="space-y-4">
           {/* Top Mentor Scope Tabs */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-[#111827] border border-[#334155]">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-[#111827] border border-border">
             <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
               <button
                 onClick={() => setMentorScopeTab('unassigned')}
                 className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
                   mentorScopeTab === 'unassigned'
-                    ? 'bg-[#A855F7] text-white shadow-md shadow-[#A855F7]/25'
-                    : 'text-slate-400 hover:text-white bg-[#1E293B]/70'
+                    ? 'bg-[#A855F7] text-foreground shadow-md shadow-[#A855F7]/25'
+                    : 'text-muted-foreground hover:text-foreground bg-card'
                 }`}
               >
                 <span>Chờ tiếp nhận (Open)</span>
@@ -943,8 +936,8 @@ export const SupportTickets: React.FC = () => {
                 onClick={() => setMentorScopeTab('my_assigned')}
                 className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
                   mentorScopeTab === 'my_assigned'
-                    ? 'bg-[#A855F7] text-white shadow-md shadow-[#A855F7]/25'
-                    : 'text-slate-400 hover:text-white bg-[#1E293B]/70'
+                    ? 'bg-[#A855F7] text-foreground shadow-md shadow-[#A855F7]/25'
+                    : 'text-muted-foreground hover:text-foreground bg-card'
                 }`}
               >
                 <span>Tôi đang phụ trách</span>
@@ -958,8 +951,8 @@ export const SupportTickets: React.FC = () => {
                   onClick={() => setMentorScopeTab('all')}
                   className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
                     mentorScopeTab === 'all'
-                      ? 'bg-[#A855F7] text-white shadow-md shadow-[#A855F7]/25'
-                      : 'text-slate-400 hover:text-white bg-[#1E293B]/70'
+                      ? 'bg-[#A855F7] text-foreground shadow-md shadow-[#A855F7]/25'
+                      : 'text-muted-foreground hover:text-foreground bg-card'
                   }`}
                 >
                   <span>Toàn bộ hệ thống</span>
@@ -972,12 +965,12 @@ export const SupportTickets: React.FC = () => {
 
             {/* Quick Filters: Status, Priority & Search */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 bg-[#1E293B] px-2.5 py-1 rounded-lg border border-[#334155]">
-                <span className="text-slate-400 text-[11px]">Trạng thái:</span>
+              <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-lg border border-border">
+                <span className="text-muted-foreground text-[11px]">Trạng thái:</span>
                 <select
                   value={mentorStatusFilter}
                   onChange={(e) => setMentorStatusFilter(e.target.value as typeof mentorStatusFilter)}
-                  className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                  className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer"
                 >
                   <option value="all">Tất cả</option>
                   <option value="open">Chờ nhận</option>
@@ -987,12 +980,12 @@ export const SupportTickets: React.FC = () => {
                 </select>
               </div>
 
-              <div className="flex items-center gap-1 bg-[#1E293B] px-2.5 py-1 rounded-lg border border-[#334155]">
-                <span className="text-slate-400 text-[11px]">Ưu tiên:</span>
+              <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-lg border border-border">
+                <span className="text-muted-foreground text-[11px]">Ưu tiên:</span>
                 <select
                   value={mentorPriorityFilter}
                   onChange={(e) => setMentorPriorityFilter(e.target.value as typeof mentorPriorityFilter)}
-                  className="bg-transparent text-xs text-white focus:outline-none cursor-pointer"
+                  className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer"
                 >
                   <option value="all">Tất cả mức độ</option>
                   <option value="urgent">🔴 Khẩn cấp (Urgent)</option>
@@ -1003,13 +996,13 @@ export const SupportTickets: React.FC = () => {
               </div>
 
               <div className="relative">
-                <Search size={14} className="absolute left-2.5 top-2.5 text-slate-400" />
+                <Search size={14} className="absolute left-2.5 top-2.5 text-muted-foreground" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Tìm kiếm ticket..."
-                  className="pl-8 pr-3 py-1.5 bg-[#1E293B] border border-[#334155] rounded-lg text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#A855F7] w-36 sm:w-44"
+                  className="pl-8 pr-3 py-1.5 bg-card border border-border rounded-lg text-xs text-foreground placeholder:text-slate-500 focus:outline-none focus:border-[#A855F7] w-36 sm:w-44"
                 />
               </div>
             </div>
@@ -1018,19 +1011,19 @@ export const SupportTickets: React.FC = () => {
           {/* Main 2-Column Split View for Mentor/Admin */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[580px]">
             {/* Left: Ticket Queue (5/12) */}
-            <div className="lg:col-span-5 rounded-2xl border border-[#334155] bg-[#111827] p-4 flex flex-col space-y-3">
-              <div className="flex items-center justify-between pb-2 border-b border-[#1E293B]">
-                <span className="text-xs font-semibold text-slate-300">
+            <div className="lg:col-span-5 rounded-2xl border border-border bg-[#111827] p-4 flex flex-col space-y-3">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <span className="text-xs font-semibold text-muted-foreground">
                   Hàng Đợi Yêu Cầu Hỗ Trợ ({filteredMentorTickets.length})
                 </span>
-                <span className="text-[11px] text-slate-500">
+                <span className="text-[11px] text-muted-foreground">
                   {isMentor ? 'Dữ liệu phân quyền Mentor' : 'Quyền Quản trị viên'}
                 </span>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2.5 max-h-[520px] pr-1">
                 {filteredMentorTickets.length === 0 ? (
-                  <div className="text-center py-12 text-xs text-slate-500">
+                  <div className="text-center py-12 text-xs text-muted-foreground">
                     <Inbox size={32} className="mx-auto text-slate-600 mb-2 opacity-50" />
                     Không có ticket nào khớp với bộ lọc hiện tại.
                   </div>
@@ -1047,8 +1040,8 @@ export const SupportTickets: React.FC = () => {
                         onClick={() => setSelectedTicketId(t.id)}
                         className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                           isSelected
-                            ? 'bg-[#1E293B] border-[#A855F7] shadow-md shadow-[#A855F7]/10'
-                            : 'bg-[#0B1120] border-[#1E293B] hover:border-[#334155]'
+                            ? 'bg-card border-[#A855F7] shadow-md shadow-[#A855F7]/10'
+                            : 'bg-muted/40 dark:bg-slate-900/60 border-border hover:border-primary/40'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -1065,19 +1058,19 @@ export const SupportTickets: React.FC = () => {
                           </div>
                         </div>
 
-                        <h4 className="text-xs font-semibold text-white line-clamp-1 mb-1">
+                        <h4 className="text-xs font-semibold text-foreground line-clamp-1 mb-1">
                           {t.title}
                         </h4>
 
-                        <div className="flex items-center justify-between gap-2 text-[11px] text-slate-400">
+                        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
                           <div className="flex items-center gap-1.5 truncate">
-                            <span className="text-[#818CF8] font-medium truncate">{t.teamName}</span>
+                            <span className="text-primary font-medium truncate">{t.teamName}</span>
                             <span>•</span>
                             <Badge variant={cat.variant} size="sm">
                               {cat.label}
                             </Badge>
                           </div>
-                          <span className="text-[10px] text-slate-500 shrink-0">
+                          <span className="text-[10px] text-muted-foreground shrink-0">
                             {new Date(t.createdAt).toLocaleTimeString('vi-VN')}
                           </span>
                         </div>
@@ -1089,11 +1082,11 @@ export const SupportTickets: React.FC = () => {
             </div>
 
             {/* Right: Ticket Detail & Action Center (7/12) */}
-            <div className="lg:col-span-7 rounded-2xl border border-[#334155] bg-[#111827] flex flex-col overflow-hidden">
+            <div className="lg:col-span-7 rounded-2xl border border-border bg-[#111827] flex flex-col overflow-hidden">
               {activeTicket ? (
                 <>
                   {/* Detail Header */}
-                  <div className="p-4 border-b border-[#334155] bg-[#0F172A] space-y-3">
+                  <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 space-y-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-bold text-[#C084FC]">
@@ -1111,7 +1104,7 @@ export const SupportTickets: React.FC = () => {
                             variant="secondary"
                             size="sm"
                             onClick={handleEscalateTicket}
-                            className="gap-1 text-xs text-amber-300 border-amber-500/30 hover:bg-amber-500/10"
+                            className="gap-1 text-xs text-amber-700 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/10"
                             title="Chuyển giao lên hàng chờ Ban Tổ Chức (Admin)"
                           >
                             <ArrowUpRight size={13} />
@@ -1134,17 +1127,17 @@ export const SupportTickets: React.FC = () => {
                       </div>
                     </div>
 
-                    <h3 className="text-base font-semibold text-white">
+                    <h3 className="text-base font-semibold text-foreground">
                       {activeTicket.title}
                     </h3>
 
                     <div className="flex flex-wrap items-center gap-2 text-xs">
-                      <span className="flex items-center gap-1 text-slate-300 bg-[#1E293B] px-2.5 py-1 rounded-lg border border-[#334155]">
-                        <Users size={12} className="text-[#818CF8]" />
+                      <span className="flex items-center gap-1 text-muted-foreground bg-card px-2.5 py-1 rounded-lg border border-border">
+                        <Users size={12} className="text-primary" />
                         <span>Đội: <strong>{activeTicket.teamName}</strong></span>
                       </span>
-                      <span className="flex items-center gap-1 text-slate-300 bg-[#1E293B] px-2.5 py-1 rounded-lg border border-[#334155]">
-                        <User size={12} className="text-[#818CF8]" />
+                      <span className="flex items-center gap-1 text-muted-foreground bg-card px-2.5 py-1 rounded-lg border border-border">
+                        <User size={12} className="text-primary" />
                         <span>Người gửi: <strong>{activeTicket.creatorName || 'Thí sinh'}</strong></span>
                       </span>
                       <Badge variant={CATEGORY_LABELS[activeTicket.category || 'technical']?.variant || 'neutral'}>
@@ -1154,7 +1147,7 @@ export const SupportTickets: React.FC = () => {
                         {PRIORITY_LABELS[activeTicket.priority]?.label || activeTicket.priority}
                       </Badge>
                       {activeTicket.assignedMentorName && (
-                        <span className="text-xs text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        <span className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                           <UserCheck size={12} />
                           <span>Mentor phụ trách: {activeTicket.assignedMentorName}</span>
                         </span>
@@ -1163,13 +1156,13 @@ export const SupportTickets: React.FC = () => {
                   </div>
 
                   {/* Body: Issue Description & Mentor Response Editor */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#080D18]">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/40 dark:bg-slate-900/60">
                     {/* Problem Content */}
-                    <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-1.5">
-                      <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1.5">
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                         Chi tiết vấn đề Thí sinh phản ánh:
                       </span>
-                      <p className="text-xs text-slate-200 leading-relaxed whitespace-pre-wrap">
+                      <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap">
                         {activeTicket.description || activeTicket.content}
                       </p>
                     </div>
@@ -1177,11 +1170,11 @@ export const SupportTickets: React.FC = () => {
                     {/* Official Response Banner if already resolved */}
                     {activeTicket.response && (
                       <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2">
-                        <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
+                        <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 text-xs font-bold">
                           <CheckCircle2 size={16} />
                           <span>Câu Trả Lời / Hướng Dẫn Đã Gửi Cho Thí Sinh:</span>
                         </div>
-                        <p className="text-xs text-emerald-100 leading-relaxed whitespace-pre-wrap bg-[#0B1120]/60 p-3 rounded-lg border border-emerald-500/20">
+                        <p className="text-xs text-emerald-100 leading-relaxed whitespace-pre-wrap bg-muted/40 dark:bg-slate-900/60 p-3 rounded-lg border border-emerald-500/20">
                           {activeTicket.response || 'Đã hỗ trợ hoàn tất.'}
                         </p>
                       </div>
@@ -1192,9 +1185,9 @@ export const SupportTickets: React.FC = () => {
                       <>
                         {/* Case 1: Ticket open unassigned */}
                         {isUnassignedOpen && (
-                          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200 flex items-center justify-between gap-3">
+                          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-400 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-2">
-                              <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+                              <AlertTriangle size={16} className="text-amber-700 dark:text-amber-400 shrink-0" />
                               <span>Ticket này đang ở trạng thái <strong>Chờ tiếp nhận</strong>. Bạn cần bấm &quot;Nhận Xử Lý (Claim)&quot; để phụ trách trước khi giải quyết.</span>
                             </div>
                             <Button
@@ -1210,8 +1203,8 @@ export const SupportTickets: React.FC = () => {
 
                         {/* Case 2: Ticket assigned to another Mentor */}
                         {isAssignedToOtherMentor && (
-                          <div className="p-4 rounded-xl bg-slate-800/80 border border-slate-700 text-xs text-slate-300 flex items-center gap-2.5">
-                            <UserCheck size={16} className="text-[#818CF8] shrink-0" />
+                          <div className="p-4 rounded-xl bg-muted/60 border border-border text-xs text-muted-foreground flex items-center gap-2.5">
+                            <UserCheck size={16} className="text-primary shrink-0" />
                             <span>
                               Ticket này hiện đang do <strong>{activeTicket.assignedMentorName}</strong> phụ trách. Chỉ Mentor được phân công hoặc Admin mới có quyền gửi phản hồi và giải quyết.
                             </span>
@@ -1220,13 +1213,13 @@ export const SupportTickets: React.FC = () => {
 
                         {/* Case 3: Assigned to current Mentor (or Admin) -> Show Response Editor */}
                         {isAssignedToCurrentMentor && (
-                          <div className="p-4 rounded-xl bg-[#111827] border border-[#334155] space-y-3">
+                          <div className="p-4 rounded-xl bg-[#111827] border border-border space-y-3">
                             <div className="flex items-center justify-between">
-                              <label className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                              <label className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                                 <MessageSquare size={14} className="text-[#A855F7]" />
                                 <span>Khung Hướng Dẫn Giải Quyết (Response):</span>
                               </label>
-                              <span className="text-[11px] text-amber-400 font-medium">
+                              <span className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
                                 * Bắt buộc trước khi đánh dấu Đã giải quyết
                               </span>
                             </div>
@@ -1236,11 +1229,11 @@ export const SupportTickets: React.FC = () => {
                               value={mentorResponseText}
                               onChange={(e) => setMentorResponseText(e.target.value)}
                               placeholder="Nhập nội dung hướng dẫn chuyên môn, giải pháp kỹ thuật cụ thể hoặc hướng khắc phục sự cố cho đội thi..."
-                              className="w-full p-3 rounded-xl bg-[#0B1120] border border-[#334155] text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-[#A855F7] leading-relaxed"
+                              className="w-full p-3 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-xs text-foreground placeholder:text-slate-500 focus:outline-none focus:border-[#A855F7] leading-relaxed"
                             />
 
                             <div className="flex items-center justify-between pt-1">
-                              <span className="text-[11px] text-slate-400">
+                              <span className="text-[11px] text-muted-foreground">
                                 Thí sinh sẽ nhận được phản hồi này ngay lập tức trên trang /tickets.
                               </span>
                               <Button
@@ -1259,19 +1252,19 @@ export const SupportTickets: React.FC = () => {
 
                     {/* Ongoing Messages */}
                     {activeTicket.messages && activeTicket.messages.length > 0 && (
-                      <div className="space-y-2 pt-2 border-t border-[#1E293B]">
-                        <span className="text-xs font-semibold text-slate-400">Lịch sử trao đổi trong ticket:</span>
+                      <div className="space-y-2 pt-2 border-t border-border">
+                        <span className="text-xs font-semibold text-muted-foreground">Lịch sử trao đổi trong ticket:</span>
                         {activeTicket.messages.map((m) => (
                           <div
                             key={m.id}
                             className={`p-3 rounded-xl text-xs ${
                               m.senderRole === 'mentor'
-                                ? 'bg-[#1E293B] border border-[#334155] text-slate-200'
-                                : 'bg-[#0F172A] border border-[#1E293B] text-slate-300'
+                                ? 'bg-card border border-border text-foreground'
+                                : 'bg-muted/40 dark:bg-slate-900/60 border border-border text-muted-foreground'
                             }`}
                           >
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                              <span className="font-semibold text-white">
+                            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                              <span className="font-semibold text-foreground">
                                 {m.senderName} ({m.senderRole === 'mentor' ? 'Cố vấn' : 'Thí sinh'})
                               </span>
                               <span>{new Date(m.sentAt).toLocaleTimeString('vi-VN')}</span>
@@ -1284,9 +1277,9 @@ export const SupportTickets: React.FC = () => {
                   </div>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-500 text-xs">
+                <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-muted-foreground text-xs">
                   <Inbox size={48} className="text-slate-600 mb-3 opacity-40" />
-                  <p className="font-medium text-slate-400">Chưa chọn ticket nào để xử lý</p>
+                  <p className="font-medium text-muted-foreground">Chưa chọn ticket nào để xử lý</p>
                   <p className="text-[11px] text-slate-600 mt-1 max-w-sm">
                     Chọn một yêu cầu từ danh sách bên trái để xem nội dung vướng mắc và tiếp nhận hướng dẫn đội thi.
                   </p>
@@ -1307,9 +1300,9 @@ export const SupportTickets: React.FC = () => {
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-              <span>Tiêu đề yêu cầu <strong className="text-rose-400">*</strong></span>
-              <span className="text-[10px] text-slate-500">5 – 128 ký tự</span>
+            <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+              <span>Tiêu đề yêu cầu <strong className="text-rose-700 dark:text-rose-400">*</strong></span>
+              <span className="text-[10px] text-muted-foreground">5 – 128 ký tự</span>
             </label>
             <Input
               value={newTitle}
@@ -1321,7 +1314,7 @@ export const SupportTickets: React.FC = () => {
               className="text-xs"
             />
             {formErrors.title && (
-              <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-0.5">
+              <p className="text-[11px] text-rose-700 dark:text-rose-400 flex items-center gap-1 mt-0.5">
                 <AlertTriangle size={12} />
                 <span>{formErrors.title}</span>
               </p>
@@ -1331,13 +1324,13 @@ export const SupportTickets: React.FC = () => {
           {/* Category & Priority Selectors */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">
-                Danh mục vấn đề <strong className="text-rose-400">*</strong>
+              <label className="text-xs font-semibold text-muted-foreground">
+                Danh mục vấn đề <strong className="text-rose-700 dark:text-rose-400">*</strong>
               </label>
               <select
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value as TicketCategory)}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-[#0F172A] border border-[#334155] text-white focus:outline-none focus:border-[#6366F1] cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground focus:outline-none focus:border-[#6366F1] cursor-pointer"
               >
                 <option value="technical">Kỹ thuật (Lỗi hệ thống / CI/CD)</option>
                 <option value="topic_clarification">Đề tài (Giải đáp yêu cầu)</option>
@@ -1348,13 +1341,13 @@ export const SupportTickets: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-300">
-                Mức độ ưu tiên <strong className="text-rose-400">*</strong>
+              <label className="text-xs font-semibold text-muted-foreground">
+                Mức độ ưu tiên <strong className="text-rose-700 dark:text-rose-400">*</strong>
               </label>
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value as TicketPriority)}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-[#0F172A] border border-[#334155] text-white focus:outline-none focus:border-[#6366F1] cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground focus:outline-none focus:border-[#6366F1] cursor-pointer"
               >
                 <option value="urgent">🔴 Urgent (Khẩn cấp - Sự cố sát giờ nộp)</option>
                 <option value="high">🟠 High (Cao - Chặn tiến độ làm bài)</option>
@@ -1366,9 +1359,9 @@ export const SupportTickets: React.FC = () => {
 
           {/* Description/Content Field (>= 10 chars) */}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-300 flex items-center justify-between">
-              <span>Mô tả chi tiết vướng mắc <strong className="text-rose-400">*</strong></span>
-              <span className="text-[10px] text-slate-500">Tối thiểu 10 ký tự</span>
+            <label className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+              <span>Mô tả chi tiết vướng mắc <strong className="text-rose-700 dark:text-rose-400">*</strong></span>
+              <span className="text-[10px] text-muted-foreground">Tối thiểu 10 ký tự</span>
             </label>
             <textarea
               rows={5}
@@ -1378,10 +1371,10 @@ export const SupportTickets: React.FC = () => {
                 if (formErrors.content) setFormErrors((prev) => ({ ...prev, content: '' }));
               }}
               placeholder="Mô tả cụ thể thông báo lỗi, các bước tái hiện, liên kết log hoặc câu hỏi chuyên môn cần Cố vấn hỗ trợ..."
-              className="w-full p-3 rounded-xl bg-[#0F172A] border border-[#334155] text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1] leading-relaxed"
+              className="w-full p-3 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-xs text-foreground placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1] leading-relaxed"
             />
             {formErrors.content && (
-              <p className="text-[11px] text-rose-400 flex items-center gap-1 mt-0.5">
+              <p className="text-[11px] text-rose-700 dark:text-rose-400 flex items-center gap-1 mt-0.5">
                 <AlertTriangle size={12} />
                 <span>{formErrors.content}</span>
               </p>
@@ -1393,7 +1386,7 @@ export const SupportTickets: React.FC = () => {
               type="button"
               variant="outline"
               onClick={() => setIsCreateOpen(false)}
-              className="text-xs text-slate-400 border-[#334155]"
+              className="text-xs text-muted-foreground border-border"
             >
               <X size={14} className="mr-1" />
               <span>Hủy Bỏ</span>

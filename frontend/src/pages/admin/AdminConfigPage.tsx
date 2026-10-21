@@ -103,26 +103,21 @@ export const AdminConfigPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto'] w-full pb-10">
+    <div className="space-y-6  w-full pb-10">
       {/* Top Header & Overview Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-[#1E293B]">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
           <div className="flex items-center gap-2.5 mb-1">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#818CF8]">
+            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#6366F1]/20 border border-[#6366F1]/40 text-primary">
               <Settings size={20} />
             </div>
             <h1
-              className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-              style={{
-                background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
+              className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
             >
               Cấu Hình Hệ Thống Cuộc Thi
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Thiết lập thông số vận hành toàn diện: tên cuộc thi, số lượng thành viên, mốc thời gian và chế độ chấm thi.
           </p>
         </div>
@@ -149,15 +144,15 @@ export const AdminConfigPage: React.FC = () => {
       </div>
 
       {alert && (
-        <div className="p-4 rounded-[12px] bg-emerald-950/40 border border-emerald-500/40 text-xs sm:text-sm text-emerald-300 flex items-center justify-between shadow-lg shadow-emerald-950/20 animate-in fade-in">
+        <div className="p-4 rounded-[12px] bg-emerald-500/10 border border-emerald-500/40 text-xs sm:text-sm text-emerald-700 dark:text-emerald-400 flex items-center justify-between shadow-lg shadow-emerald-950/20 animate-in fade-in">
           <div className="flex items-center gap-2.5">
-            <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+            <CheckCircle2 size={18} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
             <span className="font-medium">{alert}</span>
           </div>
           <button
             type="button"
             onClick={() => setAlert(null)}
-            className="text-emerald-400 hover:text-emerald-200 text-xs cursor-pointer"
+            className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-200 text-xs cursor-pointer"
           >
             Đóng
           </button>
@@ -165,14 +160,14 @@ export const AdminConfigPage: React.FC = () => {
       )}
 
       {isDirty && (
-        <div className="p-4 rounded-[12px] bg-amber-500/10 border border-amber-500/40 text-xs sm:text-sm text-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-amber-950/20 animate-in fade-in">
+        <div className="p-4 rounded-[12px] bg-amber-500/10 border border-amber-500/40 text-xs sm:text-sm text-amber-700 dark:text-amber-400 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg shadow-amber-950/20 animate-in fade-in">
           <div className="flex items-center gap-2.5">
-            <AlertTriangle size={18} className="text-amber-400 shrink-0" />
+            <AlertTriangle size={18} className="text-amber-700 dark:text-amber-400 shrink-0" />
             <span>
               Bạn đang có thay đổi cấu hình chưa được lưu. Hãy bấm nút <strong>"Lưu Cấu Hình Hackathon"</strong> bên dưới để áp dụng.
             </span>
           </div>
-          <span className="text-xs bg-amber-500/20 text-amber-200 px-3 py-1 rounded-full font-bold self-start sm:self-auto shrink-0 border border-amber-500/30">
+          <span className="text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 px-3 py-1 rounded-full font-bold self-start sm:self-auto shrink-0 border border-amber-500/30">
             Thay đổi chưa lưu
           </span>
         </div>
@@ -185,16 +180,16 @@ export const AdminConfigPage: React.FC = () => {
            ======================================================== */}
         <div className="lg:col-span-7 xl:col-span-8 space-y-6">
           {/* Card 1: Thông Tin Chung Cuộc Thi */}
-          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 sm:p-7 space-y-5 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-3 pb-3 border-b border-[#334155]">
-              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <div className="rounded-[16px] border border-border bg-card p-6 sm:p-7 space-y-5 shadow-lg shadow-black/20">
+            <div className="flex items-center gap-3 pb-3 border-b border-border">
+              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
                 <Sliders size={18} />
               </div>
               <div>
-                <h3 className="font-['Righteous'] text-base sm:text-lg text-white">
+                <h3 className="font-semibold tracking-tight text-foreground text-base sm:text-lg text-foreground">
                   Thông Tin Chung & Quy Định Đội Thi
                 </h3>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted-foreground">
                   Tên định danh cuộc thi, tiến trình giai đoạn và quy định số lượng thành viên tham gia.
                 </p>
               </div>
@@ -211,14 +206,14 @@ export const AdminConfigPage: React.FC = () => {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-slate-300 font-medium text-xs flex items-center justify-between">
+                  <label className="text-muted-foreground font-medium text-xs flex items-center justify-between">
                     <span>Giai đoạn hiện tại *</span>
-                    <span className="text-[10px] text-indigo-300">Đang hoạt động</span>
+                    <span className="text-[10px] text-primary">Đang hoạt động</span>
                   </label>
                   <select
                     value={currentPhase}
                     onChange={(e) => setCurrentPhase(e.target.value)}
-                    className="w-full p-2.5 rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 text-xs focus:border-[#6366F1] focus:outline-none transition-colors"
+                    className="w-full p-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none transition-colors"
                   >
                     <option value="Đăng ký tài khoản & Lập đội">Giai đoạn 1: Đăng ký & Lập đội</option>
                     <option value="Lựa chọn đề tài & Giới hạn số lượng">Giai đoạn 2: Chọn đề tài & Khóa số lượng</option>
@@ -226,7 +221,7 @@ export const AdminConfigPage: React.FC = () => {
                     <option value="Hội đồng chấm thi độc lập">Giai đoạn 4: Hội đồng chấm thi độc lập</option>
                     <option value="Bế mạc & Công bố kết quả">Giai đoạn 5: Bế mạc & Bảng xếp hạng</option>
                   </select>
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-muted-foreground">
                     Hiển thị thông báo tiến độ trên thanh điều hướng của toàn bộ người dùng.
                   </span>
                 </div>
@@ -241,7 +236,7 @@ export const AdminConfigPage: React.FC = () => {
                     onChange={(e) => setMaxTeamMembers(Number(e.target.value))}
                     required
                   />
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-muted-foreground">
                     Giới hạn số thành viên được phép gia nhập cùng một đội (khuyến nghị 3 - 5 người).
                   </span>
                 </div>
@@ -256,17 +251,17 @@ export const AdminConfigPage: React.FC = () => {
                     onChange={(e) => setFinalDeadline(e.target.value)}
                     required
                   />
-                  <span className="text-[11px] text-slate-400">
+                  <span className="text-[11px] text-muted-foreground">
                     Mốc thời gian khóa cổng nộp sản phẩm chính thức của giải đấu.
                   </span>
                 </div>
 
-                <div className="p-3.5 rounded-[10px] bg-[#0F172A] border border-[#334155] flex flex-col justify-between text-xs space-y-2">
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <Calendar size={15} className="text-[#818CF8]" />
-                    <span className="font-semibold text-white">Quy chế nộp bài</span>
+                <div className="p-3.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col justify-between text-xs space-y-2">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar size={15} className="text-primary" />
+                    <span className="font-semibold text-foreground">Quy chế nộp bài</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
                     Hệ thống sẽ ghi nhận commit SHA mới nhất trước mốc hạn chót này. Mọi lượt nộp sau hạn chót sẽ bị hệ thống tự động từ chối.
                   </p>
                 </div>
@@ -275,17 +270,17 @@ export const AdminConfigPage: React.FC = () => {
           </div>
 
           {/* Card 2: Điều Khiển Thời Gian & Đồng Hồ Đếm Ngược */}
-          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 sm:p-7 space-y-5 shadow-lg shadow-black/20">
-            <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
+          <div className="rounded-[16px] border border-border bg-card p-6 sm:p-7 space-y-5 shadow-lg shadow-black/20">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                <div className="p-2 rounded-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
                   <Clock size={18} />
                 </div>
                 <div>
-                  <h3 className="font-['Righteous'] text-base sm:text-lg text-white">
+                  <h3 className="font-semibold tracking-tight text-foreground text-base sm:text-lg text-foreground">
                     Thời Gian Cuộc Thi & Đồng Hồ Đếm Ngược
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     Điều khiển kích hoạt thời gian thi đấu để đồng bộ đồng hồ đếm ngược trên giao diện thí sinh.
                   </p>
                 </div>
@@ -308,13 +303,13 @@ export const AdminConfigPage: React.FC = () => {
                         config.isContestStarted ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                       }`}
                     />
-                    <span className="font-['Righteous'] text-sm sm:text-base text-white">
+                    <span className="font-semibold tracking-tight text-foreground text-sm sm:text-base text-foreground">
                       {config.isContestStarted
                         ? 'Cuộc Thi Đang Diễn Ra (Đang Đếm Ngược)'
                         : 'Cuộc Thi Chưa Bắt Đầu (Chế Độ Chờ)'}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-300 leading-relaxed">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     {config.isContestStarted
                       ? 'Đồng hồ đếm ngược đang đếm trực tiếp đến hạn chót nộp bài trên màn hình của toàn bộ thí sinh. Các chặng nộp bài đang mở tiếp nhận bài làm.'
                       : 'Hệ thống đang ở chế độ chờ. Thí sinh nhìn thấy thông báo chuẩn bị và đồng hồ chưa kích hoạt cho đến khi Ban Quản Trị phát lệnh bắt đầu.'}
@@ -326,7 +321,7 @@ export const AdminConfigPage: React.FC = () => {
                     <button
                       type="button"
                       onClick={toggleContestStarted}
-                      className="w-full sm:w-auto px-4 py-2.5 rounded-[10px] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-amber-950/20"
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-[10px] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-amber-950/20"
                     >
                       <Pause size={15} />
                       <span>Tạm Dừng / Dừng Cuộc Thi</span>
@@ -350,7 +345,7 @@ export const AdminConfigPage: React.FC = () => {
                   <CountdownTimer
                     targetDate={config.finalSubmissionDeadline}
                     title="Đồng hồ đếm ngược trực tiếp (Xem trước giao diện thí sinh)"
-                    className="p-3 bg-[#0B1120] border-[#334155]/60"
+                    className="p-3 bg-muted/40 dark:bg-slate-900/60 border-border"
                   />
                 </div>
               )}
@@ -358,9 +353,9 @@ export const AdminConfigPage: React.FC = () => {
           </div>
 
           {/* Form Submit Bar */}
-          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-2 text-xs text-slate-400">
-              <CheckCircle2 size={16} className="text-[#818CF8]" />
+          <div className="rounded-[16px] border border-border bg-card p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-black/20">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <CheckCircle2 size={16} className="text-primary" />
               <span>Các thay đổi sẽ được áp dụng ngay trên toàn bộ giao diện sau khi lưu.</span>
             </div>
             <Button variant="primary" type="submit" size="lg" className="w-full sm:w-auto gap-2 px-8">
@@ -375,24 +370,24 @@ export const AdminConfigPage: React.FC = () => {
            ======================================================== */}
         <div className="lg:col-span-5 xl:col-span-4 space-y-6">
           {/* Card 3: Chế Độ Chấm Thi & Bảng Điểm */}
-          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-5 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-3 pb-3 border-b border-[#334155]">
-              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <div className="rounded-[16px] border border-border bg-card p-6 space-y-5 shadow-lg shadow-black/20">
+            <div className="flex items-center gap-3 pb-3 border-b border-border">
+              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
                 <ShieldCheck size={18} />
               </div>
               <div>
-                <h3 className="font-['Righteous'] text-base text-white">Chế Độ Chấm & Minh Bạch</h3>
-                <p className="text-xs text-slate-400">Quy tắc chấm độc lập và công bố thứ hạng.</p>
+                <h3 className="font-semibold tracking-tight text-foreground text-base text-foreground">Chế Độ Chấm & Minh Bạch</h3>
+                <p className="text-xs text-muted-foreground">Quy tắc chấm độc lập và công bố thứ hạng.</p>
               </div>
             </div>
 
             <div className="space-y-4">
               {/* Toggle 1: Chế Độ Chấm Ẩn Danh */}
-              <div className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-3">
+              <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <EyeOff size={16} className={config.blindJudgingMode ? 'text-amber-400' : 'text-slate-400'} />
-                    <span className="font-bold text-white text-xs">Chế Độ Chấm Ẩn Danh</span>
+                    <EyeOff size={16} className={config.blindJudgingMode ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'} />
+                    <span className="font-bold text-foreground text-xs">Chế Độ Chấm Ẩn Danh</span>
                   </div>
 
                   <button
@@ -401,7 +396,7 @@ export const AdminConfigPage: React.FC = () => {
                     role="switch"
                     aria-checked={config.blindJudgingMode}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      config.blindJudgingMode ? 'bg-[#6366F1]' : 'bg-slate-700'
+                      config.blindJudgingMode ? 'bg-[#6366F1]' : 'bg-muted'
                     }`}
                   >
                     <span
@@ -411,14 +406,14 @@ export const AdminConfigPage: React.FC = () => {
                     />
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
                   Tự động mã hóa tên đội, trường học và danh tính thí sinh khỏi màn hình chấm của Giám khảo để đảm bảo tính khách quan tuyệt đối.
                 </p>
-                <div className="flex items-center justify-between pt-2 border-t border-[#334155]/60 text-[11px]">
-                  <span className="text-slate-400">Trạng thái hiện tại:</span>
+                <div className="flex items-center justify-between pt-2 border-t border-border text-[11px]">
+                  <span className="text-muted-foreground">Trạng thái hiện tại:</span>
                   <span
                     className={`font-semibold ${
-                      config.blindJudgingMode ? 'text-amber-300' : 'text-slate-400'
+                      config.blindJudgingMode ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'
                     }`}
                   >
                     {config.blindJudgingMode ? '● Đang bật ẩn danh' : '○ Công khai danh tính'}
@@ -427,11 +422,11 @@ export const AdminConfigPage: React.FC = () => {
               </div>
 
               {/* Toggle 2: Công Bố Bảng Xếp Hạng */}
-              <div className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] space-y-3">
+              <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <Trophy size={16} className={config.resultsPublished ? 'text-emerald-400' : 'text-slate-400'} />
-                    <span className="font-bold text-white text-xs">Công Bố Bảng Xếp Hạng</span>
+                    <Trophy size={16} className={config.resultsPublished ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'} />
+                    <span className="font-bold text-foreground text-xs">Công Bố Bảng Xếp Hạng</span>
                   </div>
 
                   <button
@@ -440,7 +435,7 @@ export const AdminConfigPage: React.FC = () => {
                     role="switch"
                     aria-checked={config.resultsPublished}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      config.resultsPublished ? 'bg-emerald-500' : 'bg-slate-700'
+                      config.resultsPublished ? 'bg-emerald-500' : 'bg-muted'
                     }`}
                   >
                     <span
@@ -450,14 +445,14 @@ export const AdminConfigPage: React.FC = () => {
                     />
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
                   Mở công khai điểm số tổng hợp và xếp thứ hạng của các đội thi trên trang Leaderboard cho toàn bộ thí sinh.
                 </p>
-                <div className="flex items-center justify-between pt-2 border-t border-[#334155]/60 text-[11px]">
-                  <span className="text-slate-400">Trạng thái hiện tại:</span>
+                <div className="flex items-center justify-between pt-2 border-t border-border text-[11px]">
+                  <span className="text-muted-foreground">Trạng thái hiện tại:</span>
                   <span
                     className={`font-semibold ${
-                      config.resultsPublished ? 'text-emerald-300' : 'text-slate-400'
+                      config.resultsPublished ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'
                     }`}
                   >
                     {config.resultsPublished ? '● Đã công bố công khai' : '○ Tạm ẩn điểm'}
@@ -468,65 +463,65 @@ export const AdminConfigPage: React.FC = () => {
           </div>
 
           {/* Card 4: Tổng Quan Dữ Liệu Vận Hành */}
-          <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-3 pb-3 border-b border-[#334155]">
-              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <div className="rounded-[16px] border border-border bg-card p-6 space-y-4 shadow-lg shadow-black/20">
+            <div className="flex items-center gap-3 pb-3 border-b border-border">
+              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
                 <Layers size={18} />
               </div>
               <div>
-                <h3 className="font-['Righteous'] text-base text-white">Tổng Quan Dữ Liệu</h3>
-                <p className="text-xs text-slate-400">Quy mô các thực thể trong giải đấu.</p>
+                <h3 className="font-semibold tracking-tight text-foreground text-base text-foreground">Tổng Quan Dữ Liệu</h3>
+                <p className="text-xs text-muted-foreground">Quy mô các thực thể trong giải đấu.</p>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] space-y-1">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                  <Users size={13} className="text-[#818CF8]" />
+              <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                  <Users size={13} className="text-primary" />
                   <span>Đội thi</span>
                 </div>
-                <div className="font-['Righteous'] text-lg text-white">{teams.length}</div>
+                <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">{teams.length}</div>
               </div>
 
-              <div className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] space-y-1">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                  <CheckSquare size={13} className="text-emerald-400" />
+              <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                  <CheckSquare size={13} className="text-emerald-700 dark:text-emerald-400" />
                   <span>Chặng nộp</span>
                 </div>
-                <div className="font-['Righteous'] text-lg text-white">{checkpoints.length}</div>
+                <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">{checkpoints.length}</div>
               </div>
 
-              <div className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] space-y-1">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                  <Scale size={13} className="text-amber-400" />
+              <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                  <Scale size={13} className="text-amber-700 dark:text-amber-400" />
                   <span>Tiêu chí Rubric</span>
                 </div>
-                <div className="font-['Righteous'] text-lg text-white">{rubricCriteria.length}</div>
+                <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">{rubricCriteria.length}</div>
               </div>
 
-              <div className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] space-y-1">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
-                  <Megaphone size={13} className="text-purple-400" />
+              <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                  <Megaphone size={13} className="text-purple-700 dark:text-purple-400" />
                   <span>Thông báo</span>
                 </div>
-                <div className="font-['Righteous'] text-lg text-white">{announcements.length}</div>
+                <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">{announcements.length}</div>
               </div>
             </div>
           </div>
 
           {/* Card 5: Vùng Nguy Hiểm (Danger Zone) */}
-          <div className="rounded-[16px] border border-rose-500/30 bg-rose-950/10 p-6 space-y-3.5 shadow-lg shadow-rose-950/20">
-            <div className="flex items-center gap-2.5 text-rose-300">
+          <div className="rounded-[16px] border border-rose-500/30 bg-rose-500/10 p-6 space-y-3.5 shadow-lg shadow-rose-950/20">
+            <div className="flex items-center gap-2.5 text-rose-700 dark:text-rose-400">
               <AlertTriangle size={18} className="shrink-0" />
-              <h3 className="font-['Righteous'] text-base">Đặt Lại Dữ Liệu Ban Đầu</h3>
+              <h3 className="font-semibold tracking-tight text-foreground text-base">Đặt Lại Dữ Liệu Ban Đầu</h3>
             </div>
-            <p className="text-xs text-rose-200/80 leading-relaxed">
+            <p className="text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
               Thao tác này sẽ xóa toàn bộ dữ liệu mẫu (đội thi, đề tài, chặng nộp bài, tiêu chí) để bắt đầu giải đấu từ trạng thái hoàn toàn sạch.
             </p>
             <button
               type="button"
               onClick={handleResetAll}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[10px] border border-rose-500/50 bg-rose-500/20 hover:bg-rose-500/30 text-rose-200 text-xs font-bold transition-all cursor-pointer shadow-md"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[10px] border border-rose-500/50 bg-rose-500/20 hover:bg-rose-500/30 text-rose-700 dark:text-rose-400 text-xs font-bold transition-all cursor-pointer shadow-md"
             >
               <RotateCcw size={15} />
               <span>Xóa Sạch Dữ Liệu Cũ (Đặt Lại Từ Đầu)</span>

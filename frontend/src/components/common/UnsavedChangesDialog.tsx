@@ -24,18 +24,18 @@ export const UnsavedChangesDialog: React.FC<UnsavedChangesDialogProps> = ({
 
   return (
     <Modal isOpen={isOpen} onClose={onStay} title={title}>
-      <div className="space-y-5 font-['Roboto']">
+      <div className="space-y-5 ">
         <div className="p-4 rounded-[12px] bg-amber-500/10 border border-amber-500/30 flex items-start gap-3.5">
-          <div className="p-2 rounded-[10px] bg-amber-500/20 text-amber-300 shrink-0 mt-0.5">
+          <div className="p-2 rounded-[10px] bg-amber-500/20 text-amber-700 dark:text-amber-400 shrink-0 mt-0.5">
             <AlertTriangle size={20} />
           </div>
-          <div className="space-y-1.5 text-xs text-slate-200 leading-relaxed">
-            <p className="font-bold text-amber-300 text-sm">Cảnh báo: Dữ liệu chưa được lưu!</p>
-            <p className="text-slate-300">{message}</p>
+          <div className="space-y-1.5 text-xs text-foreground leading-relaxed">
+            <p className="font-bold text-amber-700 dark:text-amber-400 text-sm">Cảnh báo: Dữ liệu chưa được lưu!</p>
+            <p className="text-muted-foreground">{message}</p>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-3 border-t border-[#334155]">
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-3 border-t border-border">
           <Button variant="ghost" onClick={onStay} className="w-full sm:w-auto">
             Ở lại tiếp tục sửa
           </Button>
