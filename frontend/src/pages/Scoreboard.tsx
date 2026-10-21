@@ -255,7 +255,7 @@ export const Scoreboard: React.FC = () => {
           </div>
 
           {/* Detailed Leaderboard Table */}
-          <div className="bg-[#111827] border border-border rounded-2xl overflow-hidden shadow-xl">
+          <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xl">
             <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold tracking-tight text-foreground text-base sm:text-lg text-foreground">
@@ -282,7 +282,7 @@ export const Scoreboard: React.FC = () => {
                     {isAdmin && <th className="py-3 px-4 text-center">Kiểm Tra Đối Soát</th>}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#1E293B]">
+                <tbody className="divide-y divide-border">
                   {teamsWithScores.map((team, idx) => {
                     const rank = idx + 1;
                     return (
@@ -295,15 +295,15 @@ export const Scoreboard: React.FC = () => {
                         {/* Rank */}
                         <td className="py-3.5 px-4 text-center">
                           {rank === 1 ? (
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-slate-950 font-bold font-semibold tracking-tight text-foreground">
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white font-bold tracking-tight">
                               1
                             </span>
                           ) : rank === 2 ? (
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-300 text-slate-950 font-bold font-semibold tracking-tight text-foreground">
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-300 dark:bg-slate-600 text-slate-900 dark:text-white font-bold tracking-tight">
                               2
                             </span>
                           ) : rank === 3 ? (
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-700 text-foreground font-bold font-semibold tracking-tight text-foreground">
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-amber-700 text-white font-bold tracking-tight">
                               3
                             </span>
                           ) : (

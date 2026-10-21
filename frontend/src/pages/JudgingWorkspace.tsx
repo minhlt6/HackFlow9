@@ -278,7 +278,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#111827] border border-border rounded-xl overflow-hidden shadow-2xl">
+    <div className="flex flex-col h-full bg-card border border-border rounded-xl overflow-hidden shadow-sm">
       {/* Rubric Header */}
       <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 flex items-center justify-between shrink-0">
         <div>
@@ -314,7 +314,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
       </div>
 
       {/* Criteria List & Comments */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/20 dark:bg-slate-950/30">
         {rubricCriteria.map((c) => {
           const currentScore = scores[c.id];
           const displayScore = currentScore === '' ? '' : currentScore ?? 0;
@@ -392,7 +392,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
                     setCriteriaComments((prev) => ({ ...prev, [c.id]: e.target.value }))
                   }
                   placeholder="Ghi chú nhận xét chuyên môn cho tiêu chí này..."
-                  className="w-full px-3 py-1.5 text-xs rounded-lg bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-slate-600 focus:outline-none focus:border-[#6366F1] disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-1.5 text-xs rounded-lg bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#6366F1] disabled:opacity-70 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -411,7 +411,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
             value={generalComment}
             onChange={(e) => setGeneralComment(e.target.value)}
             placeholder="Nhận xét chi tiết về giải pháp, kiến trúc kỹ thuật và tiềm năng phát triển của sản phẩm..."
-            className="w-full p-3 rounded-lg bg-muted/40 dark:bg-slate-900/60 border border-border text-xs text-foreground placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1] disabled:opacity-70 disabled:cursor-not-allowed leading-relaxed"
+            className="w-full p-3 rounded-lg bg-muted/40 dark:bg-slate-900/60 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-[#6366F1] disabled:opacity-70 disabled:cursor-not-allowed leading-relaxed"
           />
         </div>
       </div>
@@ -643,9 +643,9 @@ export const JudgingWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)]  -m-4 sm:-m-6 lg:-m-8 bg-muted/40 dark:bg-slate-900/60">
+    <div className="flex flex-col h-[calc(100vh-5rem)] -m-4 sm:-m-6 lg:-m-8 bg-background">
       {/* Top Bar Navigation & Filters */}
-      <div className="h-16 border-b border-border bg-muted/40 dark:bg-slate-900/60 px-4 flex items-center justify-between shrink-0 gap-4">
+      <div className="h-16 border-b border-border bg-card px-4 flex items-center justify-between shrink-0 gap-4">
         {/* Left: Title & Team Navigator */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
@@ -764,7 +764,7 @@ export const JudgingWorkspace: React.FC = () => {
       {/* Main Split-screen 50/50 Body */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 min-h-0 overflow-hidden">
         {/* LEFT COLUMN: Submission & Artifacts */}
-        <div className="flex flex-col h-full bg-[#111827] border border-border rounded-xl overflow-hidden shadow-2xl">
+        <div className="flex flex-col h-full bg-card border border-border rounded-xl overflow-hidden shadow-sm">
           {/* Header: Anonymous code & Action Links */}
           <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 shrink-0 space-y-3">
             <div className="flex items-center justify-between gap-3">
@@ -904,7 +904,7 @@ export const JudgingWorkspace: React.FC = () => {
           </div>
 
           {/* Artifact Content Body */}
-          <div className="flex-1 overflow-y-auto p-4 bg-muted/40 dark:bg-slate-900/60">
+          <div className="flex-1 overflow-y-auto p-4 bg-card">
             {leftTab === 'code' && (
               <div className="space-y-4">
                 <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2">

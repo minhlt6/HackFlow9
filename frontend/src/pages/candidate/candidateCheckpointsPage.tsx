@@ -234,7 +234,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                       <ChevronRight
                         size={18}
                         className={`shrink-0 transition-transform ${
-                          isSelected ? 'text-primary translate-x-0.5' : 'text-slate-600'
+                          isSelected ? 'text-primary translate-x-0.5' : 'text-muted-foreground'
                         }`}
                       />
                     </div>

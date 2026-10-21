@@ -531,7 +531,7 @@ export const OnboardingPage: React.FC = () => {
                     </svg>
                     <span>@{githubHandle}</span>
                   </span>
-                  <span className="text-slate-600">•</span>
+                  <span className="text-muted-foreground">•</span>
                   <span className="flex items-center gap-1.5">
                     <Mail size={14} className="text-muted-foreground" />
                     <span>{user?.email || 'Chưa cập nhật email'}</span>

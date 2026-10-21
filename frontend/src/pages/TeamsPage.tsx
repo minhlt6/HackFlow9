@@ -843,7 +843,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
                               )}
                               {!isLeader && !isSelf && (
                                 <span
-                                  className="text-[11px] text-slate-600 select-none"
+                                  className="text-[11px] text-muted-foreground select-none"
                                   title="Chỉ Đội Trưởng mới có quyền thao tác"
                                 >
                                   —

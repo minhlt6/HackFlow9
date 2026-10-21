@@ -101,7 +101,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
                     {item.label}
                   </span>
                 </div>
-                {index < 3 && <span className="text-xl font-bold text-slate-600 -mt-4">:</span>}
+                {index < 3 && <span className="text-xl font-bold text-muted-foreground -mt-4">:</span>}
               </React.Fragment>
             ))}
           </div>
