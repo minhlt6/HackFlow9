@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { AppSidebar } from '../components/layout/AppSidebar';
 import { TopNav } from '../components/layout/TopNav';
@@ -10,6 +10,11 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useMockStore } from '../store/useMockStore';
 import { useThemeStore } from '../store/useThemeStore';
 import { cn } from '../lib/utils';
+
+const DEFAULT_SIDEBAR_WIDTH = 256;
+const MIN_EXPANDED_WIDTH = 180;
+const MAX_EXPANDED_WIDTH = 360;
+const SNAP_COLLAPSE_THRESHOLD = 120;
 
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
@@ -26,6 +31,8 @@ export const MainLayout: React.FC = () => {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(DEFAULT_SIDEBAR_WIDTH);
+  const [isResizing, setIsResizing] = useState(false);
   const navigate = useNavigate();
 
   // Synchronize light/dark theme class on mount and change
@@ -82,6 +89,53 @@ export const MainLayout: React.FC = () => {
     });
   }, [user, switchPersona, updateCurrentUserProfile]);
 
+  // Interactive drag-to-resize handler for Sidebar
+  const handleStartResize = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newX = e.clientX;
+      if (newX < SNAP_COLLAPSE_THRESHOLD) {
+        setSidebarCollapsed(true);
+      } else {
+        setSidebarCollapsed(false);
+        const clamped = Math.min(
+          MAX_EXPANDED_WIDTH,
+          Math.max(MIN_EXPANDED_WIDTH, newX),
+        );
+        setSidebarWidth(clamped);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
+
+  const handleResetWidth = useCallback(() => {
+    setSidebarCollapsed(false);
+    setSidebarWidth(DEFAULT_SIDEBAR_WIDTH);
+  }, []);
+
   const handleLogout = () => {
     logout();
     mockLogout();
@@ -95,6 +149,7 @@ export const MainLayout: React.FC = () => {
     currentRole !== 'candidate' || user?.approvalStatus === 'approved';
 
   const openTicketsCount = tickets.filter((t) => t.status !== 'resolved').length;
+  const effectiveDesktopWidth = sidebarCollapsed ? 64 : sidebarWidth;
 
   return (
     <div className="min-h-screen bg-background text-foreground flex font-sans antialiased">
@@ -110,13 +165,22 @@ export const MainLayout: React.FC = () => {
         onCloseMobile={() => setMobileMenuOpen(false)}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+        width={sidebarWidth}
+        isResizing={isResizing}
+        onStartResize={handleStartResize}
+        onResetWidth={handleResetWidth}
         onLogout={handleLogout}
       />
 
       <div
+        style={
+          {
+            '--sidebar-offset': `${effectiveDesktopWidth}px`,
+          } as React.CSSProperties
+        }
         className={cn(
-          'flex-1 flex flex-col min-w-0 transition-all duration-200',
-          sidebarCollapsed ? 'lg:pl-16' : 'lg:pl-64',
+          'flex-1 flex flex-col min-w-0 lg:pl-[var(--sidebar-offset)]',
+          !isResizing && 'transition-all duration-200',
         )}
       >
         <TopNav

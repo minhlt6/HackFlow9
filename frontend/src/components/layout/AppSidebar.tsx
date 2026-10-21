@@ -21,6 +21,8 @@ import {
   Lock,
   PanelLeftClose,
   PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
   Terminal,
 } from 'lucide-react';
 import { Badge } from '../ui/badge';
@@ -51,6 +53,10 @@ export interface AppSidebarProps {
   onCloseMobile: () => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  width?: number;
+  isResizing?: boolean;
+  onStartResize?: (e: React.MouseEvent<HTMLDivElement>) => void;
+  onResetWidth?: () => void;
   onLogout: () => void;
 }
 
@@ -66,6 +72,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
   onCloseMobile,
   collapsed,
   onToggleCollapse,
+  width = 256,
+  isResizing = false,
+  onStartResize,
+  onResetWidth,
   onLogout,
 }) => {
   const displayInitial = displayName.charAt(0).toUpperCase();
@@ -170,10 +180,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     currentRole === 'admin'
       ? adminMenuGroups
       : currentRole === 'judge'
-      ? judgeMenuGroups
-      : currentRole === 'mentor'
-      ? mentorMenuGroups
-      : candidateMenuGroups;
+        ? judgeMenuGroups
+        : currentRole === 'mentor'
+          ? mentorMenuGroups
+          : candidateMenuGroups;
 
   const roleBadgeMeta: {
     label: string;
@@ -182,13 +192,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     currentRole === 'admin'
       ? { label: 'Quản trị viên', variant: 'indigo' }
       : currentRole === 'judge'
-      ? { label: 'Giám khảo', variant: 'warning' }
-      : currentRole === 'mentor'
-      ? { label: 'Cố vấn chuyên môn', variant: 'purple' }
-      : {
-          label: isApproved ? 'Thí sinh' : 'Chờ duyệt',
-          variant: isApproved ? 'success' : 'warning',
-        };
+        ? { label: 'Giám khảo', variant: 'warning' }
+        : currentRole === 'mentor'
+          ? { label: 'Cố vấn chuyên môn', variant: 'purple' }
+          : {
+              label: isApproved ? 'Thí sinh' : 'Chờ duyệt',
+              variant: isApproved ? 'success' : 'warning',
+            };
+
+  const effectiveDesktopWidth = collapsed ? 64 : width;
 
   return (
     <>
@@ -204,12 +216,50 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       {/* Sidebar Container */}
       <aside
         aria-label="Điều hướng chính"
+        style={
+          {
+            '--sidebar-width': `${effectiveDesktopWidth}px`,
+          } as React.CSSProperties
+        }
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col justify-between border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-all duration-200 lg:translate-x-0',
-          collapsed ? 'lg:w-16' : 'lg:w-64',
+          'fixed inset-y-0 left-0 z-40 flex flex-col justify-between border-r border-sidebar-border bg-sidebar text-sidebar-foreground lg:translate-x-0 lg:w-[var(--sidebar-width)]',
+          !isResizing && 'transition-all duration-200',
           mobileOpen ? 'w-64 translate-x-0 shadow-xl' : 'w-64 -translate-x-full',
         )}
       >
+        {/* Right-edge Interactive Drag Resizer + Quick Collapse Handle (Desktop) */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Kéo để thay đổi độ rộng thanh menu (Nhấp đúp để đặt lại)"
+          title="Kéo sang trái/phải để co giãn menu • Nhấp đúp để đặt lại mặc định"
+          onMouseDown={onStartResize}
+          onDoubleClick={onResetWidth}
+          className={cn(
+            'hidden lg:block absolute top-0 -right-1.5 bottom-0 w-3 z-50 cursor-col-resize group/resizer select-none',
+          )}
+        >
+          <div
+            className={cn(
+              'mx-auto h-full w-[2px] transition-colors',
+              isResizing
+                ? 'bg-primary'
+                : 'bg-transparent group-hover/resizer:bg-primary/60',
+            )}
+          />
+        </div>
+
+        {/* Floating Quick Expand/Collapse Pill on Sidebar Edge */}
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          aria-label={collapsed ? 'Mở rộng thanh menu' : 'Thu gọn thanh menu'}
+          title={collapsed ? 'Mở rộng menu' : 'Thu gọn menu'}
+          className="hidden lg:flex absolute top-16 -right-3 z-50 h-6 w-6 items-center justify-center rounded-full border border-border bg-card text-muted-foreground shadow-sm hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors cursor-pointer"
+        >
+          {collapsed ? <ChevronRight size={13} /> : <ChevronLeft size={13} />}
+        </button>
+
         <div className="flex flex-col flex-1 min-h-0">
           {/* Brand Header */}
           <div
@@ -224,10 +274,10 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               </div>
               <div className={cn('min-w-0', collapsed && 'lg:hidden')}>
                 <div className="flex items-center gap-1.5">
-                  <span className="font-semibold text-sm tracking-tight text-foreground">
+                  <span className="font-semibold text-sm tracking-tight text-foreground truncate">
                     HackFlow
                   </span>
-                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground border border-border">
+                  <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground border border-border shrink-0">
                     v2.4
                   </span>
                 </div>
@@ -285,7 +335,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               <div key={group.title} className="space-y-1">
                 <div
                   className={cn(
-                    'px-2.5 pt-1 pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground',
+                    'px-2.5 pt-1 pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground truncate',
                     collapsed && 'lg:sr-only',
                   )}
                 >
@@ -380,7 +430,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
             className="hidden lg:flex w-full items-center justify-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
           >
             {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
-            {!collapsed && <span>Thu gọn menu</span>}
+            {!collapsed && <span className="truncate">Thu gọn menu</span>}
           </button>
 
           <button
