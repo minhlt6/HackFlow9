@@ -184,12 +184,13 @@ export const AdminTeamsPage: React.FC = () => {
         sortable: true,
         sortAccessor: (row) => row.name,
         cell: (row) => (
-          <div className="space-y-1 min-w-[180px]">
-            <div className="flex items-center gap-2">
+          <div className="space-y-1 max-w-[175px] xl:max-w-[215px]">
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setDetailTeam(row)}
-                className="font-semibold text-foreground hover:text-primary transition-colors text-left cursor-pointer"
+                title={row.name}
+                className="font-semibold text-foreground hover:text-primary transition-colors text-left truncate cursor-pointer"
               >
                 {row.name}
               </button>
@@ -199,13 +200,13 @@ export const AdminTeamsPage: React.FC = () => {
                 </Badge>
               )}
             </div>
-            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground whitespace-nowrap">
               <span className="rounded bg-muted px-1.5 py-0.5 font-mono font-medium text-foreground border border-border">
                 {row.inviteCode}
               </span>
               {row.latestCommitSha && (
                 <span className="inline-flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                  <GitCommit size={11} className="text-primary" />
+                  <GitCommit size={11} className="text-primary shrink-0" />
                   {row.latestCommitSha.slice(0, 7)}
                 </span>
               )}
@@ -219,12 +220,17 @@ export const AdminTeamsPage: React.FC = () => {
         sortable: true,
         sortAccessor: (row) => row.leaderName || '',
         cell: (row) => (
-          <div className="space-y-0.5 min-w-[200px]">
-            <div className="flex items-center gap-1.5 font-medium text-foreground">
+          <div className="space-y-0.5 max-w-[175px] xl:max-w-[215px]">
+            <div className="flex items-center gap-1.5 font-medium text-foreground truncate">
               <Crown size={13} className="text-amber-500 shrink-0" />
-              <span>{row.leaderName}</span>
+              <span className="truncate" title={row.leaderName}>
+                {row.leaderName}
+              </span>
             </div>
-            <div className="text-xs text-muted-foreground truncate max-w-[240px]">
+            <div
+              className="text-xs text-muted-foreground truncate"
+              title={row.university}
+            >
               {row.university}
             </div>
           </div>
@@ -238,14 +244,17 @@ export const AdminTeamsPage: React.FC = () => {
         cell: (row) => {
           const meta = getSubTopicMeta(row.subTopicId);
           return (
-            <div className="space-y-0.5 max-w-[260px]">
+            <div className="space-y-0.5 max-w-[185px] xl:max-w-[235px]">
               <div
                 className="font-medium text-foreground truncate"
                 title={meta.subTopicTitle}
               >
                 {meta.subTopicTitle}
               </div>
-              <div className="text-[11px] text-muted-foreground truncate">
+              <div
+                className="text-[11px] text-muted-foreground truncate"
+                title={meta.majorTopicTitle}
+              >
                 {meta.majorTopicTitle}
               </div>
             </div>
@@ -258,11 +267,12 @@ export const AdminTeamsPage: React.FC = () => {
         align: 'center',
         sortable: true,
         sortAccessor: (row) => row.memberCount ?? row.members.length,
+        className: 'whitespace-nowrap',
         cell: (row) => {
           const count = row.memberCount ?? row.members.length;
           const isCompliant = count >= 3 && count <= 5;
           return (
-            <div className="inline-flex flex-col items-center gap-1">
+            <div className="inline-flex flex-col items-center gap-1 whitespace-nowrap">
               <Badge
                 variant={isCompliant ? 'neutral' : 'warning'}
                 className="font-mono"
@@ -282,6 +292,7 @@ export const AdminTeamsPage: React.FC = () => {
         align: 'center',
         sortable: true,
         sortAccessor: (row) => row.status.toLowerCase(),
+        className: 'whitespace-nowrap',
         cell: (row) => {
           const normalized = row.status.toLowerCase();
           return (
@@ -290,15 +301,15 @@ export const AdminTeamsPage: React.FC = () => {
                 normalized === 'approved'
                   ? 'success'
                   : normalized === 'rejected'
-                  ? 'destructive'
-                  : 'warning'
+                    ? 'destructive'
+                    : 'warning'
               }
             >
               {normalized === 'approved'
                 ? 'Đã duyệt'
                 : normalized === 'rejected'
-                ? 'Bị từ chối'
-                : 'Chờ duyệt'}
+                  ? 'Bị từ chối'
+                  : 'Chờ duyệt'}
             </Badge>
           );
         },
@@ -309,8 +320,9 @@ export const AdminTeamsPage: React.FC = () => {
         align: 'center',
         sortable: true,
         sortAccessor: (row) => row.createdAt,
+        className: 'whitespace-nowrap',
         cell: (row) => (
-          <span className="font-mono text-xs text-muted-foreground">
+          <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">
             {row.createdAt}
           </span>
         ),
@@ -319,28 +331,45 @@ export const AdminTeamsPage: React.FC = () => {
         id: 'actions',
         header: 'Thao Tác',
         align: 'right',
+        headerClassName:
+          'sticky right-0 z-10 bg-muted/95 backdrop-blur-xs border-l border-border/60',
+        className:
+          'sticky right-0 z-10 bg-card/95 group-hover:bg-muted/80 backdrop-blur-xs border-l border-border/60 whitespace-nowrap',
         cell: (row) => {
           const normalized = row.status.toLowerCase();
           return (
-            <div className="flex items-center justify-end gap-1">
+            <div className="inline-flex items-center justify-end gap-1">
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
                 onClick={() => setDetailTeam(row)}
                 aria-label={`Xem hồ sơ đội ${row.name}`}
                 title="Xem chi tiết hồ sơ"
               >
-                <Eye size={15} />
+                <Eye size={14} />
+              </Button>
+
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                onClick={() => openEditModal(row)}
+                aria-label={`Chỉnh sửa đội ${row.name}`}
+                title="Chỉnh sửa thông tin"
+              >
+                <Edit2 size={14} />
               </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
                   aria-label={`Mở menu thao tác cho đội ${row.name}`}
+                  title="Thêm thao tác"
                 >
-                  <MoreHorizontal size={16} />
+                  <MoreHorizontal size={15} />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-52">
                   <DropdownMenuLabel>Đội: {row.name}</DropdownMenuLabel>
