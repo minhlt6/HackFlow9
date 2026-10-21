@@ -31,7 +31,6 @@ import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { Card } from '../components/Card';
 import {
-  mockTeamInTeam,
   fetchMockTeam,
   mockCreateTeamApi,
   mockJoinTeamApi,
@@ -43,7 +42,7 @@ import { useMockStore } from '../store/useMockStore';
 
 type PreviewMode = 'no_team' | 'in_team' | 'full' | 'loading' | 'error';
 
-const TEAM_STORAGE_KEY = 'hackflow_team_details_v2';
+const TEAM_STORAGE_KEY = 'hackflow_team_details_clean_v1';
 
 const loadInitialTeam = (): TeamDetails | null => {
   try {
@@ -64,7 +63,7 @@ const loadInitialTeam = (): TeamDetails | null => {
   } catch {
     // ignore storage errors
   }
-  return mockTeamInTeam;
+  return null;
 };
 
 export const TeamsPage: React.FC = () => {
@@ -75,7 +74,7 @@ export const TeamsPage: React.FC = () => {
 
   // State dữ liệu đội thi
 const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
-  const [previewMode, setPreviewMode] = useState<PreviewMode>('in_team');
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('no_team');
   const [isDevOpen, setIsDevOpen] = useState<boolean>(false);
 
   // Thành viên đang đăng nhập / đóng vai xem trang (mặc định khớp email user hoặc Nguyễn Văn Minh)
@@ -109,8 +108,8 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
     const loadTeam = async () => {
       try {
         const remoteTeam = await teamsApi.getMyTeam();
-        if (isMounted && remoteTeam) {
-          setTeam(remoteTeam);
+        if (isMounted) {
+          setTeam(remoteTeam ?? null);
           return;
         }
       } catch {

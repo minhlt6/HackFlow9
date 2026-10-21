@@ -762,6 +762,16 @@ export const JudgingWorkspace: React.FC = () => {
       )}
 
       {/* Main Split-screen 50/50 Body */}
+      {!selectedTeam ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <div className="max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm space-y-2">
+            <h3 className="text-base font-semibold text-foreground">Chưa có đội thi hoặc bài nộp nào</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Hệ thống hiện chưa có đội thi nào đăng ký hoặc nộp sản phẩm để chấm điểm. Vui lòng quay lại sau khi các đội thi hoàn tất nộp bài.
+            </p>
+          </div>
+        </div>
+      ) : (
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 min-h-0 overflow-hidden">
         {/* LEFT COLUMN: Submission & Artifacts */}
         <div className="flex flex-col h-full bg-[#111827] border border-border rounded-xl overflow-hidden shadow-2xl">
@@ -1035,6 +1045,7 @@ export const JudgingWorkspace: React.FC = () => {
           onAlert={showAlert}
         />
       </div>
+      )}
     </div>
   );
 };

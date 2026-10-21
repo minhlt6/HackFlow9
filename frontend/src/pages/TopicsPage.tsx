@@ -126,7 +126,7 @@ export const TopicsPage: React.FC = () => {
 
     try {
       const remoteTopics = await topicsApi.getTopics();
-      loadedTopics = remoteTopics && remoteTopics.length > 0 ? remoteTopics : INITIAL_MOCK_TOPICS;
+      loadedTopics = Array.isArray(remoteTopics) ? remoteTopics : INITIAL_MOCK_TOPICS;
     } catch {
       loadedTopics = INITIAL_MOCK_TOPICS;
     }
@@ -158,7 +158,7 @@ export const TopicsPage: React.FC = () => {
 
       try {
         const remoteTopics = await topicsApi.getTopics();
-        loadedTopics = remoteTopics && remoteTopics.length > 0 ? remoteTopics : INITIAL_MOCK_TOPICS;
+        loadedTopics = Array.isArray(remoteTopics) ? remoteTopics : INITIAL_MOCK_TOPICS;
       } catch {
         loadedTopics = INITIAL_MOCK_TOPICS;
       }

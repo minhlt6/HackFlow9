@@ -218,6 +218,21 @@ const getInitialTabSession = () => {
   };
 };
 
+if (typeof window !== 'undefined') {
+  try {
+    [
+      'hackflow-full-setup-v3',
+      'hackflow_admin_teams_v2',
+      'hackflow_team_details_v2',
+      'hackflow_notifications_v1',
+      'hackflow_checkpoint_submissions',
+      'hackflow_checkpoint_submission_history',
+    ].forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // ignore
+  }
+}
+
 const initialSession = getInitialTabSession();
 
 export const useMockStore = create<MockStoreState>()(
@@ -1276,7 +1291,7 @@ export const useMockStore = create<MockStoreState>()(
       },
     }),
     {
-      name: 'hackflow-full-setup-v3', // Full contest setup mock data
+      name: 'hackflow-clean-setup-v1', // Full contest setup mock data
       onRehydrateStorage: () => (state) => {
         if (typeof window !== 'undefined' && state) {
           const tabPersona = sessionStorage.getItem('hackflow_session_persona');
