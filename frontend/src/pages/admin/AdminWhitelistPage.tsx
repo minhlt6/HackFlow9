@@ -64,7 +64,10 @@ export const AdminWhitelistPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    void fetchBackendWhitelist();
+    const timer = window.setTimeout(() => {
+      void fetchBackendWhitelist();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchBackendWhitelist]);
 
   const combinedWhitelist: WhitelistEntry[] = [

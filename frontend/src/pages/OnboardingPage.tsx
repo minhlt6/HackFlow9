@@ -231,6 +231,7 @@ export const OnboardingPage: React.FC = () => {
     };
 
     void syncCurrentUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateField = (field: Exclude<keyof ProfileForm, 'skills'>, value: string) => {

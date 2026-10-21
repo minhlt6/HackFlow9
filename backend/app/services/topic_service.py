@@ -86,18 +86,23 @@ class TopicService:
         """
         Atomically register a topic for the current user's team.
         Enforces:
-        - User must belong to an active, valid team (min 3 members)
+        - User must belong to an active, valid team (min 3 members) and hold LEADER role
         - Team must not have already selected a topic
         - Topic must be active and have remaining quota
         - Concurrency protection via SELECT FOR UPDATE on Team, Topic, and Subtopic
         - Automatic rollback on any constraint violation
         """
-        # 1. Check user membership
+        # 1. Check user membership & leader role
         membership = await team_repo.get_user_membership(db, str(current_user.id))
         if not membership:
             raise ForbiddenException(
                 message="Bạn chưa tham gia đội thi nào.",
                 error_code="TEAM_ACCESS_DENIED",
+            )
+        if membership.role != TeamMemberRole.LEADER.value:
+            raise ForbiddenException(
+                message="Chỉ đội trưởng mới có quyền chọn đề tài cho đội.",
+                error_code="FORBIDDEN_ROLE",
             )
 
         # 2. Check competition window if config exists

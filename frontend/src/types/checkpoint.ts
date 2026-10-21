@@ -252,8 +252,9 @@ export function getCommitUrl(repoUrl?: string | null, commitSha?: string | null)
   if (repoUrl && repoUrl.trim().startsWith('http')) {
     const cleanRepo = repoUrl
       .trim()
+      .replace(/\/+$/, '')
       .replace(/\.git$/i, '')
-      .replace(/\/$/, '');
+      .replace(/\/+$/, '');
     return `${cleanRepo}/commit/${sha}`;
   }
   return null;

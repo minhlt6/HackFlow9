@@ -78,7 +78,7 @@ const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
 
 const syncMockStoreWithUser = (user: User) => {
   const mockStore = useMockStore.getState();
-  let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected' = 'leader';
+  let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected';
   if (user.role === 'admin') targetPersona = 'admin';
   else if (user.role === 'judge') targetPersona = 'judge';
   else if (user.role === 'mentor') targetPersona = 'mentor';
