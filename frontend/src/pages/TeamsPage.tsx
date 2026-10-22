@@ -36,6 +36,7 @@ import {
   mockJoinTeamApi,
 } from '../mocks/mockTeams';
 import { teamsApi } from '../api/teamsApi';
+import apiClient from '../api/axiosClient';
 import type { TeamDetails, TeamMember } from '../types/team';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMockStore } from '../store/useMockStore';
@@ -110,6 +111,14 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
         const remoteTeam = await teamsApi.getMyTeam();
         if (isMounted) {
           setTeam(remoteTeam ?? null);
+          setPreviewMode(remoteTeam ? 'in_team' : 'no_team');
+          if (remoteTeam && currentUser?.email) {
+            const matched = remoteTeam.members.find(
+              (m) => m.email.toLowerCase() === currentUser.email.toLowerCase(),
+            );
+            if (matched) setActiveMemberId(matched.id);
+          }
+          useMockStore.getState().syncFromBackend?.();
           return;
         }
       } catch {
@@ -126,7 +135,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
       isMounted = false;
       window.removeEventListener('hackflow_team_updated', handleTeamUpdate);
     };
-  }, []);
+  }, [currentUser?.email]);
 
 
   // Loading & Error states
@@ -262,7 +271,14 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
     setIsCreating(true);
 
     try {
-      const created = await mockCreateTeamApi({ team_name: trimmed });
+      let created: TeamDetails;
+      try {
+        created = await teamsApi.createTeam({ team_name: trimmed });
+      } catch (apiErr: unknown) {
+        const apiMsg = (apiErr as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        if (apiMsg) throw new Error(apiMsg, { cause: apiErr });
+        created = await mockCreateTeamApi({ team_name: trimmed });
+      }
       if (newTeamDesc.trim()) {
         created.description = newTeamDesc.trim();
       }
@@ -274,6 +290,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
       setIsCreateOpen(false);
       setNewTeamName('');
       setNewTeamDesc('');
+      useMockStore.getState().syncFromBackend?.();
       showToast(`Đăng ký thành công đội thi "${created.team_name}"!`, 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Tạo đội thất bại.';
@@ -302,11 +319,25 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
     setIsJoining(true);
 
     try {
-      const joined = await mockJoinTeamApi({ invite_code: cleaned });
+      let joined: TeamDetails;
+      try {
+        joined = await teamsApi.joinTeam({ invite_code: cleaned });
+      } catch (apiErr: unknown) {
+        const apiMsg = (apiErr as { response?: { data?: { message?: string } } })?.response?.data?.message;
+        if (apiMsg) throw new Error(apiMsg, { cause: apiErr });
+        joined = await mockJoinTeamApi({ invite_code: cleaned });
+      }
       setTeam(joined);
+      if (currentUser?.email) {
+        const matched = joined.members.find(
+          (m) => m.email.toLowerCase() === currentUser.email.toLowerCase(),
+        );
+        if (matched) setActiveMemberId(matched.id);
+      }
       setPreviewMode('in_team');
       setIsJoinOpen(false);
       setJoinCode('');
+      useMockStore.getState().syncFromBackend?.();
       showToast(`Gia nhập thành công đội thi "${joined.team_name}"!`, 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gia nhập đội thất bại.';
@@ -343,22 +374,31 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   };
 
   // Xác nhận chuyển giao quyền Đội Trưởng
-  const handleConfirmTransfer = () => {
+  const handleConfirmTransfer = async () => {
     if (!team || !isLeader || !transferTarget) return;
 
-    const updatedMembers = team.members.map((m) => ({
-      ...m,
-      role: (m.id === transferTarget.id ? 'leader' : 'member') as 'leader' | 'member',
-    }));
+    try {
+      const res = await apiClient.patch('/teams/leader', {
+        new_leader_id: transferTarget.user_id,
+      });
+      if (res.data?.data) {
+        setTeam(res.data.data);
+      }
+    } catch {
+      const updatedMembers = team.members.map((m) => ({
+        ...m,
+        role: (m.id === transferTarget.id ? 'leader' : 'member') as 'leader' | 'member',
+      }));
 
-    setTeam({
-      ...team,
-      leader_id: transferTarget.user_id,
-      members: updatedMembers,
-    });
+      setTeam({
+        ...team,
+        leader_id: transferTarget.user_id,
+        members: updatedMembers,
+      });
+    }
 
-    // Đồng bộ sang MockStore nếu có team tương ứng
-    transferTeamLeaderInStore('team-cyber', transferTarget.user_id);
+    transferTeamLeaderInStore(team.id, transferTarget.user_id);
+    useMockStore.getState().syncFromBackend?.();
 
     const newLeaderName = transferTarget.full_name;
     setTransferTarget(null);
@@ -379,17 +419,25 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   };
 
   // Xác nhận mời thành viên ra khỏi đội
-  const handleConfirmRemove = () => {
+  const handleConfirmRemove = async () => {
     if (!team || !isLeader || !removeTarget) return;
 
-    const updatedMembers = team.members.filter((m) => m.id !== removeTarget.id);
-    setTeam({
-      ...team,
-      member_count: updatedMembers.length,
-      members: updatedMembers,
-    });
+    try {
+      const res = await apiClient.delete(`/teams/members/${removeTarget.user_id}`);
+      if (res.data?.data) {
+        setTeam(res.data.data);
+      }
+    } catch {
+      const updatedMembers = team.members.filter((m) => m.id !== removeTarget.id);
+      setTeam({
+        ...team,
+        member_count: updatedMembers.length,
+        members: updatedMembers,
+      });
+    }
 
-    removeTeamMemberInStore('team-cyber', removeTarget.user_id);
+    removeTeamMemberInStore(team.id, removeTarget.user_id);
+    useMockStore.getState().syncFromBackend?.();
 
     const removedName = removeTarget.full_name;
     setRemoveTarget(null);
@@ -397,7 +445,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   };
 
   // Rời khỏi đội thi
-  const handleConfirmLeave = () => {
+  const handleConfirmLeave = async () => {
     if (!team) return;
     if (isLeader && team.members.length > 1) {
       showToast(
@@ -407,9 +455,15 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
       setIsLeaveOpen(false);
       return;
     }
+    try {
+      await apiClient.post('/teams/leave');
+    } catch {
+      // ignore if offline
+    }
     setTeam(null);
     setPreviewMode('no_team');
     setIsLeaveOpen(false);
+    useMockStore.getState().syncFromBackend?.();
     showToast('Bạn đã rời khỏi đội thi.', 'info');
   };
 

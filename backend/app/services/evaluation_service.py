@@ -126,6 +126,15 @@ class EvaluationService:
                 error_code="CRITERIA_WEIGHT_INVALID",
             )
 
+        raw_active_sum = sum(
+            float(c.weight) for c in payload.criteria if c.is_active and c.weight is not None
+        )
+        if abs(raw_active_sum - 100.0) <= 1e-4 and all(
+            c.weight is not None and 0 < float(c.weight) <= 100.0 for c in payload.criteria
+        ):
+            for item in payload.criteria:
+                item.weight = round(float(item.weight) / 100.0, 6)
+
         for item in payload.criteria:
             if item.max_score is None or float(item.max_score) <= 0:
                 raise AppException(
@@ -368,6 +377,10 @@ class EvaluationService:
             )
 
         submission = await self.repo.get_submission_by_id_or_team(payload.submission_id)
+        if submission is None and payload.team_id:
+            submission = await self.repo.ensure_final_submission_for_team(
+                payload.team_id, str(current_user.id)
+            )
         if submission is None:
             raise AppException(
                 status_code=status.HTTP_404_NOT_FOUND,

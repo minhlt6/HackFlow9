@@ -80,6 +80,7 @@ export const MainLayout: React.FC = () => {
 
     switchPersona(targetPersona);
     updateCurrentUserProfile({
+      id: user.id,
       fullName: user.fullName,
       email: user.email,
       role: user.role,
@@ -87,6 +88,7 @@ export const MainLayout: React.FC = () => {
       githubUsername: user.githubUsername,
       avatarUrl: user.avatarUrl,
     });
+    void useMockStore.getState().syncFromBackend?.();
   }, [user, switchPersona, updateCurrentUserProfile]);
 
   // Interactive drag-to-resize handler for Sidebar

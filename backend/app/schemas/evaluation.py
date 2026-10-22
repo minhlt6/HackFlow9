@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 class RubricCriterionInput(BaseModel):
     """Input schema for a single rubric criterion when configuring a rubric."""
+    id: Optional[str] = None
     title: str = Field(..., min_length=1, max_length=128)
     description: Optional[str] = None
     max_score: float = Field(default=10.0)
@@ -51,7 +52,7 @@ class EvaluationCriterionScoreInput(BaseModel):
 
 class EvaluationSubmitRequest(BaseModel):
     """Request schema for POST /api/v1/evaluations (Judge)."""
-    submission_id: str
+    submission_id: Optional[str] = None
     status: str = Field(default="draft")
     evaluations: List[EvaluationCriterionScoreInput] = Field(default_factory=list)
     general_comment: Optional[str] = None
@@ -62,10 +63,22 @@ class EvaluationSubmitRequest(BaseModel):
     def normalize_evaluations_alias(cls, values: Any) -> Any:
         if isinstance(values, dict):
             values = dict(values)
-            if "evaluations" not in values and "scores" in values:
-                raw_scores = values["scores"]
+            if not values.get("submission_id") and values.get("team_id"):
+                values["submission_id"] = str(values["team_id"])
+            if "status" not in values and "is_draft" in values:
+                values["status"] = "draft" if values["is_draft"] else "submitted"
+            if "evaluations" not in values:
+                raw_scores = values.get("scores") if "scores" in values else values.get("details")
                 if isinstance(raw_scores, list):
-                    values["evaluations"] = raw_scores
+                    values["evaluations"] = [
+                        {
+                            **item,
+                            "criteria_id": item.get("criteria_id") or item.get("criteriaId"),
+                        }
+                        if isinstance(item, dict)
+                        else item
+                        for item in raw_scores
+                    ]
                 elif isinstance(raw_scores, dict):
                     values["evaluations"] = [
                         {"criteria_id": k, "score": v} for k, v in raw_scores.items()

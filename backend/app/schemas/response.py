@@ -23,6 +23,15 @@ class ApiResponse(BaseModel, Generic[T]):
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
+    @classmethod
+    def ok(
+        cls,
+        data: Optional[T] = None,
+        message: Optional[str] = "Success",
+        error_code: Optional[str] = None,
+    ) -> "ApiResponse[T]":
+        return cls(success=True, data=data, message=message, error_code=error_code)
+
 
 class ErrorResponse(BaseModel):
     """

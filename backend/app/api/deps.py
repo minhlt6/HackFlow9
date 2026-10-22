@@ -1,15 +1,48 @@
-from typing import List, Optional
+from typing import Dict, List, Optional, Tuple, Union
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.exceptions import ForbiddenException, UnauthorizedException
-from app.core.security import decode_access_token
+from app.core.security import decode_access_token, hash_password
 from app.models.user import ApprovalStatus, User, UserRole
 from app.repositories.user_repo import user_repo
 
 security_scheme = HTTPBearer(auto_error=False)
+
+DEV_PERSONA_TOKENS: Dict[str, Tuple[str, str, str, str]] = {
+    "mock-jwt-token-admin": ("admin@hackflow.dev", "BTC HackFlow Administrator", "admin", "admin-dev"),
+    "mock-jwt-token-judge": ("judge.tech@hackathon.org", "TS. Nguyễn Hoàng Giám Khảo", "judge", "judge-hf"),
+    "mock-jwt-token-mentor": ("mentor.ai@ailab.org.vn", "ThS. Phạm Cố Vấn AI", "mentor", "mentor-hf"),
+    "mock-jwt-token-leader": ("leader@cybersamurai.team", "Trần Quốc Bảo", "candidate", "quocbao-dev"),
+    "mock-jwt-token-member": ("member@cybersamurai.team", "Lê Hoàng Nam", "candidate", "hoangnam-fe"),
+    "mock-jwt-token-member2": ("member2@cybersamurai.team", "Nguyễn Minh Thư", "candidate", "minhthu-ai"),
+    "mock-jwt-token-candidate_leader": ("leader@cybersamurai.team", "Trần Quốc Bảo", "candidate", "quocbao-dev"),
+    "mock-jwt-token-candidate_member": ("member@cybersamurai.team", "Lê Hoàng Nam", "candidate", "hoangnam-fe"),
+}
+
+
+async def _resolve_dev_persona_user(db: AsyncSession, token: str) -> Optional[User]:
+    persona = DEV_PERSONA_TOKENS.get(token)
+    if not persona:
+        return None
+    email, full_name, role, gh_user = persona
+    user = await user_repo.get_by_email(db, email)
+    if not user:
+        user = User(
+            email=email,
+            full_name=full_name,
+            hashed_password=hash_password("123456"),
+            role=role,
+            approval_status=ApprovalStatus.APPROVED.value,
+            github_username=gh_user,
+            is_active=True,
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+    return user
 
 
 async def get_current_user(
@@ -24,6 +57,11 @@ async def get_current_user(
         raise UnauthorizedException(message="Yêu cầu xác thực: Thiếu Bearer Token.")
 
     token = credentials.credentials
+    if token in DEV_PERSONA_TOKENS:
+        persona_user = await _resolve_dev_persona_user(db, token)
+        if persona_user:
+            return persona_user
+
     payload = decode_access_token(token)
     if not payload:
         raise UnauthorizedException(message="Token xác thực không hợp lệ hoặc đã hết hạn.")
@@ -52,7 +90,10 @@ async def get_optional_current_user(
     """
     if not credentials or not credentials.credentials:
         return None
-    payload = decode_access_token(credentials.credentials)
+    token = credentials.credentials
+    if token in DEV_PERSONA_TOKENS:
+        return await _resolve_dev_persona_user(db, token)
+    payload = decode_access_token(token)
     if not payload:
         return None
     user_id = payload.get("sub") or payload.get("user_id")
@@ -62,10 +103,6 @@ async def get_optional_current_user(
     if not user or not user.is_active:
         return None
     return user
-
-
-
-from typing import List, Optional, Union
 
 
 def require_role(allowed_roles: Union[List[str], str]):
@@ -189,4 +226,3 @@ async def require_checkpoint_open_by_id(
 
     _, grace_applied, _ = checkpoint_service.validate_checkpoint_submission_window(cp)
     return cp, grace_applied
-

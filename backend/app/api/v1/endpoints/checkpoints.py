@@ -273,3 +273,22 @@ async def toggle_active_checkpoint(
         message=f"Đã {state_str} checkpoint '{checkpoint.title}'.",
     )
 
+
+@router.delete(
+    "/{checkpoint_id}",
+    response_model=ApiResponse[dict],
+    summary="Xóa mốc Checkpoint (Chỉ Admin)",
+)
+async def delete_checkpoint(
+    checkpoint_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+) -> ApiResponse[dict]:
+    """
+    Ban Tổ Chức (BTC) xóa một mốc Checkpoint.
+    """
+    await checkpoint_service.delete_checkpoint(db, checkpoint_id)
+    return success_response(
+        data={"id": checkpoint_id, "deleted": True},
+        message="Đã xóa checkpoint thành công.",
+    )
