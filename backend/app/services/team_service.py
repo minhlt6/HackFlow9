@@ -1,16 +1,18 @@
 import asyncio
 import secrets
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.exceptions import (
     AppException,
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     NotFoundException,
 )
-from app.models.team import Team
+from app.models.team import Team, TeamMember, TeamMemberRole
 from app.models.user import User
 from app.repositories.team_repo import team_repo
 from app.schemas.team import TeamMemberResponse, TeamResponse
@@ -79,7 +81,12 @@ class TeamService:
             members_resp[0].user_id if members_resp else None,
         )
         topic_obj = team.__dict__.get("topic")
-        topic_name = topic_obj.title if topic_obj else None
+        subtopic_obj = team.__dict__.get("subtopic")
+        topic_name = (
+            subtopic_obj.title
+            if subtopic_obj
+            else (topic_obj.title if topic_obj else None)
+        )
 
         return TeamResponse(
             id=str(team.id),
@@ -98,19 +105,26 @@ class TeamService:
             created_at=team.created_at,
         )
 
+    async def list_all_teams(self, db: AsyncSession) -> List[TeamResponse]:
+        stmt = (
+            select(Team)
+            .options(
+                selectinload(Team.members).selectinload(TeamMember.user),
+                selectinload(Team.topic),
+                selectinload(Team.subtopic),
+            )
+            .order_by(Team.created_at.desc())
+        )
+        res = await db.execute(stmt)
+        teams = list(res.scalars().all())
+        return [self.build_team_response(t) for t in teams]
+
     async def create_team(
         self,
         db: AsyncSession,
         current_user: User,
         team_name: str,
     ) -> TeamResponse:
-        """
-        Create a new hackathon team with the creator as leader.
-        Enforces:
-        - User cannot already belong to another team
-        - Team name 3-50 chars, trimmed, unique
-        - Unique 6-character invite code
-        """
         cleaned_name = team_name.strip()
         if len(cleaned_name) < 3 or len(cleaned_name) > 50:
             raise AppException(
@@ -119,7 +133,6 @@ class TeamService:
                 error_code="TEAM_NAME_INVALID",
             )
 
-        # 1. Check if user is already in a team
         existing_membership = await team_repo.get_user_membership(db, str(current_user.id))
         if existing_membership:
             raise ConflictException(
@@ -127,7 +140,6 @@ class TeamService:
                 error_code="ALREADY_IN_TEAM",
             )
 
-        # 2. Check team name uniqueness (case-insensitive)
         existing_team = await team_repo.get_by_name(db, cleaned_name)
         if existing_team:
             raise ConflictException(
@@ -135,10 +147,8 @@ class TeamService:
                 error_code="TEAM_NAME_TAKEN",
             )
 
-        # 3. Generate unique invite code
         invite_code = await self.generate_invite_code(db)
 
-        # 4. Create team and leader inside transaction
         team = await team_repo.create_team_with_leader(
             db,
             team_name=cleaned_name,
@@ -149,7 +159,6 @@ class TeamService:
         await db.commit()
         db.expire_all()
 
-        # Re-fetch fully loaded team
         loaded = await team_repo.get_by_id(db, team_id)
         return self.build_team_response(loaded)  # type: ignore
 
@@ -159,15 +168,6 @@ class TeamService:
         current_user: User,
         invite_code: str,
     ) -> TeamResponse:
-        """
-        Join an existing team using a 6-character invite code.
-        Enforces:
-        - User cannot already belong to another team
-        - Valid, existing invite code
-        - Team not locked
-        - Maximum 5 members limit
-        - Concurrency safety with row-level locking
-        """
         cleaned_code = invite_code.strip().upper()
         if not cleaned_code or len(cleaned_code) < 6:
             raise BadRequestException(
@@ -175,7 +175,6 @@ class TeamService:
                 error_code="INVITE_CODE_INVALID",
             )
 
-        # 1. Check if user is already in a team
         existing_membership = await team_repo.get_user_membership(db, str(current_user.id))
         if existing_membership:
             raise ConflictException(
@@ -183,7 +182,6 @@ class TeamService:
                 error_code="ALREADY_IN_TEAM",
             )
 
-        # 2. Find and lock the team
         lock = self._get_team_lock(cleaned_code)
         async with lock:
             team = await team_repo.get_by_invite_code(db, cleaned_code, for_update=True)
@@ -199,7 +197,6 @@ class TeamService:
                     error_code="TEAM_LOCKED",
                 )
 
-            # 3. Check current member count
             member_count = await team_repo.count_members(db, team.id)
             if member_count >= 5:
                 raise ConflictException(
@@ -207,24 +204,77 @@ class TeamService:
                     error_code="TEAM_FULL",
                 )
 
-            # 4. Add member
             team_id = str(team.id)
             await team_repo.add_member(db, team_id, str(current_user.id))
             await db.commit()
 
-            # Re-fetch fully loaded team with updated relationships
             db.expire_all()
             loaded = await team_repo.get_by_id(db, team_id)
             return self.build_team_response(loaded)  # type: ignore
+
+    async def leave_team(
+        self,
+        db: AsyncSession,
+        current_user: User,
+    ) -> dict:
+        membership = await team_repo.get_user_membership(db, str(current_user.id))
+        if not membership:
+            raise BadRequestException(message="Bạn chưa tham gia đội thi nào.")
+        team_id = str(membership.team_id)
+        team = await team_repo.get_by_id(db, team_id)
+        await db.delete(membership)
+        await db.flush()
+
+        remaining = await team_repo.count_members(db, team_id)
+        if remaining == 0 and team:
+            await db.delete(team)
+        await db.commit()
+        return {"team_id": team_id, "left": True}
+
+    async def remove_member(
+        self,
+        db: AsyncSession,
+        current_user: User,
+        member_user_id: str,
+    ) -> TeamResponse:
+        leader_mem = await team_repo.get_user_membership(db, str(current_user.id))
+        if not leader_mem or leader_mem.role != TeamMemberRole.LEADER.value:
+            raise ForbiddenException(message="Chỉ đội trưởng mới có quyền xóa thành viên.")
+        target_mem = await team_repo.get_user_membership(db, member_user_id)
+        if not target_mem or str(target_mem.team_id) != str(leader_mem.team_id):
+            raise NotFoundException(message="Không tìm thấy thành viên trong đội.")
+        if str(target_mem.user_id) == str(current_user.id):
+            raise BadRequestException(message="Không thể tự xóa chính mình.")
+        await db.delete(target_mem)
+        await db.commit()
+        db.expire_all()
+        loaded = await team_repo.get_by_id(db, str(leader_mem.team_id))
+        return self.build_team_response(loaded)  # type: ignore
+
+    async def transfer_leader(
+        self,
+        db: AsyncSession,
+        current_user: User,
+        new_leader_user_id: str,
+    ) -> TeamResponse:
+        leader_mem = await team_repo.get_user_membership(db, str(current_user.id))
+        if not leader_mem or leader_mem.role != TeamMemberRole.LEADER.value:
+            raise ForbiddenException(message="Chỉ đội trưởng mới có quyền nhượng quyền.")
+        target_mem = await team_repo.get_user_membership(db, new_leader_user_id)
+        if not target_mem or str(target_mem.team_id) != str(leader_mem.team_id):
+            raise NotFoundException(message="Thành viên được chọn không thuộc đội của bạn.")
+        leader_mem.role = TeamMemberRole.MEMBER.value
+        target_mem.role = TeamMemberRole.LEADER.value
+        await db.commit()
+        db.expire_all()
+        loaded = await team_repo.get_by_id(db, str(leader_mem.team_id))
+        return self.build_team_response(loaded)  # type: ignore
 
     async def get_my_team(
         self,
         db: AsyncSession,
         current_user: User,
     ) -> Optional[TeamResponse]:
-        """
-        Retrieve the current user's team information.
-        """
         team = await team_repo.get_user_team(db, str(current_user.id))
         if not team:
             return None
@@ -235,9 +285,6 @@ class TeamService:
         db: AsyncSession,
         team_id: str,
     ) -> TeamResponse:
-        """
-        Retrieve a team by its ID.
-        """
         team = await team_repo.get_by_id(db, team_id)
         if not team:
             raise NotFoundException(

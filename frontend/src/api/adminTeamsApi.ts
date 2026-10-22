@@ -20,8 +20,6 @@ export interface AdminTeamUpsertPayload {
   description: string;
 }
 
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
 function loadPersistedAdminTeams(): EnrichedAdminTeam[] {
   if (typeof window === 'undefined') return ADMIN_TEAMS_MOCK_DATA;
   try {
@@ -55,13 +53,12 @@ export const adminTeamsApi = {
   getAllTeams: async (
     storeTeams: Team[] = [],
   ): Promise<EnrichedAdminTeam[]> => {
-    await delay(180);
-
     try {
       const res = await axiosClient.get<ApiResponse<EnrichedAdminTeam[]>>(
         '/admin/teams',
       );
       if (res.data?.success && Array.isArray(res.data.data)) {
+        savePersistedAdminTeams(res.data.data);
         return res.data.data;
       }
     } catch {
@@ -85,11 +82,11 @@ export const adminTeamsApi = {
           majorTopicId: st.subTopicId?.startsWith('sub-iot')
             ? 'major-iot'
             : st.subTopicId?.startsWith('sub-fin')
-            ? 'major-fintech'
-            : st.subTopicId?.startsWith('sub-hlt')
-            ? 'major-health'
-            : 'major-ai',
-          checkpointsCompleted: 1,
+              ? 'major-fintech'
+              : st.subTopicId?.startsWith('sub-hlt')
+                ? 'major-health'
+                : 'major-ai',
+          checkpointsCompleted: 0,
           totalCheckpoints: 3,
         });
       }
@@ -105,7 +102,35 @@ export const adminTeamsApi = {
   createTeam: async (
     payload: AdminTeamUpsertPayload,
   ): Promise<EnrichedAdminTeam> => {
-    await delay(320);
+    try {
+      const res = await axiosClient.post<ApiResponse<EnrichedAdminTeam>>(
+        '/admin/teams',
+        {
+          name: payload.name.trim(),
+          inviteCode: payload.inviteCode.trim().toUpperCase(),
+          leaderName: payload.leaderName.trim(),
+          leaderEmail: payload.leaderEmail.trim(),
+          university: payload.university.trim(),
+          majorTopicId: payload.majorTopicId,
+          subTopicId: payload.subTopicId,
+          memberCount: payload.memberCount,
+          repoUrl: payload.repoUrl?.trim() || undefined,
+          description: payload.description.trim(),
+        },
+      );
+      if (res.data?.data) {
+        const created = res.data.data;
+        const current = loadPersistedAdminTeams();
+        savePersistedAdminTeams([created, ...current.filter((t) => t.id !== created.id)]);
+        return created;
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string; detail?: string } } };
+      const msg = e?.response?.data?.message || e?.response?.data?.detail;
+      if (msg) {
+        throw new Error(msg, { cause: err });
+      }
+    }
 
     const current = loadPersistedAdminTeams();
     const duplicateName = current.some(
@@ -179,7 +204,37 @@ export const adminTeamsApi = {
     teamId: string,
     payload: AdminTeamUpsertPayload,
   ): Promise<EnrichedAdminTeam> => {
-    await delay(280);
+    try {
+      const res = await axiosClient.put<ApiResponse<EnrichedAdminTeam>>(
+        `/admin/teams/${teamId}`,
+        {
+          name: payload.name.trim(),
+          inviteCode: payload.inviteCode.trim().toUpperCase(),
+          leaderName: payload.leaderName.trim(),
+          leaderEmail: payload.leaderEmail.trim(),
+          university: payload.university.trim(),
+          majorTopicId: payload.majorTopicId,
+          subTopicId: payload.subTopicId,
+          memberCount: payload.memberCount,
+          repoUrl: payload.repoUrl?.trim() || undefined,
+          description: payload.description.trim(),
+        },
+      );
+      if (res.data?.data) {
+        const updatedTeam = res.data.data;
+        const current = loadPersistedAdminTeams();
+        savePersistedAdminTeams(
+          current.map((t) => (t.id === teamId ? updatedTeam : t)),
+        );
+        return updatedTeam;
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { message?: string; detail?: string } } };
+      const msg = e?.response?.data?.message || e?.response?.data?.detail;
+      if (msg) {
+        throw new Error(msg, { cause: err });
+      }
+    }
 
     const current = loadPersistedAdminTeams();
     const index = current.findIndex((t) => t.id === teamId);
@@ -187,42 +242,7 @@ export const adminTeamsApi = {
       throw new Error('Không tìm thấy đội thi cần cập nhật.');
     }
 
-    const duplicateName = current.some(
-      (t) =>
-        t.id !== teamId &&
-        t.name.toLowerCase() === payload.name.trim().toLowerCase(),
-    );
-    if (duplicateName) {
-      throw new Error(`Tên đội thi "${payload.name}" đã bị trùng với đội khác.`);
-    }
-
     const existing = current[index];
-    const updatedMembers = [...existing.members];
-    if (updatedMembers.length > 0) {
-      updatedMembers[0] = {
-        ...updatedMembers[0],
-        fullName: payload.leaderName.trim(),
-        email: payload.leaderEmail.trim(),
-        school: payload.university.trim(),
-      };
-    }
-    while (updatedMembers.length < payload.memberCount) {
-      const nextIdx = updatedMembers.length + 1;
-      updatedMembers.push({
-        userId: `user-mem-${Date.now()}-${nextIdx}`,
-        fullName: `Thành viên #${nextIdx} (${payload.name.trim()})`,
-        email: `member${nextIdx}.${payload.inviteCode.toLowerCase()}@student.edu.vn`,
-        roleInTeam: 'member',
-        studentId: `2022${1000 + nextIdx}`,
-        school: payload.university.trim(),
-        skills: ['Software Engineering'],
-        joinedAt: existing.createdAt,
-      });
-    }
-    if (updatedMembers.length > payload.memberCount) {
-      updatedMembers.length = payload.memberCount;
-    }
-
     const updatedTeam: EnrichedAdminTeam = {
       ...existing,
       name: payload.name.trim(),
@@ -236,7 +256,6 @@ export const adminTeamsApi = {
       memberCount: payload.memberCount,
       repoUrl: payload.repoUrl?.trim() || undefined,
       description: payload.description.trim(),
-      members: updatedMembers,
     };
 
     current[index] = updatedTeam;
@@ -248,7 +267,22 @@ export const adminTeamsApi = {
    * Approve a single team registration.
    */
   approveTeam: async (teamId: string): Promise<EnrichedAdminTeam> => {
-    await delay(200);
+    try {
+      const res = await axiosClient.patch<ApiResponse<EnrichedAdminTeam>>(
+        `/admin/teams/${teamId}/approve`,
+      );
+      if (res.data?.data) {
+        const updated = res.data.data;
+        const current = loadPersistedAdminTeams();
+        savePersistedAdminTeams(
+          current.map((t) => (t.id === teamId ? updated : t)),
+        );
+        return updated;
+      }
+    } catch {
+      // Fallback below
+    }
+
     const current = loadPersistedAdminTeams();
     const index = current.findIndex((t) => t.id === teamId);
     if (index === -1) throw new Error('Không tìm thấy đội thi.');
@@ -267,7 +301,19 @@ export const adminTeamsApi = {
    * Bulk approve multiple teams.
    */
   bulkApproveTeams: async (teamIds: string[]): Promise<EnrichedAdminTeam[]> => {
-    await delay(280);
+    try {
+      await axiosClient.post('/admin/teams/bulk-approve', { team_ids: teamIds });
+      const res = await axiosClient.get<ApiResponse<EnrichedAdminTeam[]>>(
+        '/admin/teams',
+      );
+      if (res.data?.data) {
+        savePersistedAdminTeams(res.data.data);
+        return res.data.data;
+      }
+    } catch {
+      // Fallback below
+    }
+
     const current = loadPersistedAdminTeams();
     const updated = current.map((t) =>
       teamIds.includes(t.id)
@@ -285,7 +331,23 @@ export const adminTeamsApi = {
     teamId: string,
     reason: string,
   ): Promise<EnrichedAdminTeam> => {
-    await delay(240);
+    try {
+      const res = await axiosClient.patch<ApiResponse<EnrichedAdminTeam>>(
+        `/admin/teams/${teamId}/reject`,
+        { reason },
+      );
+      if (res.data?.data) {
+        const updated = res.data.data;
+        const current = loadPersistedAdminTeams();
+        savePersistedAdminTeams(
+          current.map((t) => (t.id === teamId ? updated : t)),
+        );
+        return updated;
+      }
+    } catch {
+      // Fallback below
+    }
+
     const current = loadPersistedAdminTeams();
     const index = current.findIndex((t) => t.id === teamId);
     if (index === -1) throw new Error('Không tìm thấy đội thi.');
@@ -304,17 +366,20 @@ export const adminTeamsApi = {
    * Remove a team registration from the competition.
    */
   deleteTeam: async (teamId: string): Promise<void> => {
-    await delay(240);
+    try {
+      await axiosClient.delete(`/admin/teams/${teamId}`);
+    } catch {
+      // Fallback below
+    }
     const current = loadPersistedAdminTeams();
     const filtered = current.filter((t) => t.id !== teamId);
     savePersistedAdminTeams(filtered);
   },
 
   /**
-   * Reset persisted teams back to the default 12-team mock dataset.
+   * Reset persisted teams back to the default mock dataset.
    */
   resetMockTeams: async (): Promise<EnrichedAdminTeam[]> => {
-    await delay(150);
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
     }

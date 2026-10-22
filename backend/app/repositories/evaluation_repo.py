@@ -1,9 +1,10 @@
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.checkpoint import AuditLog, Checkpoint, Submission
+from app.models.checkpoint import AuditLog, Checkpoint, Submission, SubmissionStatus
 from app.models.evaluation import Evaluation, EvaluationStatus, JudgeAssignment, RubricCriteria
 from app.models.team import Team
 
@@ -42,16 +43,19 @@ class EvaluationRepository:
 
         created: List[RubricCriteria] = []
         for idx, item in enumerate(criteria_items, start=1):
-            criterion = RubricCriteria(
-                title=item["title"],
-                description=item.get("description"),
-                max_score=float(item["max_score"]),
-                weight=float(item["weight"]),
-                is_required=bool(item.get("is_required", True)),
-                display_order=int(item.get("display_order") or idx),
-                is_active=bool(item.get("is_active", True)),
-                rubric_name=rubric_name,
-            )
+            kwargs: Dict[str, Any] = {
+                "title": item["title"],
+                "description": item.get("description"),
+                "max_score": float(item["max_score"]),
+                "weight": float(item["weight"]),
+                "is_required": bool(item.get("is_required", True)),
+                "display_order": int(item.get("display_order") or idx),
+                "is_active": bool(item.get("is_active", True)),
+                "rubric_name": rubric_name,
+            }
+            if item.get("id"):
+                kwargs["id"] = str(item["id"])
+            criterion = RubricCriteria(**kwargs)
             self.db.add(criterion)
             created.append(criterion)
 
@@ -109,6 +113,64 @@ class EvaluationRepository:
         )
         result_team = await self.db.execute(stmt_team)
         return result_team.scalar_one_or_none()
+
+    async def ensure_final_submission_for_team(
+        self, team_id: str, user_id: Optional[str] = None
+    ) -> Optional[Submission]:
+        """
+        If `team_id` corresponds to a real Team in the database and has no final checkpoint
+        submission yet, automatically creates a final checkpoint (if missing) and a final
+        submission for that team so Frontend JudgingWorkspace can evaluate by team_id.
+        """
+        team_res = await self.db.execute(select(Team).where(Team.id == team_id))
+        team = team_res.scalar_one_or_none()
+        if not team:
+            return None
+
+        cp_stmt = select(Checkpoint).where(Checkpoint.is_final_checkpoint == True).limit(1)  # noqa: E712
+        cp_res = await self.db.execute(cp_stmt)
+        final_cp = cp_res.scalar_one_or_none()
+        now_utc = datetime.now(timezone.utc)
+        if not final_cp:
+            final_cp = Checkpoint(
+                title="Bàn giao Sản phẩm Cuối cùng (Final Submission)",
+                description="Cổng nộp mã nguồn GitHub, Slide thuyết trình và Video Demo chung cuộc.",
+                start_time=now_utc - timedelta(hours=2),
+                deadline=now_utc + timedelta(days=7),
+                is_active=True,
+                is_final_checkpoint=True,
+                grace_period_seconds=5,
+            )
+            self.db.add(final_cp)
+            await self.db.flush()
+
+        # Check if team already has any submission to copy repo_url/demo_url from
+        any_sub_res = await self.db.execute(
+            select(Submission)
+            .where(Submission.team_id == str(team.id))
+            .order_by(Submission.submitted_at.desc())
+            .limit(1)
+        )
+        any_sub = any_sub_res.scalar_one_or_none()
+
+        new_sub = Submission(
+            checkpoint_id=str(final_cp.id),
+            team_id=str(team.id),
+            submitted_by=user_id,
+            repo_url=any_sub.repo_url if any_sub else None,
+            demo_url=any_sub.demo_url if any_sub else None,
+            commit_sha=any_sub.commit_sha if any_sub else None,
+            submission_data=any_sub.submission_data if any_sub else {},
+            note=any_sub.note if any_sub else None,
+            status=SubmissionStatus.SUBMITTED.value,
+            grace_period_applied=False,
+            version=1,
+            version_history=[],
+            submitted_at=now_utc,
+        )
+        self.db.add(new_sub)
+        await self.db.flush()
+        return await self.get_submission_by_id_or_team(str(new_sub.id))
 
     async def list_judge_evaluations_for_submission(
         self, submission_id: str, judge_id: str

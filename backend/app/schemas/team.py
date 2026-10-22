@@ -1,6 +1,6 @@
 from datetime import datetime
-from typing import List, Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Any, List, Optional
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class TeamCreateRequest(BaseModel):
@@ -11,6 +11,15 @@ class TeamCreateRequest(BaseModel):
         description="Tên đội thi (3-50 ký tự, không chứa khoảng trắng thừa)",
         examples=["CyberWarriors"],
     )
+    description: Optional[str] = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_name_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "team_name" not in data and "name" in data:
+                data = {**data, "team_name": data["name"]}
+        return data
 
     @field_validator("team_name")
     @classmethod

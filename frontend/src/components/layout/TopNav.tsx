@@ -32,7 +32,8 @@ import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useMockStore } from '../../store/useMockStore';
 import { mockUsers } from '../../mock/mockData';
-import type { Announcement } from '../../types';
+import apiClient from '../../api/axiosClient';
+import type { Announcement, User as AppUser } from '../../types';
 
 const SEGMENT_LABELS: Record<string, string> = {
   admin: 'Quản trị',
@@ -94,14 +95,43 @@ export const TopNav: React.FC<TopNavProps> = ({
     return { label, href };
   });
 
-  const handleQuickRoleSwitch = (
-    personaKey: 'admin' | 'leader' | 'judge' | 'mentor',
+  const handleQuickRoleSwitch = async (
+    personaKey: 'admin' | 'leader' | 'member' | 'judge' | 'mentor',
     targetPath: string,
   ) => {
     const targetUser = mockUsers[personaKey];
     if (!targetUser) return;
-    login(targetUser, `mock-jwt-token-${personaKey}`);
     switchPersona(personaKey);
+    try {
+      const res = await apiClient.post('/auth/login', {
+        email: targetUser.email,
+        password: '123456',
+      });
+      const payload = res.data?.data;
+      if (payload?.access_token && payload?.user) {
+        const authenticatedUser: AppUser = {
+          ...targetUser,
+          id: String(payload.user.id),
+          email: payload.user.email || targetUser.email,
+          fullName: payload.user.full_name || targetUser.fullName,
+          role: payload.user.role || targetUser.role,
+          approvalStatus: payload.user.approval_status || targetUser.approvalStatus,
+          githubUsername: payload.user.github_username || targetUser.githubUsername,
+        };
+        login(authenticatedUser, payload.access_token);
+        useMockStore.getState().updateCurrentUserProfile({
+          id: authenticatedUser.id,
+          email: authenticatedUser.email,
+          fullName: authenticatedUser.fullName,
+        });
+        useMockStore.getState().syncFromBackend?.();
+        navigate(targetPath);
+        return;
+      }
+    } catch {
+      // Fallback to dev persona token if offline
+    }
+    login(targetUser, `mock-jwt-token-${personaKey}`);
     navigate(targetPath);
   };
 
@@ -228,7 +258,16 @@ export const TopNav: React.FC<TopNavProps> = ({
               <User size={14} className="text-emerald-500" />
               <div className="flex flex-col">
                 <span>Thí sinh (Team Leader)</span>
-                <span className="text-[10px] text-muted-foreground">Đội thi CyberSamurai</span>
+                <span className="text-[10px] text-muted-foreground">leader@cybersamurai.team</span>
+              </div>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleQuickRoleSwitch('member', '/dashboard')}
+            >
+              <User size={14} className="text-sky-500" />
+              <div className="flex flex-col">
+                <span>Thí sinh (Thành viên)</span>
+                <span className="text-[10px] text-muted-foreground">member@cybersamurai.team</span>
               </div>
             </DropdownMenuItem>
           </DropdownMenuContent>

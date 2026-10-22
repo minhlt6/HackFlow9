@@ -29,8 +29,31 @@ class TopicResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class TopicCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=128)
+    description: Optional[str] = None
+    max_teams: int = Field(default=50, ge=1)
+    is_active: bool = Field(default=True)
+
+
+class SubtopicCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=128)
+    description: Optional[str] = None
+    max_teams: int = Field(default=5, ge=1)
+    quota_max: Optional[int] = Field(default=None, ge=1)
+    is_active: bool = Field(default=True)
+
+
+class SubtopicUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1, max_length=128)
+    description: Optional[str] = None
+    max_teams: Optional[int] = Field(default=None, ge=1)
+    quota_max: Optional[int] = Field(default=None, ge=1)
+    is_active: Optional[bool] = None
+
+
 class TopicSelectRequest(BaseModel):
-    topic_id: str = Field(..., description="ID của đề tài chính cần chọn")
+    topic_id: str = Field(..., description="ID của đề tài chính hoặc đề tài phụ cần chọn")
     subtopic_id: Optional[str] = Field(None, description="ID của đề tài phụ / subtopic (nếu có)")
 
 

@@ -1,8 +1,8 @@
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class AnnouncementPriorityEnum(str, Enum):
@@ -32,6 +32,17 @@ class AnnouncementCreate(BaseModel):
         description="Mức độ ưu tiên: info | warning | urgent",
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def map_type_to_priority(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            values = dict(values)
+            if "priority" not in values and "type" in values and values["type"]:
+                t_val = str(values["type"]).lower().strip()
+                if t_val in ("info", "warning", "urgent"):
+                    values["priority"] = t_val
+        return values
+
 
 class AnnouncementUpdate(BaseModel):
     """Schema for updating an announcement (PUT request body). All fields optional."""
@@ -52,6 +63,17 @@ class AnnouncementUpdate(BaseModel):
         None,
         description="Mức độ ưu tiên: info | warning | urgent",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def map_type_to_priority(cls, values: Any) -> Any:
+        if isinstance(values, dict):
+            values = dict(values)
+            if "priority" not in values and "type" in values and values["type"]:
+                t_val = str(values["type"]).lower().strip()
+                if t_val in ("info", "warning", "urgent"):
+                    values["priority"] = t_val
+        return values
 
 
 class AnnouncementResponse(BaseModel):

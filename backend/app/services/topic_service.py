@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
+    BadRequestException,
     ConflictException,
     ForbiddenException,
     NotFoundException,
@@ -13,7 +14,10 @@ from app.models.user import User
 from app.repositories.team_repo import team_repo
 from app.repositories.topic_repo import topic_repo
 from app.schemas.topic import (
+    SubtopicCreateRequest,
     SubtopicResponse,
+    SubtopicUpdateRequest,
+    TopicCreateRequest,
     TopicResponse,
     TopicSelectRequest,
     TopicSelectResponse,
@@ -77,6 +81,121 @@ class TopicService:
         topics = await topic_repo.get_all(db, only_active=True)
         return [self.build_topic_response(t) for t in topics]
 
+    async def create_topic(
+        self,
+        db: AsyncSession,
+        req: TopicCreateRequest,
+    ) -> TopicResponse:
+        topic = await topic_repo.create_topic(
+            db,
+            title=req.title,
+            description=req.description,
+            max_teams=req.max_teams,
+            is_active=req.is_active,
+        )
+        tid = str(topic.id)
+        await db.commit()
+        loaded = await topic_repo.get_by_id(db, tid)
+        return self.build_topic_response(loaded)
+
+    async def delete_topic(
+        self,
+        db: AsyncSession,
+        topic_id: str,
+    ) -> Dict[str, str]:
+        topic = await topic_repo.get_by_id(db, topic_id)
+        if not topic:
+            raise NotFoundException(
+                message="Không tìm thấy mảng đề tài yêu cầu.",
+                error_code="TOPIC_NOT_FOUND",
+            )
+        if topic.current_teams > 0 or any(s.current_teams > 0 for s in (topic.subtopics or [])):
+            raise ConflictException(
+                message="Không thể xóa mảng đề tài đã có đội thi đăng ký.",
+                error_code="TOPIC_IN_USE",
+            )
+        await db.delete(topic)
+        await db.commit()
+        return {"id": topic_id, "deleted": "true"}
+
+    async def create_subtopic(
+        self,
+        db: AsyncSession,
+        topic_id: str,
+        req: SubtopicCreateRequest,
+    ) -> TopicResponse:
+        topic = await topic_repo.get_by_id(db, topic_id)
+        if not topic:
+            raise NotFoundException(
+                message="Không tìm thấy mảng đề tài chính.",
+                error_code="TOPIC_NOT_FOUND",
+            )
+        effective_quota = req.quota_max if req.quota_max is not None else req.max_teams
+        tid = str(topic.id)
+        await topic_repo.create_subtopic(
+            db,
+            topic_id=tid,
+            title=req.title,
+            description=req.description,
+            max_teams=effective_quota,
+            is_active=req.is_active,
+        )
+        # Ensure parent topic max_teams is at least the sum of its subtopics
+        topic.max_teams = max(topic.max_teams, (topic.max_teams or 0) + effective_quota)
+        await db.commit()
+        db.expire_all()
+        loaded = await topic_repo.get_by_id(db, tid)
+        return self.build_topic_response(loaded)
+
+    async def update_subtopic(
+        self,
+        db: AsyncSession,
+        subtopic_id: str,
+        req: SubtopicUpdateRequest,
+    ) -> SubtopicResponse:
+        subtopic = await topic_repo.get_subtopic_by_id(db, subtopic_id, for_update=True)
+        if not subtopic:
+            raise NotFoundException(
+                message="Không tìm thấy đề tài chi tiết.",
+                error_code="TOPIC_NOT_FOUND",
+            )
+        effective_quota = req.quota_max if req.quota_max is not None else req.max_teams
+        if effective_quota is not None:
+            if effective_quota < subtopic.current_teams:
+                raise BadRequestException(
+                    message=f"Quota mới ({effective_quota}) không được nhỏ hơn số đội đã đăng ký ({subtopic.current_teams}).",
+                    error_code="INVALID_QUOTA",
+                )
+            subtopic.max_teams = effective_quota
+            parent_topic = await topic_repo.get_by_id(db, str(subtopic.topic_id))
+            if parent_topic:
+                total_sub_quota = sum(
+                    (effective_quota if str(s.id) == str(subtopic.id) else s.max_teams)
+                    for s in (parent_topic.subtopics or [])
+                )
+                parent_topic.max_teams = max(parent_topic.max_teams, total_sub_quota)
+
+        if req.title is not None:
+            subtopic.title = req.title.strip()
+        if req.description is not None:
+            subtopic.description = req.description
+        if req.is_active is not None:
+            subtopic.is_active = req.is_active
+
+        await db.commit()
+        await db.refresh(subtopic)
+        rem_sub = max(0, subtopic.max_teams - subtopic.current_teams)
+        return SubtopicResponse(
+            id=str(subtopic.id),
+            topic_id=str(subtopic.topic_id),
+            title=subtopic.title,
+            description=subtopic.description,
+            max_teams=subtopic.max_teams,
+            current_teams=subtopic.current_teams,
+            remaining_slots=rem_sub,
+            is_active=subtopic.is_active,
+        )
+
     async def select_topic(
         self,
         db: AsyncSession,
@@ -85,12 +204,8 @@ class TopicService:
     ) -> TopicSelectResponse:
         """
         Atomically register a topic for the current user's team.
-        Enforces:
-        - User must belong to an active, valid team (min 3 members) and hold LEADER role
-        - Team must not have already selected a topic
-        - Topic must be active and have remaining quota
-        - Concurrency protection via SELECT FOR UPDATE on Team, Topic, and Subtopic
-        - Automatic rollback on any constraint violation
+        Supports passing either a main Topic ID (with optional subtopic_id)
+        or a Subtopic ID directly in req.topic_id.
         """
         # 1. Check user membership & leader role
         membership = await team_repo.get_user_membership(db, str(current_user.id))
@@ -114,7 +229,6 @@ class TopicService:
                     message="Đề tài cuộc thi chưa được công bố.",
                     error_code="TOPIC_SELECTION_CLOSED",
                 )
-            # Ensure comparison is timezone-aware
             start_time = config.start_time
             if start_time and start_time.tzinfo is None:
                 start_time = start_time.replace(tzinfo=timezone.utc)
@@ -149,9 +263,9 @@ class TopicService:
                     error_code="TEAM_LOCKED",
                 )
 
-            # Verify team has at least 3 members (VALID status requirement)
+            # Verify team has at least 3 members (VALID status requirement) or is Admin-approved
             member_count = await team_repo.count_members(db, team.id)
-            if member_count < 3:
+            if member_count < 3 and str(getattr(team, "status", "")).upper() != "APPROVED":
                 raise ConflictException(
                     message=f"Đội thi chưa đủ điều kiện (cần tối thiểu 3 thành viên, hiện có {member_count}).",
                     error_code="TEAM_NOT_VALID",
@@ -164,8 +278,15 @@ class TopicService:
                     error_code="TEAM_TOPIC_ALREADY_SELECTED",
                 )
 
-            # 4. Lock Topic with SELECT FOR UPDATE
+            # 4. Resolve Topic (or Subtopic if req.topic_id is actually a Subtopic ID)
+            effective_subtopic_id = req.subtopic_id
             topic = await topic_repo.get_by_id(db, req.topic_id, for_update=True)
+            if not topic and not effective_subtopic_id:
+                direct_sub = await topic_repo.get_subtopic_by_id(db, req.topic_id, for_update=True)
+                if direct_sub:
+                    effective_subtopic_id = str(direct_sub.id)
+                    topic = await topic_repo.get_by_id(db, str(direct_sub.topic_id), for_update=True)
+
             if not topic:
                 raise NotFoundException(
                     message="Không tìm thấy đề tài yêu cầu.",
@@ -186,8 +307,8 @@ class TopicService:
 
             # 5. Lock Subtopic if specified
             subtopic = None
-            if req.subtopic_id:
-                subtopic = await topic_repo.get_subtopic_by_id(db, req.subtopic_id, for_update=True)
+            if effective_subtopic_id:
+                subtopic = await topic_repo.get_subtopic_by_id(db, effective_subtopic_id, for_update=True)
                 if not subtopic or str(subtopic.topic_id) != str(topic.id):
                     raise NotFoundException(
                         message="Không tìm thấy đề tài phụ thuộc đề tài này.",
@@ -213,8 +334,12 @@ class TopicService:
             team_id_val = str(team.id)
             topic_id_val = str(topic.id)
             subtopic_id_val = str(team.subtopic_id) if team.subtopic_id else None
-            topic_title_val = topic.title
-            rem = max(0, topic.max_teams - topic.current_teams)
+            topic_title_val = subtopic.title if subtopic else topic.title
+            rem = (
+                max(0, subtopic.max_teams - subtopic.current_teams)
+                if subtopic
+                else max(0, topic.max_teams - topic.current_teams)
+            )
 
             await db.commit()
             db.expire_all()

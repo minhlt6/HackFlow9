@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import apiClient from '../api/axiosClient';
 import type {
   User,
   Team,
+  TeamMember,
   MajorTopic,
   Checkpoint,
   CheckpointSubmission,
@@ -166,8 +168,9 @@ interface MockStoreState {
   broadcastAnnouncement: (title: string, content: string, targetRole?: 'all' | 'candidates' | 'judges' | 'mentors') => void;
   deleteAnnouncement: (id: string) => void;
 
-  // Reset
+  // Reset & Sync
   resetAllMockData: () => void;
+  syncFromBackend?: () => Promise<void>;
 
   // Onboarding Wizard & Guided Setup
   isWizardOpen: boolean;
@@ -234,6 +237,40 @@ if (typeof window !== 'undefined') {
 }
 
 const initialSession = getInitialTabSession();
+
+const syncRubricsToBackend = async (criteria: RubricCriteria[]) => {
+  if (!criteria || criteria.length === 0) return;
+  const totalRaw = criteria.reduce((s, c) => s + (c.weight > 0 ? c.weight : 1), 0) || 100;
+  let running = 0;
+  const normalized = criteria.map((c, idx) => {
+    const rawW = c.weight > 0 ? c.weight : 1;
+    let w: number;
+    if (idx === criteria.length - 1) {
+      w = Math.max(0.0001, Number((1 - running).toFixed(4)));
+    } else {
+      w = Math.max(0.0001, Number((rawW / totalRaw).toFixed(4)));
+      running += w;
+    }
+    return {
+      id: c.id,
+      title: c.name,
+      description: c.description || '',
+      max_score: c.maxScore > 0 ? c.maxScore : 10,
+      weight: w,
+      is_required: true,
+      display_order: c.displayOrder || idx + 1,
+      is_active: true,
+    };
+  });
+  try {
+    await apiClient.post('/rubrics', {
+      name: 'HackFlow Final Rubric',
+      criteria: normalized,
+    });
+  } catch {
+    // ignore if offline or locked
+  }
+};
 
 export const useMockStore = create<MockStoreState>()(
   persist(
@@ -635,8 +672,10 @@ export const useMockStore = create<MockStoreState>()(
       majorTopics: initialMajorTopics,
 
       addMajorTopic: (title, description) => {
+        const tempId = `major-${Date.now()}`;
         const newMajor: MajorTopic = {
-          id: `major-${Date.now()}`,
+          id: tempId,
+          name: title,
           title,
           domain: title,
           description,
@@ -644,12 +683,27 @@ export const useMockStore = create<MockStoreState>()(
           subTopics: [],
         };
         set((state) => ({ majorTopics: [...state.majorTopics, newMajor] }));
+
+        void apiClient
+          .post('/topics', { title, description, max_teams: 50 })
+          .then((res) => {
+            const created = res.data?.data;
+            if (created?.id) {
+              set((state) => ({
+                majorTopics: state.majorTopics.map((m) =>
+                  m.id === tempId ? { ...m, id: String(created.id) } : m
+                ),
+              }));
+            }
+          })
+          .catch(() => {});
       },
 
       deleteMajorTopic: (id) => {
         set((state) => ({
           majorTopics: state.majorTopics.filter((m) => m.id !== id),
         }));
+        void apiClient.delete(`/topics/${id}`).catch(() => {});
       },
 
       selectTopicForTeam: (teamId, subTopicId) => {
@@ -678,7 +732,6 @@ export const useMockStore = create<MockStoreState>()(
           };
         }
 
-        // If team already has an old topic, release old quota
         const oldTopicId = team.topicId;
 
         const updatedMajors = get().majorTopics.map((major) => ({
@@ -714,6 +767,8 @@ export const useMockStore = create<MockStoreState>()(
           teams: state.teams.map((t) => (t.id === teamId ? { ...t, topicId: subTopicId } : t)),
         }));
 
+        void apiClient.post('/topics/select', { topic_id: subTopicId }).catch(() => {});
+
         return { success: true, message: `Chọn đề tài "${targetSubTopic.title}" thành công!` };
       },
 
@@ -744,11 +799,13 @@ export const useMockStore = create<MockStoreState>()(
           teams: state.teams.map((t) => (t.id === teamId ? { ...t, topicId: null } : t)),
         }));
 
+        void apiClient.post('/topics/cancel', { team_id: teamId }).catch(() => {});
+
         return { success: true, message: 'Đã hủy đề tài thành công. Quota đã được giải phóng.' };
       },
 
       addSubTopic: (majorTopicId, newSub) => {
-        const id = `sub-${Date.now()}`;
+        const tempId = `sub-${Date.now()}`;
         set((state) => ({
           majorTopics: state.majorTopics.map((m) =>
             m.id === majorTopicId
@@ -757,7 +814,7 @@ export const useMockStore = create<MockStoreState>()(
                   subTopics: [
                     ...m.subTopics,
                     {
-                      id,
+                      id: tempId,
                       majorTopicId,
                       title: newSub.title,
                       description: newSub.description,
@@ -773,6 +830,36 @@ export const useMockStore = create<MockStoreState>()(
               : m
           ),
         }));
+
+        void apiClient
+          .post(`/topics/${majorTopicId}/subtopics`, {
+            title: newSub.title,
+            description: newSub.description,
+            max_teams: newSub.quota,
+            quota_max: newSub.quota,
+          })
+          .then((res) => {
+            const topicData = res.data?.data;
+            const subs = topicData?.subtopics;
+            if (Array.isArray(subs) && subs.length > 0) {
+              const createdSub = subs[subs.length - 1];
+              if (createdSub?.id) {
+                set((state) => ({
+                  majorTopics: state.majorTopics.map((m) =>
+                    m.id === majorTopicId
+                      ? {
+                          ...m,
+                          subTopics: m.subTopics.map((s) =>
+                            s.id === tempId ? { ...s, id: String(createdSub.id) } : s
+                          ),
+                        }
+                      : m
+                  ),
+                }));
+              }
+            }
+          })
+          .catch(() => {});
       },
 
       updateSubTopicQuota: (subTopicId, newQuota) => {
@@ -793,6 +880,12 @@ export const useMockStore = create<MockStoreState>()(
             }),
           })),
         }));
+        void apiClient
+          .patch(`/topics/subtopics/${subTopicId}`, {
+            max_teams: newQuota,
+            quota_max: newQuota,
+          })
+          .catch(() => {});
       },
 
       // Checkpoints
@@ -805,14 +898,35 @@ export const useMockStore = create<MockStoreState>()(
         const startedAt = get().config.contestStartedAt;
         const baseTime = startedAt ? new Date(startedAt).getTime() : Date.now();
         const calculatedDeadline = cp.deadline || new Date(baseTime + duration * 60 * 1000).toISOString();
+        const tempId = `cp-${Date.now()}`;
 
         const newCp: Checkpoint = {
           ...cp,
           durationMinutes: duration,
           deadline: calculatedDeadline,
-          id: `cp-${Date.now()}`,
+          id: tempId,
         };
         set((state) => ({ checkpoints: [...state.checkpoints, newCp] }));
+
+        void apiClient
+          .post('/checkpoints', {
+            title: cp.title || cp.name || 'Checkpoint mới',
+            description: cp.description || '',
+            deadline: calculatedDeadline,
+            duration_minutes: duration,
+            is_active: true,
+          })
+          .then((res) => {
+            const created = res.data?.data;
+            if (created?.id) {
+              set((state) => ({
+                checkpoints: state.checkpoints.map((c) =>
+                  c.id === tempId ? { ...c, id: String(created.id) } : c
+                ),
+              }));
+            }
+          })
+          .catch(() => {});
       },
 
       reorderCheckpoints: (fromIndex, toIndex) => {
@@ -841,6 +955,7 @@ export const useMockStore = create<MockStoreState>()(
       },
 
       updateCheckpoint: (id, updates) => {
+        let nextDeadline = updates.deadline;
         set((state) => ({
           checkpoints: state.checkpoints.map((c) => {
             if (c.id !== id) return c;
@@ -853,6 +968,7 @@ export const useMockStore = create<MockStoreState>()(
               (updates.durationMinutes !== undefined
                 ? new Date(baseTime + newDuration * 60 * 1000).toISOString()
                 : c.deadline);
+            nextDeadline = calculatedDeadline;
 
             return {
               ...c,
@@ -862,12 +978,21 @@ export const useMockStore = create<MockStoreState>()(
             };
           }),
         }));
+
+        void apiClient
+          .put(`/checkpoints/${id}`, {
+            title: updates.title || updates.name,
+            description: updates.description,
+            deadline: nextDeadline,
+          })
+          .catch(() => {});
       },
 
       deleteCheckpoint: (id) => {
         set((state) => ({
           checkpoints: state.checkpoints.filter((c) => c.id !== id),
         }));
+        void apiClient.delete(`/checkpoints/${id}`).catch(() => {});
       },
 
       submitCheckpoint: (checkpointId, teamId, dataOrRepoUrl, demoUrl) => {
@@ -895,6 +1020,15 @@ export const useMockStore = create<MockStoreState>()(
           ],
         }));
 
+        void apiClient
+          .post(`/checkpoints/${checkpointId}/submissions`, {
+            checkpoint_id: checkpointId,
+            repo_url: dataObj.repoUrl || '',
+            demo_url: dataObj.demoUrl || '',
+            note: dataObj.description || '',
+          })
+          .catch(() => {});
+
         return { success: true, commitSha };
       },
 
@@ -918,6 +1052,17 @@ export const useMockStore = create<MockStoreState>()(
             newFinal,
           ],
         }));
+
+        void apiClient
+          .post('/submissions/final', {
+            team_id: teamId,
+            github_url: repoUrl,
+            demo_url: demoVideoUrl,
+            slide_url: slideUrl,
+            description: summary,
+            commit_sha: commitSha,
+          })
+          .catch(() => {});
 
         return { success: true, commitSha };
       },
@@ -947,6 +1092,7 @@ export const useMockStore = create<MockStoreState>()(
             weight: idx < remainder ? base + 1 : base,
           }));
           set({ rubricCriteria: updated });
+          syncRubricsToBackend(updated);
           return;
         }
 
@@ -982,12 +1128,16 @@ export const useMockStore = create<MockStoreState>()(
             }));
           }
 
-          set({ rubricCriteria: [...updatedExisting, newCrit] });
+          const updated = [...updatedExisting, newCrit];
+          set({ rubricCriteria: updated });
+          syncRubricsToBackend(updated);
           return;
         }
 
         // Default 'none': append directly
-        set((state) => ({ rubricCriteria: [...state.rubricCriteria, newCrit] }));
+        const updated = [...existing, newCrit];
+        set({ rubricCriteria: updated });
+        syncRubricsToBackend(updated);
       },
 
       rebalanceRubricWeights: (mode: 'equal' | 'proportional') => {
@@ -1003,6 +1153,7 @@ export const useMockStore = create<MockStoreState>()(
             weight: idx < remainder ? base + 1 : base,
           }));
           set({ rubricCriteria: updated });
+          syncRubricsToBackend(updated);
           return;
         }
 
@@ -1034,18 +1185,19 @@ export const useMockStore = create<MockStoreState>()(
           weight: Math.max(1, finalWeights[idx]),
         }));
         set({ rubricCriteria: updated });
+        syncRubricsToBackend(updated);
       },
 
       updateRubricCriterion: (id, updates) => {
-        set((state) => ({
-          rubricCriteria: state.rubricCriteria.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-        }));
+        const updated = get().rubricCriteria.map((c) => (c.id === id ? { ...c, ...updates } : c));
+        set({ rubricCriteria: updated });
+        syncRubricsToBackend(updated);
       },
 
       deleteRubricCriterion: (id) => {
-        set((state) => ({
-          rubricCriteria: state.rubricCriteria.filter((c) => c.id !== id),
-        }));
+        const updated = get().rubricCriteria.filter((c) => c.id !== id);
+        set({ rubricCriteria: updated });
+        syncRubricsToBackend(updated);
       },
 
       saveEvaluation: (teamId, judgeId, judgeName, scoresMap, generalComment, isDraft) => {
@@ -1233,8 +1385,9 @@ export const useMockStore = create<MockStoreState>()(
       // Announcements
       announcements: initialAnnouncements,
       addAnnouncement: (title, content, isPinned = false) => {
+        const tempId = `ann-${Date.now()}`;
         const newAnn: Announcement = {
-          id: `ann-${Date.now()}`,
+          id: tempId,
           title,
           content,
           sender: get().currentUser.fullName,
@@ -1244,11 +1397,30 @@ export const useMockStore = create<MockStoreState>()(
           isPinned,
         };
         set((state) => ({ announcements: [newAnn, ...state.announcements] }));
+        void apiClient
+          .post('/announcements', {
+            title,
+            content,
+            is_pinned: isPinned,
+            priority: 'info',
+            target_audience: 'all',
+          })
+          .then((res) => {
+            const payload = (res.data as { data?: { id?: string }; id?: string })?.data ?? res.data;
+            const realId = (payload as { id?: string })?.id;
+            if (realId) {
+              set((state) => ({
+                announcements: state.announcements.map((a) => (a.id === tempId ? { ...a, id: String(realId) } : a)),
+              }));
+            }
+          })
+          .catch(() => {});
       },
 
       broadcastAnnouncement: (title, content, targetRole = 'all') => {
+        const tempId = `ann-${Date.now()}`;
         const newAnn: Announcement = {
-          id: `ann-${Date.now()}`,
+          id: tempId,
           title,
           content,
           sender: get().currentUser.fullName,
@@ -1259,10 +1431,203 @@ export const useMockStore = create<MockStoreState>()(
           isPinned: false,
         };
         set((state) => ({ announcements: [newAnn, ...state.announcements] }));
+        void apiClient
+          .post('/announcements', {
+            title,
+            content,
+            is_pinned: false,
+            priority: 'info',
+            target_audience: targetRole || 'all',
+          })
+          .then((res) => {
+            const payload = (res.data as { data?: { id?: string }; id?: string })?.data ?? res.data;
+            const realId = (payload as { id?: string })?.id;
+            if (realId) {
+              set((state) => ({
+                announcements: state.announcements.map((a) => (a.id === tempId ? { ...a, id: String(realId) } : a)),
+              }));
+            }
+          })
+          .catch(() => {});
       },
 
       deleteAnnouncement: (id) => {
         set((state) => ({ announcements: state.announcements.filter((a) => a.id !== id) }));
+        void apiClient.delete(`/announcements/${id}`).catch(() => {});
+      },
+
+      syncFromBackend: async () => {
+        const unwrap = (raw: unknown): unknown =>
+          raw && typeof raw === 'object' && 'data' in (raw as Record<string, unknown>)
+            ? (raw as { data: unknown }).data
+            : raw;
+
+        const [topicsRes, checkpointsRes, rubricsRes, annRes, teamsRes] = await Promise.allSettled([
+          apiClient.get('/topics'),
+          apiClient.get('/checkpoints'),
+          apiClient.get('/rubrics'),
+          apiClient.get('/announcements'),
+          apiClient.get('/teams'),
+        ]);
+
+        const updates: Partial<MockStoreState> = {};
+
+        if (topicsRes.status === 'fulfilled') {
+          const topicsArr = unwrap(topicsRes.value.data);
+          if (Array.isArray(topicsArr)) {
+            updates.majorTopics = (topicsArr as Array<Record<string, unknown>>).map((t) => ({
+              id: String(t.id),
+              name: String(t.title ?? t.name ?? ''),
+              description: String(t.description ?? ''),
+              subTopics: Array.isArray(t.subtopics)
+                ? (t.subtopics as Array<Record<string, unknown>>).map((s) => ({
+                    id: String(s.id),
+                    majorTopicId: String(t.id),
+                    title: String(s.title ?? s.name ?? ''),
+                    name: String(s.title ?? s.name ?? ''),
+                    description: String(s.description ?? ''),
+                    maxTeamsQuota: Number(s.max_teams ?? s.maxTeamsQuota ?? 5),
+                    currentTeams: Number(s.current_teams ?? s.currentTeams ?? 0),
+                  }))
+                : [],
+            }));
+          }
+        }
+
+        if (checkpointsRes.status === 'fulfilled') {
+          const cpArr = unwrap(checkpointsRes.value.data);
+          if (Array.isArray(cpArr)) {
+            const now = Date.now();
+            updates.checkpoints = (cpArr as Array<Record<string, unknown>>).map((cp) => {
+              const deadlineStr = String(cp.deadline ?? new Date().toISOString());
+              const startStr = String(cp.start_time ?? deadlineStr);
+              const deadlineMs = new Date(deadlineStr).getTime();
+              const startMs = new Date(startStr).getTime();
+              let status: 'upcoming' | 'open' | 'closed' = 'open';
+              if (now > deadlineMs) status = 'closed';
+              else if (now < startMs) status = 'upcoming';
+
+              return {
+                id: String(cp.id),
+                checkpointNumber: Number(cp.checkpoint_number ?? 1),
+                title: String(cp.title ?? ''),
+                description: String(cp.description ?? ''),
+                deadline: deadlineStr,
+                durationMinutes: Number(cp.duration_minutes ?? 60),
+                status,
+              };
+            });
+          }
+        }
+
+        if (rubricsRes.status === 'fulfilled') {
+          const rubricsObj = unwrap(rubricsRes.value.data) as { criteria?: Array<Record<string, unknown>> } | null;
+          if (Array.isArray(rubricsObj?.criteria)) {
+            updates.rubricCriteria = rubricsObj.criteria.map((c, idx) => {
+              const rawWeight = Number(c.weight ?? 25);
+              return {
+                id: String(c.id),
+                name: String(c.name ?? c.title ?? ''),
+                description: String(c.description ?? ''),
+                maxScore: Number(c.max_score ?? c.maxScore ?? 10),
+                weight: rawWeight > 0 && rawWeight <= 1 ? Math.round(rawWeight * 100) : rawWeight,
+                displayOrder: Number(c.display_order ?? c.displayOrder ?? idx + 1),
+              };
+            });
+          }
+        }
+
+        if (annRes.status === 'fulfilled') {
+          const annArr = unwrap(annRes.value.data);
+          if (Array.isArray(annArr)) {
+            updates.announcements = (annArr as Array<Record<string, unknown>>).map((a) => ({
+              id: String(a.id),
+              title: String(a.title ?? ''),
+              content: String(a.content ?? ''),
+              sender: String(a.sender_name ?? 'Ban Tổ Chức'),
+              author: String(a.sender_name ?? 'Ban Tổ Chức'),
+              targetRole: (String(a.target_audience ?? 'all') as Announcement['targetRole']) || 'all',
+              createdAt: a.created_at
+                ? new Date(String(a.created_at)).toLocaleTimeString('vi-VN') +
+                  ' - ' +
+                  new Date(String(a.created_at)).toLocaleDateString('vi-VN')
+                : '',
+              publishedAt: String(a.created_at ?? new Date().toISOString()),
+              isPinned: Boolean(a.is_pinned),
+            }));
+          }
+        }
+
+        if (teamsRes.status === 'fulfilled') {
+          const teamsArr = unwrap(teamsRes.value.data);
+          if (Array.isArray(teamsArr)) {
+            const mappedTeams: Team[] = (teamsArr as Array<Record<string, unknown>>).map((t) => {
+              const membersRaw = Array.isArray(t.members) ? (t.members as Array<Record<string, unknown>>) : [];
+              const members: TeamMember[] = membersRaw.map((m) => ({
+                userId: String(m.user_id ?? m.userId ?? m.id ?? ''),
+                fullName: String(m.full_name ?? m.fullName ?? ''),
+                email: String(m.email ?? ''),
+                roleInTeam: (String(m.role ?? m.role_in_team ?? '').toLowerCase() === 'leader'
+                  ? 'leader'
+                  : 'member') as 'leader' | 'member',
+                githubUsername: m.github_username ? String(m.github_username) : undefined,
+                joinedAt: String(m.joined_at ?? new Date().toISOString()),
+              }));
+              const rawStatus = String(t.status ?? t.approval_status ?? 'approved').toLowerCase();
+              const status: Team['status'] =
+                rawStatus === 'approved' || rawStatus === 'valid'
+                  ? 'APPROVED'
+                  : rawStatus === 'rejected'
+                    ? 'REJECTED'
+                    : 'pending';
+              const resolvedSubOrTopicId =
+                t.subtopic_id ?? t.selected_subtopic_id ?? t.topic_id ?? t.selected_topic_id;
+              const resolvedTopicName =
+                t.topic_name ?? t.selected_subtopic_title ?? t.selected_topic_title;
+              return {
+                id: String(t.id),
+                name: String(t.team_name ?? t.name ?? ''),
+                description: String(t.description ?? ''),
+                inviteCode: String(t.invite_code ?? ''),
+                leaderId: String(t.leader_id ?? t.created_by ?? ''),
+                topicId: resolvedSubOrTopicId ? String(resolvedSubOrTopicId) : undefined,
+                topicName: resolvedTopicName ? String(resolvedTopicName) : undefined,
+                status,
+                memberCount: Number(t.member_count ?? members.length),
+                maxMembers: 5,
+                createdAt: String(t.created_at ?? new Date().toISOString()),
+                members,
+              };
+            });
+            updates.teams = mappedTeams;
+
+            const currUser = get().currentUser;
+            const matchedTeam = mappedTeams.find((t) =>
+              t.members.some(
+                (m) =>
+                  m.userId === currUser.id ||
+                  (currUser.email && m.email.toLowerCase() === currUser.email.toLowerCase())
+              )
+            );
+            if (matchedTeam) {
+              const matchedMember = matchedTeam.members.find(
+                (m) =>
+                  m.userId === currUser.id ||
+                  (currUser.email && m.email.toLowerCase() === currUser.email.toLowerCase())
+              );
+              updates.currentUser = {
+                ...currUser,
+                id: matchedMember?.userId || currUser.id,
+                teamId: matchedTeam.id,
+                roleInTeam: matchedMember?.roleInTeam || 'member',
+              };
+            }
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          set(updates);
+        }
       },
 
       // Reset

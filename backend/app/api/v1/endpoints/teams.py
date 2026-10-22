@@ -1,5 +1,6 @@
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_approved
@@ -10,6 +11,25 @@ from app.schemas.team import TeamCreateRequest, TeamJoinRequest, TeamResponse
 from app.services.team_service import team_service
 
 router = APIRouter()
+
+
+class TransferLeaderRequest(BaseModel):
+    new_leader_id: str
+
+
+@router.get(
+    "",
+    response_model=ApiResponse[List[TeamResponse]],
+    summary="Danh sách toàn bộ các đội thi",
+)
+async def list_teams(
+    db: AsyncSession = Depends(get_db),
+) -> ApiResponse[List[TeamResponse]]:
+    teams = await team_service.list_all_teams(db)
+    return success_response(
+        data=teams,
+        message=f"Tải danh sách đội thi thành công ({len(teams)} đội).",
+    )
 
 
 @router.post(
@@ -53,6 +73,56 @@ async def join_team(
     return success_response(
         data=team,
         message="Gia nhập đội thi thành công.",
+    )
+
+
+@router.post(
+    "/leave",
+    response_model=ApiResponse[dict],
+    summary="Rời khỏi đội thi hiện tại",
+)
+async def leave_team(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApiResponse[dict]:
+    res = await team_service.leave_team(db, current_user)
+    return success_response(
+        data=res,
+        message="Đã rời khỏi đội thi thành công.",
+    )
+
+
+@router.delete(
+    "/members/{user_id}",
+    response_model=ApiResponse[TeamResponse],
+    summary="Đội trưởng xóa thành viên khỏi đội",
+)
+async def remove_team_member(
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApiResponse[TeamResponse]:
+    team = await team_service.remove_member(db, current_user, user_id)
+    return success_response(
+        data=team,
+        message="Đã xóa thành viên khỏi đội.",
+    )
+
+
+@router.patch(
+    "/leader",
+    response_model=ApiResponse[TeamResponse],
+    summary="Chuyển nhượng quyền Đội trưởng",
+)
+async def transfer_team_leader(
+    body: TransferLeaderRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApiResponse[TeamResponse]:
+    team = await team_service.transfer_leader(db, current_user, body.new_leader_id)
+    return success_response(
+        data=team,
+        message="Đã chuyển quyền Đội trưởng thành công.",
     )
 
 

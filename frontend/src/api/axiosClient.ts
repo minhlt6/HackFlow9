@@ -48,3 +48,6 @@ axiosClient.interceptors.response.use(
     return Promise.reject(error);
   },
 );
+
+export const apiClient = axiosClient;
+export default axiosClient;

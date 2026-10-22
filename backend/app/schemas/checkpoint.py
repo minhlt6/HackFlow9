@@ -1,7 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class CheckpointStatus(str, Enum):
@@ -25,21 +25,33 @@ class SubmissionFieldConfig(BaseModel):
 class CheckpointCreateRequest(BaseModel):
     title: str = Field(..., min_length=3, max_length=128, description="Tên mốc checkpoint / milestone")
     description: Optional[str] = Field(None, description="Mô tả chi tiết yêu cầu mốc nộp bài")
-    start_time: datetime = Field(..., description="Thời điểm mở cổng nộp bài (ISO 8601 UTC)")
+    start_time: Optional[datetime] = Field(None, description="Thời điểm mở cổng nộp bài (ISO 8601 UTC)")
     deadline: datetime = Field(..., description="Hạn chót đóng cổng nộp bài (ISO 8601 UTC)")
+    duration_minutes: Optional[int] = Field(None, description="Thời lượng mở cổng (phút)")
+    weight: Optional[float] = Field(None, description="Trọng số (tùy chọn)")
     requirements: Optional[str] = Field(None, description="Chi tiết các tiêu chí/tệp cần nộp (Markdown)")
     is_active: bool = Field(True, description="Trạng thái kích hoạt mốc checkpoint của BTC")
     is_final_checkpoint: bool = Field(False, description="True: Checkpoint chốt sản phẩm cuối cùng; False: Checkpoint trung gian")
     grace_period_seconds: int = Field(5, ge=0, le=300, description="Thời gian ân hạn mạng riêng từng checkpoint (0 - 300 giây, mặc định 5s)")
     submission_fields: Optional[List[SubmissionFieldConfig]] = Field(None, description="Cấu hình các trường nộp bài động")
 
-    @field_validator("deadline")
-    @classmethod
-    def validate_deadline_after_start(cls, v: datetime, info) -> datetime:
-        start_time = info.data.get("start_time")
-        if start_time and v <= start_time:
-            raise ValueError("Thời hạn chót (deadline) phải sau thời điểm mở cổng (start_time).")
-        return v
+    @model_validator(mode="after")
+    def default_and_validate_times(self) -> "CheckpointCreateRequest":
+        dl = self.deadline
+        if dl.tzinfo is None:
+            dl = dl.replace(tzinfo=timezone.utc)
+        if self.start_time is None:
+            now_utc = datetime.now(timezone.utc)
+            dur = self.duration_minutes or 120
+            candidate_start = min(now_utc - timedelta(minutes=1), dl - timedelta(minutes=max(1, dur)))
+            self.start_time = candidate_start
+        else:
+            st = self.start_time
+            if st.tzinfo is None:
+                st = st.replace(tzinfo=timezone.utc)
+            if dl <= st:
+                raise ValueError("Thời hạn chót (deadline) phải sau thời điểm mở cổng (start_time).")
+        return self
 
 
 class CheckpointUpdateRequest(BaseModel):
@@ -47,6 +59,8 @@ class CheckpointUpdateRequest(BaseModel):
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     deadline: Optional[datetime] = None
+    duration_minutes: Optional[int] = None
+    weight: Optional[float] = None
     requirements: Optional[str] = None
     is_active: Optional[bool] = None
     is_final_checkpoint: Optional[bool] = None
@@ -92,7 +106,6 @@ class CheckpointResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
-
 
 
 class CheckpointTimeGatedStatusResponse(BaseModel):

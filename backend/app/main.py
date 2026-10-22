@@ -1,7 +1,15 @@
 import logging
+import sys
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,7 +30,7 @@ logger = logging.getLogger("hackflow.main")
 
 async def _seed_default_accounts() -> None:
     """
-    Ensure default role accounts (Admin, Judge, Mentor) exist on fresh deployments.
+    Ensure default role accounts (Admin, Judge, Mentor, Candidate personas) exist on fresh deployments.
     All operational contest data (Topics, Teams, Checkpoints, Submissions, Tickets, etc.) starts empty.
     """
     from sqlalchemy import select
@@ -40,6 +48,9 @@ async def _seed_default_accounts() -> None:
         ("admin@hackflow.com", "Admin HackFlow", "admin", "approved", "admin-com"),
         ("judge.tech@hackathon.org", "TS. Nguyễn Hoàng Giám Khảo", "judge", "approved", "judge-hf"),
         ("mentor.ai@ailab.org.vn", "ThS. Phạm Cố Vấn AI", "mentor", "approved", "mentor-hf"),
+        ("leader@cybersamurai.team", "Trần Quốc Bảo", "candidate", "approved", "quocbao-dev"),
+        ("member@cybersamurai.team", "Lê Hoàng Nam", "candidate", "approved", "hoangnam-fe"),
+        ("member2@cybersamurai.team", "Nguyễn Minh Châu", "candidate", "approved", "minhchau-ai"),
     ]
     default_pw_hash = hash_password("123456")
 
@@ -59,8 +70,11 @@ async def _seed_default_accounts() -> None:
                 )
                 session.add(existing)
                 await session.flush()
-            elif existing.hashed_password != default_pw_hash:
-                existing.hashed_password = default_pw_hash
+            else:
+                if existing.hashed_password != default_pw_hash:
+                    existing.hashed_password = default_pw_hash
+                if existing.approval_status != approval_status:
+                    existing.approval_status = approval_status
 
         await session.commit()
 
@@ -108,88 +122,6 @@ Hệ thống tuân thủ nghiêm ngặt mô hình 3 tầng phân tách độc l�
 1. **Router (API Layer)**: Tiếp nhận HTTP request, xác thực schema Pydantic, bảo mật JWT Bearer / RBAC, trả về Envelope chuẩn hóa.
 2. **Service (Business Layer)**: Thực thi toàn bộ quy tắc nghiệp vụ Hackathon (ràng buộc 3-5 thành viên/đội, kiểm tra hạn chót, kiểm tra trạng thái phê duyệt).
 3. **Repository (Data Layer)**: Truy xuất cơ sở dữ liệu qua Async SQLAlchemy 2.0 (PostgreSQL / Supabase), hỗ trợ khóa chống tranh chấp `SELECT FOR UPDATE`.
-
----
-
-## 📦 Chuẩn hóa phản hồi (API Envelope Pattern)
-Toàn bộ phản hồi HTTP (cả 2xx thành công lẫn 4xx/5xx lỗi) đều được đóng gói theo định dạng `ApiResponse[T]` thống nhất:
-
-### Thành công (HTTP 200 / 201):
-```json
-{
-  "success": true,
-  "data": { ... },
-  "message": "Thông báo kết quả thao tác thành công"
-}
-```
-
-### Thất bại (HTTP 400 / 401 / 403 / 404 / 409 / 422 / 500):
-```json
-{
-  "success": false,
-  "data": null,
-  "message": "Mô tả chi tiết nguyên nhân lỗi",
-  "error_code": "TEN_MA_LOI_CHUAN_HOA"
-}
-```
-
----
-
-## 🔐 Xác thực & Phân quyền (Authentication & Authorization)
-- **Cơ chế xác thực**: JSON Web Token (JWT) theo chuẩn RFC 7519.
-- **Header gửi kèm**: `Authorization: Bearer <access_token>`
-- **Phương thức đăng nhập**:
-  - Email + Password nội bộ (cho Admin, Judge, Mentor)
-  - GitHub OAuth 2.0 (dành cho Thí sinh - Candidate)
-- **Trạng thái phê duyệt (Approval Status)**:
-  - `pending`: Thí sinh mới đăng ký, chờ BTC phê duyệt.
-  - `approved`: Đã được duyệt hoặc có trong Whitelist, toàn quyền tạo đội & chọn đề tài.
-  - `rejected`: Đơn đăng ký bị từ chối.
-- **Vai trò người dùng (Roles)**:
-  - `admin`: Ban Tổ Chức (toàn quyền quản lý Whitelist, duyệt thí sinh, cấu hình đề tài).
-  - `judge`: Giám khảo chấm thi.
-  - `mentor`: Cố vấn hướng dẫn.
-  - `candidate`: Thí sinh thi đấu (Leader / Member).
-
----
-
-## ⚠️ Bảng mã lỗi chuẩn hóa (Standard Error Codes)
-| Mã lỗi (`error_code`) | HTTP Status | Ý nghĩa & Hướng xử lý cho Frontend |
-|---|---|---|
-| `UNAUTHORIZED` | 401 | Thiếu token hoặc token đã hết hạn/không hợp lệ. Điều hướng về `/login`. |
-| `FORBIDDEN_ROLE` | 403 | Người dùng không đủ quyền RBAC truy cập chức năng này. |
-| `ACCOUNT_NOT_APPROVED` | 403 | Tài khoản chưa được BTC phê duyệt (`approval_status != 'approved'`). |
-| `ALREADY_IN_TEAM` | 400 | Thí sinh đã tham gia một đội thi khác, không thể tạo hoặc tham gia thêm. |
-| `TEAM_FULL` | 400 | Đội thi đã đạt số lượng tối đa 5 thành viên. |
-| `TEAM_NAME_TAKEN` | 400 | Tên đội thi đã được đăng ký trước đó. |
-| `NOT_IN_TEAM` | 400 | Thao tác yêu cầu người dùng phải thuộc một đội thi. |
-| `ONLY_LEADER_CAN_PERFORM`| 403 | Thao tác (như chọn hoặc hủy đề tài) chỉ dành riêng cho Đội trưởng. |
-| `TEAM_NOT_QUALIFIED` | 400 | Đội thi chưa đủ điều kiện (chưa đạt tối thiểu 3 thành viên để đăng ký đề tài). |
-| `TOPIC_FULL` | 409 | Đề tài đã đạt giới hạn quota số đội đăng ký tối đa. |
-| `TOPIC_SELECTION_CLOSED` | 400 | Thời gian đăng ký đề tài đã kết thúc hoặc đề tài tạm khóa. |
-| `TOPIC_ALREADY_SELECTED` | 400 | Đội thi đã chọn một đề tài trước đó (cần hủy đề tài cũ trước). |
-| `CHECKPOINT_NOT_OPEN` | 403 | Cổng nộp bài cho checkpoint này chưa đến giờ mở (`now < start_time`). |
-| `CHECKPOINT_INACTIVE` | 403 | Checkpoint này đang tạm khóa hoặc đã bị vô hiệu hóa bởi Ban tổ chức (`is_active=False`). |
-| `DEADLINE_EXCEEDED` | 403/400 | Đã quá hạn chót cho phép thao tác (chọn đề tài hoặc nộp bài sau Deadline + Grace Period 5s). |
-| `GITHUB_REPO_INACCESSIBLE`| 400 | Repo GitHub nộp bài không công khai hoặc không truy cập được. |
-| `NOT_FOUND` | 404 | Không tìm thấy bản ghi/tài nguyên yêu cầu. |
-| `VALIDATION_ERROR` | 422 | Dữ liệu gửi lên sai kiểu dữ liệu hoặc vi phạm validation rules. |
-
----
-
-## 🗺️ Lộ trình triển khai API (Implementation Status)
-- ✅ **Sprint 1 (Hoàn tất)**:
-  - `HF-17`: Khởi tạo kiến trúc 3 tầng & chuẩn hóa ApiResponse Envelope.
-  - `HF-19`: Xác thực JWT, GitHub OAuth 2.0 Callback, RBAC, Admin Whitelist & Candidate Approval.
-  - `HF-20`: Quản lý Đội thi (Create, Join by 6-char code, Me, Team Detail, giới hạn 3-5 thành viên).
-  - `HF-21`: Quản lý Đề tài thi (List Topics, Quota, Atomic Select `SELECT FOR UPDATE`, Cancel Topic).
-  - `HF-22`: Xuất Swagger Docs & Tài liệu Bàn giao API Contract.
-- 🚀 **Sprint 2 (Đang triển khai)**:
-  - `HF-32`: Lập trình API Checkpoint Time-gated (Mở/Khóa cổng nộp bài, ân hạn mạng 5s) — **Hoàn tất**.
-  - `HF-33`: Lập trình module tích hợp GitHub API xác thực HEAD Commit SHA.
-  - `HF-34`: Lập trình API POST /submissions (Lưu trữ bài nộp) và Audit Log.
-- ⏳ **Sprint 3 (Roadmap sắp tới)**:
-  - Evaluation & Scoring Matrix API (Chấm điểm Rubric cho Giám khảo, xếp hạng tự động).
 """
 
 TAGS_METADATA = [
