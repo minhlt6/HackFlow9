@@ -1,5 +1,20 @@
 import { axiosClient } from '../api/axiosClient';
 
+export interface RubricCriterionInput {
+  title: string;
+  description?: string;
+  max_score?: number;
+  weight: number;
+  is_required?: boolean;
+  display_order?: number;
+  is_active?: boolean;
+}
+
+export interface RubricConfigurePayload {
+  name?: string;
+  criteria: RubricCriterionInput[];
+}
+
 export interface EvaluationCriteriaScore {
   criteria_id: string;
   score: number;
@@ -51,6 +66,38 @@ export const evaluationService = {
   },
 
   /**
+   * Cấu hình toàn bộ danh mục tiêu chí Rubric (Admin only)
+   * POST /api/v1/rubrics
+   */
+  configureRubrics: async (payload: RubricConfigurePayload) => {
+    const response = await axiosClient.post('/rubrics', payload);
+    return response.data;
+  },
+
+  /**
+   * Cập nhật danh mục tiêu chí Rubric (Admin only)
+   * PUT /api/v1/rubrics
+   */
+  updateRubrics: async (payload: RubricConfigurePayload) => {
+    try {
+      const response = await axiosClient.put('/rubrics', payload);
+      return response.data;
+    } catch {
+      return evaluationService.configureRubrics(payload);
+    }
+  },
+
+  /**
+   * Xóa tiêu chí Rubric (Admin only)
+   * DELETE /api/v1/rubrics/{id}
+   */
+  deleteRubrics: async (id?: string) => {
+    const url = id ? `/rubrics/${id}` : '/rubrics';
+    const response = await axiosClient.delete(url);
+    return response.data;
+  },
+
+  /**
    * Lấy danh sách bài nộp ẩn danh (Blind Judging) dành cho Giám khảo
    * GET /api/v1/evaluations/submissions
    */
@@ -91,6 +138,9 @@ export const evaluationService = {
 
 export const {
   getRubrics,
+  configureRubrics,
+  updateRubrics,
+  deleteRubrics,
   getAnonymousSubmissions,
   submitEvaluation,
   getLeaderboard,

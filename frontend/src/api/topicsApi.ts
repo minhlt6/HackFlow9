@@ -106,4 +106,47 @@ export const topicsApi = {
     );
     return response.data.data;
   },
+
+  /**
+   * Tạo đề tài mới (Admin only)
+   * POST /api/v1/topics
+   */
+  createTopic: async (payload: {
+    title: string;
+    description?: string;
+    max_teams?: number;
+    subtopics?: Array<{
+      title: string;
+      description?: string;
+      max_teams?: number;
+    }>;
+  }): Promise<Topic> => {
+    const response = await axiosClient.post<ApiResponse<Topic>>('/topics', payload);
+    return response.data.data;
+  },
+
+  /**
+   * Cập nhật thông tin/quota đề tài (Admin only)
+   * PUT /api/v1/topics/{id}
+   */
+  updateTopic: async (
+    id: string,
+    payload: {
+      title?: string;
+      description?: string;
+      max_teams?: number;
+      is_active?: boolean;
+    }
+  ): Promise<Topic> => {
+    const response = await axiosClient.put<ApiResponse<Topic>>(`/topics/${id}`, payload);
+    return response.data.data;
+  },
+
+  /**
+   * Xóa đề tài (Admin only)
+   * DELETE /api/v1/topics/{id}
+   */
+  deleteTopic: async (id: string): Promise<void> => {
+    await axiosClient.delete(`/topics/${id}`);
+  },
 };

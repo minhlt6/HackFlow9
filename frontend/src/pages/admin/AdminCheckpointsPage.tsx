@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
@@ -24,10 +25,18 @@ import {
   File,
   X,
   ListChecks,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import type { Checkpoint, SubmissionFieldConfig, SubmissionFieldType } from '../../types';
 import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
+import {
+  checkpointApi,
+  type CheckpointCreatePayload,
+  type CheckpointUpdatePayload,
+} from '../../api/checkpointApi';
 
 const DEFAULT_SUBMISSION_FIELDS: SubmissionFieldConfig[] = [
   {
@@ -220,7 +229,7 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-2">
           <ListChecks size={16} className="text-primary" />
-          <h4 className="font-semibold tracking-tight text-foreground text-sm text-foreground tracking-wide">
+          <h4 className="font-semibold tracking-tight text-foreground text-sm tracking-wide">
             Cấu Hình Yêu Cầu Nộp Bài Cho Thí Sinh
           </h4>
         </div>
@@ -242,7 +251,7 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
                 key={tmpl.type}
                 type="button"
                 onClick={() => handleAddField(tmpl)}
-                className="px-3 py-1.5 rounded-[8px] text-xs font-medium bg-card hover:bg-accent text-foreground hover:text-foreground border border-border hover:border-[#6366F1]/60 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+                className="px-3 py-1.5 rounded-[8px] text-xs font-medium bg-card hover:bg-accent text-foreground border border-border hover:border-[#6366F1]/60 flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
               >
                 <Icon size={13} className="text-primary" />
                 <span>+ {tmpl.label}</span>
@@ -405,18 +414,41 @@ const SubmissionFieldsEditor: React.FC<SubmissionFieldsEditorProps> = ({
   );
 };
 
+interface RawFieldConfig {
+  field_key?: string;
+  field_label?: string;
+  label?: string;
+  required?: boolean;
+  apply_sha_freeze?: boolean;
+  description?: string;
+}
+
+interface RawCheckpoint {
+  id?: string;
+  title?: string;
+  name?: string;
+  description?: string;
+  start_time?: string;
+  deadline?: string;
+  requirements?: string | string[];
+  weight?: number;
+  is_active?: boolean;
+  status?: string;
+  submission_fields?: RawFieldConfig[];
+}
+
 export const AdminCheckpointsPage: React.FC = () => {
   const {
     config,
     checkpoints,
     submissions,
     teams,
-    updateCheckpoint,
-    addCheckpoint,
-    deleteCheckpoint,
     reorderCheckpoints,
     sortCheckpointsByDeadline,
   } = useMockStore();
+
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const [editingCp, setEditingCp] = useState<Checkpoint | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -426,7 +458,100 @@ export const AdminCheckpointsPage: React.FC = () => {
   const [editRequirements, setEditRequirements] = useState<string[]>([]);
   const [editSubmissionFields, setEditSubmissionFields] = useState<SubmissionFieldConfig[]>([]);
   const [editReqInput, setEditReqInput] = useState('');
-  const [alert, setAlert] = useState<string | null>(null);
+  const [alert, setAlert] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'success', duration = 4000) => {
+    setAlert({ type, message });
+    setTimeout(() => {
+      setAlert((curr) => (curr?.message === message ? null : curr));
+    }, duration);
+  };
+
+  const mapCheckpoints = (data: RawCheckpoint[]): Checkpoint[] => {
+    return data.map((cp, index: number) => {
+      let reqs: string[] = [];
+      if (Array.isArray(cp.requirements)) {
+        reqs = cp.requirements;
+      } else if (typeof cp.requirements === 'string') {
+        reqs = cp.requirements.split('\n').map((s: string) => s.trim()).filter(Boolean);
+      }
+
+      const start = cp.start_time ? new Date(cp.start_time).getTime() : Date.now();
+      const end = cp.deadline ? new Date(cp.deadline).getTime() : start + 180 * 60 * 1000;
+      const durationMinutes = Math.max(15, Math.round((end - start) / (60 * 1000))) || 180;
+
+      let fields: SubmissionFieldConfig[] = DEFAULT_SUBMISSION_FIELDS;
+      if (Array.isArray(cp.submission_fields) && cp.submission_fields.length > 0) {
+        fields = cp.submission_fields.map((f, fIdx: number) => ({
+          id: f.field_key || `f-${fIdx}`,
+          type: (f.apply_sha_freeze || f.field_key === 'repo_url')
+            ? 'repoUrl'
+            : f.field_key === 'demo_url'
+            ? 'demoUrl'
+            : f.field_key === 'presentation_pdf' || f.field_key === 'slide_url'
+            ? 'slideUrl'
+            : 'description',
+          label: f.field_label || f.label || 'Hạng mục nộp',
+          placeholder: '',
+          required: Boolean(f.required),
+          description: f.description || '',
+        }));
+      }
+
+      return {
+        id: String(cp.id || `cp-${index + 1}`),
+        title: cp.title || cp.name || `Checkpoint ${index + 1}`,
+        description: cp.description || '',
+        durationMinutes,
+        weight: cp.weight || 25,
+        requirements: reqs.length > 0 ? reqs : ['Kho mã nguồn GitHub', 'Tài liệu kiến trúc hệ thống'],
+        submissionFields: fields,
+        deadline: cp.deadline || new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
+        startTime: cp.start_time || new Date().toISOString(),
+        status: (cp.status as 'upcoming' | 'open' | 'closed') || (cp.is_active ? 'open' : 'closed'),
+      };
+    });
+  };
+
+  // Fetch Checkpoints from Backend
+  const loadCheckpoints = useCallback(async () => {
+    try {
+      const data = await checkpointApi.getCheckpoints();
+      if (Array.isArray(data) && data.length > 0) {
+        const mapped = mapCheckpoints(data as RawCheckpoint[]);
+        useMockStore.setState({ checkpoints: mapped });
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        if (err.response) {
+          showAlert(err.response.data?.message || 'Không thể tải danh sách chặng nộp từ máy chủ.', 'error');
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    checkpointApi
+      .getCheckpoints()
+      .then((data) => {
+        if (!ignore && Array.isArray(data) && data.length > 0) {
+          const mapped = mapCheckpoints(data as RawCheckpoint[]);
+          useMockStore.setState({ checkpoints: mapped });
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore && axios.isAxiosError(err) && err.response) {
+          showAlert(err.response.data?.message || 'Không thể tải danh sách chặng nộp từ máy chủ.', 'error');
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   // New Checkpoint modal state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -529,66 +654,152 @@ export const AdminCheckpointsPage: React.FC = () => {
     setEditReqInput('');
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCp) return;
 
-    updateCheckpoint(editingCp.id, {
-      title: editTitle.trim(),
-      description: editDescription.trim(),
-      durationMinutes: Number(editDurationMinutes),
-      weight: Number(editWeight),
-      requirements: editRequirements,
-      submissionFields: editSubmissionFields,
-    });
+    setSubmitting(true);
+    try {
+      const now = new Date();
+      const deadlineDate = new Date(now.getTime() + Number(editDurationMinutes) * 60 * 1000);
 
-    setEditingCp(null);
-    setAlert(`Đã cập nhật chặng nộp "${editTitle}" thành công!`);
-    setTimeout(() => setAlert(null), 3000);
+      const payload: CheckpointUpdatePayload = {
+        title: editTitle.trim(),
+        description: editDescription.trim() || undefined,
+        deadline: deadlineDate.toISOString(),
+        requirements: editRequirements.join('\n'),
+        is_final_checkpoint: editSubmissionFields.some((f) => f.type === 'repoUrl' && f.required),
+        submission_fields: editSubmissionFields.map((f) => ({
+          field_key: f.type === 'repoUrl' ? 'repo_url' : f.type === 'demoUrl' ? 'demo_url' : f.id,
+          field_label: f.label,
+          required: f.required,
+          apply_sha_freeze: f.type === 'repoUrl',
+        })),
+      };
+
+      await checkpointApi.updateCheckpoint(editingCp.id, payload);
+      await loadCheckpoints();
+      setEditingCp(null);
+      showAlert(`Đã cập nhật chặng nộp "${editTitle}" thành công lên máy chủ!`, 'success');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        if (!err.response) {
+          // Offline fallback
+          useMockStore.getState().updateCheckpoint(editingCp.id, {
+            title: editTitle.trim(),
+            description: editDescription.trim(),
+            durationMinutes: Number(editDurationMinutes),
+            weight: Number(editWeight),
+            requirements: editRequirements,
+            submissionFields: editSubmissionFields,
+          });
+          setEditingCp(null);
+          showAlert('Mất kết nối máy chủ: Đã cập nhật tạm vào bộ nhớ cục bộ.', 'info');
+          return;
+        }
+        const msg = err.response.data?.message || 'Có lỗi xảy ra khi cập nhật chặng nộp bài.';
+        showAlert(msg, 'error');
+      } else {
+        showAlert('Đã xảy ra lỗi không xác định khi cập nhật.', 'error');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    const insertIndex = insertPosition === 'end' ? undefined : Number(insertPosition);
+    setSubmitting(true);
+    try {
+      const now = new Date();
+      const deadlineDate = new Date(now.getTime() + Number(newDurationMinutes) * 60 * 1000);
 
-    addCheckpoint(
-      {
+      const payload: CheckpointCreatePayload = {
         title: newTitle.trim(),
-        description: newDescription.trim(),
-        durationMinutes: Number(newDurationMinutes),
-        weight: Number(newWeight),
-        requirements: newRequirements,
-        submissionFields: newSubmissionFields,
-        deadline: new Date(Date.now() + Number(newDurationMinutes) * 60 * 1000).toISOString(),
-      },
-      insertIndex,
-    );
+        description: newDescription.trim() || undefined,
+        start_time: now.toISOString(),
+        deadline: deadlineDate.toISOString(),
+        requirements: newRequirements.join('\n'),
+        is_active: true,
+        is_final_checkpoint: newSubmissionFields.some((f) => f.type === 'repoUrl' && f.required),
+        grace_period_seconds: 5,
+        submission_fields: newSubmissionFields.map((f) => ({
+          field_key: f.type === 'repoUrl' ? 'repo_url' : f.type === 'demoUrl' ? 'demo_url' : f.id,
+          field_label: f.label,
+          required: f.required,
+          apply_sha_freeze: f.type === 'repoUrl',
+        })),
+      };
 
-    setIsAddOpen(false);
-    setNewTitle('');
-    setNewDescription('');
-    setNewDurationMinutes(180);
-    setNewWeight(25);
-    setNewRequirements([]);
-    setNewSubmissionFields([]);
-    setInsertPosition('end');
-    setAlert(`Đã thêm chặng nộp "${newTitle}" vào đúng vị trí thứ tự thành công!`);
-    setTimeout(() => setAlert(null), 3000);
+      await checkpointApi.createCheckpoint(payload);
+      await loadCheckpoints();
+
+      setIsAddOpen(false);
+      setNewTitle('');
+      setNewDescription('');
+      setNewDurationMinutes(180);
+      setNewWeight(25);
+      setNewRequirements([]);
+      setNewSubmissionFields([]);
+      setInsertPosition('end');
+      showAlert(`Đã tạo chặng nộp "${newTitle}" thành công lên máy chủ!`, 'success');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        if (!err.response) {
+          // Offline fallback
+          const insertIndex = insertPosition === 'end' ? undefined : Number(insertPosition);
+          useMockStore.getState().addCheckpoint(
+            {
+              title: newTitle.trim(),
+              description: newDescription.trim(),
+              durationMinutes: Number(newDurationMinutes),
+              weight: Number(newWeight),
+              requirements: newRequirements,
+              submissionFields: newSubmissionFields,
+              deadline: new Date(Date.now() + Number(newDurationMinutes) * 60 * 1000).toISOString(),
+            },
+            insertIndex
+          );
+          setIsAddOpen(false);
+          showAlert('Mất kết nối máy chủ: Đã lưu tạm chặng nộp vào bộ nhớ cục bộ.', 'info');
+          return;
+        }
+        const msg = err.response.data?.message || 'Có lỗi xảy ra khi tạo chặng nộp bài.';
+        showAlert(msg, 'error');
+      } else {
+        showAlert('Đã xảy ra lỗi không xác định khi tạo chặng nộp.', 'error');
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDelete = (id: string, title?: string) => {
+  const handleDelete = async (id: string, title?: string) => {
     const displayTitle = title || 'chặng nộp này';
-    if (window.confirm(`Bạn có chắc muốn xóa chặng nộp "${displayTitle}"?`)) {
-      deleteCheckpoint(id);
-      setAlert(`Đã xóa chặng nộp "${displayTitle}".`);
-      setTimeout(() => setAlert(null), 3000);
+    if (window.confirm(`Bạn có chắc muốn xóa/vô hiệu hóa chặng nộp "${displayTitle}"?`)) {
+      try {
+        await checkpointApi.deleteCheckpoint(id);
+        await loadCheckpoints();
+        showAlert(`Đã xóa chặng nộp "${displayTitle}".`, 'success');
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+          if (!err.response) {
+            useMockStore.getState().deleteCheckpoint(id);
+            showAlert(`Đã xóa chặng nộp "${displayTitle}" trong bộ nhớ cục bộ.`, 'info');
+            return;
+          }
+          showAlert(err.response.data?.message || 'Không thể xóa chặng nộp.', 'error');
+        } else {
+          showAlert('Có lỗi xảy ra khi xóa chặng nộp.', 'error');
+        }
+      }
     }
   };
 
   return (
-    <div className="space-y-6  w-full">
+    <div className="space-y-6 w-full">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
@@ -596,9 +807,7 @@ export const AdminCheckpointsPage: React.FC = () => {
             <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#6366F1]/20 border border-[#6366F1]/40 text-primary">
               <CheckSquare size={20} />
             </div>
-            <h1
-              className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
-            >
+            <h1 className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide">
               Cấu Hình Chặng Nộp và Thời Lượng
             </h1>
           </div>
@@ -608,6 +817,21 @@ export const AdminCheckpointsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setLoading(true);
+              void loadCheckpoints();
+            }}
+            disabled={loading}
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            title="Tải lại danh sách chặng nộp từ Backend"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Làm mới</span>
+          </Button>
+
           <Badge variant={config.isContestStarted ? 'success' : 'warning'} className="gap-1.5 py-1 px-3">
             <span
               className={`w-2 h-2 rounded-full ${
@@ -624,8 +848,7 @@ export const AdminCheckpointsPage: React.FC = () => {
               variant="secondary"
               onClick={() => {
                 sortCheckpointsByDeadline();
-                setAlert('Đã tự động sắp xếp lại các chặng theo mốc thời hạn (Deadline từ sớm đến muộn)!');
-                setTimeout(() => setAlert(null), 3000);
+                showAlert('Đã tự động sắp xếp lại các chặng theo mốc thời hạn (Deadline từ sớm đến muộn)!', 'info');
               }}
               className="gap-2 text-xs"
               title="Tự động sắp xếp các chặng theo thời hạn deadline từ sớm đến muộn"
@@ -643,15 +866,29 @@ export const AdminCheckpointsPage: React.FC = () => {
       </div>
 
       {alert && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/40 text-xs sm:text-sm text-emerald-700 dark:text-emerald-400 flex items-center justify-between shadow-lg shadow-emerald-950/20 animate-in fade-in">
+        <div
+          className={`p-3.5 rounded-[10px] border text-xs sm:text-sm flex items-center justify-between shadow-lg animate-in fade-in ${
+            alert.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-400'
+              : alert.type === 'error'
+              ? 'bg-rose-500/10 border-rose-500/40 text-rose-700 dark:text-rose-400'
+              : 'bg-sky-500/10 border-sky-500/40 text-sky-700 dark:text-sky-400'
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
-            <span>{alert}</span>
+            {alert.type === 'success' ? (
+              <CheckCircle2 size={16} className="shrink-0" />
+            ) : alert.type === 'error' ? (
+              <AlertCircle size={16} className="shrink-0" />
+            ) : (
+              <Sparkles size={16} className="shrink-0" />
+            )}
+            <span>{alert.message}</span>
           </div>
           <button
             type="button"
             onClick={() => setAlert(null)}
-            className="text-emerald-700 dark:text-emerald-400 hover:text-emerald-200 text-xs cursor-pointer"
+            className="hover:underline text-xs cursor-pointer ml-3 shrink-0"
           >
             Đóng
           </button>
@@ -660,14 +897,19 @@ export const AdminCheckpointsPage: React.FC = () => {
 
       {/* Checkpoints Cards */}
       <div className="space-y-4">
-        {checkpoints.length === 0 ? (
+        {loading && checkpoints.length === 0 ? (
+          <div className="rounded-[16px] border border-border bg-card p-10 text-center space-y-3">
+            <Loader2 size={32} className="mx-auto text-primary animate-spin" />
+            <p className="text-xs text-muted-foreground">Đang tải danh sách các mốc Checkpoint từ máy chủ...</p>
+          </div>
+        ) : checkpoints.length === 0 ? (
           <div className="rounded-[16px] border border-border bg-card p-10 text-center space-y-3">
             <CheckSquare size={36} className="mx-auto text-muted-foreground" />
             <h3 className="font-bold text-foreground text-base">Chưa có chặng nộp bài nào</h3>
             <p className="text-xs text-muted-foreground max-w-md mx-auto">
               Hệ thống hiện đang ở trạng thái sạch. Hãy bấm nút "Thêm Chặng Nộp Mới" để thiết lập các mốc nộp bài cho cuộc thi.
             </p>
-            <Button variant="primary" onClick={() => setIsAddOpen(true)} className="gap-2 mt-2">
+            <Button variant="primary" onClick={handleOpenAdd} className="gap-2 mt-2">
               <Plus size={16} />
               <span>Tạo Chặng Nộp Đầu Tiên</span>
             </Button>
@@ -692,8 +934,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                         disabled={idx === 0}
                         onClick={() => {
                           reorderCheckpoints(idx, idx - 1);
-                          setAlert(`Đã chuyển chặng "${cp.title}" lên vị trí #${idx}!`);
-                          setTimeout(() => setAlert(null), 2500);
+                          showAlert(`Đã chuyển chặng "${cp.title}" lên vị trí #${idx}!`, 'info', 2500);
                         }}
                         className="p-1 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all"
                         title={idx === 0 ? 'Đã ở vị trí đầu tiên' : `Di chuyển lên vị trí #${idx}`}
@@ -708,8 +949,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                         disabled={idx === checkpoints.length - 1}
                         onClick={() => {
                           reorderCheckpoints(idx, idx + 1);
-                          setAlert(`Đã chuyển chặng "${cp.title}" xuống vị trí #${idx + 2}!`);
-                          setTimeout(() => setAlert(null), 2500);
+                          showAlert(`Đã chuyển chặng "${cp.title}" xuống vị trí #${idx + 2}!`, 'info', 2500);
                         }}
                         className="p-1 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all"
                         title={idx === checkpoints.length - 1 ? 'Đã ở vị trí cuối cùng' : `Di chuyển xuống vị trí #${idx + 2}`}
@@ -718,7 +958,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                       </button>
                     </div>
 
-                    <h3 className="font-semibold tracking-tight text-foreground text-lg sm:text-xl text-foreground">{cp.title}</h3>
+                    <h3 className="font-semibold tracking-tight text-foreground text-lg sm:text-xl">{cp.title}</h3>
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -731,6 +971,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => handleEdit(cp)}
+                      disabled={submitting}
                       className="gap-1.5"
                     >
                       <Edit2 size={13} />
@@ -740,6 +981,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                       variant="danger"
                       size="sm"
                       onClick={() => handleDelete(cp.id, cp.title)}
+                      disabled={submitting}
                       className="gap-1.5"
                       title="Xóa chặng này"
                     >
@@ -850,7 +1092,7 @@ export const AdminCheckpointsPage: React.FC = () => {
         title="Thêm Chặng Nộp Mới & Cấu Hình Yêu Cầu Bài Nộp"
         maxWidth="4xl"
       >
-        <form onSubmit={handleAdd} className="space-y-4 ">
+        <form onSubmit={handleAdd} className="space-y-4">
           {/* Top Row: Title & Weight */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
             <div className="sm:col-span-8">
@@ -986,11 +1228,12 @@ export const AdminCheckpointsPage: React.FC = () => {
 
           {/* Sticky Modal Action Buttons */}
           <div className="sticky bottom-0 bg-card backdrop-blur-sm -mx-6 -mb-6 px-6 py-4 border-t border-border flex justify-end gap-3 z-10 rounded-b-[16px]">
-            <Button variant="ghost" type="button" onClick={handleCloseAdd}>
+            <Button variant="ghost" type="button" onClick={handleCloseAdd} disabled={submitting}>
               Hủy
             </Button>
-            <Button variant="primary" type="submit">
-              Tạo Chặng Nộp
+            <Button variant="primary" type="submit" disabled={submitting} className="gap-2">
+              {submitting && <Loader2 size={14} className="animate-spin" />}
+              <span>{submitting ? 'Đang tạo...' : 'Tạo Chặng Nộp'}</span>
             </Button>
           </div>
         </form>
@@ -1003,7 +1246,7 @@ export const AdminCheckpointsPage: React.FC = () => {
         title={`Chỉnh Sửa Chặng & Cấu Hình Yêu Cầu: ${editingCp?.title || ''}`}
         maxWidth="4xl"
       >
-        <form onSubmit={handleSave} className="space-y-4 ">
+        <form onSubmit={handleSave} className="space-y-4">
           {/* Top Row: Title & Weight */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
             <div className="sm:col-span-8">
@@ -1104,11 +1347,12 @@ export const AdminCheckpointsPage: React.FC = () => {
 
           {/* Sticky Modal Action Buttons */}
           <div className="sticky bottom-0 bg-card backdrop-blur-sm -mx-6 -mb-6 px-6 py-4 border-t border-border flex justify-end gap-3 z-10 rounded-b-[16px]">
-            <Button variant="ghost" type="button" onClick={handleCloseEdit}>
+            <Button variant="ghost" type="button" onClick={handleCloseEdit} disabled={submitting}>
               Hủy
             </Button>
-            <Button variant="primary" type="submit">
-              Lưu Thay Đổi
+            <Button variant="primary" type="submit" disabled={submitting} className="gap-2">
+              {submitting && <Loader2 size={14} className="animate-spin" />}
+              <span>{submitting ? 'Đang lưu...' : 'Lưu Thay Đổi'}</span>
             </Button>
           </div>
         </form>

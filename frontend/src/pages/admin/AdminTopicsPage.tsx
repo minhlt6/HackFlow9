@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import axios from 'axios';
 import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
@@ -11,11 +12,102 @@ import {
   Trash2,
   Users,
   CheckCircle2,
+  RefreshCw,
+  Loader2,
+  AlertCircle,
+  Sparkles,
 } from 'lucide-react';
+import { topicsApi } from '../../api/topicsApi';
+import type { MajorTopic, SubTopic } from '../../types';
 
 export const AdminTopicsPage: React.FC = () => {
   const { majorTopics, addMajorTopic, deleteMajorTopic, addSubTopic, updateSubTopicQuota } =
     useMockStore();
+
+  const [loading, setLoading] = useState(false);
+  const [alert, setAlert] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'success', duration = 3500) => {
+    setAlert({ type, message });
+    setTimeout(() => {
+      setAlert((curr) => (curr?.message === message ? null : curr));
+    }, duration);
+  };
+
+  const mapTopics = (data: Array<{
+    id: string;
+    title: string;
+    description?: string | null;
+    subtopics?: Array<{
+      id: string;
+      title: string;
+      description?: string | null;
+      max_teams: number;
+      current_teams: number;
+      is_active: boolean;
+    }>;
+  }>): MajorTopic[] => {
+    return data.map((t) => {
+      const subTopics: SubTopic[] = (t.subtopics || []).map((s) => ({
+        id: String(s.id),
+        majorTopicId: String(t.id),
+        title: s.title,
+        description: s.description || '',
+        quota: s.max_teams,
+        maxTeamsQuota: s.max_teams,
+        registeredTeamsCount: s.current_teams,
+        currentTeams: s.current_teams,
+        status: s.is_active ? 'OPEN' : 'CLOSED',
+      }));
+
+      return {
+        id: String(t.id),
+        title: t.title,
+        description: t.description || '',
+        subTopics,
+      };
+    });
+  };
+
+  // Fetch real topics from backend API
+  const fetchTopics = useCallback(async () => {
+    try {
+      const data = await topicsApi.getTopics();
+      if (Array.isArray(data) && data.length > 0) {
+        const mapped = mapTopics(data);
+        useMockStore.setState({ majorTopics: mapped });
+      }
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        if (err.response) {
+          showAlert(err.response.data?.message || 'Không thể tải danh sách đề tài từ máy chủ.', 'error');
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let ignore = false;
+    topicsApi
+      .getTopics()
+      .then((data) => {
+        if (!ignore && Array.isArray(data) && data.length > 0) {
+          const mapped = mapTopics(data);
+          useMockStore.setState({ majorTopics: mapped });
+        }
+      })
+      .catch((err: unknown) => {
+        if (!ignore && axios.isAxiosError(err) && err.response) {
+          showAlert(err.response.data?.message || 'Không thể tải danh sách đề tài từ máy chủ.', 'error');
+        }
+      });
+
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   // Major Topic Modal
   const [isAddMajorOpen, setIsAddMajorOpen] = useState(false);
@@ -33,65 +125,146 @@ export const AdminTopicsPage: React.FC = () => {
   // Edit Quota Modal
   const [editingSubTopic, setEditingSubTopic] = useState<{ id: string; title: string; quota: number } | null>(null);
   const [newQuotaValue, setNewQuotaValue] = useState(3);
-  const [alert, setAlert] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleAddMajor = (e: React.FormEvent) => {
+  const handleAddMajor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!majorTitle.trim()) return;
 
-    addMajorTopic(majorTitle.trim(), majorDescription.trim());
+    setIsSubmitting(true);
+    try {
+      await topicsApi.createTopic({
+        title: majorTitle.trim(),
+        description: majorDescription.trim() || undefined,
+      });
+      await fetchTopics();
+      showAlert(`Đã thêm lĩnh vực đề tài lớn "${majorTitle}" thành công lên máy chủ!`, 'success');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        if (!err.response) {
+          addMajorTopic(majorTitle.trim(), majorDescription.trim());
+          showAlert(`Đã thêm lĩnh vực đề tài lớn "${majorTitle}" vào bộ nhớ cục bộ (ngoại tuyến).`, 'info');
+        } else {
+          showAlert(err.response.data?.message || 'Có lỗi xảy ra khi tạo lĩnh vực đề tài.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        addMajorTopic(majorTitle.trim(), majorDescription.trim());
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+
     setIsAddMajorOpen(false);
     setMajorTitle('');
     setMajorDescription('');
-    setAlert(`Đã thêm lĩnh vực đề tài lớn "${majorTitle}" thành công!`);
-    setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleDeleteMajor = (id: string, name?: string) => {
+  const handleDeleteMajor = async (id: string, name?: string) => {
     const displayName = name || 'lĩnh vực này';
     if (window.confirm(`Bạn có chắc muốn xóa lĩnh vực "${displayName}" cùng toàn bộ đề tài nhánh?`)) {
-      deleteMajorTopic(id);
-      setAlert(`Đã xóa lĩnh vực "${displayName}".`);
-      setTimeout(() => setAlert(null), 3000);
+      try {
+        await topicsApi.deleteTopic(id);
+        await fetchTopics();
+        showAlert(`Đã xóa lĩnh vực "${displayName}".`, 'success');
+      } catch (err: unknown) {
+        if (axios.isAxiosError(err)) {
+          if (!err.response) {
+            deleteMajorTopic(id);
+            showAlert(`Đã xóa lĩnh vực "${displayName}" trong bộ nhớ cục bộ.`, 'info');
+          } else {
+            showAlert(err.response.data?.message || 'Có lỗi xảy ra khi xóa đề tài.', 'error');
+          }
+        } else {
+          deleteMajorTopic(id);
+        }
+      }
     }
   };
 
-  const handleAddSubTopic = (e: React.FormEvent) => {
+  const handleAddSubTopic = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !selectedMajorId) return;
 
-    addSubTopic(selectedMajorId, {
-      title: title.trim(),
-      description: description.trim(),
-      quota,
-      mentorName: mentorName.trim(),
-    });
+    setIsSubmitting(true);
+    try {
+      await topicsApi.createTopic({
+        title: title.trim(),
+        description: description.trim() || undefined,
+        max_teams: quota,
+      });
+      await fetchTopics();
+      showAlert(`Đã thêm đề tài nhánh mới "${title}" thành công lên máy chủ!`, 'success');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        if (!err.response) {
+          addSubTopic(selectedMajorId, {
+            title: title.trim(),
+            description: description.trim(),
+            quota,
+            mentorName: mentorName.trim(),
+          });
+          showAlert(`Đã thêm đề tài nhánh mới "${title}" vào bộ nhớ cục bộ.`, 'info');
+        } else {
+          showAlert(err.response.data?.message || 'Có lỗi xảy ra khi tạo đề tài con.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        addSubTopic(selectedMajorId, {
+          title: title.trim(),
+          description: description.trim(),
+          quota,
+          mentorName: mentorName.trim(),
+        });
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
 
     setIsAddOpen(false);
     setTitle('');
     setDescription('');
-    setAlert(`Đã thêm đề tài nhánh mới "${title}" thành công!`);
-    setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleSaveQuota = (e: React.FormEvent) => {
+  const handleSaveQuota = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSubTopic) return;
 
-    updateSubTopicQuota(editingSubTopic.id, newQuotaValue);
+    setIsSubmitting(true);
+    try {
+      await topicsApi.updateTopic(editingSubTopic.id, {
+        max_teams: newQuotaValue,
+      });
+      await fetchTopics();
+      showAlert('Đã cập nhật chỉ tiêu Quota thành công lên máy chủ!', 'success');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        if (!err.response) {
+          updateSubTopicQuota(editingSubTopic.id, newQuotaValue);
+          showAlert('Đã cập nhật chỉ tiêu Quota trong bộ nhớ cục bộ.', 'info');
+        } else {
+          showAlert(err.response.data?.message || 'Có lỗi xảy ra khi cập nhật hạn ngạch quota.', 'error');
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        updateSubTopicQuota(editingSubTopic.id, newQuotaValue);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+
     setEditingSubTopic(null);
-    setAlert('Đã cập nhật chỉ tiêu Quota thành công!');
-    setTimeout(() => setAlert(null), 3000);
   };
 
   return (
-    <div className="space-y-6 ">
+    <div className="space-y-6">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
-          <h1
-            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
-          >
+          <h1 className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide">
             Quản Lý Đề Tài và Hạn Ngạch Đội
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
@@ -100,10 +273,26 @@ export const AdminTopicsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setLoading(true);
+              void fetchTopics();
+            }}
+            disabled={loading}
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            title="Tải lại danh sách đề tài từ máy chủ Backend"
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            <span>Làm mới</span>
+          </Button>
+
           <Button variant="secondary" onClick={() => setIsAddMajorOpen(true)} className="gap-2">
             <Plus size={16} />
             <span>Thêm Lĩnh Vực Lớn</span>
           </Button>
+
           <Button
             variant="primary"
             onClick={() => {
@@ -123,15 +312,43 @@ export const AdminTopicsPage: React.FC = () => {
       </div>
 
       {alert && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
-          <CheckCircle2 size={15} />
-          <span>{alert}</span>
+        <div
+          className={`p-3.5 rounded-[10px] border text-xs sm:text-sm flex items-center justify-between shadow-lg animate-in fade-in ${
+            alert.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+              : alert.type === 'error'
+              ? 'bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400'
+              : 'bg-sky-500/10 border-sky-500/30 text-sky-700 dark:text-sky-400'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {alert.type === 'success' ? (
+              <CheckCircle2 size={16} className="shrink-0" />
+            ) : alert.type === 'error' ? (
+              <AlertCircle size={16} className="shrink-0" />
+            ) : (
+              <Sparkles size={16} className="shrink-0" />
+            )}
+            <span>{alert.message}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAlert(null)}
+            className="hover:underline text-xs cursor-pointer ml-3 shrink-0"
+          >
+            Đóng
+          </button>
         </div>
       )}
 
       {/* Major Topics List */}
       <div className="space-y-6">
-        {majorTopics.length === 0 ? (
+        {loading && majorTopics.length === 0 ? (
+          <div className="rounded-[16px] border border-border bg-card p-10 text-center space-y-3">
+            <Loader2 size={32} className="mx-auto text-primary animate-spin" />
+            <p className="text-xs text-muted-foreground">Đang tải danh sách đề tài và quota từ máy chủ...</p>
+          </div>
+        ) : majorTopics.length === 0 ? (
           <div className="rounded-[16px] border border-border bg-card p-10 text-center space-y-3">
             <Lightbulb size={36} className="mx-auto text-muted-foreground" />
             <h3 className="font-bold text-foreground text-base">Chưa có đề tài nào</h3>
@@ -155,7 +372,7 @@ export const AdminTopicsPage: React.FC = () => {
                     <Lightbulb size={20} />
                   </div>
                   <div>
-                    <h2 className="font-semibold tracking-tight text-foreground text-xl text-foreground">
+                    <h2 className="font-semibold tracking-tight text-foreground text-xl">
                       {(major.title || major.name || '').replace(/\s*&\s*/g, ' và ')}
                     </h2>
                     <p className="text-xs text-muted-foreground">{major.description}</p>
@@ -277,11 +494,12 @@ export const AdminTopicsPage: React.FC = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-3">
-            <Button variant="ghost" type="button" onClick={() => setIsAddMajorOpen(false)}>
+            <Button variant="ghost" type="button" onClick={() => setIsAddMajorOpen(false)} disabled={isSubmitting}>
               Hủy
             </Button>
-            <Button variant="primary" type="submit">
-              Tạo Lĩnh Vực
+            <Button variant="primary" type="submit" disabled={isSubmitting} className="gap-2">
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              <span>{isSubmitting ? 'Đang tạo...' : 'Tạo Lĩnh Vực'}</span>
             </Button>
           </div>
         </form>
@@ -348,11 +566,12 @@ export const AdminTopicsPage: React.FC = () => {
           </div>
 
           <div className="flex justify-end gap-3 pt-3">
-            <Button variant="ghost" type="button" onClick={() => setIsAddOpen(false)}>
+            <Button variant="ghost" type="button" onClick={() => setIsAddOpen(false)} disabled={isSubmitting}>
               Hủy
             </Button>
-            <Button variant="primary" type="submit">
-              Lưu Đề Tài
+            <Button variant="primary" type="submit" disabled={isSubmitting} className="gap-2">
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              <span>{isSubmitting ? 'Đang lưu...' : 'Lưu Đề Tài'}</span>
             </Button>
           </div>
         </form>
@@ -380,11 +599,12 @@ export const AdminTopicsPage: React.FC = () => {
           />
 
           <div className="flex justify-end gap-3 pt-2">
-            <Button variant="ghost" type="button" onClick={() => setEditingSubTopic(null)}>
+            <Button variant="ghost" type="button" onClick={() => setEditingSubTopic(null)} disabled={isSubmitting}>
               Hủy
             </Button>
-            <Button variant="primary" type="submit">
-              Cập nhật Quota
+            <Button variant="primary" type="submit" disabled={isSubmitting} className="gap-2">
+              {isSubmitting && <Loader2 size={14} className="animate-spin" />}
+              <span>{isSubmitting ? 'Đang cập nhật...' : 'Cập nhật Quota'}</span>
             </Button>
           </div>
         </form>

@@ -6,6 +6,30 @@ import type {
   Submission,
 } from '../types/checkpoint';
 
+export interface CheckpointCreatePayload {
+  title: string;
+  description?: string;
+  start_time: string;
+  deadline: string;
+  requirements?: string;
+  is_active?: boolean;
+  is_final_checkpoint?: boolean;
+  grace_period_seconds?: number;
+  submission_fields?: Record<string, unknown>[];
+}
+
+export interface CheckpointUpdatePayload {
+  title?: string;
+  description?: string;
+  start_time?: string;
+  deadline?: string;
+  requirements?: string;
+  is_active?: boolean;
+  is_final_checkpoint?: boolean;
+  grace_period_seconds?: number;
+  submission_fields?: Record<string, unknown>[];
+}
+
 // Mock data ban đầu nếu backend chưa triển khai endpoint Checkpoint (theo chuẩn SRS HF-23)
 const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
   {
@@ -17,7 +41,7 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
     deadline: '2026-10-08T23:59:59.000Z',
     requirements: 'Tài liệu PRD/SRS và link Figma hoặc Wireframe sơ bộ.',
     is_active: false,
-    is_final_checkpoint: false, // Chặng tiến độ trung gian: không bắt buộc repo, không đóng băng SHA
+    is_final_checkpoint: false,
     grace_period_seconds: 5,
     status: 'closed',
     is_open: false,
@@ -36,7 +60,7 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
       team_id: 'team-01',
       repo_url: null,
       demo_url: 'https://figma.com/@cybersamurai/hackflow',
-      commit_sha: null, // Chặng trung gian không đóng băng SHA
+      commit_sha: null,
       status: 'evaluated',
       grace_period_applied: false,
       submitted_at: '2026-10-08T21:15:30.000Z',
@@ -53,7 +77,7 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
     deadline: new Date(Date.now() + (2 * 24 * 3600 + 4 * 3600) * 1000).toISOString(),
     requirements: 'Link báo cáo tiến độ, tài liệu kiến trúc hoặc link demo (Không bắt buộc GitHub và không đóng băng SHA).',
     is_active: true,
-    is_final_checkpoint: false, // Chặng tiến độ trung gian: ẩn ô GitHub Repo nếu không yêu cầu
+    is_final_checkpoint: false,
     grace_period_seconds: 5,
     status: 'open',
     is_open: true,
@@ -83,7 +107,7 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
     deadline: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
     requirements: 'Mã nguồn đầy đủ các tính năng cam kết trên GitHub repository public. Hệ thống sẽ ghi nhận Commit HEAD tại thời điểm nộp bài.',
     is_active: true,
-    is_final_checkpoint: true, // Chặng cuối cùng: Bắt buộc GitHub repo & đóng băng Commit SHA
+    is_final_checkpoint: true,
     grace_period_seconds: 5,
     status: 'upcoming',
     is_open: false,
@@ -106,10 +130,8 @@ const INITIAL_MOCK_CHECKPOINTS: CheckpointWithSubmission[] = [
   },
 ];
 
-// Cờ môi trường dev mock: Chỉ kích hoạt mock khi có cờ VITE_USE_MOCK=true (HF-31 Lỗi 1)
 const USE_DEV_MOCK = import.meta.env.VITE_USE_MOCK === 'true';
 
-// Mock lịch sử nộp bài chỉ dùng khi bật cờ dev mock
 export const INITIAL_MOCK_SUBMISSION_HISTORY: Submission[] = [
   {
     id: 'sub-01-v2',
@@ -168,7 +190,6 @@ function getStoredHistory(): Submission[] {
 function saveStoredHistory(submission: Submission) {
   try {
     const current = getStoredHistory();
-    // Đẩy bản nộp mới lên đầu danh sách lịch sử
     const updated = [submission, ...current.filter((s) => s.id !== submission.id)];
     localStorage.setItem(LOCAL_STORAGE_HISTORY_KEY, JSON.stringify(updated));
   } catch {
@@ -180,9 +201,11 @@ export const checkpointApi = {
   /**
    * Lấy danh sách các checkpoint của cuộc thi kèm bài nộp gần nhất (nếu có)
    */
-  getCheckpoints: async (): Promise<CheckpointWithSubmission[]> => {
+  getCheckpoints: async (onlyActive = false): Promise<CheckpointWithSubmission[]> => {
     try {
-      const response = await axiosClient.get<ApiResponse<CheckpointWithSubmission[]>>('/checkpoints');
+      const response = await axiosClient.get<ApiResponse<CheckpointWithSubmission[]>>(
+        `/checkpoints${onlyActive ? '?only_active=true' : ''}`
+      );
       if (response.data && Array.isArray(response.data.data) && response.data.data.length > 0) {
         return response.data.data;
       }
@@ -204,7 +227,6 @@ export const checkpointApi = {
 
   /**
    * Nộp bài cho một Checkpoint (HF-30 & SRS HF-23)
-   * Gửi repo_url (bắt buộc nếu là chặng cuối), demo_url, submission_data và note lên hệ thống.
    */
   submitCheckpoint: async (
     checkpointId: string,
@@ -226,12 +248,8 @@ export const checkpointApi = {
 
   /**
    * Tích hợp API GET /submissions để hiển thị table lịch sử nộp bài (HF-31 AC-1)
-   * - Tuyệt đối không nuốt lỗi để trả mock giả khi chạy môi trường thật (Review Lỗi 1)
-   * - Nếu lỗi 404 (chưa có bản nộp): trả về mảng rỗng [] để UI hiển thị Empty State
-   * - Nếu lỗi mạng / 500: Ném lỗi để UI hiển thị thông báo lỗi kèm nút Tải lại
    */
   getSubmissions: async (checkpointId?: string): Promise<Submission[]> => {
-    // 1. Nếu cờ dev mock được bật rõ ràng qua VITE_USE_MOCK=true
     if (USE_DEV_MOCK) {
       const storedHistory = getStoredHistory();
       const allHistory = [...storedHistory];
@@ -246,7 +264,6 @@ export const checkpointApi = {
       return allHistory;
     }
 
-    // 2. Môi trường thật: Gọi API GET /submissions theo chuẩn REST
     try {
       const url = checkpointId ? `/submissions?checkpoint_id=${checkpointId}` : '/submissions';
       const response = await axiosClient.get<ApiResponse<Submission[]>>(url);
@@ -266,14 +283,10 @@ export const checkpointApi = {
       };
 
       const status = errorObj.response?.status;
-
-      // 404: Đội thi chưa có bài nộp nào cho checkpoint này -> Trả về mảng rỗng [] để hiển thị Empty State
       if (status === 404) {
         return [];
       }
 
-      // Các lỗi khác (500 Server Error, Network Error, 401 Unauthorized...):
-      // Ném lỗi để UI hiển thị trạng thái lỗi kèm nút Retry (Lỗi 1)
       throw new Error(
         errorObj.response?.data?.message ||
           errorObj.message ||
@@ -288,5 +301,64 @@ export const checkpointApi = {
    */
   getSubmissionHistory: async (checkpointId: string): Promise<Submission[]> => {
     return checkpointApi.getSubmissions(checkpointId);
+  },
+
+  /**
+   * Tạo mốc Checkpoint mới (Admin only)
+   * POST /api/v1/checkpoints
+   */
+  createCheckpoint: async (payload: CheckpointCreatePayload): Promise<CheckpointWithSubmission> => {
+    const response = await axiosClient.post<ApiResponse<CheckpointWithSubmission>>('/checkpoints', payload);
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Không thể tạo mốc Checkpoint.');
+  },
+
+  /**
+   * Cập nhật thông tin mốc Checkpoint (Admin only)
+   * PUT /api/v1/checkpoints/{id}
+   */
+  updateCheckpoint: async (
+    id: string,
+    payload: CheckpointUpdatePayload
+  ): Promise<CheckpointWithSubmission> => {
+    const response = await axiosClient.put<ApiResponse<CheckpointWithSubmission>>(
+      `/checkpoints/${id}`,
+      payload
+    );
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Không thể cập nhật mốc Checkpoint.');
+  },
+
+  /**
+   * Khóa hoặc mở kích hoạt Checkpoint (Admin only)
+   * PATCH /api/v1/checkpoints/{id}/toggle-active
+   */
+  toggleActiveCheckpoint: async (
+    id: string,
+    is_active: boolean
+  ): Promise<CheckpointWithSubmission> => {
+    const response = await axiosClient.patch<ApiResponse<CheckpointWithSubmission>>(
+      `/checkpoints/${id}/toggle-active`,
+      { is_active }
+    );
+    if (response.data && response.data.data) {
+      return response.data.data;
+    }
+    throw new Error(response.data?.message || 'Không thể thay đổi trạng thái kích hoạt Checkpoint.');
+  },
+
+  /**
+   * Xóa hoặc vô hiệu hóa Checkpoint (Admin only)
+   */
+  deleteCheckpoint: async (id: string): Promise<void> => {
+    try {
+      await axiosClient.delete(`/checkpoints/${id}`);
+    } catch {
+      await axiosClient.patch(`/checkpoints/${id}/toggle-active`, { is_active: false });
+    }
   },
 };
