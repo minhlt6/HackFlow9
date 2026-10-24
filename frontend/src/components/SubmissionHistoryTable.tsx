@@ -81,17 +81,17 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
 
   return (
     <div
-      className={`rounded-[16px] bg-[#0F172A] border border-[#334155] shadow-xl overflow-hidden ${className}`}
+      className={`rounded-[16px] bg-muted/40 dark:bg-slate-900/60 border border-border shadow-xl overflow-hidden ${className}`}
     >
       {/* Header của bảng lịch sử nộp bài */}
-      <div className="p-4 sm:p-5 border-b border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#111A2E]/80">
+      <div className="p-4 sm:p-5 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card">
         <div className="flex items-center gap-2.5">
-          <span className="p-2 rounded-xl bg-[#6366F1]/15 text-[#818CF8] border border-[#6366F1]/30">
+          <span className="p-2 rounded-xl bg-[#6366F1]/15 text-primary border border-[#6366F1]/30">
             <History size={18} />
           </span>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-base sm:text-lg font-bold text-white tracking-wide">
+              <h3 className="text-base sm:text-lg font-bold text-foreground tracking-wide">
                 Lịch sử nộp bài
               </h3>
               {!isLoading && !errorMessage && (
@@ -101,8 +101,8 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
               )}
             </div>
             {checkpointTitle && (
-              <p className="text-xs text-slate-400 mt-0.5 truncate max-w-md">
-                Chặng: <span className="text-slate-300 font-medium">{checkpointTitle}</span>
+              <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-md">
+                Chặng: <span className="text-muted-foreground font-medium">{checkpointTitle}</span>
               </p>
             )}
           </div>
@@ -113,10 +113,10 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
             type="button"
             onClick={onRefresh}
             disabled={isLoading}
-            className="self-end sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-[#1E293B] hover:bg-[#334155] border border-[#334155] transition-colors disabled:opacity-50"
+            className="self-end sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground bg-card hover:bg-accent border border-border transition-colors disabled:opacity-50"
             title="Làm mới lịch sử nộp bài"
           >
-            <RefreshCw size={13} className={isLoading ? 'animate-spin text-[#818CF8]' : ''} />
+            <RefreshCw size={13} className={isLoading ? 'animate-spin text-primary' : ''} />
             <span>Tải lại</span>
           </button>
         )}
@@ -124,27 +124,27 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
 
       {/* Trạng thái Loading */}
       {isLoading ? (
-        <div className="p-12 flex flex-col items-center justify-center gap-3 text-slate-400">
-          <RefreshCw size={24} className="animate-spin text-[#818CF8]" />
+        <div className="p-12 flex flex-col items-center justify-center gap-3 text-muted-foreground">
+          <RefreshCw size={24} className="animate-spin text-primary" />
           <p className="text-xs">Đang tải lịch sử các lần nộp bài...</p>
         </div>
       ) : errorMessage ? (
         /* Trạng thái Lỗi API thật kèm nút Thử lại (HF-31 Review Lỗi 1) */
         <div className="p-10 text-center flex flex-col items-center justify-center gap-3">
-          <div className="p-3 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/30">
+          <div className="p-3 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 border border-rose-500/30">
             <AlertCircle size={26} />
           </div>
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-rose-300">
+            <p className="text-sm font-semibold text-rose-700 dark:text-rose-400">
               Không thể tải lịch sử nộp bài
             </p>
-            <p className="text-xs text-rose-200/80 max-w-md">{errorMessage}</p>
+            <p className="text-xs text-rose-700 dark:text-rose-400 max-w-md">{errorMessage}</p>
           </div>
           {onRefresh && (
             <button
               type="button"
               onClick={onRefresh}
-              className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium bg-[#1E293B] hover:bg-[#334155] text-white border border-[#334155] transition-colors"
+              className="mt-2 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium bg-card hover:bg-accent text-foreground border border-border transition-colors"
             >
               <RefreshCw size={12} />
               <span>Thử lại</span>
@@ -153,15 +153,15 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
         </div>
       ) : sortedSubmissions.length === 0 ? (
         /* Trạng thái Rỗng (Chưa có bài nộp nào) */
-        <div className="p-12 text-center flex flex-col items-center justify-center gap-3 text-slate-400">
-          <div className="p-3 rounded-full bg-[#1E293B] text-slate-500 border border-[#334155]">
+        <div className="p-12 text-center flex flex-col items-center justify-center gap-3 text-muted-foreground">
+          <div className="p-3 rounded-full bg-card text-muted-foreground border border-border">
             <Inbox size={26} />
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-300">
+            <p className="text-sm font-semibold text-muted-foreground">
               Chưa có lượt nộp bài nào cho chặng thi này
             </p>
-            <p className="text-xs text-slate-400 mt-1 max-w-md">
+            <p className="text-xs text-muted-foreground mt-1 max-w-md">
               Đội trưởng có thể gửi link sản phẩm, báo cáo tiến độ hoặc tài liệu demo ở biểu mẫu nộp bài phía trên.
             </p>
           </div>
@@ -171,7 +171,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="border-b border-[#334155] bg-[#0A0F1D] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+              <tr className="border-b border-border bg-muted/40 dark:bg-slate-900/60 text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">
                 <th scope="col" className="py-3 px-4 w-14">
                   #
                 </th>
@@ -192,7 +192,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#334155]/60">
+            <tbody className="divide-y divide-border">
               {sortedSubmissions.map((sub, index) => {
                 const isLatest = index === 0;
                 // Phiên bản tăng dần theo thứ tự thời gian: bản cũ nhất là v1, bản mới nhất là vN
@@ -205,14 +205,14 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                 return (
                   <tr
                     key={sub.id || `sub-${index}`}
-                    className={`hover:bg-[#1E293B]/40 transition-colors ${
-                      isLatest ? 'bg-[#1E293B]/15' : ''
+                    className={`hover:bg-accent transition-colors ${
+                      isLatest ? 'bg-card' : ''
                     }`}
                   >
                     {/* Cột 1: Phiên bản nộp (v1, v2...) & Nhãn Mới nhất */}
                     <td className="py-3.5 px-4 font-mono">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-bold text-slate-200">v{versionNumber}</span>
+                        <span className="font-bold text-foreground">v{versionNumber}</span>
                         {isLatest && (
                           <Badge variant="indigo" size="sm" className="text-[10px] px-1.5 py-0">
                             Mới nhất
@@ -224,15 +224,15 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                     {/* Cột 2: Thời gian nộp (HF-31 AC-3) */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-0.5">
-                        <span className="font-semibold text-slate-100 text-xs flex items-center gap-1.5">
-                          <Clock size={12} className="text-amber-400 shrink-0" />
+                        <span className="font-semibold text-foreground text-xs flex items-center gap-1.5">
+                          <Clock size={12} className="text-amber-700 dark:text-amber-400 shrink-0" />
                           <span>{timeInfo.relative}</span>
                         </span>
-                        <span className="text-[11px] text-slate-400 font-mono">
+                        <span className="text-[11px] text-muted-foreground font-mono">
                           {timeInfo.absolute}
                         </span>
                         {sub.grace_period_applied && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-300 font-medium mt-0.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 font-medium mt-0.5">
                             <ShieldCheck size={11} className="shrink-0" />
                             <span>Ân hạn mạng (Grace Period)</span>
                           </span>
@@ -249,40 +249,40 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                             target="_blank"
                             rel="noopener noreferrer"
                             title={`Xem commit ${sub.commit_sha} trên GitHub (Click để mở tab mới)`}
-                            className="inline-flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-[8px] bg-[#0A0F1D] hover:bg-[#1E293B] text-indigo-300 hover:text-white border border-[#334155] hover:border-[#6366F1] transition-all group shadow-sm"
+                            className="inline-flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-[8px] bg-muted/40 dark:bg-slate-900/60 hover:bg-accent text-primary hover:text-foreground border border-border hover:border-[#6366F1] transition-all group shadow-sm"
                           >
-                            <GitCommit size={13} className="text-emerald-400 shrink-0" />
+                            <GitCommit size={13} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
                             <span className="font-semibold">{shortSha}</span>
                             <ExternalLink
                               size={11}
-                              className="text-slate-400 group-hover:text-indigo-300 transition-colors"
+                              className="text-muted-foreground group-hover:text-indigo-300 transition-colors"
                             />
                           </a>
                         ) : (
                           <span
                             title={sub.commit_sha}
-                            className="inline-flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-[8px] bg-[#0A0F1D] text-indigo-300 border border-[#334155]"
+                            className="inline-flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-[8px] bg-muted/40 dark:bg-slate-900/60 text-primary border border-border"
                           >
-                            <GitCommit size={13} className="text-emerald-400 shrink-0" />
+                            <GitCommit size={13} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
                             <span className="font-semibold">{shortSha}</span>
                           </span>
                         )
                       ) : statusMeta.normalizedStatus === 'pending_sha_freeze' ? (
-                        <span className="inline-flex items-center gap-1 text-indigo-300 text-[11px] font-medium">
-                          <RefreshCw size={11} className="animate-spin text-indigo-400 shrink-0" />
+                        <span className="inline-flex items-center gap-1 text-primary text-[11px] font-medium">
+                          <RefreshCw size={11} className="animate-spin text-primary shrink-0" />
                           <span>Đang lấy SHA...</span>
                         </span>
                       ) : statusMeta.normalizedStatus === 'sha_verification_failed' ? (
-                        <span className="inline-flex items-center gap-1 text-amber-300 text-[11px] font-medium">
-                          <AlertTriangle size={12} className="shrink-0 text-amber-400" />
+                        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 text-[11px] font-medium">
+                          <AlertTriangle size={12} className="shrink-0 text-amber-700 dark:text-amber-400" />
                           <span>Chờ xác minh</span>
                         </span>
                       ) : isFinalCheckpoint ? (
-                        <span className="text-slate-500 font-mono text-xs italic">
+                        <span className="text-muted-foreground font-mono text-xs italic">
                           - (Chưa có SHA)
                         </span>
                       ) : (
-                        <span className="text-slate-500 font-mono text-xs italic">
+                        <span className="text-muted-foreground font-mono text-xs italic">
                           - (Chặng tiến độ)
                         </span>
                       )}
@@ -296,12 +296,12 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                             href={sub.repo_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-slate-200 hover:text-indigo-300 transition-colors truncate max-w-[200px]"
+                            className="inline-flex items-center gap-1.5 text-foreground hover:text-indigo-300 transition-colors truncate max-w-[200px]"
                             title={`GitHub Repo: ${sub.repo_url}`}
                           >
-                            <GithubIcon size={13} className="shrink-0 text-slate-400" />
+                            <GithubIcon size={13} className="shrink-0 text-muted-foreground" />
                             <span className="truncate">{sub.repo_url.replace(/^https?:\/\//, '')}</span>
-                            <ExternalLink size={10} className="shrink-0 text-slate-500" />
+                            <ExternalLink size={10} className="shrink-0 text-muted-foreground" />
                           </a>
                         )}
 
@@ -310,12 +310,12 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                             href={sub.demo_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-cyan-300 hover:text-cyan-200 transition-colors truncate max-w-[200px]"
+                            className="inline-flex items-center gap-1.5 text-sky-700 dark:text-cyan-400 hover:text-cyan-200 transition-colors truncate max-w-[200px]"
                             title={`Demo / Báo cáo: ${sub.demo_url}`}
                           >
-                            <Globe size={13} className="shrink-0 text-cyan-400" />
+                            <Globe size={13} className="shrink-0 text-sky-700 dark:text-cyan-400" />
                             <span className="truncate">{sub.demo_url.replace(/^https?:\/\//, '')}</span>
-                            <ExternalLink size={10} className="shrink-0 text-slate-500" />
+                            <ExternalLink size={10} className="shrink-0 text-muted-foreground" />
                           </a>
                         )}
 
@@ -337,18 +337,18 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                                 href={val}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 text-indigo-300 hover:text-indigo-200 transition-colors truncate max-w-[200px]"
+                                className="inline-flex items-center gap-1.5 text-primary hover:text-indigo-200 transition-colors truncate max-w-[200px]"
                                 title={`${label}: ${val}`}
                               >
-                                <Globe size={13} className="shrink-0 text-indigo-400" />
+                                <Globe size={13} className="shrink-0 text-primary" />
                                 <span className="truncate">{label}: {val.replace(/^https?:\/\//, '')}</span>
-                                <ExternalLink size={10} className="shrink-0 text-slate-500" />
+                                <ExternalLink size={10} className="shrink-0 text-muted-foreground" />
                               </a>
                             );
                           })}
 
                         {!sub.repo_url && !sub.demo_url && !sub.submission_data && (
-                          <span className="text-slate-500 text-xs">-</span>
+                          <span className="text-muted-foreground text-xs">-</span>
                         )}
                       </div>
                     </td>
@@ -371,19 +371,19 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                     <td className="py-3.5 px-4">
                       <div className="space-y-1 max-w-[240px]">
                         {sub.note && (
-                          <p className="text-slate-300 text-xs line-clamp-2 italic flex items-start gap-1">
-                            <FileText size={12} className="text-slate-400 shrink-0 mt-0.5" />
+                          <p className="text-muted-foreground text-xs line-clamp-2 italic flex items-start gap-1">
+                            <FileText size={12} className="text-muted-foreground shrink-0 mt-0.5" />
                             <span>{sub.note}</span>
                           </p>
                         )}
 
                         {sub.feedback ? (
-                          <div className="p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-[11px] flex items-start gap-1">
+                          <div className="p-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] flex items-start gap-1">
                             <MessageSquare size={11} className="shrink-0 mt-0.5" />
                             <span className="line-clamp-2">{sub.feedback}</span>
                           </div>
                         ) : (
-                          !sub.note && <span className="text-slate-500 text-xs">-</span>
+                          !sub.note && <span className="text-muted-foreground text-xs">-</span>
                         )}
                       </div>
                     </td>

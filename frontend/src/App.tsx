@@ -143,7 +143,7 @@ const FallbackRedirect: React.FC = () => {
 
 const router = createBrowserRouter([
   {
-element: <RootTitleLayout />,
+    element: <RootTitleLayout />,
     children: [
       { path: '/login', element: <LoginPage /> },
       { path: '/auth/callback', element: <AuthCallback /> },
@@ -151,7 +151,7 @@ element: <RootTitleLayout />,
       {
         path: '/preview-teams',
         element: (
-          <div className="min-h-screen bg-[#060911] text-slate-100 p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
             <TeamsPage />
           </div>
         ),
@@ -159,7 +159,7 @@ element: <RootTitleLayout />,
       {
         path: '/preview-topics',
         element: (
-          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
             <TopicsPage />
           </div>
         ),
@@ -167,7 +167,7 @@ element: <RootTitleLayout />,
       {
         path: '/preview-checkpoints',
         element: (
-          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
             <CandidateCheckpointsPage />
           </div>
         ),
@@ -179,7 +179,7 @@ element: <RootTitleLayout />,
       {
         path: '/preview-judging',
         element: (
-          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
             <JudgingWorkspace />
           </div>
         ),
@@ -187,7 +187,7 @@ element: <RootTitleLayout />,
       {
         path: '/preview-tickets',
         element: (
-          <div className="min-h-screen bg-[#080D18] text-slate-100 p-4 sm:p-6 lg:p-8">
+          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
             <SupportTickets />
           </div>
         ),
@@ -245,7 +245,6 @@ element: <RootTitleLayout />,
       },
 
       { path: '*', element: <FallbackRedirect /> },
-
     ],
   },
 ]);

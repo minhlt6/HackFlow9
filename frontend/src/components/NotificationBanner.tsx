@@ -15,18 +15,18 @@ export const NotificationBanner: React.FC = () => {
   return (
     <div
       role="alert"
-      className="sticky top-16 z-20 w-full bg-gradient-to-r from-amber-950/90 via-amber-900/80 to-amber-950/90 border-b border-amber-500/40 text-amber-200 px-4 py-2.5 shadow-lg backdrop-blur-md transition-all font-['Roboto'] animate-in slide-in-from-top-2 duration-200"
+      className="sticky top-14 z-20 w-full bg-amber-50/95 dark:bg-amber-950/90 border-b border-amber-300 dark:border-amber-500/40 text-amber-900 dark:text-amber-200 px-4 py-2.5 shadow-sm backdrop-blur-md transition-all font-sans animate-in slide-in-from-top-2 duration-200"
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 text-xs sm:text-sm">
+      <div className="max-w-[1440px] mx-auto flex items-center justify-between gap-3 text-xs sm:text-sm">
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          <span className="p-1 rounded-md bg-amber-500/20 text-amber-400 border border-amber-500/30 shrink-0">
+          <span className="p-1 rounded-md bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/30 shrink-0">
             <AlertTriangle size={16} />
           </span>
           <div className="min-w-0 flex-1">
-            <span className="font-semibold text-amber-300 mr-2">
+            <span className="font-semibold text-amber-800 dark:text-amber-300 mr-2">
               [CẢNH BÁO] {warning.title}:
             </span>
-            <span className="text-amber-100/90 text-xs sm:text-sm leading-relaxed">
+            <span className="text-amber-900/90 dark:text-amber-100/90 text-xs sm:text-sm leading-relaxed">
               {warning.content}
             </span>
           </div>
@@ -37,7 +37,7 @@ export const NotificationBanner: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate(warning.action_url!)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/25 hover:bg-amber-500/40 text-amber-200 border border-amber-500/40 text-xs font-medium transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 border border-amber-500/40 text-xs font-medium transition-colors cursor-pointer"
             >
               <span>{warning.action_label || 'Kiểm tra'}</span>
               <ArrowRight size={12} />
@@ -48,7 +48,7 @@ export const NotificationBanner: React.FC = () => {
             type="button"
             onClick={() => dismissWarning(warning.id)}
             aria-label="Đã hiểu cảnh báo"
-            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-amber-500/20 text-amber-300 hover:text-white transition-colors text-xs font-medium cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 rounded-md hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 hover:text-amber-950 dark:hover:text-foreground transition-colors text-xs font-medium cursor-pointer"
             title="Đóng thông báo"
           >
             <span>Đã hiểu</span>

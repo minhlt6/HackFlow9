@@ -278,12 +278,12 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#111827] border border-[#334155] rounded-xl overflow-hidden shadow-2xl">
+    <div className="flex flex-col h-full bg-[#111827] border border-border rounded-xl overflow-hidden shadow-2xl">
       {/* Rubric Header */}
-      <div className="p-4 border-b border-[#334155] bg-[#0F172A] flex items-center justify-between shrink-0">
+      <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 flex items-center justify-between shrink-0">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-['Righteous'] text-lg text-white">Phiếu Chấm Điểm Rubric</h3>
+            <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">Phiếu Chấm Điểm Rubric</h3>
             {isLocked ? (
               <Badge variant="success" className="gap-1">
                 <Lock size={12} />
@@ -300,16 +300,16 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
               </Badge>
             )}
           </div>
-          <p className="text-xs text-slate-400 mt-0.5">
+          <p className="text-xs text-muted-foreground mt-0.5">
             Điểm chấm được chuẩn hóa tự động theo thang 100 điểm của cuộc thi.
           </p>
         </div>
 
         {/* Total Score Badge */}
-        <div className="text-right bg-[#1E293B] border border-[#334155] px-4 py-2 rounded-xl flex items-baseline gap-1.5">
-          <span className="text-xs text-slate-400 font-medium">Tổng điểm:</span>
-          <span className="font-['Righteous'] text-2xl text-[#818CF8]">{totalWeightedScore}</span>
-          <span className="text-xs text-slate-400">/ 100</span>
+        <div className="text-right bg-card border border-border px-4 py-2 rounded-xl flex items-baseline gap-1.5">
+          <span className="text-xs text-muted-foreground font-medium">Tổng điểm:</span>
+          <span className="font-semibold tracking-tight text-foreground text-2xl text-primary">{totalWeightedScore}</span>
+          <span className="text-xs text-muted-foreground">/ 100</span>
         </div>
       </div>
 
@@ -323,19 +323,19 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
               key={c.id}
               className={`p-4 rounded-xl border transition-all ${
                 isLocked
-                  ? 'bg-[#1E293B]/40 border-[#334155]/60'
-                  : 'bg-[#1E293B] border-[#334155] hover:border-[#6366F1]/50'
+                  ? 'bg-card border-border'
+                  : 'bg-card border-border hover:border-[#6366F1]/50'
               }`}
             >
               <div className="flex items-start justify-between gap-3 mb-2">
                 <div>
-                  <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     {c.name}
                     <Badge variant="neutral" size="sm">
                       Trọng số: {c.weight}%
                     </Badge>
                   </h4>
-                  <p className="text-xs text-slate-400 mt-0.5">{c.description}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">{c.description}</p>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -351,9 +351,9 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
                     }}
                     onChange={(e) => handleScoreInputChange(c.id, e.target.value, c.maxScore)}
                     onBlur={() => handleScoreBlur(c.id)}
-                    className="w-16 px-2 py-1 text-center font-['Righteous'] text-base rounded-lg bg-[#0F172A] border border-[#334155] text-white focus:outline-none focus:border-[#6366F1] disabled:opacity-75 disabled:cursor-not-allowed"
+                    className="w-16 px-2 py-1 text-center font-semibold tracking-tight text-foreground text-base rounded-lg bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground focus:outline-none focus:border-[#6366F1] disabled:opacity-75 disabled:cursor-not-allowed"
                   />
-                  <span className="text-xs text-slate-400 font-medium">/ {c.maxScore}</span>
+                  <span className="text-xs text-muted-foreground font-medium">/ {c.maxScore}</span>
                 </div>
               </div>
 
@@ -371,7 +371,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
                   }
                   className="w-full accent-[#6366F1] cursor-pointer disabled:cursor-not-allowed"
                 />
-                <div className="flex justify-between text-[10px] text-slate-400">
+                <div className="flex justify-between text-[10px] text-muted-foreground">
                   <span>0đ</span>
                   <span>Bước nhảy: 0.5đ</span>
                   <span>{c.maxScore}đ</span>
@@ -379,8 +379,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
               </div>
 
               {/* Criterion comment field */}
-              <div className="mt-3 pt-2.5 border-t border-[#334155]/60">
-                <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-1">
+              <div className="mt-3 pt-2.5 border-t border-border">
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
                   <MessageSquare size={12} />
                   <span>Nhận xét tiêu chí (tùy chọn):</span>
                 </div>
@@ -392,7 +392,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
                     setCriteriaComments((prev) => ({ ...prev, [c.id]: e.target.value }))
                   }
                   placeholder="Ghi chú nhận xét chuyên môn cho tiêu chí này..."
-                  className="w-full px-3 py-1.5 text-xs rounded-lg bg-[#0B1120] border border-[#334155] text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-[#6366F1] disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-1.5 text-xs rounded-lg bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-slate-600 focus:outline-none focus:border-[#6366F1] disabled:opacity-70 disabled:cursor-not-allowed"
                 />
               </div>
             </div>
@@ -400,9 +400,9 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
         })}
 
         {/* General Comment */}
-        <div className="p-4 rounded-xl bg-[#1E293B] border border-[#334155] space-y-2">
-          <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
-            <FileText size={14} className="text-[#818CF8]" />
+        <div className="p-4 rounded-xl bg-card border border-border space-y-2">
+          <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+            <FileText size={14} className="text-primary" />
             <span>Nhận Xét Chung Toàn Diện Cho Đội Thi</span>
           </label>
           <textarea
@@ -411,16 +411,16 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
             value={generalComment}
             onChange={(e) => setGeneralComment(e.target.value)}
             placeholder="Nhận xét chi tiết về giải pháp, kiến trúc kỹ thuật và tiềm năng phát triển của sản phẩm..."
-            className="w-full p-3 rounded-lg bg-[#0F172A] border border-[#334155] text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1] disabled:opacity-70 disabled:cursor-not-allowed leading-relaxed"
+            className="w-full p-3 rounded-lg bg-muted/40 dark:bg-slate-900/60 border border-border text-xs text-foreground placeholder:text-slate-500 focus:outline-none focus:border-[#6366F1] disabled:opacity-70 disabled:cursor-not-allowed leading-relaxed"
           />
         </div>
       </div>
 
       {/* Action Footer */}
-      <div className="p-4 border-t border-[#334155] bg-[#0B1120] flex items-center justify-between shrink-0 gap-3">
+      <div className="p-4 border-t border-border bg-muted/40 dark:bg-slate-900/60 flex items-center justify-between shrink-0 gap-3">
         {isLocked ? (
           <div className="w-full flex items-center justify-between">
-            <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold">
+            <div className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
               <CheckCircle2 size={16} />
               <span>Bảng điểm đã được khóa chính thức (Read-only). Điểm số: {totalWeightedScore}đ</span>
             </div>
@@ -429,12 +429,12 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
                 variant="ghost"
                 size="sm"
                 onClick={handleAdminUnlock}
-                className="text-slate-400 hover:text-amber-300 text-xs border border-amber-500/30"
+                className="text-muted-foreground hover:text-amber-300 text-xs border border-amber-500/30"
               >
                 Mở khóa sửa lại (Admin/BTC)
               </Button>
             ) : (
-              <span className="text-[11px] text-slate-500 italic">
+              <span className="text-[11px] text-muted-foreground italic">
                 Chỉ Admin/BTC mới có quyền mở khóa phiếu chấm đã khóa
               </span>
             )}
@@ -465,30 +465,30 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
         title="Xác Nhận Khóa Bảng Điểm"
         maxWidth="md"
       >
-        <div className="space-y-4 font-['Roboto']">
-          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-3">
-            <AlertTriangle size={22} className="shrink-0 text-amber-400 mt-0.5" />
+        <div className="space-y-4 ">
+          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-3">
+            <AlertTriangle size={22} className="shrink-0 text-amber-700 dark:text-amber-400 mt-0.5" />
             <div className="space-y-1">
-              <p className="font-bold text-sm text-white">Khóa vĩnh viễn bảng điểm chính thức</p>
-              <p className="text-amber-200/90 leading-relaxed text-xs">
+              <p className="font-bold text-sm text-foreground">Khóa vĩnh viễn bảng điểm chính thức</p>
+              <p className="text-amber-700 dark:text-amber-400 leading-relaxed text-xs">
                 Sau khi xác nhận khóa, toàn bộ điểm số theo tiêu chí Rubric và nhận xét cho đội thi{' '}
-                <strong className="text-white">{displayName}</strong> sẽ chuyển sang trạng thái{' '}
-                <strong className="text-amber-400">SUBMITTED (Read-only)</strong>.
+                <strong className="text-foreground">{displayName}</strong> sẽ chuyển sang trạng thái{' '}
+                <strong className="text-amber-700 dark:text-amber-400">SUBMITTED (Read-only)</strong>.
               </p>
-              <p className="text-slate-400 text-xs">
+              <p className="text-muted-foreground text-xs">
                 Giám khảo sẽ không thể tự ý sửa đổi nếu không có sự cho phép và mở khóa từ Admin/BTC.
               </p>
             </div>
           </div>
 
-          <div className="p-4 rounded-xl bg-[#0B1120] border border-[#334155] space-y-2 text-xs">
-            <div className="flex justify-between items-center text-slate-400">
+          <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2 text-xs">
+            <div className="flex justify-between items-center text-muted-foreground">
               <span>Đội thi:</span>
-              <span className="font-semibold text-white">{displayName}</span>
+              <span className="font-semibold text-foreground">{displayName}</span>
             </div>
-            <div className="flex justify-between items-center text-slate-400">
+            <div className="flex justify-between items-center text-muted-foreground">
               <span>Tổng điểm quy đổi (thang 100):</span>
-              <span className="font-['Righteous'] text-lg text-emerald-400">
+              <span className="font-semibold tracking-tight text-foreground text-lg text-emerald-700 dark:text-emerald-400">
                 {totalWeightedScore} / 100
               </span>
             </div>
@@ -643,9 +643,9 @@ export const JudgingWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-5rem)] font-['Roboto'] -m-4 sm:-m-6 lg:-m-8 bg-[#080D18]">
+    <div className="flex flex-col h-[calc(100vh-5rem)]  -m-4 sm:-m-6 lg:-m-8 bg-muted/40 dark:bg-slate-900/60">
       {/* Top Bar Navigation & Filters */}
-      <div className="h-16 border-b border-[#1E293B] bg-[#0B1120] px-4 flex items-center justify-between shrink-0 gap-4">
+      <div className="h-16 border-b border-border bg-muted/40 dark:bg-slate-900/60 px-4 flex items-center justify-between shrink-0 gap-4">
         {/* Left: Title & Team Navigator */}
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1.5">
@@ -654,7 +654,7 @@ export const JudgingWorkspace: React.FC = () => {
               size="sm"
               disabled={currentTeamIndex <= 0}
               onClick={handlePrevTeam}
-              className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30"
+              className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
               title="Đội trước"
             >
               <ChevronLeft size={18} />
@@ -663,7 +663,7 @@ export const JudgingWorkspace: React.FC = () => {
             <select
               value={activeTeamId}
               onChange={(e) => selectTeam(e.target.value)}
-              className="px-3 py-1.5 rounded-lg bg-[#1E293B] border border-[#334155] text-xs font-semibold text-slate-100 focus:outline-none focus:border-[#6366F1]"
+              className="px-3 py-1.5 rounded-lg bg-card border border-border text-xs font-semibold text-foreground focus:outline-none focus:border-[#6366F1]"
             >
               {filteredTeams.map((t, idx) => {
                 const label = config.blindJudgingMode
@@ -688,7 +688,7 @@ export const JudgingWorkspace: React.FC = () => {
               size="sm"
               disabled={currentTeamIndex >= filteredTeams.length - 1 || currentTeamIndex === -1}
               onClick={handleNextTeam}
-              className="p-1.5 text-slate-400 hover:text-white disabled:opacity-30"
+              className="p-1.5 text-muted-foreground hover:text-foreground disabled:opacity-30"
               title="Đội kế tiếp"
             >
               <ChevronRight size={18} />
@@ -696,15 +696,15 @@ export const JudgingWorkspace: React.FC = () => {
           </div>
 
           <div className="hidden lg:flex items-center gap-2">
-            <span className="text-xs text-slate-400">
-              Đội <strong className="text-white">{currentTeamIndex + 1}</strong> / {filteredTeams.length}
+            <span className="text-xs text-muted-foreground">
+              Đội <strong className="text-foreground">{currentTeamIndex + 1}</strong> / {filteredTeams.length}
             </span>
           </div>
         </div>
 
         {/* Center: Filter Tabs */}
-        <div className="flex items-center bg-[#1E293B] p-1 rounded-xl border border-[#334155] text-xs">
-          <span className="px-2 text-slate-400 hidden md:flex items-center gap-1">
+        <div className="flex items-center bg-card p-1 rounded-xl border border-border text-xs">
+          <span className="px-2 text-muted-foreground hidden md:flex items-center gap-1">
             <Filter size={12} />
             <span>Lọc:</span>
           </span>
@@ -722,7 +722,7 @@ export const JudgingWorkspace: React.FC = () => {
               className={`px-3 py-1 rounded-lg font-medium transition-all ${
                 statusFilter === f.key
                   ? 'bg-[#6366F1] text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
             >
               {f.label}
@@ -736,8 +736,8 @@ export const JudgingWorkspace: React.FC = () => {
             onClick={toggleBlindJudging}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
               config.blindJudgingMode
-                ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                : 'bg-slate-800 border-slate-700 text-slate-300 hover:text-white'
+                ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-400'
+                : 'bg-muted/60 border-border text-muted-foreground hover:text-foreground'
             }`}
           >
             <EyeOff size={14} />
@@ -755,7 +755,7 @@ export const JudgingWorkspace: React.FC = () => {
             <CheckCircle2 size={16} />
             <span className="font-medium">{alert}</span>
           </div>
-          <button onClick={() => setAlert(null)} className="text-white/80 hover:text-white text-xs">
+          <button onClick={() => setAlert(null)} className="text-foreground/80 hover:text-foreground text-xs">
             ✕
           </button>
         </div>
@@ -764,13 +764,13 @@ export const JudgingWorkspace: React.FC = () => {
       {/* Main Split-screen 50/50 Body */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 p-4 min-h-0 overflow-hidden">
         {/* LEFT COLUMN: Submission & Artifacts */}
-        <div className="flex flex-col h-full bg-[#111827] border border-[#334155] rounded-xl overflow-hidden shadow-2xl">
+        <div className="flex flex-col h-full bg-[#111827] border border-border rounded-xl overflow-hidden shadow-2xl">
           {/* Header: Anonymous code & Action Links */}
-          <div className="p-4 border-b border-[#334155] bg-[#0F172A] shrink-0 space-y-3">
+          <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 shrink-0 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <h2 className="font-['Righteous'] text-xl text-white tracking-wide">
+                  <h2 className="font-semibold tracking-tight text-foreground text-xl text-foreground tracking-wide">
                     {displayName}
                   </h2>
                   {config.blindJudgingMode ? (
@@ -782,10 +782,10 @@ export const JudgingWorkspace: React.FC = () => {
                     <Badge variant="primary">CÔNG KHAI</Badge>
                   )}
                 </div>
-                <p className="text-xs text-slate-400 mt-1 flex items-center gap-1.5">
-                  <Globe size={13} className="text-[#818CF8]" />
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                  <Globe size={13} className="text-primary" />
                   <span>
-                    Đề tài: <strong className="text-slate-200">{teamTopicTitle}</strong>
+                    Đề tài: <strong className="text-foreground">{teamTopicTitle}</strong>
                   </span>
                 </p>
               </div>
@@ -797,9 +797,9 @@ export const JudgingWorkspace: React.FC = () => {
                     href={finalSub.repoUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#1E293B] hover:bg-[#334155] text-xs font-semibold text-slate-200 border border-[#334155] transition-all"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-accent text-xs font-semibold text-foreground border border-border transition-all"
                   >
-                    <GitBranch size={13} className="text-[#818CF8]" />
+                    <GitBranch size={13} className="text-primary" />
                     <span>Repo</span>
                     <ExternalLink size={12} />
                   </a>
@@ -820,23 +820,23 @@ export const JudgingWorkspace: React.FC = () => {
             </div>
 
             {/* Frozen Commit SHA Box with Copy Button */}
-            <div className="p-2.5 rounded-xl bg-[#0B1120] border border-[#334155] flex items-center justify-between gap-3">
+            <div className="p-2.5 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs">
-                <ShieldCheck size={16} className="text-emerald-400 shrink-0" />
-                <span className="text-slate-400">Commit SHA đóng băng:</span>
-                <code className="px-2 py-0.5 rounded bg-[#1E293B] border border-[#334155] text-emerald-400 font-mono font-semibold text-xs">
+                <ShieldCheck size={16} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
+                <span className="text-muted-foreground">Commit SHA đóng băng:</span>
+                <code className="px-2 py-0.5 rounded bg-card border border-border text-emerald-700 dark:text-emerald-400 font-mono font-semibold text-xs">
                   {commitSha}
                 </code>
               </div>
               <button
                 onClick={handleCopySha}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#1E293B] hover:bg-[#334155] text-[11px] font-medium text-slate-300 border border-[#334155] transition-all"
+                className="flex items-center gap-1 px-2.5 py-1 rounded bg-card hover:bg-accent text-[11px] font-medium text-muted-foreground border border-border transition-all"
                 title="Sao chép Commit SHA"
               >
                 {copiedSha ? (
                   <>
-                    <Check size={12} className="text-emerald-400" />
-                    <span className="text-emerald-400">Đã chép</span>
+                    <Check size={12} className="text-emerald-700 dark:text-emerald-400" />
+                    <span className="text-emerald-700 dark:text-emerald-400">Đã chép</span>
                   </>
                 ) : (
                   <>
@@ -848,21 +848,21 @@ export const JudgingWorkspace: React.FC = () => {
             </div>
 
             {/* Solution Summary */}
-            <div className="text-xs text-slate-300 bg-[#0B1120]/50 p-2.5 rounded-xl border border-[#1E293B] leading-relaxed">
-              <span className="text-slate-400 font-semibold">Tóm tắt giải pháp: </span>
+            <div className="text-xs text-muted-foreground bg-muted/40 dark:bg-slate-900/60 p-2.5 rounded-xl border border-border leading-relaxed">
+              <span className="text-muted-foreground font-semibold">Tóm tắt giải pháp: </span>
               {finalSub?.summary ||
                 'Hệ thống ứng dụng AI Agent hỗ trợ tự động hóa luồng phê duyệt và đối soát tài liệu, tích hợp RAG pipeline giảm 85% thời gian xử lý thủ công.'}
             </div>
           </div>
 
           {/* Artifact Tabs Header */}
-          <div className="flex border-b border-[#334155] bg-[#0B1120] shrink-0 text-xs">
+          <div className="flex border-b border-border bg-muted/40 dark:bg-slate-900/60 shrink-0 text-xs">
             <button
               onClick={() => setLeftTab('code')}
               className={`flex-1 py-2.5 px-3 flex items-center justify-center gap-1.5 font-medium border-b-2 transition-all ${
                 leftTab === 'code'
-                  ? 'border-[#6366F1] text-[#818CF8] bg-[#1E293B]/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-[#6366F1] text-primary bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <FileCode size={14} />
@@ -872,8 +872,8 @@ export const JudgingWorkspace: React.FC = () => {
               onClick={() => setLeftTab('video')}
               className={`flex-1 py-2.5 px-3 flex items-center justify-center gap-1.5 font-medium border-b-2 transition-all ${
                 leftTab === 'video'
-                  ? 'border-[#6366F1] text-[#818CF8] bg-[#1E293B]/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-[#6366F1] text-primary bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <Video size={14} />
@@ -883,8 +883,8 @@ export const JudgingWorkspace: React.FC = () => {
               onClick={() => setLeftTab('slides')}
               className={`flex-1 py-2.5 px-3 flex items-center justify-center gap-1.5 font-medium border-b-2 transition-all ${
                 leftTab === 'slides'
-                  ? 'border-[#6366F1] text-[#818CF8] bg-[#1E293B]/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-[#6366F1] text-primary bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <Presentation size={14} />
@@ -894,8 +894,8 @@ export const JudgingWorkspace: React.FC = () => {
               onClick={() => setLeftTab('checkpoints')}
               className={`flex-1 py-2.5 px-3 flex items-center justify-center gap-1.5 font-medium border-b-2 transition-all ${
                 leftTab === 'checkpoints'
-                  ? 'border-[#6366F1] text-[#818CF8] bg-[#1E293B]/50'
-                  : 'border-transparent text-slate-400 hover:text-slate-200'
+                  ? 'border-[#6366F1] text-primary bg-card'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               }`}
             >
               <CheckSquare size={14} />
@@ -904,14 +904,14 @@ export const JudgingWorkspace: React.FC = () => {
           </div>
 
           {/* Artifact Content Body */}
-          <div className="flex-1 overflow-y-auto p-4 bg-[#080D18]">
+          <div className="flex-1 overflow-y-auto p-4 bg-muted/40 dark:bg-slate-900/60">
             {leftTab === 'code' && (
               <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-2">
-                  <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider">
+                <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     Thông tin Kho Lưu Trữ (Repository)
                   </h4>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-muted-foreground">
                     Mã nguồn đã được hệ thống ghi nhận tại thời điểm đóng băng (Code Freeze).
                   </p>
                   <div className="pt-2 flex items-center gap-2">
@@ -919,7 +919,7 @@ export const JudgingWorkspace: React.FC = () => {
                       href={finalSub?.repoUrl || 'https://github.com/hackflow/team-repo'}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1.5 text-xs text-[#818CF8] hover:underline"
+                      className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
                     >
                       <GitBranch size={14} />
                       <span>{finalSub?.repoUrl || 'https://github.com/hackflow/team-repo'}</span>
@@ -928,12 +928,12 @@ export const JudgingWorkspace: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="p-4 rounded-xl bg-[#0F172A] border border-[#1E293B] space-y-3 font-mono text-xs">
-                  <div className="flex items-center justify-between text-slate-400 border-b border-[#1E293B] pb-2">
+                <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3 font-mono text-xs">
+                  <div className="flex items-center justify-between text-muted-foreground border-b border-border pb-2">
                     <span>README.md (Trích đoạn dự án)</span>
-                    <span className="text-[10px] text-emerald-400">Verified Commit</span>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400">Verified Commit</span>
                   </div>
-                  <pre className="text-slate-300 whitespace-pre-wrap font-sans text-xs leading-relaxed">
+                  <pre className="text-muted-foreground whitespace-pre-wrap font-sans text-xs leading-relaxed">
                     {`# ${displayName} - HackFlow Project
 - Tech Stack: React 19, FastAPI, PostgreSQL, Docker, PyTorch.
 - Core Feature: Multi-agent coordination with autonomous tool calling.
@@ -945,13 +945,13 @@ export const JudgingWorkspace: React.FC = () => {
 
             {leftTab === 'video' && (
               <div className="space-y-3">
-                <div className="aspect-video w-full rounded-xl bg-[#0F172A] border border-[#334155] flex flex-col items-center justify-center text-center p-6 space-y-3">
-                  <div className="h-16 w-16 rounded-full bg-[#6366F1]/10 flex items-center justify-center text-[#818CF8]">
+                <div className="aspect-video w-full rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col items-center justify-center text-center p-6 space-y-3">
+                  <div className="h-16 w-16 rounded-full bg-[#6366F1]/10 flex items-center justify-center text-primary">
                     <Video size={32} />
                   </div>
                   <div className="space-y-1">
-                    <p className="font-semibold text-sm text-white">Video Thuyết Trình & Demo Sản Phẩm</p>
-                    <p className="text-xs text-slate-400">Thời lượng: 04:45 • Độ phân giải: 1080p</p>
+                    <p className="font-semibold text-sm text-foreground">Video Thuyết Trình & Demo Sản Phẩm</p>
+                    <p className="text-xs text-muted-foreground">Thời lượng: 04:45 • Độ phân giải: 1080p</p>
                   </div>
                   {finalSub?.demoVideoUrl && (
                     <a
@@ -970,20 +970,20 @@ export const JudgingWorkspace: React.FC = () => {
 
             {leftTab === 'slides' && (
               <div className="space-y-3">
-                <div className="aspect-video w-full rounded-xl bg-[#0F172A] border border-[#334155] flex flex-col items-center justify-center text-center p-6 space-y-3">
-                  <div className="h-16 w-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                <div className="aspect-video w-full rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col items-center justify-center text-center p-6 space-y-3">
+                  <div className="h-16 w-16 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-700 dark:text-emerald-400">
                     <Presentation size={32} />
                   </div>
                   <div className="space-y-1">
-                    <p className="font-semibold text-sm text-white">Slide Pitching Chung Kết</p>
-                    <p className="text-xs text-slate-400">Định dạng: PDF / Canva Presentation (16 slides)</p>
+                    <p className="font-semibold text-sm text-foreground">Slide Pitching Chung Kết</p>
+                    <p className="text-xs text-muted-foreground">Định dạng: PDF / Canva Presentation (16 slides)</p>
                   </div>
                   {finalSub?.slideUrl && (
                     <a
                       href={finalSub.slideUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="px-4 py-2 rounded-lg bg-[#1E293B] hover:bg-[#334155] border border-[#334155] text-xs font-semibold text-slate-200 flex items-center gap-1.5 transition-all"
+                      className="px-4 py-2 rounded-lg bg-card hover:bg-accent border border-border text-xs font-semibold text-foreground flex items-center gap-1.5 transition-all"
                     >
                       <span>Xem Slide Pitching</span>
                       <ExternalLink size={12} />
@@ -996,22 +996,22 @@ export const JudgingWorkspace: React.FC = () => {
             {leftTab === 'checkpoints' && (
               <div className="space-y-3">
                 {teamCheckpoints.length === 0 ? (
-                  <div className="text-center py-8 text-xs text-slate-500">
+                  <div className="text-center py-8 text-xs text-muted-foreground">
                     Chưa có bài nộp chặng tiến độ nào được ghi nhận.
                   </div>
                 ) : (
                   teamCheckpoints.map((chk, idx) => (
                     <div
                       key={chk.id || idx}
-                      className="p-3 rounded-xl bg-[#0F172A] border border-[#1E293B] text-xs space-y-1.5"
+                      className="p-3 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-xs space-y-1.5"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-white">Chặng #{idx + 1}</span>
+                        <span className="font-semibold text-foreground">Chặng #{idx + 1}</span>
                         <Badge variant="success" size="sm">
                           Đã nộp
                         </Badge>
                       </div>
-                      <p className="text-slate-400 text-[11px] leading-relaxed">
+                      <p className="text-muted-foreground text-[11px] leading-relaxed">
                         {chk.description || 'Đã nộp báo cáo kiến trúc và mã nguồn giai đoạn MVP.'}
                       </p>
                     </div>

@@ -118,6 +118,34 @@ async def test_select_topic_success(client: AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_select_topic_forbidden_for_non_leader_member(client: AsyncClient):
+    """
+    Regression test for BUG-BE-01:
+    Regular team member (role='member') must not be allowed to select a topic (403 FORBIDDEN_ROLE).
+    """
+    from tests.conftest import TestSessionLocal
+    async with TestSessionLocal() as session:
+        _, l_token = await create_approved_user(session, "leader_rbac@example.com", "Leader RBAC")
+        _, m2_token = await create_approved_user(session, "member2_rbac@example.com", "Member 2 RBAC")
+        _, m3_token = await create_approved_user(session, "member3_rbac@example.com", "Member 3 RBAC")
+
+        topic = Topic(title="RBAC Guarded Topic", max_teams=5, current_teams=0, is_active=True)
+        session.add(topic)
+        await session.commit()
+        topic_id = str(topic.id)
+
+    await create_valid_team(client, l_token, m2_token, m3_token, "RBACGuardedTeam")
+
+    res = await client.post(
+        "/api/v1/topics/select",
+        headers={"Authorization": f"Bearer {m2_token}"},
+        json={"topic_id": topic_id},
+    )
+    assert res.status_code == 403
+    assert res.json()["error_code"] == "FORBIDDEN_ROLE"
+
+
+@pytest.mark.asyncio
 async def test_select_topic_team_not_valid_less_than_3_members(client: AsyncClient):
     """
     Test team with fewer than 3 members cannot select a topic (409 TEAM_NOT_VALID).

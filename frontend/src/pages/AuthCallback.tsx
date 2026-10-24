@@ -78,7 +78,7 @@ const normalizeUser = (backendUser: BackendUser | undefined): User | null => {
 
 const syncMockStoreWithUser = (user: User) => {
   const mockStore = useMockStore.getState();
-  let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected' = 'leader';
+  let targetPersona: 'admin' | 'judge' | 'mentor' | 'leader' | 'member' | 'pending' | 'rejected';
   if (user.role === 'admin') targetPersona = 'admin';
   else if (user.role === 'judge') targetPersona = 'judge';
   else if (user.role === 'mentor') targetPersona = 'mentor';
@@ -163,10 +163,10 @@ export const AuthCallback: React.FC = () => {
   }, [searchParams, login, navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+    <div className="min-h-screen flex items-center justify-center bg-muted/60 text-foreground">
       <div className="text-center space-y-3">
         <div className="inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-sm text-slate-300">Đang hoàn tất xác thực tài khoản GitHub...</p>
+        <p className="text-sm text-muted-foreground">Đang hoàn tất xác thực tài khoản GitHub...</p>
       </div>
     </div>
   );

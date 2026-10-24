@@ -418,7 +418,7 @@ class EvaluationService:
                 score_val = float(item.score)
                 if score_val < 0.0 or score_val > float(criterion.max_score):
                     raise AppException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                         message=(
                             f"Score for '{criterion.title}' must be between 0 and {criterion.max_score}"
                         ),
@@ -445,7 +445,7 @@ class EvaluationService:
 
             if missing_criteria_ids:
                 raise AppException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     message="All required rubric criteria must have scores before submission",
                     error_code="MISSING_RUBRIC_CRITERIA_SCORE",
                     data={"missing_criteria_ids": missing_criteria_ids},

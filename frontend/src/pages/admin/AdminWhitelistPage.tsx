@@ -64,7 +64,10 @@ export const AdminWhitelistPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    void fetchBackendWhitelist();
+    const timer = window.setTimeout(() => {
+      void fetchBackendWhitelist();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [fetchBackendWhitelist]);
 
   const combinedWhitelist: WhitelistEntry[] = [
@@ -156,21 +159,16 @@ export const AdminWhitelistPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1
-            className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-            style={{
-              background: 'linear-gradient(90deg, #6366F1 0%, #FAFBFF 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}
+            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
           >
             Quản Lý Danh Sách Hợp Lệ
           </h1>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Chỉ những email nằm trong danh sách hợp lệ mới được kích hoạt tài khoản chính thức sau khi đăng nhập qua GitHub.
           </p>
         </div>
@@ -188,35 +186,35 @@ export const AdminWhitelistPage: React.FC = () => {
       </div>
 
       {alert && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-950/40 border border-emerald-800 text-xs text-emerald-300 flex items-center gap-2">
+        <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
           <CheckCircle2 size={15} />
           <span>{alert}</span>
         </div>
       )}
 
       {/* Filter and Stats */}
-      <div className="rounded-[14px] border border-[#334155] bg-[#1E293B] p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="rounded-[14px] border border-border bg-card p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative flex-1 w-full max-w-md">
-          <Search size={16} className="absolute left-3.5 top-3 text-slate-400" />
+          <Search size={16} className="absolute left-3.5 top-3 text-muted-foreground" />
           <input
             type="text"
             placeholder="Tìm kiếm email, ghi chú đơn vị..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full h-10 pl-10 pr-4 rounded-[10px] bg-[#0F172A] border border-[#334155] text-white text-xs placeholder-slate-400 focus:border-[#6366F1] focus:outline-none"
+            className="w-full h-10 pl-10 pr-4 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs placeholder:text-muted-foreground focus:border-[#6366F1] focus:outline-none"
           />
         </div>
 
-        <div className="text-xs text-slate-400">
-          Tổng cộng: <strong className="text-white">{combinedWhitelist.length}</strong> email trong danh sách
+        <div className="text-xs text-muted-foreground">
+          Tổng cộng: <strong className="text-foreground">{combinedWhitelist.length}</strong> email trong danh sách
         </div>
       </div>
 
       {/* Table */}
-      <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-        <div className="overflow-x-auto rounded-[12px] border border-[#334155] bg-[#0F172A]">
+      <div className="rounded-[16px] border border-border bg-card p-6 space-y-4">
+        <div className="overflow-x-auto rounded-[12px] border border-border bg-muted/40 dark:bg-slate-900/60">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-[#1E293B]/70 border-b border-[#334155] text-slate-400 font-semibold uppercase tracking-wider text-[11px]">
+            <thead className="bg-card border-b border-border text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">
               <tr>
                 <th className="py-3.5 px-4">Địa Chỉ Email</th>
                 <th className="py-3.5 px-4">Ghi Chú Đơn Vị</th>
@@ -225,26 +223,26 @@ export const AdminWhitelistPage: React.FC = () => {
                 <th className="py-3.5 px-4 text-right">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#334155]/60 text-slate-200">
+            <tbody className="divide-y divide-border text-foreground">
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-slate-400 text-xs italic">
+                  <td colSpan={5} className="py-8 text-center text-muted-foreground text-xs italic">
                     Chưa có email nào trong danh sách hợp lệ. Bấm "Thêm Email" hoặc "Nhập Danh Sách Hàng Loạt" để cấu hình.
                   </td>
                 </tr>
               ) : (
                 filtered.map((item) => (
-                <tr key={item.id} className="hover:bg-[#1E293B]/40 transition-colors">
-                  <td className="py-3.5 px-4 font-mono font-medium text-white">{item.email}</td>
-                  <td className="py-3.5 px-4 text-slate-300">{item.note || '—'}</td>
-                  <td className="py-3.5 px-4 hidden sm:table-cell text-slate-400">{item.addedAt}</td>
+                <tr key={item.id} className="hover:bg-accent transition-colors">
+                  <td className="py-3.5 px-4 font-mono font-medium text-foreground">{item.email}</td>
+                  <td className="py-3.5 px-4 text-muted-foreground">{item.note || '—'}</td>
+                  <td className="py-3.5 px-4 hidden sm:table-cell text-muted-foreground">{item.addedAt}</td>
                   <td className="py-3.5 px-4 text-center">
                     <button
                       onClick={() => void handleToggleActive(item)}
                       className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-colors ${
                         item.isActive
-                          ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
-                          : 'bg-slate-700/50 text-slate-400 border-slate-600/40 hover:bg-slate-700'
+                          ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                          : 'bg-muted text-muted-foreground border-border hover:bg-accent'
                       }`}
                     >
                       {item.isActive ? 'Kích hoạt' : 'Tạm khóa'}
@@ -253,7 +251,7 @@ export const AdminWhitelistPage: React.FC = () => {
                   <td className="py-3.5 px-4 text-right">
                     <button
                       onClick={() => handleDelete(item.id, item.email)}
-                      className="p-1.5 rounded-md hover:bg-[#334155] text-rose-400 hover:text-rose-300 transition-colors"
+                      className="p-1.5 rounded-md hover:bg-accent text-rose-700 dark:text-rose-400 hover:text-rose-300 transition-colors"
                       title="Xóa khỏi Whitelist"
                     >
                       <Trash2 size={15} />
@@ -304,7 +302,7 @@ export const AdminWhitelistPage: React.FC = () => {
         maxWidth="lg"
       >
         <form onSubmit={handleBulkImport} className="space-y-4">
-          <p className="text-xs text-slate-300">
+          <p className="text-xs text-muted-foreground">
             Dán danh sách email cần thêm vào ô bên dưới, mỗi email trên một dòng (hoặc cách nhau bằng dấu phẩy):
           </p>
 
@@ -312,7 +310,7 @@ export const AdminWhitelistPage: React.FC = () => {
             rows={6}
             value={bulkText}
             onChange={(e) => setBulkText(e.target.value)}
-            className="w-full p-3 font-mono text-xs rounded-[10px] bg-[#0F172A] border border-[#334155] text-slate-100 placeholder-slate-400 focus:border-[#6366F1] focus:outline-none"
+            className="w-full p-3 font-mono text-xs rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground focus:border-[#6366F1] focus:outline-none"
             placeholder="email1@domain.edu.vn&#10;email2@domain.edu.vn"
             required
           />

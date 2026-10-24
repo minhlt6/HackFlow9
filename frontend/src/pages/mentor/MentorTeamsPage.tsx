@@ -16,19 +16,14 @@ export const MentorTeamsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       <div>
         <h1
-          className="font-['Righteous'] text-2xl sm:text-3xl tracking-wide"
-          style={{
-            background: 'linear-gradient(90deg, #A855F7 0%, #FAFBFF 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}
+          className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
         >
           Đội Thi Thuộc Lĩnh Vực Phụ Trách
         </h1>
-        <p className="text-xs sm:text-sm text-slate-400 mt-1">
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Danh sách các đội thi đăng ký đề tài trong lĩnh vực Trí Tuệ Nhân Tạo & Y Tế Số.
         </p>
       </div>
@@ -37,39 +32,39 @@ export const MentorTeamsPage: React.FC = () => {
         {teams.map((team) => (
           <div
             key={team.id}
-            className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4"
+            className="rounded-[16px] border border-border bg-card p-6 space-y-4"
           >
-            <div className="flex items-start justify-between gap-2 pb-3 border-b border-[#334155]">
+            <div className="flex items-start justify-between gap-2 pb-3 border-b border-border">
               <div>
-                <h3 className="font-['Righteous'] text-xl text-white">{team.name}</h3>
-                <span className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-                  <Crown size={12} className="text-amber-400" />
+                <h3 className="font-semibold tracking-tight text-foreground text-xl text-foreground">{team.name}</h3>
+                <span className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <Crown size={12} className="text-amber-700 dark:text-amber-400" />
                   <span>Đội trưởng: {team.leaderName}</span>
                 </span>
               </div>
               <Badge variant="indigo">{team.members.length} thành viên</Badge>
             </div>
 
-            <div className="p-3 rounded-[10px] bg-[#0F172A] border border-[#334155] text-xs space-y-1">
-              <span className="text-slate-400 flex items-center gap-1">
-                <Lightbulb size={13} className="text-[#818CF8]" />
+            <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-xs space-y-1">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Lightbulb size={13} className="text-primary" />
                 <span>Đề tài:</span>
               </span>
-              <span className="text-white font-semibold">{getSubTopicTitle(team.subTopicId)}</span>
+              <span className="text-foreground font-semibold">{getSubTopicTitle(team.subTopicId)}</span>
             </div>
 
             <div className="space-y-2">
-              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block">
                 Thành viên đội:
               </span>
               <div className="space-y-1.5">
                 {team.members.map((m) => (
                   <div
                     key={m.id}
-                    className="p-2 rounded-[8px] bg-[#0F172A] text-xs flex items-center justify-between text-slate-300"
+                    className="p-2 rounded-[8px] bg-muted/40 dark:bg-slate-900/60 text-xs flex items-center justify-between text-muted-foreground"
                   >
                     <span>{m.fullName}</span>
-                    <span className="text-slate-400 text-[11px] font-mono">{m.email}</span>
+                    <span className="text-muted-foreground text-[11px] font-mono">{m.email}</span>
                   </div>
                 ))}
               </div>

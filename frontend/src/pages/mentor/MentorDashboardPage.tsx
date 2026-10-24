@@ -20,33 +20,28 @@ export const MentorDashboardPage: React.FC = () => {
   const claimedByMe = tickets.filter((t) => t.assignedMentorId === currentUser.id);
 
   return (
-    <div className="space-y-6 font-['Roboto']">
+    <div className="space-y-6 ">
       {/* Top Banner */}
-      <div className="relative overflow-hidden rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 lg:p-8">
+      <div className="relative overflow-hidden rounded-[16px] border border-border bg-card p-6 lg:p-8">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#6366F1]/10 blur-3xl pointer-events-none" />
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-[#818CF8]">
+              <span className="text-xs font-bold uppercase tracking-wider text-primary">
                 Cố Vấn Chuyên Môn Kỹ Thuật
               </span>
-              <span className="text-slate-500">•</span>
+              <span className="text-muted-foreground">•</span>
               <Badge variant="purple">Hỗ Trợ Kỹ Thuật 24/7</Badge>
             </div>
             <h1
-              className="font-['Righteous'] text-2xl sm:text-3xl lg:text-4xl tracking-wide"
-              style={{
-                background: 'linear-gradient(90deg, #A855F7 0%, #FAFBFF 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
+              className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl lg:text-4xl tracking-wide"
             >
               Xin chào, {currentUser.fullName}!
             </h1>
-            <p className="text-sm text-slate-300 max-w-2xl leading-relaxed">
+            <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
               Bạn đang phụ trách cố vấn kỹ thuật cho lĩnh vực{' '}
-              <strong className="text-white">Trí Tuệ Nhân Tạo & Y Tế Số</strong>. Tiếp nhận các yêu cầu hỗ trợ và đồng hành cùng các đội thi.
+              <strong className="text-foreground">Trí Tuệ Nhân Tạo & Y Tế Số</strong>. Tiếp nhận các yêu cầu hỗ trợ và đồng hành cùng các đội thi.
             </p>
           </div>
 
@@ -95,9 +90,9 @@ export const MentorDashboardPage: React.FC = () => {
       </div>
 
       {/* Recent Tickets Queue */}
-      <div className="rounded-[16px] border border-[#334155] bg-[#1E293B] p-6 space-y-4">
-        <div className="flex items-center justify-between pb-3 border-b border-[#334155]">
-          <h3 className="font-['Righteous'] text-lg text-white">
+      <div className="rounded-[16px] border border-border bg-card p-6 space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-border">
+          <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
             Hàng Đợi Yêu Cầu Hỗ Trợ Mới Nhất
           </h3>
           <Button
@@ -115,17 +110,17 @@ export const MentorDashboardPage: React.FC = () => {
           {openTickets.map((t) => (
             <div
               key={t.id}
-              className="p-4 rounded-[12px] bg-[#0F172A] border border-[#334155] flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-white text-sm">{t.title}</span>
+                  <span className="font-bold text-foreground text-sm">{t.title}</span>
                   <Badge variant={t.priority === 'high' ? 'danger' : 'warning'}>
                     {t.priority.toUpperCase()}
                   </Badge>
                 </div>
-                <p className="text-xs text-slate-400 mt-1 line-clamp-1">{t.description}</p>
-                <div className="text-[11px] text-[#818CF8] mt-1">
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{t.description}</p>
+                <div className="text-[11px] text-primary mt-1">
                   Đội thi: {t.teamName} • Người tạo: {t.creatorName}
                 </div>
               </div>
