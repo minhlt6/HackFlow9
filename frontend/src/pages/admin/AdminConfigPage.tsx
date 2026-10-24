@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
+import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Badge } from '../../components/Badge';
@@ -49,6 +50,42 @@ export const AdminConfigPage: React.FC = () => {
     config.finalSubmissionDeadline ? config.finalSubmissionDeadline.slice(0, 16) : ''
   );
   const [alert, setAlert] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    apiClient
+      .get('/admin/config')
+      .then((res) => {
+        if (!mounted) return;
+        const data = res.data?.data ?? res.data;
+        if (data && typeof data === 'object') {
+          const currCfg = useMockStore.getState().config;
+          const nextName = String(data.name ?? data.eventName ?? currCfg.name);
+          const nextMaxTeam = Number(data.maxTeamSize ?? currCfg.maxTeamMembers ?? 5);
+          const nextEnd = String(data.end_time ?? data.endAt ?? currCfg.finalSubmissionDeadline);
+          setName(nextName);
+          setMaxTeamMembers(nextMaxTeam);
+          if (nextEnd) {
+            setFinalDeadline(nextEnd.slice(0, 16));
+          }
+          useMockStore.setState((state) => ({
+            config: {
+              ...state.config,
+              name: nextName,
+              maxTeamMembers: nextMaxTeam,
+              finalSubmissionDeadline: nextEnd || state.config.finalSubmissionDeadline,
+              blindJudging: Boolean(data.blindJudgingEnabled ?? state.config.blindJudging),
+              blindJudgingMode: Boolean(data.blindJudgingEnabled ?? state.config.blindJudgingMode),
+              resultsPublished: Boolean(data.is_result_published ?? data.leaderboardPublished ?? state.config.resultsPublished),
+            },
+          }));
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const initialName = config.name;
   const initialPhase = config.currentPhase;

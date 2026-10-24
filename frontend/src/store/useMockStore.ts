@@ -314,6 +314,15 @@ export const useMockStore = create<MockStoreState>()(
         set((state) => ({
           currentUser: { ...state.currentUser, ...profile },
         }));
+        void apiClient
+          .patch('/auth/profile', {
+            full_name: profile.fullName,
+            student_id: profile.studentId,
+            school: profile.university || profile.school,
+            phone: profile.phone,
+            skills: profile.skills,
+          })
+          .catch(() => {});
       },
 
       // Onboarding Wizard & Guided Setup
@@ -346,24 +355,37 @@ export const useMockStore = create<MockStoreState>()(
         set((state) => ({
           config: { ...state.config, ...newConfig },
         }));
+        void apiClient
+          .patch('/admin/config', {
+            name: newConfig.name,
+            end_time: newConfig.finalSubmissionDeadline,
+            maxTeamSize: newConfig.maxTeamMembers,
+            status: newConfig.currentPhase,
+            blindJudgingEnabled: newConfig.blindJudgingMode ?? newConfig.blindJudging,
+            is_result_published: newConfig.resultsPublished,
+          })
+          .catch(() => {});
       },
       toggleBlindJudging: () => {
-        set((state) => {
-          const next = !state.config.blindJudgingMode;
-          return {
-            config: { ...state.config, blindJudging: next, blindJudgingMode: next },
-          };
-        });
+        const next = !get().config.blindJudgingMode;
+        set((state) => ({
+          config: { ...state.config, blindJudging: next, blindJudgingMode: next },
+        }));
+        void apiClient.patch('/admin/config', { blindJudgingEnabled: next }).catch(() => {});
       },
       toggleResultsPublished: () => {
+        const next = !get().config.resultsPublished;
         set((state) => ({
-          config: { ...state.config, resultsPublished: !state.config.resultsPublished },
+          config: { ...state.config, resultsPublished: next },
         }));
+        void apiClient
+          .patch('/admin/config', { is_result_published: next, leaderboardPublished: next })
+          .catch(() => {});
       },
       toggleContestStarted: () => {
+        const nextStarted = !get().config.isContestStarted;
+        const now = Date.now();
         set((state) => {
-          const nextStarted = !state.config.isContestStarted;
-          const now = Date.now();
           const updatedCheckpoints = nextStarted
             ? state.checkpoints.map((cp) => {
                 const duration = cp.durationMinutes || 180;
@@ -387,6 +409,12 @@ export const useMockStore = create<MockStoreState>()(
             checkpoints: updatedCheckpoints,
           };
         });
+        void apiClient
+          .patch('/admin/config', {
+            status: nextStarted ? 'hacking' : 'registration',
+            is_topic_published: true,
+          })
+          .catch(() => {});
       },
 
       // Whitelist
@@ -1237,6 +1265,20 @@ export const useMockStore = create<MockStoreState>()(
             evalRecord,
           ],
         }));
+
+        void apiClient
+          .post('/evaluations', {
+            submission_id: teamId,
+            team_id: teamId,
+            status: isDraft ? 'draft' : 'submitted',
+            general_comment: generalComment,
+            evaluations: details.map((d) => ({
+              criteria_id: d.criteriaId,
+              score: d.score,
+              comment: generalComment,
+            })),
+          })
+          .catch(() => {});
       },
 
       // Tickets
@@ -1462,13 +1504,21 @@ export const useMockStore = create<MockStoreState>()(
             ? (raw as { data: unknown }).data
             : raw;
 
-        const [topicsRes, checkpointsRes, rubricsRes, annRes, teamsRes] = await Promise.allSettled([
-          apiClient.get('/topics'),
-          apiClient.get('/checkpoints'),
-          apiClient.get('/rubrics'),
-          apiClient.get('/announcements'),
-          apiClient.get('/teams'),
-        ]);
+        const roleNow = get().currentUser.role || get().activeRolePersona;
+        const [topicsRes, checkpointsRes, rubricsRes, annRes, teamsRes, ticketsRes, submissionsRes, judgeSubmRes, configRes] =
+          await Promise.allSettled([
+            apiClient.get('/topics'),
+            apiClient.get('/checkpoints'),
+            apiClient.get('/rubrics'),
+            apiClient.get('/announcements'),
+            apiClient.get('/teams'),
+            apiClient.get('/tickets'),
+            apiClient.get('/submissions'),
+            roleNow === 'judge' || roleNow === 'admin'
+              ? apiClient.get('/evaluations/submissions')
+              : Promise.resolve({ data: null }),
+            roleNow === 'admin' ? apiClient.get('/admin/config') : Promise.resolve({ data: null }),
+          ]);
 
         const updates: Partial<MockStoreState> = {};
 
@@ -1622,6 +1672,151 @@ export const useMockStore = create<MockStoreState>()(
                 roleInTeam: matchedMember?.roleInTeam || 'member',
               };
             }
+          }
+        }
+
+        if (ticketsRes.status === 'fulfilled') {
+          const tkRaw = unwrap(ticketsRes.value.data);
+          const tkArr = Array.isArray(tkRaw)
+            ? tkRaw
+            : tkRaw && typeof tkRaw === 'object' && Array.isArray((tkRaw as { items?: unknown[] }).items)
+              ? (tkRaw as { items: unknown[] }).items
+              : null;
+          if (Array.isArray(tkArr)) {
+            updates.tickets = (tkArr as Array<Record<string, unknown>>).map((tk, idx) => ({
+              id: String(tk.id),
+              ticketCode: String(tk.ticket_code ?? `TK-${String(idx + 1).padStart(2, '0')}`),
+              teamId: String(tk.team_id ?? ''),
+              teamName: String(tk.team_name ?? 'Đội thi'),
+              creatorId: String(tk.created_by ?? tk.user_id ?? ''),
+              creatorName: String(tk.creator_name ?? tk.sender_name ?? 'Thí sinh'),
+              senderId: String(tk.created_by ?? tk.user_id ?? ''),
+              senderName: String(tk.creator_name ?? tk.sender_name ?? 'Thí sinh'),
+              title: String(tk.title ?? ''),
+              description: String(tk.description ?? tk.content ?? ''),
+              content: String(tk.description ?? tk.content ?? ''),
+              category: (String(tk.category ?? 'technical') as SupportTicket['category']) || 'technical',
+              priority: (String(tk.priority ?? 'normal') as SupportTicket['priority']) || 'normal',
+              status: (String(tk.status ?? 'open') as SupportTicket['status']) || 'open',
+              mentorId: tk.assigned_to ? String(tk.assigned_to) : undefined,
+              mentorName: tk.assignee_name ? String(tk.assignee_name) : undefined,
+              assignedMentorId: tk.assigned_to ? String(tk.assigned_to) : undefined,
+              assignedMentorName: tk.assignee_name ? String(tk.assignee_name) : undefined,
+              response: tk.resolution_note ? String(tk.resolution_note) : undefined,
+              createdAt: String(tk.created_at ?? new Date().toISOString()),
+              updatedAt: String(tk.updated_at ?? tk.created_at ?? new Date().toISOString()),
+              replies: [],
+              messages: [],
+            }));
+          }
+        }
+
+        if (submissionsRes.status === 'fulfilled') {
+          const subArr = unwrap(submissionsRes.value.data);
+          if (Array.isArray(subArr)) {
+            const mappedSubs: CheckpointSubmission[] = [];
+            const mappedFinals: FinalSubmission[] = [];
+            for (const raw of subArr as Array<Record<string, unknown>>) {
+              const subData =
+                raw.submission_data && typeof raw.submission_data === 'object'
+                  ? (raw.submission_data as Record<string, unknown>)
+                  : {};
+              const repoUrl = String(raw.repo_url ?? subData.repo_url ?? subData.github_url ?? '');
+              const demoUrl = String(raw.demo_url ?? subData.demo_url ?? '');
+              const slideUrl = String(subData.slide_url ?? subData.presentation_url ?? '');
+              const note = String(raw.note ?? subData.note ?? subData.description ?? '');
+              const teamId = String(raw.team_id ?? '');
+              const cpId = String(raw.checkpoint_id ?? '');
+              const submittedAt = String(raw.submitted_at ?? new Date().toISOString());
+              const commitSha = String(raw.commit_sha ?? 'verified');
+
+              mappedSubs.push({
+                id: String(raw.id),
+                checkpointId: cpId,
+                teamId,
+                repoUrl,
+                demoUrl,
+                description: note,
+                commitSha,
+                submittedAt,
+                isAfterDeadline: Boolean(raw.grace_period_applied),
+                status: 'submitted',
+              });
+
+              if (repoUrl || demoUrl || slideUrl) {
+                mappedFinals.push({
+                  teamId,
+                  repoUrl,
+                  demoVideoUrl: demoUrl,
+                  slideUrl,
+                  summary: note,
+                  commitSha,
+                  submittedAt,
+                  isLate: Boolean(raw.grace_period_applied),
+                  status: 'submitted',
+                });
+              }
+            }
+            updates.submissions = mappedSubs;
+            if (mappedFinals.length > 0) {
+              updates.finalSubmissions = mappedFinals;
+            }
+          }
+        }
+
+        if (judgeSubmRes.status === 'fulfilled' && judgeSubmRes.value.data) {
+          const jRaw = unwrap(judgeSubmRes.value.data) as { submissions?: Array<Record<string, unknown>> } | null;
+          if (Array.isArray(jRaw?.submissions)) {
+            const currJudge = get().currentUser;
+            const mappedEvals: TeamEvaluation[] = [];
+            for (const js of jRaw.submissions) {
+              const evalStatus = String(js.evaluation_status ?? 'not_started');
+              if (evalStatus === 'not_started') continue;
+              const rawEvals = Array.isArray(js.my_evaluations)
+                ? (js.my_evaluations as Array<Record<string, unknown>>)
+                : [];
+              const scoresMap: Record<string, number> = {};
+              const details: Array<{ criteriaId: string; score: number }> = [];
+              for (const ev of rawEvals) {
+                const cid = String(ev.criteria_id ?? '');
+                const sc = Number(ev.score ?? 0);
+                if (cid) {
+                  scoresMap[cid] = sc;
+                  details.push({ criteriaId: cid, score: sc });
+                }
+              }
+              mappedEvals.push({
+                id: `eval-${String(js.submission_id)}`,
+                teamId: String(js.submission_id),
+                judgeId: currJudge.id,
+                judgeName: currJudge.fullName,
+                totalScore: Number(js.my_total_score ?? 0),
+                scores: scoresMap,
+                generalComment: String(js.note ?? ''),
+                isDraft: evalStatus === 'draft',
+                confirmedAt: evalStatus === 'submitted' ? String(js.submitted_at ?? new Date().toISOString()) : undefined,
+                details,
+              });
+            }
+            if (mappedEvals.length > 0) {
+              updates.evaluations = mappedEvals;
+            }
+          }
+        }
+
+        if (configRes.status === 'fulfilled' && configRes.value.data) {
+          const cfgObj = unwrap(configRes.value.data) as Record<string, unknown> | null;
+          if (cfgObj && typeof cfgObj === 'object') {
+            const currCfg = get().config;
+            updates.config = {
+              ...currCfg,
+              name: String(cfgObj.name ?? cfgObj.eventName ?? currCfg.name),
+              blindJudging: Boolean(cfgObj.blindJudgingEnabled ?? currCfg.blindJudging),
+              blindJudgingMode: Boolean(cfgObj.blindJudgingEnabled ?? currCfg.blindJudgingMode),
+              resultsPublished: Boolean(cfgObj.is_result_published ?? cfgObj.leaderboardPublished ?? currCfg.resultsPublished),
+              maxTeamMembers: Number(cfgObj.maxTeamSize ?? currCfg.maxTeamMembers ?? 5),
+              finalSubmissionDeadline: String(cfgObj.end_time ?? cfgObj.endAt ?? currCfg.finalSubmissionDeadline),
+            };
           }
         }
 

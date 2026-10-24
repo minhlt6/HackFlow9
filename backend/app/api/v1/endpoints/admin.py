@@ -591,12 +591,16 @@ async def delete_admin_team(
     summary="Danh sách Giám khảo và Cố vấn (Admin)",
 )
 async def list_personnel(
+    role: Optional[str] = Query(default=None),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
+    allowed_roles = [UserRole.JUDGE.value, UserRole.MENTOR.value]
+    if role and role.strip().lower() in allowed_roles:
+        allowed_roles = [role.strip().lower()]
     stmt = (
         select(User)
-        .where(User.role.in_([UserRole.JUDGE.value, UserRole.MENTOR.value]))
+        .where(User.role.in_(allowed_roles))
         .order_by(User.created_at.asc())
     )
     res = await db.execute(stmt)
@@ -957,3 +961,298 @@ async def approve_or_reject_candidate(
             data=UserResponse.model_validate(candidate),
             message=f"Tài khoản {candidate.email} đã bị từ chối.",
         )
+
+
+
+# ─── Admin: Personnel Update, Hackathon Config & Dashboard Stats (HF-51) ─────
+
+
+class AdminPersonnelUpdateRequest(BaseModel):
+    full_name: Optional[str] = None
+    role: Optional[str] = None
+    organization: Optional[str] = None
+    specialty: Optional[str] = None
+    assigned_tracks: Optional[List[str]] = None
+    assigned_team_ids: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+
+@router.patch(
+    "/personnel/{user_id}",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Cập nhật thông tin nhân sự Giám khảo / Cố vấn (Admin)",
+)
+async def update_personnel(
+    user_id: str,
+    body: AdminPersonnelUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(require_role("admin")),
+):
+    u = await user_repo.get_by_id(db, user_id)
+    if not u:
+        raise NotFoundException(message="Không tìm thấy nhân sự.")
+
+    if body.full_name is not None:
+        u.full_name = body.full_name.strip()
+    if body.role is not None:
+        role_val = body.role.strip().lower()
+        if role_val not in (UserRole.JUDGE.value, UserRole.MENTOR.value):
+            raise BadRequestException(message="Vai trò nhân sự phải là 'judge' hoặc 'mentor'.")
+        u.role = role_val
+    if body.is_active is not None:
+        u.is_active = body.is_active
+
+    uid = str(u.id)
+    meta = _PERSONNEL_EXTRA_META.setdefault(
+        uid,
+        {
+            "organization": "Hội đồng Chuyên môn",
+            "specialty": "Công nghệ Phần mềm & AI",
+            "assigned_tracks": [],
+            "assigned_team_ids": [],
+        },
+    )
+    if body.organization is not None:
+        meta["organization"] = body.organization
+    if body.specialty is not None:
+        meta["specialty"] = body.specialty
+    if body.assigned_tracks is not None:
+        meta["assigned_tracks"] = body.assigned_tracks
+    if body.assigned_team_ids is not None:
+        meta["assigned_team_ids"] = body.assigned_team_ids
+        if u.role == UserRole.JUDGE.value:
+            old_assigns = await db.execute(
+                select(JudgeAssignment).where(JudgeAssignment.judge_id == uid)
+            )
+            for oa in old_assigns.scalars().all():
+                await db.delete(oa)
+            await db.flush()
+            for tid in body.assigned_team_ids:
+                db.add(
+                    JudgeAssignment(
+                        judge_id=uid,
+                        team_id=tid,
+                        assigned_by=str(current_admin.id),
+                    )
+                )
+
+    db.add(u)
+    await db.commit()
+    await db.refresh(u)
+    return success_response(
+        data={
+            "id": uid,
+            "full_name": u.full_name,
+            "email": u.email,
+            "role": u.role,
+            "organization": meta.get("organization", "Hội đồng Chuyên môn"),
+            "specialty": meta.get("specialty", "Công nghệ Phần mềm & AI"),
+            "assigned_tracks": meta.get("assigned_tracks", []),
+            "assigned_team_ids": meta.get("assigned_team_ids", []),
+            "is_active": u.is_active,
+        },
+        message=f"Đã cập nhật thông tin nhân sự '{u.full_name}' thành công.",
+    )
+
+
+_CONFIG_EXTENDED_META: Dict[str, Any] = {
+    "season": "Fall 2026",
+    "status": "hacking",
+    "registrationDeadline": "2026-10-14T16:59:00.000Z",
+    "blindJudgingEnabled": True,
+    "submissionFreezeEnabled": True,
+    "maxTeamSize": 5,
+    "minTeamSize": 2,
+    "discrepancyThreshold": 15,
+}
+
+
+async def _get_or_create_hackathon_config(db: AsyncSession):
+    from app.models.config import HackathonConfig
+
+    res = await db.execute(select(HackathonConfig).order_by(HackathonConfig.created_at.asc()))
+    cfg = res.scalars().first()
+    if not cfg:
+        cfg = HackathonConfig(
+            name="HackFlow 2026 — Vietnam AI & Web3 Innovation Challenge",
+            start_time=datetime(2026, 10, 15, 1, 0, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 10, 18, 11, 0, 0, tzinfo=timezone.utc),
+            is_topic_published=True,
+            is_result_published=False,
+        )
+        db.add(cfg)
+        await db.commit()
+        await db.refresh(cfg)
+    return cfg
+
+
+def _serialize_hackathon_config(cfg: Any) -> Dict[str, Any]:
+    start_iso = cfg.start_time.isoformat() if cfg.start_time else "2026-10-15T01:00:00+00:00"
+    end_iso = cfg.end_time.isoformat() if cfg.end_time else "2026-10-18T11:00:00+00:00"
+    return {
+        "id": str(cfg.id),
+        "name": cfg.name,
+        "start_time": start_iso,
+        "end_time": end_iso,
+        "is_topic_published": bool(cfg.is_topic_published),
+        "is_result_published": bool(cfg.is_result_published),
+        # Extended UI fields for AdminConfigPage
+        "eventName": cfg.name,
+        "season": _CONFIG_EXTENDED_META.get("season", "Fall 2026"),
+        "status": _CONFIG_EXTENDED_META.get("status", "hacking"),
+        "startAt": start_iso,
+        "endAt": end_iso,
+        "registrationDeadline": _CONFIG_EXTENDED_META.get(
+            "registrationDeadline", "2026-10-14T16:59:00.000Z"
+        ),
+        "blindJudgingEnabled": bool(_CONFIG_EXTENDED_META.get("blindJudgingEnabled", True)),
+        "leaderboardPublished": bool(cfg.is_result_published),
+        "topicSelectionLocked": not bool(cfg.is_topic_published),
+        "submissionFreezeEnabled": bool(_CONFIG_EXTENDED_META.get("submissionFreezeEnabled", True)),
+        "maxTeamSize": int(_CONFIG_EXTENDED_META.get("maxTeamSize", 5)),
+        "minTeamSize": int(_CONFIG_EXTENDED_META.get("minTeamSize", 2)),
+        "discrepancyThreshold": int(_CONFIG_EXTENDED_META.get("discrepancyThreshold", 15)),
+    }
+
+
+@router.get(
+    "/config",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Lấy cấu hình cuộc thi Hackathon (Admin - HF-51)",
+)
+async def get_hackathon_config(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    cfg = await _get_or_create_hackathon_config(db)
+    return success_response(
+        data=_serialize_hackathon_config(cfg),
+        message="Tải cấu hình cuộc thi thành công.",
+    )
+
+
+@router.patch(
+    "/config",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Cập nhật cấu hình cuộc thi Hackathon (Admin - HF-51)",
+)
+async def update_hackathon_config(
+    body: Dict[str, Any] = Body(...),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    cfg = await _get_or_create_hackathon_config(db)
+
+    # 1. Name / eventName
+    new_name = body.get("name") or body.get("eventName")
+    if isinstance(new_name, str) and new_name.strip():
+        cfg.name = new_name.strip()
+
+    # 2. Parse start_time / startAt & end_time / endAt
+    raw_start = body.get("start_time") or body.get("startAt")
+    raw_end = body.get("end_time") or body.get("endAt")
+
+    def _parse_dt(val: Any) -> Optional[datetime]:
+        if isinstance(val, datetime):
+            return val if val.tzinfo else val.replace(tzinfo=timezone.utc)
+        if isinstance(val, str) and val.strip():
+            cleaned = val.strip().replace("Z", "+00:00")
+            dt = datetime.fromisoformat(cleaned)
+            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+        return None
+
+    new_start = _parse_dt(raw_start) if raw_start is not None else cfg.start_time
+    new_end = _parse_dt(raw_end) if raw_end is not None else cfg.end_time
+
+    if new_start and new_end:
+        s_cmp = new_start if new_start.tzinfo else new_start.replace(tzinfo=timezone.utc)
+        e_cmp = new_end if new_end.tzinfo else new_end.replace(tzinfo=timezone.utc)
+        if s_cmp >= e_cmp:
+            raise BadRequestException(
+                message="Thời gian bắt đầu (start_time) phải nhỏ hơn thời gian kết thúc (end_time)."
+            )
+
+    if new_start is not None:
+        cfg.start_time = new_start
+    if new_end is not None:
+        cfg.end_time = new_end
+
+    # 3. Topic & Result publish flags
+    if "is_topic_published" in body and body["is_topic_published"] is not None:
+        cfg.is_topic_published = bool(body["is_topic_published"])
+    elif "topicSelectionLocked" in body and body["topicSelectionLocked"] is not None:
+        cfg.is_topic_published = not bool(body["topicSelectionLocked"])
+
+    if "is_result_published" in body and body["is_result_published"] is not None:
+        cfg.is_result_published = bool(body["is_result_published"])
+    elif "leaderboardPublished" in body and body["leaderboardPublished"] is not None:
+        cfg.is_result_published = bool(body["leaderboardPublished"])
+
+    # 4. Extended UI metadata
+    for k in (
+        "season",
+        "status",
+        "registrationDeadline",
+        "blindJudgingEnabled",
+        "submissionFreezeEnabled",
+        "maxTeamSize",
+        "minTeamSize",
+        "discrepancyThreshold",
+    ):
+        if k in body and body[k] is not None:
+            _CONFIG_EXTENDED_META[k] = body[k]
+
+    db.add(cfg)
+    await db.commit()
+    await db.refresh(cfg)
+    return success_response(
+        data=_serialize_hackathon_config(cfg),
+        message="Đã lưu cấu hình toàn cục hệ thống thành công.",
+    )
+
+
+@router.get(
+    "/stats",
+    response_model=ApiResponse[Dict[str, int]],
+    summary="Số liệu thống kê tổng quan cho Admin Dashboard (HF-51)",
+)
+async def get_admin_stats(
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    from sqlalchemy import func
+    from app.models.checkpoint import Submission
+    from app.models.support import SupportTicket, TicketStatus
+
+    total_candidates_res = await db.execute(
+        select(func.count()).select_from(User).where(User.role == UserRole.CANDIDATE.value)
+    )
+    pending_approvals_res = await db.execute(
+        select(func.count())
+        .select_from(User)
+        .where(
+            User.role == UserRole.CANDIDATE.value,
+            User.approval_status == ApprovalStatus.PENDING.value,
+        )
+    )
+    total_teams_res = await db.execute(select(func.count()).select_from(Team))
+    total_topics_res = await db.execute(select(func.count()).select_from(Topic))
+    total_submissions_res = await db.execute(select(func.count()).select_from(Submission))
+    open_tickets_res = await db.execute(
+        select(func.count())
+        .select_from(SupportTicket)
+        .where(SupportTicket.status != TicketStatus.RESOLVED.value)
+    )
+
+    stats = {
+        "total_candidates": int(total_candidates_res.scalar() or 0),
+        "pending_approvals": int(pending_approvals_res.scalar() or 0),
+        "total_teams": int(total_teams_res.scalar() or 0),
+        "total_topics": int(total_topics_res.scalar() or 0),
+        "total_submissions": int(total_submissions_res.scalar() or 0),
+        "open_tickets": int(open_tickets_res.scalar() or 0),
+    }
+    return success_response(
+        data=stats,
+        message="Tải số liệu thống kê tổng quan thành công.",
+    )

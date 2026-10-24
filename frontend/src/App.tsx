@@ -201,44 +201,66 @@ const router = createBrowserRouter([
           {
             element: <ProtectedRoute requiredApprovalStatus="approved" />,
             children: [
-              // Candidate Routes
+              // Shared Routes across Approved Roles
               { path: '/', element: <RoleRootPage /> },
-              { path: '/dashboard', element: <CandidateDashboardPage /> },
-              { path: '/teams', element: <TeamsPage /> },
-              { path: '/topics', element: <TopicsPage /> },
-              { path: '/checkpoints', element: <CandidateCheckpointsPage /> },
-              { path: '/final-submission', element: <CandidateFinalSubmissionPage /> },
               { path: '/scoreboard', element: <Scoreboard /> },
               { path: '/tickets', element: <SupportTickets /> },
 
-              // Admin Routes
-              { path: '/admin', element: <AdminDashboardPage /> },
-              { path: '/admin/dashboard', element: <AdminDashboardPage /> },
-              { path: '/admin/approvals', element: <AdminApprovalsPage /> },
-              { path: '/admin/whitelist', element: <AdminWhitelistPage /> },
-              { path: '/admin/teams', element: <AdminTeamsPage /> },
-              { path: '/admin/topics', element: <AdminTopicsPage /> },
-              { path: '/admin/checkpoints', element: <AdminCheckpointsPage /> },
-              { path: '/admin/criteria', element: <AdminCriteriaPage /> },
-              { path: '/admin/personnel', element: <AdminMentorsJudgesPage /> },
-              { path: '/admin/results', element: <AdminResultsPage /> },
-              { path: '/admin/announcements', element: <AdminAnnouncementsPage /> },
-              { path: '/admin/config', element: <AdminConfigPage /> },
+              // Candidate Routes
+              {
+                element: <ProtectedRoute requiredApprovalStatus="approved" allowedRoles={['candidate', 'admin']} />,
+                children: [
+                  { path: '/dashboard', element: <CandidateDashboardPage /> },
+                  { path: '/teams', element: <TeamsPage /> },
+                  { path: '/topics', element: <TopicsPage /> },
+                  { path: '/checkpoints', element: <CandidateCheckpointsPage /> },
+                  { path: '/final-submission', element: <CandidateFinalSubmissionPage /> },
+                ],
+              },
 
-              // Judge Routes
-              { path: '/judge', element: <JudgeDashboardPage /> },
-              { path: '/judge/dashboard', element: <JudgeDashboardPage /> },
-              { path: '/judge/split-screen', element: <JudgingWorkspace /> },
-              { path: '/judging', element: <JudgingWorkspace /> },
-              { path: '/judge/topics', element: <JudgeTopicsPage /> },
-              { path: '/judge/results', element: <JudgeResultsPage /> },
+              // Admin Routes (Strict RBAC: Admin Only)
+              {
+                element: <ProtectedRoute requiredApprovalStatus="approved" allowedRoles={['admin']} />,
+                children: [
+                  { path: '/admin', element: <AdminDashboardPage /> },
+                  { path: '/admin/dashboard', element: <AdminDashboardPage /> },
+                  { path: '/admin/approvals', element: <AdminApprovalsPage /> },
+                  { path: '/admin/whitelist', element: <AdminWhitelistPage /> },
+                  { path: '/admin/teams', element: <AdminTeamsPage /> },
+                  { path: '/admin/topics', element: <AdminTopicsPage /> },
+                  { path: '/admin/checkpoints', element: <AdminCheckpointsPage /> },
+                  { path: '/admin/criteria', element: <AdminCriteriaPage /> },
+                  { path: '/admin/personnel', element: <AdminMentorsJudgesPage /> },
+                  { path: '/admin/results', element: <AdminResultsPage /> },
+                  { path: '/admin/announcements', element: <AdminAnnouncementsPage /> },
+                  { path: '/admin/config', element: <AdminConfigPage /> },
+                ],
+              },
 
-              // Mentor Routes
-              { path: '/mentor', element: <MentorDashboardPage /> },
-              { path: '/mentor/dashboard', element: <MentorDashboardPage /> },
-              { path: '/mentor/tickets', element: <SupportTickets /> },
-              { path: '/mentor/teams', element: <MentorTeamsPage /> },
-              { path: '/mentor/checkpoints', element: <MentorCheckpointsPage /> },
+              // Judge Routes (Strict RBAC: Judge & Admin)
+              {
+                element: <ProtectedRoute requiredApprovalStatus="approved" allowedRoles={['judge', 'admin']} />,
+                children: [
+                  { path: '/judge', element: <JudgeDashboardPage /> },
+                  { path: '/judge/dashboard', element: <JudgeDashboardPage /> },
+                  { path: '/judge/split-screen', element: <JudgingWorkspace /> },
+                  { path: '/judging', element: <JudgingWorkspace /> },
+                  { path: '/judge/topics', element: <JudgeTopicsPage /> },
+                  { path: '/judge/results', element: <JudgeResultsPage /> },
+                ],
+              },
+
+              // Mentor Routes (Strict RBAC: Mentor & Admin)
+              {
+                element: <ProtectedRoute requiredApprovalStatus="approved" allowedRoles={['mentor', 'admin']} />,
+                children: [
+                  { path: '/mentor', element: <MentorDashboardPage /> },
+                  { path: '/mentor/dashboard', element: <MentorDashboardPage /> },
+                  { path: '/mentor/tickets', element: <SupportTickets /> },
+                  { path: '/mentor/teams', element: <MentorTeamsPage /> },
+                  { path: '/mentor/checkpoints', element: <MentorCheckpointsPage /> },
+                ],
+              },
             ],
           },
         ],

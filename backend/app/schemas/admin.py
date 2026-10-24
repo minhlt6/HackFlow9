@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, EmailStr, field_validator
 
@@ -77,3 +78,60 @@ class CandidateApprovalRequest(BaseModel):
             raise ValueError("action must be 'approve' or 'reject'")
         return v
 
+
+# ─── Admin: Hackathon Config & Stats (HF-51) ─────────────────────────────────
+
+class HackathonConfigUpdateRequest(BaseModel):
+    name: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    is_topic_published: Optional[bool] = None
+    is_result_published: Optional[bool] = None
+
+    # Extended UI fields (camelCase compatibility with AdminConfigPage)
+    eventName: Optional[str] = None
+    season: Optional[str] = None
+    status: Optional[str] = None
+    startAt: Optional[datetime] = None
+    endAt: Optional[datetime] = None
+    registrationDeadline: Optional[str] = None
+    blindJudgingEnabled: Optional[bool] = None
+    leaderboardPublished: Optional[bool] = None
+    topicSelectionLocked: Optional[bool] = None
+    submissionFreezeEnabled: Optional[bool] = None
+    maxTeamSize: Optional[int] = None
+    minTeamSize: Optional[int] = None
+    discrepancyThreshold: Optional[int] = None
+
+
+class HackathonConfigResponse(BaseModel):
+    id: str
+    name: str
+    start_time: str
+    end_time: str
+    is_topic_published: bool
+    is_result_published: bool
+
+    # Extended UI fields
+    eventName: str
+    season: str = "Fall 2026"
+    status: str = "hacking"
+    startAt: str
+    endAt: str
+    registrationDeadline: str = "2026-10-14T16:59:00.000Z"
+    blindJudgingEnabled: bool = True
+    leaderboardPublished: bool = False
+    topicSelectionLocked: bool = False
+    submissionFreezeEnabled: bool = True
+    maxTeamSize: int = 5
+    minTeamSize: int = 2
+    discrepancyThreshold: int = 15
+
+
+class AdminStatsResponse(BaseModel):
+    total_candidates: int
+    pending_approvals: int
+    total_teams: int
+    total_topics: int
+    total_submissions: int
+    open_tickets: int

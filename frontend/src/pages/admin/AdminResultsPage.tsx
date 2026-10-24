@@ -1,54 +1,222 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
+import { getLeaderboard } from '../../services/evaluationService';
+import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
+import { Modal } from '../../components/Modal';
+import { Input } from '../../components/Input';
 import {
   Download,
   Eye,
   EyeOff,
   Trophy,
   CheckCircle2,
+  AlertTriangle,
+  Unlock,
 } from 'lucide-react';
+
+interface ResultRow {
+  teamId: string;
+  submissionId?: string;
+  teamName: string;
+  leaderName: string;
+  evalCount: number;
+  avgScore: number;
+  hasDiscrepancy: boolean;
+  maxSpread: number;
+  judges: Array<{
+    judgeId: string;
+    judgeName: string;
+    score: number;
+    evaluationId?: string;
+  }>;
+}
 
 export const AdminResultsPage: React.FC = () => {
   const { teams, evaluations, config, toggleResultsPublished, rubricCriteria } = useMockStore();
 
   const [alert, setAlert] = useState<string | null>(null);
+  const [apiRows, setApiRows] = useState<ResultRow[] | null>(null);
+  const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [unlockTarget, setUnlockTarget] = useState<{
+    teamId: string;
+    teamName: string;
+    submissionId?: string;
+    judgeId?: string;
+    judgeName?: string;
+  } | null>(null);
+  const [unlockReason, setUnlockReason] = useState('Rà soát chênh lệch điểm giữa các giám khảo');
+  const [unlocking, setUnlocking] = useState(false);
 
-  const teamScoreRows = teams.map((team) => {
+  useEffect(() => {
+    let mounted = true;
+    getLeaderboard()
+      .then((res: unknown) => {
+        if (!mounted) return;
+        const rawData =
+          res && typeof res === 'object' && 'data' in (res as Record<string, unknown>)
+            ? (res as { data: unknown }).data
+            : res;
+        const entriesRaw =
+          rawData && typeof rawData === 'object' && 'leaderboard' in (rawData as Record<string, unknown>)
+            ? (rawData as { leaderboard: unknown[] }).leaderboard
+            : Array.isArray(rawData)
+              ? rawData
+              : [];
+        if (!Array.isArray(entriesRaw) || entriesRaw.length === 0) return;
+        const mapped: ResultRow[] = (entriesRaw as Array<Record<string, unknown>>).map((entry) => {
+          const tId = String(entry.team_id ?? entry.teamId ?? '');
+          const tName = String(entry.team_name ?? entry.teamName ?? '');
+          const matchedTeam = teams.find((t) => t.id === tId || t.name === tName);
+          const rawJudges = Array.isArray(entry.judge_scores)
+            ? (entry.judge_scores as Array<Record<string, unknown>>)
+            : Array.isArray(entry.judgeBreakdown)
+              ? (entry.judgeBreakdown as Array<Record<string, unknown>>)
+              : [];
+          const judgeList = rawJudges.map((jb: Record<string, unknown>, idx: number) => ({
+            judgeId: String(jb.judge_id ?? jb.judgeName ?? `judge-${idx + 1}`),
+            judgeName: String(jb.judge_name ?? jb.judgeName ?? `Giám khảo #${idx + 1}`),
+            score: Number(jb.total_score ?? jb.totalScore ?? 0),
+          }));
+          const spread = Number(entry.max_discrepancy ?? entry.maxSpread ?? 0);
+          return {
+            teamId: tId,
+            submissionId: String(entry.submission_id ?? tId),
+            teamName: tName || matchedTeam?.name || 'Đội thi',
+            leaderName: matchedTeam?.leaderName || 'Trưởng nhóm',
+            evalCount: Number(entry.evaluated_judges_count ?? entry.eval_count ?? entry.judgeCount ?? judgeList.length),
+            avgScore: Math.round(Number(entry.final_score ?? entry.averageScore ?? 0) * 10) / 10,
+            hasDiscrepancy: Boolean(entry.has_discrepancy ?? entry.hasDiscrepancy ?? spread > 15),
+            maxSpread: spread,
+            judges: judgeList,
+          };
+        });
+        setApiRows(mapped);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [teams]);
+
+  const fallbackRows: ResultRow[] = teams.map((team) => {
     const teamEvals = evaluations.filter((e) => e.teamId === team.id && !e.isDraft);
+    const normalizedScores = teamEvals.map((e) =>
+      normalizeScoreTo100(e.totalScore, e.scores, rubricCriteria)
+    );
     const avgScore =
-      teamEvals.length > 0
-        ? teamEvals.reduce(
-            (sum, e) => sum + normalizeScoreTo100(e.totalScore, e.scores, rubricCriteria),
-            0
-          ) / teamEvals.length
+      normalizedScores.length > 0
+        ? normalizedScores.reduce((sum, s) => sum + s, 0) / normalizedScores.length
+        : 0;
+    const maxSpread =
+      normalizedScores.length >= 2
+        ? Math.round((Math.max(...normalizedScores) - Math.min(...normalizedScores)) * 10) / 10
         : 0;
 
     return {
-      team,
+      teamId: team.id,
+      submissionId: team.id,
+      teamName: team.name,
+      leaderName: team.leaderName || 'Trưởng nhóm',
       evalCount: teamEvals.length,
       avgScore: Math.round(avgScore * 10) / 10,
-      evals: teamEvals,
+      hasDiscrepancy: maxSpread > 15,
+      maxSpread,
+      judges: teamEvals.map((ev) => ({
+        judgeId: ev.judgeId,
+        judgeName: ev.judgeName,
+        score: normalizeScoreTo100(ev.totalScore, ev.scores, rubricCriteria),
+        evaluationId: ev.id,
+      })),
     };
   });
 
-  // Sort descending
-  teamScoreRows.sort((a, b) => b.avgScore - a.avgScore);
+  const teamScoreRows = (apiRows && apiRows.length > 0 ? [...apiRows] : [...fallbackRows]).sort(
+    (a, b) => b.avgScore - a.avgScore
+  );
 
   const handleExportCsv = () => {
+    const headers = ['Hang', 'Doi Thi', 'Doi Truong', 'So Luot Cham', 'Diem TB (Thang 100)', 'Do Lech Max', 'Canh Bao Lech Diem'];
+    const csvLines = [
+      headers.join(','),
+      ...teamScoreRows.map((r, idx) =>
+        [
+          idx + 1,
+          `"${(r.teamName || '').replace(/"/g, '""')}"`,
+          `"${(r.leaderName || '').replace(/"/g, '""')}"`,
+          r.evalCount,
+          r.avgScore,
+          r.maxSpread,
+          r.hasDiscrepancy ? 'LECH_DIEM_CAO' : 'BINH_THUONG',
+        ].join(',')
+      ),
+    ];
+    try {
+      const blob = new Blob(['\uFEFF' + csvLines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'HackFlow_Official_Results_2026.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      // Fallback in headless test env
+    }
     setAlert('Đã tải xuống file biên bản kết quả: HackFlow_Official_Results_2026.csv');
     setTimeout(() => setAlert(null), 3500);
   };
 
+  const openUnlockModal = (row: ResultRow) => {
+    const firstJudge = row.judges[0];
+    setUnlockTarget({
+      teamId: row.teamId,
+      teamName: row.teamName,
+      submissionId: row.submissionId || row.teamId,
+      judgeId: firstJudge?.judgeId,
+      judgeName: firstJudge?.judgeName,
+    });
+    setUnlockReason('Rà soát chênh lệch điểm giữa các giám khảo');
+    setUnlockModalOpen(true);
+  };
+
+  const handleConfirmUnlock = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!unlockTarget || !unlockReason.trim()) return;
+    setUnlocking(true);
+    try {
+      const evalKey = unlockTarget.judgeId
+        ? `${unlockTarget.submissionId || unlockTarget.teamId}:${unlockTarget.judgeId}`
+        : unlockTarget.submissionId || unlockTarget.teamId;
+      await apiClient.post(`/admin/evaluations/${encodeURIComponent(evalKey)}/unlock`, {
+        reason: unlockReason.trim(),
+        judge_id: unlockTarget.judgeId,
+      });
+    } catch {
+      // Also update local store state so UI reflects unlock immediately
+    }
+    useMockStore.setState((state) => ({
+      evaluations: state.evaluations.map((ev) =>
+        ev.teamId === unlockTarget.teamId &&
+        (!unlockTarget.judgeId || ev.judgeId === unlockTarget.judgeId)
+          ? { ...ev, isDraft: true, confirmedAt: undefined }
+          : ev
+      ),
+    }));
+    setUnlocking(false);
+    setUnlockModalOpen(false);
+    setAlert(`Đã mở khóa phiếu chấm của đội "${unlockTarget.teamName}" về trạng thái Nháp (Draft).`);
+    setTimeout(() => setAlert(null), 4000);
+  };
+
   return (
-    <div className="space-y-6 ">
+    <div className="space-y-6">
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1
-            className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
-          >
+          <h1 className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide">
             Tổng Hợp Điểm và Công Bố Kết Quả
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
@@ -121,7 +289,7 @@ export const AdminResultsPage: React.FC = () => {
 
       {/* Aggregate Score Table */}
       <div className="rounded-[16px] border border-border bg-card p-6 space-y-4">
-        <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
+        <h3 className="font-semibold tracking-tight text-foreground text-lg">
           Bảng Điểm Tổng Hợp Có Trọng Số
         </h3>
 
@@ -134,69 +302,127 @@ export const AdminResultsPage: React.FC = () => {
                 <th className="py-3.5 px-4">Đội Trưởng</th>
                 <th className="py-3.5 px-4 text-center">Số Lượt Chấm</th>
                 <th className="py-3.5 px-4 text-right">Điểm TB Giám Khảo (Thang 100)</th>
+                <th className="py-3.5 px-4 text-center">Kiểm Soát Độ Lệch</th>
                 <th className="py-3.5 px-4 text-center">Xếp Loại</th>
+                <th className="py-3.5 px-4 text-right">Thao Tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-foreground">
               {teamScoreRows.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-muted-foreground text-xs">
+                  <td colSpan={8} className="py-12 text-center text-muted-foreground text-xs">
                     <Trophy className="mx-auto mb-2 opacity-30 text-muted-foreground" size={32} />
                     Chưa có kết quả hoặc đội thi nào được chấm điểm trong hệ thống.
                   </td>
                 </tr>
               ) : (
                 teamScoreRows.map((row, idx) => (
-                <tr key={row.team.id} className="hover:bg-accent transition-colors">
-                  <td className="py-3.5 px-4 text-center font-bold">
-                    {idx === 0 ? (
-                      <span className="text-amber-700 dark:text-amber-400">🥇 1</span>
-                    ) : idx === 1 ? (
-                      <span className="text-muted-foreground">🥈 2</span>
-                    ) : idx === 2 ? (
-                      <span className="text-amber-600">🥉 3</span>
-                    ) : (
-                      <span className="text-muted-foreground font-mono">#{idx + 1}</span>
-                    )}
-                  </td>
+                  <tr key={row.teamId} className="hover:bg-accent transition-colors">
+                    <td className="py-3.5 px-4 text-center font-bold">
+                      {idx === 0 ? (
+                        <span className="text-amber-700 dark:text-amber-400">🥇 1</span>
+                      ) : idx === 1 ? (
+                        <span className="text-muted-foreground">🥈 2</span>
+                      ) : idx === 2 ? (
+                        <span className="text-amber-600">🥉 3</span>
+                      ) : (
+                        <span className="text-muted-foreground font-mono">#{idx + 1}</span>
+                      )}
+                    </td>
 
-                  <td className="py-3.5 px-4 font-bold text-foreground">
-                    {row.team.name}
-                  </td>
+                    <td className="py-3.5 px-4 font-bold text-foreground">
+                      {row.teamName}
+                    </td>
 
-                  <td className="py-3.5 px-4 text-muted-foreground">
-                    {row.team.leaderName}
-                  </td>
+                    <td className="py-3.5 px-4 text-muted-foreground">
+                      {row.leaderName}
+                    </td>
 
-                  <td className="py-3.5 px-4 text-center">
-                    <Badge variant={row.evalCount > 0 ? 'success' : 'neutral'}>
-                      {row.evalCount} lượt
-                    </Badge>
-                  </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <Badge variant={row.evalCount > 0 ? 'success' : 'neutral'}>
+                        {row.evalCount} lượt
+                      </Badge>
+                    </td>
 
-                  <td className="py-3.5 px-4 text-right font-semibold tracking-tight text-foreground text-lg text-emerald-700 dark:text-emerald-400 font-mono">
-                    {row.avgScore} / 100
-                  </td>
+                    <td className="py-3.5 px-4 text-right font-semibold tracking-tight text-lg text-emerald-700 dark:text-emerald-400 font-mono">
+                      {row.avgScore} / 100
+                    </td>
 
-                  <td className="py-3.5 px-4 text-center">
-                    <span
-                      className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                        row.avgScore >= 85
-                          ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
-                          : row.avgScore >= 70
-                          ? 'bg-[#6366F1]/15 text-primary border border-[#6366F1]/30'
-                          : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      {row.avgScore >= 85 ? 'Xuất Sắc' : row.avgScore >= 70 ? 'Khá Giỏi' : 'Đạt'}
-                    </span>
-                  </td>
-                </tr>
-              )))}
+                    <td className="py-3.5 px-4 text-center">
+                      {row.hasDiscrepancy ? (
+                        <Badge variant="danger" className="gap-1">
+                          <AlertTriangle size={12} />
+                          <span>Lệch điểm cao ({row.maxSpread}đ)</span>
+                        </Badge>
+                      ) : (
+                        <Badge variant="neutral">Ổn định ({row.maxSpread}đ)</Badge>
+                      )}
+                    </td>
+
+                    <td className="py-3.5 px-4 text-center">
+                      <span
+                        className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                          row.avgScore >= 85
+                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                            : row.avgScore >= 70
+                            ? 'bg-[#6366F1]/15 text-primary border border-[#6366F1]/30'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {row.avgScore >= 85 ? 'Xuất Sắc' : row.avgScore >= 70 ? 'Khá Giỏi' : 'Đạt'}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-right">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => openUnlockModal(row)}
+                        className="gap-1.5 text-xs"
+                      >
+                        <Unlock size={13} />
+                        <span>Mở khóa phiếu</span>
+                      </Button>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {/* Modal Mở Khóa Phiếu Chấm (Unlock Evaluation) */}
+      <Modal
+        isOpen={unlockModalOpen}
+        onClose={() => setUnlockModalOpen(false)}
+        title={`Mở khóa phiếu chấm — ${unlockTarget?.teamName || ''}`}
+      >
+        <form onSubmit={handleConfirmUnlock} className="space-y-4">
+          <p className="text-xs text-muted-foreground">
+            Thao tác này sẽ chuyển trạng thái phiếu chấm của Giám khảo từ <strong>Đã khóa (Submitted)</strong> về{' '}
+            <strong>Bản nháp (Draft)</strong> để Giám khảo điều chỉnh lại điểm số và nhận xét.
+          </p>
+
+          <Input
+            label="Lý do mở khóa phiếu chấm (Audit Log) *"
+            value={unlockReason}
+            onChange={(e) => setUnlockReason(e.target.value)}
+            required
+            placeholder="Nhập lý do yêu cầu chấm lại..."
+          />
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button type="button" variant="secondary" onClick={() => setUnlockModalOpen(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" variant="primary" isLoading={unlocking} className="gap-1.5">
+              <Unlock size={14} />
+              <span>Xác nhận Mở khóa</span>
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

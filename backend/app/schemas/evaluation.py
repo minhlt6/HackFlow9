@@ -106,8 +106,9 @@ class BlindSubmissionResponse(BaseModel):
 
 
 class AdminUnlockEvaluationRequest(BaseModel):
-    """Optional request body for PATCH /api/v1/admin/evaluations/{submission_id}/judges/{judge_id}/unlock."""
+    """Optional request body for unlocking an evaluation."""
     reason: Optional[str] = Field(default="Admin unlocked evaluation for re-assessment")
+    judge_id: Optional[str] = None
 
 
 class JudgeAssignmentCreateRequest(BaseModel):

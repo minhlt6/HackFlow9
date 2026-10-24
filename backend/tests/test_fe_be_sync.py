@@ -206,5 +206,71 @@ async def test_full_fe_be_integration_flows(client: AsyncClient):
     assert res_personnel.status_code == 201
     new_person_id = res_personnel.json()["data"]["id"]
 
+    res_patch_person = await client.patch(
+        f"/api/v1/admin/personnel/{new_person_id}",
+        headers=admin_headers,
+        json={"organization": "Viện AI Quốc Gia", "assigned_team_ids": [team_id]},
+    )
+    assert res_patch_person.status_code == 200
+    assert res_patch_person.json()["data"]["organization"] == "Viện AI Quốc Gia"
+
+    res_filter_person = await client.get("/api/v1/admin/personnel?role=judge", headers=admin_headers)
+    assert res_filter_person.status_code == 200
+    assert all(p["role"] == "judge" for p in res_filter_person.json()["data"])
+
     res_del_person = await client.delete(f"/api/v1/admin/personnel/{new_person_id}", headers=admin_headers)
     assert res_del_person.status_code == 200
+
+    # 7. Admin Config & Stats APIs (HF-51) & Evaluation Unlock (HF-55)
+    res_cfg_get = await client.get("/api/v1/admin/config", headers=admin_headers)
+    assert res_cfg_get.status_code == 200
+    assert "name" in res_cfg_get.json()["data"]
+
+    res_cfg_patch = await client.patch(
+        "/api/v1/admin/config",
+        headers=admin_headers,
+        json={
+            "name": "HackFlow 2026 Grand Finale",
+            "is_result_published": True,
+            "blindJudgingEnabled": False,
+        },
+    )
+    assert res_cfg_patch.status_code == 200
+    assert res_cfg_patch.json()["data"]["name"] == "HackFlow 2026 Grand Finale"
+    assert res_cfg_patch.json()["data"]["is_result_published"] is True
+
+    # Invalid time window (start_time >= end_time) must return 400
+    res_cfg_invalid = await client.patch(
+        "/api/v1/admin/config",
+        headers=admin_headers,
+        json={
+            "start_time": "2026-10-20T10:00:00Z",
+            "end_time": "2026-10-19T10:00:00Z",
+        },
+    )
+    assert res_cfg_invalid.status_code == 400
+
+    res_stats = await client.get("/api/v1/admin/stats", headers=admin_headers)
+    assert res_stats.status_code == 200
+    stats_data = res_stats.json()["data"]
+    assert stats_data["total_teams"] >= 1
+    assert stats_data["total_topics"] >= 1
+    assert stats_data["total_submissions"] >= 1
+
+    # Unlock evaluation via POST /api/v1/admin/evaluations/{id}/unlock
+    res_unlock = await client.post(
+        f"/api/v1/admin/evaluations/{team_id}/unlock",
+        headers=admin_headers,
+        json={"reason": "Re-check discrepancy score"},
+    )
+    assert res_unlock.status_code == 200
+    assert res_unlock.json()["data"]["status"] == "draft"
+
+    # RBAC: Non-admin roles must receive 403 Forbidden on /admin/*
+    for non_admin_hdr in (leader_headers, judge_headers):
+        r1 = await client.get("/api/v1/admin/config", headers=non_admin_hdr)
+        assert r1.status_code == 403
+        r2 = await client.get("/api/v1/admin/stats", headers=non_admin_hdr)
+        assert r2.status_code == 403
+        r3 = await client.get("/api/v1/admin/personnel", headers=non_admin_hdr)
+        assert r3.status_code == 403
