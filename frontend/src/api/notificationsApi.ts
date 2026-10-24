@@ -5,6 +5,37 @@ import type {
   NotificationUnreadCountResponse,
 } from '../types/notification';
 
+export interface AnnouncementItem {
+  id: string;
+  title: string;
+  content: string;
+  priority: 'info' | 'warning' | 'urgent';
+  created_at: string;
+  updated_at?: string;
+  sender?: string;
+  author?: string;
+  targetRole?: 'all' | 'candidates' | 'judges' | 'mentors';
+}
+
+export interface AnnouncementCreatePayload {
+  title: string;
+  content: string;
+  priority?: 'info' | 'warning' | 'urgent';
+}
+
+export interface AnnouncementUpdatePayload {
+  title?: string;
+  content?: string;
+  priority?: 'info' | 'warning' | 'urgent';
+}
+
+export interface AnnouncementPaginationData {
+  items: AnnouncementItem[];
+  total: number;
+  page: number;
+  page_size: number;
+}
+
 const NOTIFICATIONS_STORAGE_KEY = 'hackflow_notifications_v1';
 
 const INITIAL_MOCK_NOTIFICATIONS: AppNotification[] = [
@@ -159,5 +190,38 @@ export const notificationsApi = {
         : item
     );
     saveStoredNotifications(updated);
+  },
+
+  /**
+   * Xem danh sách thông báo cuộc thi (GET /api/v1/announcements)
+   */
+  listAnnouncements: async (page = 1, pageSize = 50): Promise<AnnouncementPaginationData> => {
+    const response = await axiosClient.get<ApiResponse<AnnouncementPaginationData>>('/announcements', {
+      params: { page, page_size: pageSize },
+    });
+    return response.data.data;
+  },
+
+  /**
+   * Tạo thông báo mới (POST /api/v1/announcements) - Chỉ Admin/BTC
+   */
+  createAnnouncement: async (payload: AnnouncementCreatePayload): Promise<AnnouncementItem> => {
+    const response = await axiosClient.post<ApiResponse<AnnouncementItem>>('/announcements', payload);
+    return response.data.data;
+  },
+
+  /**
+   * Cập nhật thông báo (PUT /api/v1/announcements/{id}) - Chỉ Admin/BTC
+   */
+  updateAnnouncement: async (id: string, payload: AnnouncementUpdatePayload): Promise<AnnouncementItem> => {
+    const response = await axiosClient.put<ApiResponse<AnnouncementItem>>(`/announcements/${id}`, payload);
+    return response.data.data;
+  },
+
+  /**
+   * Xóa thông báo (DELETE /api/v1/announcements/{id}) - Chỉ Admin/BTC
+   */
+  deleteAnnouncement: async (id: string): Promise<void> => {
+    await axiosClient.delete<ApiResponse<unknown>>(`/announcements/${id}`);
   },
 };
