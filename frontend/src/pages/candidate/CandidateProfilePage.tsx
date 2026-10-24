@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
+import { useAuthStore } from '../../store/useAuthStore';
+import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Badge } from '../../components/Badge';
@@ -14,29 +16,91 @@ import {
 import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
 
+const DEFAULT_BIO =
+  'Sinh viên năm 4 đam mê Computer Vision và Generative AI. Đã có kinh nghiệm tham gia 2 kỳ Hackathon.';
+
 export const CandidateProfilePage: React.FC = () => {
-  const { currentUser, teams, updateCurrentUserProfile } = useMockStore();
+  const { currentUser, teams, updateCurrentUserProfile, syncFromBackend } = useMockStore();
+  const updateAuthUser = useAuthStore((s) => s.updateUser);
 
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
 
   const [fullName, setFullName] = useState(currentUser.fullName);
-  const [university, setUniversity] = useState(currentUser.university || 'Đại học Bách Khoa Hà Nội');
-  const [studentId, setStudentId] = useState(currentUser.studentId || '2023-CS-0842');
-  const [bio, setBio] = useState(
-    'Sinh viên năm 4 đam mê Computer Vision và Generative AI. Đã có kinh nghiệm tham gia 2 kỳ Hackathon.',
+  const [university, setUniversity] = useState(
+    currentUser.university || currentUser.school || 'Đại học Bách Khoa Hà Nội',
   );
+  const [studentId, setStudentId] = useState(currentUser.studentId || '2023-CS-0842');
+  const [phone, setPhone] = useState(currentUser.phone || '');
+  const [skillsInput, setSkillsInput] = useState(
+    Array.isArray(currentUser.skills) && currentUser.skills.length > 0
+      ? currentUser.skills.join(', ')
+      : 'React, TypeScript, Python, FastAPI',
+  );
+  const [bio, setBio] = useState(currentUser.bio || DEFAULT_BIO);
+  const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    void syncFromBackend?.().then(() => {
+      if (!mounted) return;
+      const u = useMockStore.getState().currentUser;
+      setFullName(u.fullName);
+      setUniversity(u.university || u.school || 'Đại học Bách Khoa Hà Nội');
+      setStudentId(u.studentId || '2023-CS-0842');
+      if (u.phone !== undefined) setPhone(u.phone);
+      if (Array.isArray(u.skills) && u.skills.length > 0) {
+        setSkillsInput(u.skills.join(', '));
+      }
+      if (u.bio) setBio(u.bio);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [syncFromBackend]);
 
   const isDirty =
     fullName !== currentUser.fullName ||
-    university !== (currentUser.university || 'Đại học Bách Khoa Hà Nội') ||
-    studentId !== (currentUser.studentId || '2023-CS-0842');
+    university !== (currentUser.university || currentUser.school || 'Đại học Bách Khoa Hà Nội') ||
+    studentId !== (currentUser.studentId || '2023-CS-0842') ||
+    phone !== (currentUser.phone || '') ||
+    bio !== (currentUser.bio || DEFAULT_BIO);
 
   const blocker = useUnsavedChangesWarning(isDirty);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateCurrentUserProfile({ fullName, university, studentId });
+    setIsSaving(true);
+    const parsedSkills = skillsInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    try {
+      await apiClient.post('/users/profile', {
+        full_name: fullName.trim(),
+        student_id: studentId.trim(),
+        school: university.trim(),
+        phone: phone.trim(),
+        skills: parsedSkills,
+        bio: bio.trim(),
+      });
+    } catch {
+      // Fallback to local store persistence if offline
+    }
+
+    const profileUpdates = {
+      fullName: fullName.trim(),
+      university: university.trim(),
+      school: university.trim(),
+      studentId: studentId.trim(),
+      phone: phone.trim(),
+      skills: parsedSkills,
+      bio: bio.trim(),
+    };
+    updateCurrentUserProfile(profileUpdates);
+    updateAuthUser(profileUpdates);
+    setIsSaving(false);
     setIsSaved(true);
     setTimeout(() => setIsSaved(false), 2500);
   };
@@ -119,6 +183,20 @@ export const CandidateProfilePage: React.FC = () => {
               disabled
               helperText="Đã liên kết OAuth2 vĩnh viễn"
             />
+
+            <Input
+              label="Số điện thoại liên hệ"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="0901234567"
+            />
+
+            <Input
+              label="Kỹ năng chuyên môn (cách nhau bởi dấu phẩy)"
+              value={skillsInput}
+              onChange={(e) => setSkillsInput(e.target.value)}
+              placeholder="React, Python, PyTorch, Docker..."
+            />
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -152,7 +230,7 @@ export const CandidateProfilePage: React.FC = () => {
           )}
 
           <div className="flex justify-end pt-3">
-            <Button variant="primary" type="submit" className="gap-2 px-6">
+            <Button variant="primary" type="submit" isLoading={isSaving} className="gap-2 px-6">
               <Save size={16} />
               <span>Lưu thông tin</span>
             </Button>

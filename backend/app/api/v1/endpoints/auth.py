@@ -53,6 +53,7 @@ def _build_user_response(user: User) -> UserResponse:
         resp.school = extra.get("school")
         resp.phone = extra.get("phone")
         resp.skills = extra.get("skills")
+        resp.bio = extra.get("bio")
     return resp
 
 
@@ -167,7 +168,27 @@ async def get_profile(
 @users_router.post(
     "/profile",
     response_model=ApiResponse[ProfileUpdateResponse],
-    summary="Cập nhật hồ sơ cá nhân thí sinh (Onboarding)",
+    summary="Cập nhật hồ sơ cá nhân thí sinh (Onboarding & Profile)",
+)
+@users_router.put(
+    "/profile",
+    response_model=ApiResponse[ProfileUpdateResponse],
+    summary="Cập nhật hồ sơ cá nhân thí sinh (PUT)",
+)
+@users_router.patch(
+    "/profile",
+    response_model=ApiResponse[ProfileUpdateResponse],
+    summary="Cập nhật hồ sơ cá nhân thí sinh (PATCH)",
+)
+@router.post(
+    "/profile",
+    response_model=ApiResponse[ProfileUpdateResponse],
+    summary="Cập nhật hồ sơ cá nhân (Auth alias POST)",
+)
+@router.patch(
+    "/profile",
+    response_model=ApiResponse[ProfileUpdateResponse],
+    summary="Cập nhật hồ sơ cá nhân (Auth alias PATCH)",
 )
 async def update_user_profile(
     req: ProfileUpdateRequest,
@@ -175,7 +196,7 @@ async def update_user_profile(
     current_user: User = Depends(get_current_user),
 ) -> ApiResponse[ProfileUpdateResponse]:
     """
-    Lưu thông tin hồ sơ cá nhân của thí sinh tại màn hình Onboarding.
+    Lưu thông tin hồ sơ cá nhân của thí sinh tại màn hình Onboarding hoặc Hồ sơ cá nhân.
     """
     current_user.full_name = req.full_name.strip()
     db.add(current_user)
@@ -183,11 +204,36 @@ async def update_user_profile(
     await db.refresh(current_user)
 
     store = _load_profile_store()
+    existing_extra = store.get(current_user.id) or store.get(current_user.email.lower()) or {}
+    if not isinstance(existing_extra, dict):
+        existing_extra = {}
+
     extra_payload = {
-        "student_id": (req.student_id or "").strip(),
-        "school": (req.school or "").strip(),
-        "phone": (req.phone or "").strip(),
-        "skills": list(req.skills or []),
+        "student_id": (
+            req.student_id.strip()
+            if req.student_id is not None
+            else existing_extra.get("student_id", "")
+        ),
+        "school": (
+            req.school.strip()
+            if req.school is not None
+            else existing_extra.get("school", "")
+        ),
+        "phone": (
+            req.phone.strip()
+            if req.phone is not None
+            else existing_extra.get("phone", "")
+        ),
+        "skills": (
+            list(req.skills)
+            if req.skills is not None
+            else list(existing_extra.get("skills") or [])
+        ),
+        "bio": (
+            req.bio.strip()
+            if req.bio is not None
+            else existing_extra.get("bio", "")
+        ),
     }
     store[current_user.id] = extra_payload
     store[current_user.email.lower()] = extra_payload

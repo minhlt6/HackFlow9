@@ -286,9 +286,15 @@ class EvaluationService:
                         "criteria_id": e.criteria_id,
                         "score": e.score,
                         "comment": e.comment,
+                        "general_comment": e.general_comment,
                     }
                     for e in sub_evals
                 ]
+            my_general_comment = (
+                next((e.general_comment for e in sub_evals if e.general_comment), None)
+                if sub_evals
+                else None
+            )
 
             items.append(
                 {
@@ -303,6 +309,7 @@ class EvaluationService:
                     "submitted_at": sub.submitted_at.isoformat() if sub.submitted_at else None,
                     "evaluation_status": eval_status,
                     "my_total_score": my_total_score,
+                    "my_general_comment": my_general_comment,
                     "my_evaluations": my_eval_list,
                 }
             )

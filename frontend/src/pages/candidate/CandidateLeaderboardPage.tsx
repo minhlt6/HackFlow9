@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
+import { getLeaderboard } from '../../services/evaluationService';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import {
@@ -10,13 +11,73 @@ import {
   Eye,
 } from 'lucide-react';
 
-export const CandidateLeaderboardPage: React.FC = () => {
-  const { config, teams, majorTopics, evaluations, toggleResultsPublished, rubricCriteria } = useMockStore();
+interface ApiLeaderboardRow {
+  teamId: string;
+  teamName: string;
+  topicTitle: string;
+  avgScore: number;
+  evalCount: number;
+}
 
-  // Compute team scores from evaluations
+export const CandidateLeaderboardPage: React.FC = () => {
+  const { config, teams, majorTopics, evaluations, toggleResultsPublished, rubricCriteria, syncFromBackend } =
+    useMockStore();
+  const [apiStandings, setApiStandings] = useState<ApiLeaderboardRow[] | null>(null);
+
+  useEffect(() => {
+    void syncFromBackend?.();
+  }, [syncFromBackend]);
+
+  useEffect(() => {
+    let mounted = true;
+    getLeaderboard()
+      .then((res: unknown) => {
+        if (!mounted) return;
+        const rawData =
+          res && typeof res === 'object' && 'data' in (res as Record<string, unknown>)
+            ? (res as { data: unknown }).data
+            : res;
+        if (
+          rawData &&
+          typeof rawData === 'object' &&
+          'is_result_published' in (rawData as Record<string, unknown>)
+        ) {
+          const isPub = Boolean((rawData as { is_result_published?: boolean }).is_result_published);
+          useMockStore.setState((state) => ({
+            config: { ...state.config, resultsPublished: isPub },
+          }));
+        }
+        const entriesRaw =
+          rawData && typeof rawData === 'object' && 'leaderboard' in (rawData as Record<string, unknown>)
+            ? (rawData as { leaderboard: unknown[] }).leaderboard
+            : Array.isArray(rawData)
+              ? rawData
+              : [];
+        if (!Array.isArray(entriesRaw) || entriesRaw.length === 0) return;
+        const mapped: ApiLeaderboardRow[] = (entriesRaw as Array<Record<string, unknown>>).map((entry) => ({
+          teamId: String(entry.team_id ?? entry.teamId ?? ''),
+          teamName: String(entry.team_name ?? entry.teamName ?? 'Đội thi'),
+          topicTitle: String(entry.topic_title ?? entry.topicTitle ?? 'Chưa chọn'),
+          avgScore: Math.round(Number(entry.final_score ?? entry.total_score ?? 0) * 10) / 10,
+          evalCount: Number(entry.eval_count ?? entry.evaluated_judges_count ?? 0),
+        }));
+        setApiStandings(mapped);
+      })
+      .catch(() => {
+        // When results are not published on backend, 403 is expected for candidates
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [config.resultsPublished]);
+
+  // Compute team scores from evaluations (merged with Backend leaderboard if available)
   const teamsWithScores = teams.map((team) => {
+    const apiMatch = apiStandings?.find(
+      (a) => a.teamId === team.id || a.teamName.toLowerCase() === team.name.toLowerCase()
+    );
     const teamEvals = evaluations.filter((e) => e.teamId === team.id && !e.isDraft);
-    const avgScore =
+    const localAvgScore =
       teamEvals.length > 0
         ? teamEvals.reduce(
             (acc, curr) => acc + normalizeScoreTo100(curr.totalScore, curr.scores, rubricCriteria),
@@ -24,20 +85,22 @@ export const CandidateLeaderboardPage: React.FC = () => {
           ) / teamEvals.length
         : 0;
 
-    let subTopicTitle = 'Chưa chọn';
-    for (const mt of majorTopics) {
-      const sub = mt.subTopics.find((s) => s.id === team.subTopicId);
-      if (sub) {
-        subTopicTitle = sub.title;
-        break;
+    let subTopicTitle = apiMatch?.topicTitle && apiMatch.topicTitle !== 'Chưa chọn đề tài' ? apiMatch.topicTitle : 'Chưa chọn';
+    if (subTopicTitle === 'Chưa chọn') {
+      for (const mt of majorTopics) {
+        const sub = mt.subTopics.find((s) => s.id === team.subTopicId || s.id === team.topicId);
+        if (sub) {
+          subTopicTitle = sub.title;
+          break;
+        }
       }
     }
 
     return {
       ...team,
       subTopicTitle,
-      avgScore: Math.round(avgScore * 10) / 10,
-      evalCount: teamEvals.length,
+      avgScore: apiMatch ? apiMatch.avgScore : Math.round(localAvgScore * 10) / 10,
+      evalCount: apiMatch ? apiMatch.evalCount : teamEvals.length,
     };
   });
 

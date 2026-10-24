@@ -27,6 +27,7 @@ class UserResponse(BaseModel):
     school: Optional[str] = None
     phone: Optional[str] = None
     skills: Optional[list[str]] = None
+    bio: Optional[str] = None
     is_active: bool = True
 
     model_config = {"from_attributes": True}
@@ -54,7 +55,8 @@ class ProfileUpdateRequest(BaseModel):
     student_id: Optional[str] = Field(None, description="Mã số sinh viên")
     school: Optional[str] = Field(None, description="Trường / Học viện")
     phone: Optional[str] = Field(None, description="Số điện thoại liên hệ")
-    skills: Optional[list[str]] = Field(default_factory=list, description="Danh sách kỹ năng")
+    skills: Optional[list[str]] = Field(None, description="Danh sách kỹ năng")
+    bio: Optional[str] = Field(None, description="Giới thiệu bản thân & chuyên môn")
 
 
 class ProfileUpdateResponse(BaseModel):

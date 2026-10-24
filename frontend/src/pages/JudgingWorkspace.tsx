@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMockStore } from '../store/useMockStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { apiClient } from '../api/axiosClient';
 import { evaluationService, type EvaluationCriteriaScore } from '../services/evaluationService';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
@@ -45,6 +46,8 @@ interface RubricPanelProps {
     scores: Record<string, number>,
     comment: string,
     isDraft: boolean,
+    criteriaComments?: Record<string, string>,
+    skipBackendSync?: boolean,
   ) => void;
   onAlert: (msg: string) => void;
 }
@@ -177,6 +180,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
       numericScores,
       generalComment,
       true, // isDraft = true
+      criteriaComments,
+      true, // skipBackendSync since evaluationService.submitEvaluation already succeeded
     );
 
     onAlert('Đã lưu bản nháp điểm thành công! Giám khảo vẫn có thể chỉnh sửa tiếp.');
@@ -251,6 +256,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
       numericScores,
       generalComment,
       false, // isDraft = false -> official lock
+      criteriaComments,
+      true, // skipBackendSync since evaluationService.submitEvaluation already succeeded
     );
 
     setIsConfirmModalOpen(false);
@@ -259,12 +266,20 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
     );
   };
 
-  const handleAdminUnlock = () => {
+  const handleAdminUnlock = async () => {
     if (!isAdmin) return;
     const numericScores: Record<string, number> = {};
     for (const c of rubricCriteria) {
       const val = scores[c.id];
       numericScores[c.id] = typeof val === 'number' && !isNaN(val) ? val : 0;
+    }
+    try {
+      await apiClient.post(`/admin/evaluations/${encodeURIComponent(team.id)}/unlock`, {
+        reason: 'Admin mở khóa trực tiếp trên không gian chấm điểm',
+        judge_id: existingEval?.judgeId || currentUser.id,
+      });
+    } catch {
+      // Fallback to local unlock if offline
     }
     saveEvaluation(
       team.id,
@@ -273,6 +288,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
       numericScores,
       generalComment,
       true, // convert back to draft
+      criteriaComments,
+      true,
     );
     onAlert('Admin đã mở khóa bảng điểm thành công để Giám khảo chấm lại!');
   };
@@ -527,6 +544,7 @@ export const JudgingWorkspace: React.FC = () => {
     config,
     majorTopics,
     toggleBlindJudging,
+    syncFromBackend,
   } = useMockStore();
 
   const { user } = useAuthStore();
@@ -544,13 +562,14 @@ export const JudgingWorkspace: React.FC = () => {
         await Promise.all([
           evaluationService.getRubrics(),
           evaluationService.getAnonymousSubmissions(),
+          syncFromBackend?.(),
         ]);
       } catch {
         // Fallback to local store silently in demo
       }
     };
     initService();
-  }, []);
+  }, [syncFromBackend]);
 
   // Teams with their evaluation status for the current judge
   const teamsWithStatus = useMemo(() => {
@@ -1034,7 +1053,7 @@ export const JudgingWorkspace: React.FC = () => {
 
         {/* RIGHT COLUMN: Rubric Scoring Form (Subcomponent with key=selectedTeam.id) */}
         <RubricScoringPanel
-          key={selectedTeam?.id}
+          key={`${selectedTeam?.id}-${existingEval?.id || 'unscored'}-${existingEval?.isDraft ? 'draft' : 'locked'}-${rubricCriteria.map((c) => c.id).join('_')}`}
           team={selectedTeam}
           existingEval={existingEval}
           rubricCriteria={rubricCriteria}

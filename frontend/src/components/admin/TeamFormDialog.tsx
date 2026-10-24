@@ -87,17 +87,36 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
     if (!open) return;
 
     if (editingTeam) {
+      const matchedMajorBySub = majorTopics.find((m) =>
+        m.subTopics.some((s) => s.id === editingTeam.subTopicId),
+      );
+      const validMajor =
+        majorTopics.find((m) => m.id === editingTeam.majorTopicId) ||
+        matchedMajorBySub ||
+        majorTopics[0];
+      const resolvedMajorId = validMajor?.id || defaultMajor;
+      const validSub =
+        validMajor?.subTopics.find((s) => s.id === editingTeam.subTopicId) ||
+        validMajor?.subTopics[0];
+      const resolvedSubId =
+        validSub?.id || editingTeam.subTopicId || defaultSub;
+
       reset({
-        name: editingTeam.name,
-        inviteCode: editingTeam.inviteCode,
-        leaderName: editingTeam.leaderName || '',
-        leaderEmail: editingTeam.leaderEmail || '',
-        university: editingTeam.university || '',
-        majorTopicId: editingTeam.majorTopicId || defaultMajor,
-        subTopicId: editingTeam.subTopicId || defaultSub,
-        memberCount: editingTeam.memberCount ?? editingTeam.members.length ?? 3,
+        name: editingTeam.name || '',
+        inviteCode: editingTeam.inviteCode || 'HF2026',
+        leaderName: editingTeam.leaderName || 'Đội trưởng',
+        leaderEmail: editingTeam.leaderEmail || 'leader@hackflow.dev',
+        university: editingTeam.university || 'ĐH Bách Khoa Hà Nội (HUST)',
+        majorTopicId: resolvedMajorId,
+        subTopicId: resolvedSubId,
+        memberCount: Math.min(
+          5,
+          Math.max(1, editingTeam.memberCount ?? editingTeam.members.length ?? 3),
+        ),
         repoUrl: editingTeam.repoUrl || '',
-        description: editingTeam.description || '',
+        description:
+          editingTeam.description ||
+          `Giải pháp kỹ thuật do đội thi ${editingTeam.name} phát triển tại Hackathon.`,
       });
     } else {
       reset({
@@ -113,7 +132,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
         description: '',
       });
     }
-  }, [open, editingTeam, defaultMajor, defaultSub, reset]);
+  }, [open, editingTeam, majorTopics, defaultMajor, defaultSub, reset]);
 
   const onFormValid = async (values: AdminTeamFormValues) => {
     const ok = await onSubmitForm(values);
@@ -138,7 +157,11 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onFormValid)} noValidate>
+        <form
+          onSubmit={handleSubmit(onFormValid)}
+          noValidate
+          className="flex flex-col flex-1 min-h-0 overflow-hidden"
+        >
           <DialogBody className="space-y-4">
             {/* Row 1: Team Name & Invite Code */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">

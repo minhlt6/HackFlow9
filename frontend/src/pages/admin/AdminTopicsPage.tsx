@@ -122,8 +122,15 @@ export const AdminTopicsPage: React.FC = () => {
   const [quota, setQuota] = useState(3);
   const [mentorName, setMentorName] = useState('Dr. Lê Quang');
 
-  // Edit Quota Modal
-  const [editingSubTopic, setEditingSubTopic] = useState<{ id: string; title: string; quota: number } | null>(null);
+  // Edit Subtopic / Quota Modal
+  const [editingSubTopic, setEditingSubTopic] = useState<{
+    id: string;
+    title: string;
+    description: string;
+    quota: number;
+  } | null>(null);
+  const [editSubTitle, setEditSubTitle] = useState('');
+  const [editSubDesc, setEditSubDesc] = useState('');
   const [newQuotaValue, setNewQuotaValue] = useState(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -189,7 +196,7 @@ export const AdminTopicsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await topicsApi.createTopic({
+      await topicsApi.createSubtopic(selectedMajorId, {
         title: title.trim(),
         description: description.trim() || undefined,
         max_teams: quota,
@@ -234,11 +241,13 @@ export const AdminTopicsPage: React.FC = () => {
 
     setIsSubmitting(true);
     try {
-      await topicsApi.updateTopic(editingSubTopic.id, {
+      await topicsApi.updateSubtopic(editingSubTopic.id, {
+        title: editSubTitle.trim() || editingSubTopic.title,
+        description: editSubDesc.trim() || undefined,
         max_teams: newQuotaValue,
       });
       await fetchTopics();
-      showAlert('Đã cập nhật chỉ tiêu Quota thành công lên máy chủ!', 'success');
+      showAlert('Đã cập nhật đề tài nhánh và chỉ tiêu Quota thành công lên máy chủ!', 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         if (!err.response) {
@@ -257,6 +266,23 @@ export const AdminTopicsPage: React.FC = () => {
     }
 
     setEditingSubTopic(null);
+  };
+
+  const handleDeleteSubTopic = async (subId: string, subTitle: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa đề tài nhánh "${subTitle}"?`)) {
+      return;
+    }
+    try {
+      await topicsApi.deleteSubtopic(subId);
+      await fetchTopics();
+      showAlert(`Đã xóa đề tài nhánh "${subTitle}".`, 'success');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err) && err.response?.data?.message) {
+        showAlert(err.response.data.message, 'error');
+      } else {
+        showAlert('Không thể xóa đề tài nhánh.', 'error');
+      }
+    }
   };
 
   return (
@@ -440,22 +466,36 @@ export const AdminTopicsPage: React.FC = () => {
                             </span>
                           </div>
 
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => {
-                              setEditingSubTopic({
-                                id: sub.id,
-                                title: sub.title,
-                                quota: maxQuota,
-                              });
-                              setNewQuotaValue(maxQuota);
-                            }}
-                            className="!py-1 !px-2.5 text-xs gap-1"
-                          >
-                            <Edit2 size={12} />
-                            <span>Quota</span>
-                          </Button>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => {
+                                setEditingSubTopic({
+                                  id: sub.id,
+                                  title: sub.title,
+                                  description: sub.description || '',
+                                  quota: maxQuota,
+                                });
+                                setEditSubTitle(sub.title);
+                                setEditSubDesc(sub.description || '');
+                                setNewQuotaValue(maxQuota);
+                              }}
+                              className="!py-1 !px-2.5 text-xs gap-1"
+                              title="Chỉnh sửa đề tài nhánh và chỉ tiêu Quota"
+                            >
+                              <Edit2 size={12} />
+                              <span>Chỉnh sửa / Quota</span>
+                            </Button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteSubTopic(sub.id, sub.title)}
+                              className="p-1.5 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              title="Xóa đề tài nhánh"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -577,19 +617,33 @@ export const AdminTopicsPage: React.FC = () => {
         </form>
       </Modal>
 
-      {/* Modal: Edit Quota */}
+      {/* Modal: Edit SubTopic & Quota */}
       <Modal
         isOpen={Boolean(editingSubTopic)}
         onClose={() => setEditingSubTopic(null)}
-        title="Điều Chỉnh Hạn Ngạch Đề Tài"
+        title="Chỉnh Sửa Đề Tài Nhánh & Hạn Ngạch (Quota)"
       >
         <form onSubmit={handleSaveQuota} className="space-y-4">
-          <p className="text-xs text-muted-foreground">
-            Đề tài: <strong className="text-foreground">{editingSubTopic?.title}</strong>
-          </p>
+          <Input
+            label="Tiêu đề Đề tài nhánh *"
+            value={editSubTitle}
+            onChange={(e) => setEditSubTitle(e.target.value)}
+            required
+          />
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-muted-foreground font-medium text-xs">Mô tả chi tiết bài toán</label>
+            <textarea
+              rows={3}
+              value={editSubDesc}
+              onChange={(e) => setEditSubDesc(e.target.value)}
+              className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
+              placeholder="Mô tả yêu cầu kỹ thuật..."
+            />
+          </div>
 
           <Input
-            label="Chỉ tiêu số đội tối đa"
+            label="Chỉ tiêu số đội tối đa (Quota) *"
             type="number"
             min={1}
             max={20}
@@ -604,7 +658,7 @@ export const AdminTopicsPage: React.FC = () => {
             </Button>
             <Button variant="primary" type="submit" disabled={isSubmitting} className="gap-2">
               {isSubmitting && <Loader2 size={14} className="animate-spin" />}
-              <span>{isSubmitting ? 'Đang cập nhật...' : 'Cập nhật Quota'}</span>
+              <span>{isSubmitting ? 'Đang cập nhật...' : 'Lưu cập nhật'}</span>
             </Button>
           </div>
         </form>

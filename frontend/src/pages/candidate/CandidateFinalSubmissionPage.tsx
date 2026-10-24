@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
+import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Input } from '../../components/Input';
@@ -12,10 +13,12 @@ import {
   ExternalLink,
   ShieldCheck,
   AlertCircle,
+  Edit3,
 } from 'lucide-react';
 
 export const CandidateFinalSubmissionPage: React.FC = () => {
-  const { currentUser, teams, finalSubmissions, submitFinalProject, config, openWizardAtStep } = useMockStore();
+  const { currentUser, teams, finalSubmissions, submitFinalProject, config, openWizardAtStep, syncFromBackend } =
+    useMockStore();
 
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
 
@@ -36,20 +39,60 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
   );
   const [confirmLock, setConfirmLock] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isEditingSubmitted, setIsEditingSubmitted] = useState(false);
   const [successSha, setSuccessSha] = useState<string | null>(null);
+  const [nowMs] = useState(() => Date.now());
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    void syncFromBackend?.();
+  }, [syncFromBackend]);
+
+  const isDeadlinePassed =
+    Boolean(config.finalSubmissionDeadline) &&
+    new Date(config.finalSubmissionDeadline).getTime() < nowMs;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!myTeam) return;
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      const res = submitFinalProject(myTeam.id, repoUrl, demoVideoUrl, slideUrl, summary);
-      setIsSubmitting(false);
-      if (res.success) {
-        setSuccessSha(res.commitSha);
+    let backendSha: string | null = null;
+    try {
+      const apiRes = await apiClient.post('/submissions/final', {
+        team_id: myTeam.id,
+        github_url: repoUrl.trim(),
+        demo_url: demoVideoUrl.trim(),
+        slide_url: slideUrl.trim(),
+        description: summary.trim(),
+      });
+      const dataObj = apiRes.data?.data ?? apiRes.data;
+      if (dataObj?.commit_sha) {
+        backendSha = String(dataObj.commit_sha);
       }
-    }, 600);
+    } catch {
+      // Fallback to local store commitSha generation
+    }
+
+    const res = submitFinalProject(
+      myTeam.id,
+      repoUrl.trim(),
+      demoVideoUrl.trim(),
+      slideUrl.trim(),
+      summary.trim(),
+    );
+    const finalSha = backendSha || res.commitSha;
+    if (backendSha) {
+      useMockStore.setState((state) => ({
+        finalSubmissions: state.finalSubmissions.map((f) =>
+          f.teamId === myTeam.id ? { ...f, commitSha: backendSha } : f
+        ),
+      }));
+    }
+    setIsSubmitting(false);
+    setIsEditingSubmitted(false);
+    if (res.success) {
+      setSuccessSha(finalSha);
+    }
   };
 
   return (
@@ -88,7 +131,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
         </div>
       )}
 
-      {existingFinal || successSha ? (
+      {(existingFinal || successSha) && !isEditingSubmitted ? (
         /* Submitted View with Frozen SHA */
         <div className="rounded-[16px] border border-emerald-500/40 bg-card p-6 lg:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border">
@@ -107,6 +150,23 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
+              {!isDeadlinePassed && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    if (existingFinal?.repoUrl) setRepoUrl(existingFinal.repoUrl);
+                    if (existingFinal?.demoVideoUrl) setDemoVideoUrl(existingFinal.demoVideoUrl);
+                    if (existingFinal?.slideUrl) setSlideUrl(existingFinal.slideUrl);
+                    if (existingFinal?.summary) setSummary(existingFinal.summary);
+                    setIsEditingSubmitted(true);
+                  }}
+                  className="gap-1.5 text-xs"
+                >
+                  <Edit3 size={13} />
+                  <span>Cập nhật lại bài nộp</span>
+                </Button>
+              )}
               <Badge variant="success">Trạng thái: Đã Chốt Bài Nộp</Badge>
             </div>
           </div>

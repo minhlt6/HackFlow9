@@ -143,6 +143,54 @@ export const topicsApi = {
   },
 
   /**
+   * Thêm đề tài nhánh (subtopic) vào lĩnh vực lớn (Admin only)
+   * POST /api/v1/topics/{topicId}/subtopics
+   */
+  createSubtopic: async (
+    topicId: string,
+    payload: {
+      title: string;
+      description?: string;
+      max_teams?: number;
+      is_active?: boolean;
+    }
+  ): Promise<Topic> => {
+    const response = await axiosClient.post<ApiResponse<Topic>>(
+      `/topics/${topicId}/subtopics`,
+      payload
+    );
+    return response.data.data;
+  },
+
+  /**
+   * Cập nhật thông tin/quota đề tài nhánh (Admin only)
+   * PATCH /api/v1/topics/subtopics/{subtopicId}
+   */
+  updateSubtopic: async (
+    subtopicId: string,
+    payload: {
+      title?: string;
+      description?: string;
+      max_teams?: number;
+      is_active?: boolean;
+    }
+  ): Promise<unknown> => {
+    const response = await axiosClient.patch<ApiResponse<unknown>>(
+      `/topics/subtopics/${subtopicId}`,
+      payload
+    );
+    return response.data.data;
+  },
+
+  /**
+   * Xóa đề tài nhánh (Admin only)
+   * DELETE /api/v1/topics/subtopics/{subtopicId}
+   */
+  deleteSubtopic: async (subtopicId: string): Promise<void> => {
+    await axiosClient.delete(`/topics/subtopics/${subtopicId}`);
+  },
+
+  /**
    * Xóa đề tài (Admin only)
    * DELETE /api/v1/topics/{id}
    */

@@ -145,7 +145,16 @@ interface MockStoreState {
   rebalanceRubricWeights: (mode: 'equal' | 'proportional') => void;
   updateRubricCriterion: (id: string, updates: Partial<RubricCriteria>) => void;
   deleteRubricCriterion: (id: string) => void;
-  saveEvaluation: (teamId: string, judgeId: string, judgeName: string, scores: Record<string, number>, generalComment: string, isDraft: boolean) => void;
+  saveEvaluation: (
+    teamId: string,
+    judgeId: string,
+    judgeName: string,
+    scores: Record<string, number>,
+    generalComment: string,
+    isDraft: boolean,
+    criteriaComments?: Record<string, string>,
+    skipBackendSync?: boolean,
+  ) => void;
 
   // Support Tickets
   tickets: SupportTicket[];
@@ -311,16 +320,44 @@ export const useMockStore = create<MockStoreState>()(
       },
 
       updateCurrentUserProfile: (profile) => {
-        set((state) => ({
-          currentUser: { ...state.currentUser, ...profile },
-        }));
+        set((state) => {
+          const nextUser = {
+            ...state.currentUser,
+            ...profile,
+            university: profile.university ?? profile.school ?? state.currentUser.university,
+            school: profile.school ?? profile.university ?? state.currentUser.school,
+          };
+          const nextTeams = state.teams.map((t) => ({
+            ...t,
+            leaderName:
+              t.leaderId === nextUser.id && nextUser.fullName ? nextUser.fullName : t.leaderName,
+            members: t.members.map((m) =>
+              m.userId === nextUser.id || m.id === nextUser.id
+                ? {
+                    ...m,
+                    fullName: nextUser.fullName || m.fullName,
+                    studentId: nextUser.studentId ?? m.studentId,
+                    university: nextUser.university ?? m.university,
+                    school: nextUser.school ?? m.school,
+                    skills: nextUser.skills ?? m.skills,
+                  }
+                : m
+            ),
+          }));
+          return {
+            currentUser: nextUser,
+            teams: nextTeams,
+          };
+        });
+        const curr = get().currentUser;
         void apiClient
-          .patch('/auth/profile', {
-            full_name: profile.fullName,
-            student_id: profile.studentId,
-            school: profile.university || profile.school,
-            phone: profile.phone,
-            skills: profile.skills,
+          .post('/users/profile', {
+            full_name: profile.fullName || curr.fullName,
+            student_id: profile.studentId ?? curr.studentId,
+            school: profile.university || profile.school || curr.university || curr.school,
+            phone: profile.phone ?? curr.phone,
+            skills: profile.skills ?? curr.skills,
+            bio: profile.bio ?? curr.bio,
           })
           .catch(() => {});
       },
@@ -1228,7 +1265,16 @@ export const useMockStore = create<MockStoreState>()(
         syncRubricsToBackend(updated);
       },
 
-      saveEvaluation: (teamId, judgeId, judgeName, scoresMap, generalComment, isDraft) => {
+      saveEvaluation: (
+        teamId,
+        judgeId,
+        judgeName,
+        scoresMap,
+        generalComment,
+        isDraft,
+        criteriaComments,
+        skipBackendSync,
+      ) => {
         const criteria = get().rubricCriteria;
         const totalWeight = criteria.reduce((sum, c) => sum + (c.weight || 0), 0) || 100;
         let weightedSum = 0;
@@ -1240,14 +1286,18 @@ export const useMockStore = create<MockStoreState>()(
           // Normalized weighted contribution: (clamped / max) * weight
           const weightedContrib = (clamped / max) * c.weight;
           weightedSum += weightedContrib;
-          return { criteriaId: c.id, score: clamped };
+          return {
+            criteriaId: c.id,
+            score: clamped,
+            comment: criteriaComments?.[c.id] || undefined,
+          };
         });
 
         // Exact 100-point scale: (weightedSum / totalWeight) * 100
         const totalScore = Math.round(((weightedSum / totalWeight) * 100) * 10) / 10;
 
         const evalRecord: TeamEvaluation = {
-          id: `eval-${teamId}`,
+          id: `eval-${teamId}-${judgeId}`,
           teamId,
           judgeId,
           judgeName,
@@ -1266,19 +1316,21 @@ export const useMockStore = create<MockStoreState>()(
           ],
         }));
 
-        void apiClient
-          .post('/evaluations', {
-            submission_id: teamId,
-            team_id: teamId,
-            status: isDraft ? 'draft' : 'submitted',
-            general_comment: generalComment,
-            evaluations: details.map((d) => ({
-              criteria_id: d.criteriaId,
-              score: d.score,
-              comment: generalComment,
-            })),
-          })
-          .catch(() => {});
+        if (!skipBackendSync) {
+          void apiClient
+            .post('/evaluations', {
+              submission_id: teamId,
+              team_id: teamId,
+              status: isDraft ? 'draft' : 'submitted',
+              general_comment: generalComment,
+              evaluations: details.map((d) => ({
+                criteria_id: d.criteriaId,
+                score: d.score,
+                comment: d.comment || '',
+              })),
+            })
+            .catch(() => {});
+        }
       },
 
       // Tickets
@@ -1505,20 +1557,31 @@ export const useMockStore = create<MockStoreState>()(
             : raw;
 
         const roleNow = get().currentUser.role || get().activeRolePersona;
-        const [topicsRes, checkpointsRes, rubricsRes, annRes, teamsRes, ticketsRes, submissionsRes, judgeSubmRes, configRes] =
-          await Promise.allSettled([
-            apiClient.get('/topics'),
-            apiClient.get('/checkpoints'),
-            apiClient.get('/rubrics'),
-            apiClient.get('/announcements'),
-            apiClient.get('/teams'),
-            apiClient.get('/tickets'),
-            apiClient.get('/submissions'),
-            roleNow === 'judge' || roleNow === 'admin'
-              ? apiClient.get('/evaluations/submissions')
-              : Promise.resolve({ data: null }),
-            roleNow === 'admin' ? apiClient.get('/admin/config') : Promise.resolve({ data: null }),
-          ]);
+        const [
+          topicsRes,
+          checkpointsRes,
+          rubricsRes,
+          annRes,
+          teamsRes,
+          ticketsRes,
+          submissionsRes,
+          judgeSubmRes,
+          configRes,
+          meRes,
+        ] = await Promise.allSettled([
+          apiClient.get('/topics'),
+          apiClient.get('/checkpoints'),
+          apiClient.get('/rubrics'),
+          apiClient.get('/announcements'),
+          apiClient.get('/teams'),
+          apiClient.get('/tickets'),
+          apiClient.get('/submissions'),
+          roleNow === 'judge' || roleNow === 'admin'
+            ? apiClient.get('/evaluations/submissions')
+            : Promise.resolve({ data: null }),
+          roleNow === 'admin' ? apiClient.get('/admin/config') : Promise.resolve({ data: null }),
+          apiClient.get('/auth/me'),
+        ]);
 
         const updates: Partial<MockStoreState> = {};
 
@@ -1613,16 +1676,22 @@ export const useMockStore = create<MockStoreState>()(
           if (Array.isArray(teamsArr)) {
             const mappedTeams: Team[] = (teamsArr as Array<Record<string, unknown>>).map((t) => {
               const membersRaw = Array.isArray(t.members) ? (t.members as Array<Record<string, unknown>>) : [];
-              const members: TeamMember[] = membersRaw.map((m) => ({
-                userId: String(m.user_id ?? m.userId ?? m.id ?? ''),
-                fullName: String(m.full_name ?? m.fullName ?? ''),
-                email: String(m.email ?? ''),
-                roleInTeam: (String(m.role ?? m.role_in_team ?? '').toLowerCase() === 'leader'
-                  ? 'leader'
-                  : 'member') as 'leader' | 'member',
-                githubUsername: m.github_username ? String(m.github_username) : undefined,
-                joinedAt: String(m.joined_at ?? new Date().toISOString()),
-              }));
+              const members: TeamMember[] = membersRaw.map((m) => {
+                const uid = String(m.user_id ?? m.userId ?? m.id ?? '');
+                return {
+                  id: uid,
+                  userId: uid,
+                  fullName: String(m.full_name ?? m.fullName ?? ''),
+                  email: String(m.email ?? ''),
+                  roleInTeam: (String(m.role ?? m.role_in_team ?? '').toLowerCase() === 'leader'
+                    ? 'leader'
+                    : 'member') as 'leader' | 'member',
+                  githubUsername: m.github_username ? String(m.github_username) : undefined,
+                  joinedAt: String(m.joined_at ?? new Date().toISOString()),
+                };
+              });
+              const leaderMem =
+                members.find((m) => m.roleInTeam === 'leader') || members[0];
               const rawStatus = String(t.status ?? t.approval_status ?? 'approved').toLowerCase();
               const status: Team['status'] =
                 rawStatus === 'approved' || rawStatus === 'valid'
@@ -1639,7 +1708,9 @@ export const useMockStore = create<MockStoreState>()(
                 name: String(t.team_name ?? t.name ?? ''),
                 description: String(t.description ?? ''),
                 inviteCode: String(t.invite_code ?? ''),
-                leaderId: String(t.leader_id ?? t.created_by ?? ''),
+                leaderId: String(t.leader_id ?? t.created_by ?? leaderMem?.userId ?? ''),
+                leaderName: String(t.leader_name ?? t.leaderName ?? leaderMem?.fullName ?? 'Đội trưởng'),
+                subTopicId: resolvedSubOrTopicId ? String(resolvedSubOrTopicId) : undefined,
                 topicId: resolvedSubOrTopicId ? String(resolvedSubOrTopicId) : undefined,
                 topicName: resolvedTopicName ? String(resolvedTopicName) : undefined,
                 status,
@@ -1768,38 +1839,89 @@ export const useMockStore = create<MockStoreState>()(
           const jRaw = unwrap(judgeSubmRes.value.data) as { submissions?: Array<Record<string, unknown>> } | null;
           if (Array.isArray(jRaw?.submissions)) {
             const currJudge = get().currentUser;
+            const knownSubs = updates.submissions || get().submissions;
             const mappedEvals: TeamEvaluation[] = [];
             for (const js of jRaw.submissions) {
               const evalStatus = String(js.evaluation_status ?? 'not_started');
               if (evalStatus === 'not_started') continue;
+              const subId = String(js.submission_id ?? '');
+              const matchedSub = knownSubs.find(
+                (s) => s.id === subId || (js.repo_url && s.repoUrl === String(js.repo_url))
+              );
+              const resolvedTeamId = matchedSub?.teamId || subId;
               const rawEvals = Array.isArray(js.my_evaluations)
                 ? (js.my_evaluations as Array<Record<string, unknown>>)
                 : [];
               const scoresMap: Record<string, number> = {};
-              const details: Array<{ criteriaId: string; score: number }> = [];
+              const details: Array<{ criteriaId: string; score: number; comment?: string }> = [];
               for (const ev of rawEvals) {
                 const cid = String(ev.criteria_id ?? '');
                 const sc = Number(ev.score ?? 0);
                 if (cid) {
                   scoresMap[cid] = sc;
-                  details.push({ criteriaId: cid, score: sc });
+                  details.push({
+                    criteriaId: cid,
+                    score: sc,
+                    comment: ev.comment ? String(ev.comment) : undefined,
+                  });
                 }
               }
+              const generalComment = String(
+                js.my_general_comment ??
+                  rawEvals.find((ev) => ev.general_comment)?.general_comment ??
+                  rawEvals.find((ev) => ev.comment)?.comment ??
+                  js.note ??
+                  ''
+              );
               mappedEvals.push({
-                id: `eval-${String(js.submission_id)}`,
-                teamId: String(js.submission_id),
+                id: `eval-${resolvedTeamId}-${currJudge.id}`,
+                teamId: resolvedTeamId,
                 judgeId: currJudge.id,
                 judgeName: currJudge.fullName,
                 totalScore: Number(js.my_total_score ?? 0),
                 scores: scoresMap,
-                generalComment: String(js.note ?? ''),
+                generalComment,
                 isDraft: evalStatus === 'draft',
                 confirmedAt: evalStatus === 'submitted' ? String(js.submitted_at ?? new Date().toISOString()) : undefined,
                 details,
               });
             }
             if (mappedEvals.length > 0) {
-              updates.evaluations = mappedEvals;
+              const existingOtherEvals = get().evaluations.filter(
+                (e) =>
+                  !mappedEvals.some(
+                    (me) => me.teamId === e.teamId && me.judgeId === e.judgeId
+                  )
+              );
+              updates.evaluations = [...existingOtherEvals, ...mappedEvals];
+            }
+          }
+        }
+
+        if (meRes.status === 'fulfilled' && meRes.value.data) {
+          const meObj = unwrap(meRes.value.data) as Record<string, unknown> | null;
+          if (meObj && typeof meObj === 'object' && meObj.email) {
+            const baseUser = updates.currentUser || get().currentUser;
+            if (
+              !baseUser.email ||
+              String(meObj.email).toLowerCase() === baseUser.email.toLowerCase()
+            ) {
+              updates.currentUser = {
+                ...baseUser,
+                id: String(meObj.id ?? baseUser.id),
+                fullName: String(meObj.full_name ?? baseUser.fullName),
+                studentId: meObj.student_id ? String(meObj.student_id) : baseUser.studentId,
+                university: meObj.school ? String(meObj.school) : baseUser.university,
+                school: meObj.school ? String(meObj.school) : baseUser.school,
+                phone: meObj.phone ? String(meObj.phone) : baseUser.phone,
+                skills: Array.isArray(meObj.skills)
+                  ? (meObj.skills as string[])
+                  : baseUser.skills,
+                bio: meObj.bio ? String(meObj.bio) : baseUser.bio,
+                githubUsername: meObj.github_username
+                  ? String(meObj.github_username)
+                  : baseUser.githubUsername,
+              };
             }
           }
         }

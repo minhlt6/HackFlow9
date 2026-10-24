@@ -98,6 +98,54 @@ class TopicService:
         loaded = await topic_repo.get_by_id(db, tid)
         return self.build_topic_response(loaded)
 
+    async def update_topic(
+        self,
+        db: AsyncSession,
+        topic_id: str,
+        req: SubtopicUpdateRequest,
+    ) -> TopicResponse:
+        topic = await topic_repo.get_by_id(db, topic_id, for_update=True)
+        if not topic:
+            # Fallback if caller passed a subtopic_id to PUT /topics/{id}
+            sub = await topic_repo.get_subtopic_by_id(db, topic_id, for_update=True)
+            if sub:
+                await self.update_subtopic(db, topic_id, req)
+                parent = await topic_repo.get_by_id(db, str(sub.topic_id))
+                return self.build_topic_response(parent)
+            raise NotFoundException(
+                message="Không tìm thấy mảng đề tài yêu cầu.",
+                error_code="TOPIC_NOT_FOUND",
+            )
+        if req.title is not None:
+            topic.title = req.title.strip()
+        if req.description is not None:
+            topic.description = req.description
+        effective_quota = req.quota_max if req.quota_max is not None else req.max_teams
+        if effective_quota is not None:
+            topic.max_teams = effective_quota
+        if req.is_active is not None:
+            topic.is_active = req.is_active
+        tid = str(topic.id)
+        await db.commit()
+        db.expire_all()
+        loaded = await topic_repo.get_by_id(db, tid)
+        return self.build_topic_response(loaded)
+
+    async def delete_subtopic(
+        self,
+        db: AsyncSession,
+        subtopic_id: str,
+    ) -> Dict[str, str]:
+        subtopic = await topic_repo.get_subtopic_by_id(db, subtopic_id, for_update=True)
+        if not subtopic:
+            raise NotFoundException(
+                message="Không tìm thấy đề tài chi tiết yêu cầu.",
+                error_code="TOPIC_NOT_FOUND",
+            )
+        await db.delete(subtopic)
+        await db.commit()
+        return {"id": subtopic_id, "deleted": "true"}
+
     async def delete_topic(
         self,
         db: AsyncSession,

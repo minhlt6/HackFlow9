@@ -93,7 +93,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   return (
     <AlertDialog open={open} onOpenChange={handleDialogOpenChange}>
       <AlertDialogContent>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <AlertDialogHeader>
             <div className="flex items-start gap-3">
               {iconBadge}

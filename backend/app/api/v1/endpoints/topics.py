@@ -57,6 +57,41 @@ async def create_topic(
     )
 
 
+@router.put(
+    "/{topic_id}",
+    response_model=ApiResponse[TopicResponse],
+    summary="Cập nhật mảng đề tài chính hoặc subtopic (Admin)",
+)
+async def update_topic(
+    topic_id: str,
+    req: SubtopicUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role([UserRole.ADMIN.value])),
+):
+    result = await topic_service.update_topic(db, topic_id, req)
+    return ApiResponse.ok(
+        data=result,
+        message="Cập nhật đề tài thành công.",
+    )
+
+
+@router.delete(
+    "/subtopics/{subtopic_id}",
+    response_model=ApiResponse[dict],
+    summary="Xóa đề tài chi tiết (subtopic) (Admin)",
+)
+async def delete_subtopic(
+    subtopic_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_role([UserRole.ADMIN.value])),
+):
+    result = await topic_service.delete_subtopic(db, subtopic_id)
+    return ApiResponse.ok(
+        data=result,
+        message="Đã xóa đề tài chi tiết thành công.",
+    )
+
+
 @router.delete(
     "/{topic_id}",
     response_model=ApiResponse[dict],

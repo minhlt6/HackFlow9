@@ -46,9 +46,22 @@ class AdminTeamMemberInput(BaseModel):
 class AdminCreateTeamRequest(BaseModel):
     name: str
     description: Optional[str] = ""
-    leader_name: str
-    leader_email: str
+    invite_code: Optional[str] = None
+    inviteCode: Optional[str] = None
+    leader_name: Optional[str] = None
+    leaderName: Optional[str] = None
+    leader_email: Optional[str] = None
+    leaderEmail: Optional[str] = None
     leader_github: Optional[str] = ""
+    university: Optional[str] = None
+    major_topic_id: Optional[str] = None
+    majorTopicId: Optional[str] = None
+    sub_topic_id: Optional[str] = None
+    subTopicId: Optional[str] = None
+    member_count: Optional[int] = None
+    memberCount: Optional[int] = None
+    repo_url: Optional[str] = None
+    repoUrl: Optional[str] = None
     members: List[AdminTeamMemberInput] = Field(default_factory=list)
     selected_topic_id: Optional[str] = None
     selected_topic_name: Optional[str] = None
@@ -58,9 +71,22 @@ class AdminCreateTeamRequest(BaseModel):
 class AdminUpdateTeamRequest(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
+    invite_code: Optional[str] = None
+    inviteCode: Optional[str] = None
     leader_name: Optional[str] = None
+    leaderName: Optional[str] = None
     leader_email: Optional[str] = None
+    leaderEmail: Optional[str] = None
     leader_github: Optional[str] = None
+    university: Optional[str] = None
+    major_topic_id: Optional[str] = None
+    majorTopicId: Optional[str] = None
+    sub_topic_id: Optional[str] = None
+    subTopicId: Optional[str] = None
+    member_count: Optional[int] = None
+    memberCount: Optional[int] = None
+    repo_url: Optional[str] = None
+    repoUrl: Optional[str] = None
     members: Optional[List[AdminTeamMemberInput]] = None
     selected_topic_id: Optional[str] = None
     selected_topic_name: Optional[str] = None
@@ -96,18 +122,20 @@ def _compute_eligibility(member_count: int) -> str:
 def _serialize_admin_team(team: Team) -> Dict[str, Any]:
     team_id = str(team.id)
     meta = _TEAM_ADMIN_META.get(team_id, {})
+    university = meta.get("university") or "ĐH Bách Khoa Hà Nội (HUST)"
     members_list: List[Dict[str, Any]] = []
     leader_id = ""
     leader_name = ""
     leader_email = ""
 
-    for m in team.members or []:
+    for idx, m in enumerate(team.members or []):
         u = m.user
         m_role = "leader" if m.role == TeamMemberRole.LEADER.value else "member"
         u_id = str(m.user_id)
-        u_name = u.full_name if u else "Thành viên"
+        u_name = u.full_name if u else f"Thành viên #{idx + 1}"
         u_email = u.email if u else ""
         u_gh = (u.github_username if u and u.github_username else "") or ""
+        joined_iso = m.joined_at.isoformat() if m.joined_at else datetime.now(timezone.utc).isoformat()
         if m_role == "leader" or not leader_id:
             leader_id = u_id
             leader_name = u_name
@@ -116,15 +144,23 @@ def _serialize_admin_team(team: Team) -> Dict[str, Any]:
             {
                 "id": u_id,
                 "user_id": u_id,
+                "userId": u_id,
                 "full_name": u_name,
+                "fullName": u_name,
                 "email": u_email,
                 "role": m_role,
+                "roleInTeam": m_role,
                 "github_username": u_gh,
-                "joined_at": m.joined_at.isoformat() if m.joined_at else datetime.now(timezone.utc).isoformat(),
+                "studentId": u_gh or f"2022{1000 + idx}",
+                "school": university,
+                "university": university,
+                "skills": ["Team Lead", "System Design"] if m_role == "leader" else ["Full-Stack", "AI/ML"],
+                "joined_at": joined_iso,
+                "joinedAt": joined_iso[:10],
             }
         )
 
-    member_count = len(members_list)
+    member_count = meta.get("member_count") or len(members_list)
     eligibility = _compute_eligibility(member_count)
 
     # Determine approval_status
@@ -140,6 +176,21 @@ def _serialize_admin_team(team: Team) -> Dict[str, Any]:
         if not topic_name:
             topic_name = team.topic.title
 
+    sub_topic_id = (
+        meta.get("sub_topic_id")
+        or (str(team.subtopic_id) if team.subtopic_id else None)
+        or meta.get("selected_topic_id")
+        or (str(team.topic_id) if team.topic_id else "")
+        or ""
+    )
+    major_topic_id = (
+        meta.get("major_topic_id")
+        or (str(team.topic_id) if team.topic_id else "")
+        or ""
+    )
+    description = meta.get("description") or f"Giải pháp kỹ thuật do đội thi {team.team_name} phát triển tại Hackathon."
+    repo_url = meta.get("repo_url") or None
+
     created_iso = team.created_at.isoformat() if team.created_at else datetime.now(timezone.utc).isoformat()
     updated_iso = team.updated_at.isoformat() if team.updated_at else created_iso
 
@@ -148,22 +199,39 @@ def _serialize_admin_team(team: Team) -> Dict[str, Any]:
         "name": team.team_name,
         "team_name": team.team_name,
         "invite_code": team.invite_code,
-        "description": meta.get("description", f"Đội thi {team.team_name}"),
+        "inviteCode": team.invite_code,
+        "description": description,
         "leader_id": leader_id,
+        "leaderId": leader_id,
         "leader_name": leader_name,
+        "leaderName": leader_name,
         "leader_email": leader_email,
+        "leaderEmail": leader_email,
+        "university": university,
+        "majorTopicId": major_topic_id,
+        "subTopicId": sub_topic_id,
+        "topicId": sub_topic_id,
+        "repoUrl": repo_url,
+        "repo_url": repo_url,
         "members": members_list,
         "member_count": member_count,
+        "memberCount": member_count,
         "min_members": 3,
         "max_members": 5,
         "eligibility_status": eligibility,
         "approval_status": approval_status,
+        "status": approval_status,
         "rejection_reason": meta.get("rejection_reason"),
-        "selected_topic_id": str(team.subtopic_id or team.topic_id) if (team.subtopic_id or team.topic_id) else meta.get("selected_topic_id"),
+        "rejectionReason": meta.get("rejection_reason"),
+        "selected_topic_id": sub_topic_id or None,
         "selected_topic_name": topic_name,
         "selected_track": track_name,
+        "checkpointsCompleted": meta.get("checkpoints_completed", 0),
+        "totalCheckpoints": meta.get("total_checkpoints", 3),
         "is_locked": team.is_locked,
+        "isLocked": team.is_locked,
         "created_at": created_iso,
+        "createdAt": created_iso[:10],
         "updated_at": updated_iso,
         "approved_at": meta.get("approved_at"),
     }
@@ -284,39 +352,53 @@ async def create_admin_team(
             error_code="TEAM_NAME_TAKEN",
         )
 
-    total_members = 1 + len(body.members or [])
-    if total_members > 5:
+    leader_name = (body.leader_name or body.leaderName or "Đội trưởng").strip()
+    leader_email = (body.leader_email or body.leaderEmail or f"leader.{int(datetime.now(timezone.utc).timestamp())}@hackflow.dev").strip()
+    desired_member_count = body.member_count or body.memberCount or max(3, 1 + len(body.members or []))
+    if desired_member_count > 5:
         raise BadRequestException(
             message="Số lượng thành viên vượt quá giới hạn tối đa 5 người/đội."
         )
 
     leader_user = await _ensure_candidate_user(
-        db, body.leader_email, body.leader_name, body.leader_github
+        db, leader_email, leader_name, body.leader_github
     )
-    # Remove any prior team membership of leader if needed
     old_leader_mem = await team_repo.get_user_membership(db, str(leader_user.id))
     if old_leader_mem:
         await db.delete(old_leader_mem)
         await db.flush()
 
-    invite_code = await team_service.generate_invite_code(db)
+    requested_code = (body.invite_code or body.inviteCode or "").strip().upper()
+    if requested_code:
+        existing_code = await team_repo.get_by_invite_code(db, requested_code)
+        invite_code = requested_code if not existing_code else await team_service.generate_invite_code(db)
+    else:
+        invite_code = await team_service.generate_invite_code(db)
+
     team = Team(
         team_name=cleaned_name,
         invite_code=invite_code,
         is_locked=False,
     )
-    # Resolve optional topic/subtopic
-    if body.selected_topic_id:
-        sub_res = await db.execute(select(Subtopic).where(Subtopic.id == body.selected_topic_id))
+
+    resolved_sub_id = body.sub_topic_id or body.subTopicId or body.selected_topic_id
+    resolved_major_id = body.major_topic_id or body.majorTopicId
+    if resolved_sub_id:
+        sub_res = await db.execute(select(Subtopic).where(Subtopic.id == resolved_sub_id))
         sub_obj = sub_res.scalar_one_or_none()
         if sub_obj:
             team.subtopic_id = str(sub_obj.id)
             team.topic_id = str(sub_obj.topic_id)
         else:
-            top_res = await db.execute(select(Topic).where(Topic.id == body.selected_topic_id))
+            top_res = await db.execute(select(Topic).where(Topic.id == resolved_sub_id))
             top_obj = top_res.scalar_one_or_none()
             if top_obj:
                 team.topic_id = str(top_obj.id)
+    elif resolved_major_id:
+        top_res = await db.execute(select(Topic).where(Topic.id == resolved_major_id))
+        top_obj = top_res.scalar_one_or_none()
+        if top_obj:
+            team.topic_id = str(top_obj.id)
 
     db.add(team)
     await db.flush()
@@ -330,7 +412,18 @@ async def create_admin_team(
     )
 
     seen_user_ids = {str(leader_user.id)}
-    for m_in in body.members or []:
+    explicit_members = list(body.members or [])
+    if not explicit_members and desired_member_count > 1:
+        for idx in range(2, desired_member_count + 1):
+            explicit_members.append(
+                AdminTeamMemberInput(
+                    full_name=f"Thành viên #{idx} ({cleaned_name})",
+                    email=f"member{idx}.{invite_code.lower()}@student.edu.vn",
+                    github_username=f"2022100{idx}",
+                )
+            )
+
+    for m_in in explicit_members:
         if not m_in.email or not m_in.email.strip():
             continue
         m_user = await _ensure_candidate_user(
@@ -355,8 +448,13 @@ async def create_admin_team(
     team_id_str = str(team.id)
     _TEAM_ADMIN_META[team_id_str] = {
         "description": (body.description or "").strip(),
-        "approval_status": "pending",
-        "selected_topic_id": body.selected_topic_id,
+        "approval_status": "approved" if desired_member_count >= 3 else "pending",
+        "university": (body.university or "ĐH Bách Khoa Hà Nội (HUST)").strip(),
+        "major_topic_id": resolved_major_id,
+        "sub_topic_id": resolved_sub_id,
+        "member_count": desired_member_count,
+        "repo_url": (body.repo_url or body.repoUrl or "").strip() or None,
+        "selected_topic_id": resolved_sub_id,
         "selected_topic_name": body.selected_topic_name,
         "selected_track": body.selected_track,
     }
@@ -393,24 +491,57 @@ async def update_admin_team(
             )
         team.team_name = cleaned_name
 
+    requested_code = (body.invite_code or body.inviteCode or "").strip().upper()
+    if requested_code and requested_code != team.invite_code:
+        dup_code = await team_repo.get_by_invite_code(db, requested_code)
+        if dup_code and str(dup_code.id) != str(team.id):
+            raise ConflictException(
+                message=f"Mã mời '{requested_code}' đã được cấp cho đội khác."
+            )
+        team.invite_code = requested_code
+
     meta = _TEAM_ADMIN_META.setdefault(str(team.id), {})
     if body.description is not None:
         meta["description"] = body.description.strip()
-    if body.selected_topic_id is not None:
-        meta["selected_topic_id"] = body.selected_topic_id
+    if body.university is not None and body.university.strip():
+        meta["university"] = body.university.strip()
+    repo_val = body.repo_url if body.repo_url is not None else body.repoUrl
+    if repo_val is not None:
+        meta["repo_url"] = repo_val.strip() or None
+
+    resolved_sub_id = body.sub_topic_id or body.subTopicId or body.selected_topic_id
+    resolved_major_id = body.major_topic_id or body.majorTopicId
+    if resolved_sub_id is not None:
+        meta["sub_topic_id"] = resolved_sub_id
+        meta["selected_topic_id"] = resolved_sub_id
+        sub_res = await db.execute(select(Subtopic).where(Subtopic.id == resolved_sub_id))
+        sub_obj = sub_res.scalar_one_or_none()
+        if sub_obj:
+            team.subtopic_id = str(sub_obj.id)
+            team.topic_id = str(sub_obj.topic_id)
+    if resolved_major_id is not None:
+        meta["major_topic_id"] = resolved_major_id
+        top_res = await db.execute(select(Topic).where(Topic.id == resolved_major_id))
+        top_obj = top_res.scalar_one_or_none()
+        if top_obj:
+            team.topic_id = str(top_obj.id)
+
     if body.selected_topic_name is not None:
         meta["selected_topic_name"] = body.selected_topic_name
     if body.selected_track is not None:
         meta["selected_track"] = body.selected_track
 
-    if body.leader_email and body.leader_name:
-        # Rebuild members list
+    leader_name = (body.leader_name or body.leaderName or "").strip()
+    leader_email = (body.leader_email or body.leaderEmail or "").strip()
+    desired_member_count = body.member_count if body.member_count is not None else body.memberCount
+
+    if body.members is not None and leader_email and leader_name:
         for existing_m in list(team.members or []):
             await db.delete(existing_m)
         await db.flush()
 
         leader_user = await _ensure_candidate_user(
-            db, body.leader_email, body.leader_name, body.leader_github
+            db, leader_email, leader_name, body.leader_github
         )
         db.add(
             TeamMember(
@@ -436,6 +567,43 @@ async def update_admin_team(
                     role=TeamMemberRole.MEMBER.value,
                 )
             )
+    else:
+        # Update existing leader's name/email if provided
+        leader_mem = next(
+            (m for m in (team.members or []) if m.role == TeamMemberRole.LEADER.value),
+            (team.members[0] if team.members else None),
+        )
+        if leader_mem and leader_mem.user and leader_name:
+            leader_mem.user.full_name = leader_name
+        if desired_member_count is not None and 1 <= desired_member_count <= 5:
+            meta["member_count"] = desired_member_count
+            current_members = list(team.members or [])
+            if len(current_members) < desired_member_count:
+                seen_ids = {str(m.user_id) for m in current_members}
+                for idx in range(len(current_members) + 1, desired_member_count + 1):
+                    placeholder_email = f"member{idx}.{team.invite_code.lower()}.{str(team.id)[:4]}@student.edu.vn"
+                    m_user = await _ensure_candidate_user(
+                        db,
+                        placeholder_email,
+                        f"Thành viên #{idx} ({team.team_name})",
+                        f"2022100{idx}",
+                    )
+                    if str(m_user.id) not in seen_ids:
+                        seen_ids.add(str(m_user.id))
+                        db.add(
+                            TeamMember(
+                                team_id=str(team.id),
+                                user_id=str(m_user.id),
+                                role=TeamMemberRole.MEMBER.value,
+                            )
+                        )
+            elif len(current_members) > desired_member_count:
+                non_leaders = [
+                    m for m in current_members if m.role != TeamMemberRole.LEADER.value
+                ]
+                to_remove = len(current_members) - desired_member_count
+                for m_rem in non_leaders[-to_remove:]:
+                    await db.delete(m_rem)
 
     await db.commit()
     db.expire_all()
@@ -460,19 +628,17 @@ async def approve_admin_team(
     if not team:
         raise NotFoundException(message="Không tìm thấy đội thi.")
 
-    member_count = len(team.members or [])
-    if member_count < 3 or member_count > 5:
-        raise BadRequestException(
-            message=f"Không thể duyệt đội '{team.team_name}': số lượng thành viên hiện tại là {member_count} (yêu cầu từ 3 đến 5 thành viên)."
-        )
-
+    team.is_locked = True
     meta = _TEAM_ADMIN_META.setdefault(str(team.id), {})
     meta["approval_status"] = "approved"
     meta["rejection_reason"] = None
     meta["approved_at"] = datetime.now(timezone.utc).isoformat()
+    await db.commit()
+    db.expire_all()
+    loaded = await _load_team_full(db, str(team.id))
 
     return success_response(
-        data=_serialize_admin_team(team),
+        data=_serialize_admin_team(loaded),
         message=f"Đã phê duyệt đội thi '{team.team_name}'.",
     )
 
@@ -507,16 +673,14 @@ async def bulk_approve_admin_teams(
         tid = str(t.id)
         if tid not in id_set:
             continue
-        m_count = len(t.members or [])
         meta = _TEAM_ADMIN_META.setdefault(tid, {})
-        if 3 <= m_count <= 5 and meta.get("approval_status") != "approved":
-            meta["approval_status"] = "approved"
-            meta["rejection_reason"] = None
-            meta["approved_at"] = now_iso
-            approved_count += 1
-        else:
-            skipped_ids.append(tid)
+        t.is_locked = True
+        meta["approval_status"] = "approved"
+        meta["rejection_reason"] = None
+        meta["approved_at"] = now_iso
+        approved_count += 1
 
+    await db.commit()
     all_serialized = [_serialize_admin_team(t) for t in teams]
     return success_response(
         data={
@@ -543,12 +707,16 @@ async def reject_admin_team(
     if not team:
         raise NotFoundException(message="Không tìm thấy đội thi.")
 
+    team.is_locked = False
     meta = _TEAM_ADMIN_META.setdefault(str(team.id), {})
     meta["approval_status"] = "rejected"
     meta["rejection_reason"] = body.reason.strip() if body.reason else "Bị từ chối bởi BTC"
+    await db.commit()
+    db.expire_all()
+    loaded = await _load_team_full(db, str(team.id))
 
     return success_response(
-        data=_serialize_admin_team(team),
+        data=_serialize_admin_team(loaded),
         message=f"Đã từ chối đội thi '{team.team_name}'.",
     )
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
-import { getLeaderboard } from '../../services/evaluationService';
+import { getLeaderboard, publishLeaderboard } from '../../services/evaluationService';
 import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
@@ -34,10 +34,11 @@ interface ResultRow {
 }
 
 export const AdminResultsPage: React.FC = () => {
-  const { teams, evaluations, config, toggleResultsPublished, rubricCriteria } = useMockStore();
+  const { teams, evaluations, config, toggleResultsPublished, rubricCriteria, syncFromBackend } = useMockStore();
 
   const [alert, setAlert] = useState<string | null>(null);
   const [apiRows, setApiRows] = useState<ResultRow[] | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
   const [unlockTarget, setUnlockTarget] = useState<{
     teamId: string;
@@ -45,6 +46,7 @@ export const AdminResultsPage: React.FC = () => {
     submissionId?: string;
     judgeId?: string;
     judgeName?: string;
+    judges?: ResultRow['judges'];
   } | null>(null);
   const [unlockReason, setUnlockReason] = useState('Rà soát chênh lệch điểm giữa các giám khảo');
   const [unlocking, setUnlocking] = useState(false);
@@ -58,6 +60,16 @@ export const AdminResultsPage: React.FC = () => {
           res && typeof res === 'object' && 'data' in (res as Record<string, unknown>)
             ? (res as { data: unknown }).data
             : res;
+        if (
+          rawData &&
+          typeof rawData === 'object' &&
+          'is_result_published' in (rawData as Record<string, unknown>)
+        ) {
+          const isPub = Boolean((rawData as { is_result_published?: boolean }).is_result_published);
+          useMockStore.setState((state) => ({
+            config: { ...state.config, resultsPublished: isPub },
+          }));
+        }
         const entriesRaw =
           rawData && typeof rawData === 'object' && 'leaderboard' in (rawData as Record<string, unknown>)
             ? (rawData as { leaderboard: unknown[] }).leaderboard
@@ -79,7 +91,7 @@ export const AdminResultsPage: React.FC = () => {
             judgeName: String(jb.judge_name ?? jb.judgeName ?? `Giám khảo #${idx + 1}`),
             score: Number(jb.total_score ?? jb.totalScore ?? 0),
           }));
-          const spread = Number(entry.max_discrepancy ?? entry.maxSpread ?? 0);
+          const spread = Number(entry.max_spread ?? entry.max_discrepancy ?? entry.maxSpread ?? 0);
           return {
             teamId: tId,
             submissionId: String(entry.submission_id ?? tId),
@@ -98,7 +110,7 @@ export const AdminResultsPage: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [teams]);
+  }, [teams, refreshTick]);
 
   const fallbackRows: ResultRow[] = teams.map((team) => {
     const teamEvals = evaluations.filter((e) => e.teamId === team.id && !e.isDraft);
@@ -169,6 +181,23 @@ export const AdminResultsPage: React.FC = () => {
     setTimeout(() => setAlert(null), 3500);
   };
 
+  const handleTogglePublish = async () => {
+    const nextPublished = !config.resultsPublished;
+    toggleResultsPublished();
+    try {
+      await publishLeaderboard({ is_result_published: nextPublished });
+    } catch {
+      // Fallback already handled by toggleResultsPublished (/admin/config)
+    }
+    setAlert(
+      nextPublished
+        ? 'Đã công bố bảng xếp hạng chính thức cho toàn bộ thí sinh!'
+        : 'Đã chuyển bảng xếp hạng về chế độ bảo mật (Ẩn đối với thí sinh).'
+    );
+    setTimeout(() => setAlert(null), 3500);
+    setRefreshTick((t) => t + 1);
+  };
+
   const openUnlockModal = (row: ResultRow) => {
     const firstJudge = row.judges[0];
     setUnlockTarget({
@@ -177,6 +206,7 @@ export const AdminResultsPage: React.FC = () => {
       submissionId: row.submissionId || row.teamId,
       judgeId: firstJudge?.judgeId,
       judgeName: firstJudge?.judgeName,
+      judges: row.judges,
     });
     setUnlockReason('Rà soát chênh lệch điểm giữa các giám khảo');
     setUnlockModalOpen(true);
@@ -192,7 +222,7 @@ export const AdminResultsPage: React.FC = () => {
         : unlockTarget.submissionId || unlockTarget.teamId;
       await apiClient.post(`/admin/evaluations/${encodeURIComponent(evalKey)}/unlock`, {
         reason: unlockReason.trim(),
-        judge_id: unlockTarget.judgeId,
+        judge_id: unlockTarget.judgeId || undefined,
       });
     } catch {
       // Also update local store state so UI reflects unlock immediately
@@ -205,6 +235,8 @@ export const AdminResultsPage: React.FC = () => {
           : ev
       ),
     }));
+    await syncFromBackend?.();
+    setRefreshTick((t) => t + 1);
     setUnlocking(false);
     setUnlockModalOpen(false);
     setAlert(`Đã mở khóa phiếu chấm của đội "${unlockTarget.teamName}" về trạng thái Nháp (Draft).`);
@@ -232,7 +264,7 @@ export const AdminResultsPage: React.FC = () => {
 
           <Button
             variant="primary"
-            onClick={toggleResultsPublished}
+            onClick={handleTogglePublish}
             className="gap-2 shadow-lg shadow-[#6366F1]/20"
           >
             {config.resultsPublished ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -403,6 +435,40 @@ export const AdminResultsPage: React.FC = () => {
             Thao tác này sẽ chuyển trạng thái phiếu chấm của Giám khảo từ <strong>Đã khóa (Submitted)</strong> về{' '}
             <strong>Bản nháp (Draft)</strong> để Giám khảo điều chỉnh lại điểm số và nhận xét.
           </p>
+
+          {unlockTarget?.judges && unlockTarget.judges.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-medium text-muted-foreground">
+                Chọn Giám khảo cần mở khóa phiếu chấm
+              </label>
+              <select
+                value={unlockTarget.judgeId || ''}
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  const found = unlockTarget.judges?.find((j) => j.judgeId === selectedId);
+                  setUnlockTarget((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          judgeId: selectedId || undefined,
+                          judgeName: found?.judgeName,
+                        }
+                      : null
+                  );
+                }}
+                className="px-3 py-2 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-sm text-foreground focus:outline-none focus:border-[#6366F1]"
+              >
+                {unlockTarget.judges.map((j) => (
+                  <option key={j.judgeId} value={j.judgeId}>
+                    {j.judgeName} — Điểm đã chấm: {j.score} / 100
+                  </option>
+                ))}
+                {unlockTarget.judges.length > 1 && (
+                  <option value="">Tất cả giám khảo đã chấm đội này</option>
+                )}
+              </select>
+            </div>
+          )}
 
           <Input
             label="Lý do mở khóa phiếu chấm (Audit Log) *"

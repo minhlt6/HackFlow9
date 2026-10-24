@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
@@ -6,8 +6,12 @@ import { useNavigate } from 'react-router-dom';
 import { Columns } from 'lucide-react';
 
 export const JudgeResultsPage: React.FC = () => {
-  const { currentUser, teams, evaluations, rubricCriteria } = useMockStore();
+  const { currentUser, teams, evaluations, rubricCriteria, syncFromBackend } = useMockStore();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    void syncFromBackend?.();
+  }, [syncFromBackend]);
 
   const myEvaluations = evaluations.filter((e) => e.judgeId === currentUser.id);
 

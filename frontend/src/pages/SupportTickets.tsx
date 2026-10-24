@@ -182,6 +182,7 @@ export const SupportTickets: React.FC = () => {
           };
         });
         setApiTickets(mapped);
+        useMockStore.setState({ tickets: mapped });
       }
     } catch {
       // Local dev / network offline fallback

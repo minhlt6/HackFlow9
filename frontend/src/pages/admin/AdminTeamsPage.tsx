@@ -59,6 +59,7 @@ const VIEW_MODES: Array<{ id: AdminTeamsViewMode; label: string }> = [
 
 export const AdminTeamsPage: React.FC = () => {
   const {
+    teams,
     filteredTeams,
     majorTopics,
     metrics,
@@ -94,6 +95,14 @@ export const AdminTeamsPage: React.FC = () => {
   const [editingTeam, setEditingTeam] = useState<EnrichedAdminTeam | null>(null);
   const [rejectTarget, setRejectTarget] = useState<EnrichedAdminTeam | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EnrichedAdminTeam | null>(null);
+
+  const activeDetailTeam = useMemo(
+    () =>
+      detailTeam
+        ? teams.find((t) => t.id === detailTeam.id) || detailTeam
+        : null,
+    [detailTeam, teams],
+  );
 
   const openCreateModal = () => {
     setEditingTeam(null);
@@ -291,10 +300,10 @@ export const AdminTeamsPage: React.FC = () => {
         header: 'Trạng Thái',
         align: 'center',
         sortable: true,
-        sortAccessor: (row) => row.status.toLowerCase(),
+        sortAccessor: (row) => (row.status || 'pending').toLowerCase(),
         className: 'whitespace-nowrap',
         cell: (row) => {
-          const normalized = row.status.toLowerCase();
+          const normalized = (row.status || 'pending').toLowerCase();
           return (
             <Badge
               variant={
@@ -336,7 +345,7 @@ export const AdminTeamsPage: React.FC = () => {
         className:
           'sticky right-0 z-10 bg-card/95 group-hover:bg-muted/80 backdrop-blur-xs border-l border-border/60 whitespace-nowrap',
         cell: (row) => {
-          const normalized = row.status.toLowerCase();
+          const normalized = (row.status || 'pending').toLowerCase();
           return (
             <div className="inline-flex items-center justify-end gap-1">
               <Button
@@ -371,7 +380,7 @@ export const AdminTeamsPage: React.FC = () => {
                 >
                   <MoreHorizontal size={15} />
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-52">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel>Đội: {row.name}</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onSelect={() => setDetailTeam(row)}>
@@ -429,8 +438,8 @@ export const AdminTeamsPage: React.FC = () => {
   );
 
   const detailTopicMeta = useMemo(
-    () => getSubTopicMeta(detailTeam?.subTopicId),
-    [detailTeam, getSubTopicMeta],
+    () => getSubTopicMeta(activeDetailTeam?.subTopicId),
+    [activeDetailTeam, getSubTopicMeta],
   );
 
   return (
@@ -641,8 +650,8 @@ export const AdminTeamsPage: React.FC = () => {
 
       {/* Team Details Dialog */}
       <TeamDetailDialog
-        team={detailTeam}
-        open={Boolean(detailTeam)}
+        team={activeDetailTeam}
+        open={Boolean(activeDetailTeam)}
         onOpenChange={(open) => {
           if (!open) setDetailTeam(null);
         }}

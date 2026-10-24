@@ -3,7 +3,7 @@ import {
   ADMIN_TEAMS_MOCK_DATA,
   type EnrichedAdminTeam,
 } from '../mocks/adminTeamsMockData';
-import type { ApiResponse, Team } from '../types';
+import type { ApiResponse, Team, TeamMember } from '../types';
 
 const STORAGE_KEY = 'hackflow_admin_teams_clean_v1';
 
@@ -20,14 +20,165 @@ export interface AdminTeamUpsertPayload {
   description: string;
 }
 
+function normalizeAdminTeam(rawInput: unknown): EnrichedAdminTeam {
+  const raw = (rawInput || {}) as Record<string, unknown>;
+  const rawMembers = Array.isArray(raw.members)
+    ? (raw.members as Array<Record<string, unknown>>)
+    : [];
+
+  const university =
+    (typeof raw.university === 'string' && raw.university.trim()) ||
+    (typeof rawMembers[0]?.school === 'string' && rawMembers[0].school) ||
+    (typeof rawMembers[0]?.university === 'string' && rawMembers[0].university) ||
+    'ĐH Bách Khoa Hà Nội (HUST)';
+
+  const members: TeamMember[] = rawMembers.map((m, idx) => {
+    const uid = String(m.userId || m.user_id || m.id || `mem-${idx}`);
+    const fullName = String(m.fullName || m.full_name || `Thành viên #${idx + 1}`);
+    const email = String(m.email || '');
+    const roleVal =
+      m.roleInTeam === 'leader' || m.role === 'leader' || idx === 0
+        ? ('leader' as const)
+        : ('member' as const);
+    const joinedRaw = String(m.joinedAt || m.joined_at || new Date().toISOString());
+    const skillsArr = Array.isArray(m.skills)
+      ? (m.skills as string[])
+      : roleVal === 'leader'
+        ? ['Team Lead', 'System Design']
+        : ['Full-Stack', 'AI/ML'];
+
+    return {
+      id: uid,
+      userId: uid,
+      user_id: uid,
+      fullName,
+      full_name: fullName,
+      email,
+      role: roleVal,
+      roleInTeam: roleVal,
+      studentId: String(m.studentId || m.github_username || `2022${1000 + idx}`),
+      school: String(m.school || m.university || university),
+      university: String(m.university || m.school || university),
+      skills: skillsArr,
+      joinedAt: joinedRaw.slice(0, 10),
+    };
+  });
+
+  const leaderMember =
+    members.find((m) => m.roleInTeam === 'leader' || m.role === 'leader') ||
+    members[0];
+
+  const id = String(raw.id || `team-${Date.now()}`);
+  const name = String(raw.name || raw.team_name || 'Đội thi');
+  const inviteCode = String(raw.inviteCode || raw.invite_code || 'HF2026').toUpperCase();
+  const leaderId = String(raw.leaderId || raw.leader_id || leaderMember?.userId || '');
+  const leaderName = String(
+    raw.leaderName || raw.leader_name || leaderMember?.fullName || 'Đội trưởng',
+  );
+  const leaderEmail = String(
+    raw.leaderEmail || raw.leader_email || leaderMember?.email || 'leader@hackflow.dev',
+  );
+
+  const subTopicId = String(
+    raw.subTopicId ||
+      raw.sub_topic_id ||
+      raw.subtopic_id ||
+      raw.selected_topic_id ||
+      raw.topicId ||
+      '',
+  );
+  const majorTopicId = String(
+    raw.majorTopicId ||
+      raw.major_topic_id ||
+      raw.topic_id ||
+      (subTopicId.startsWith('sub-iot')
+        ? 'major-iot'
+        : subTopicId.startsWith('sub-fin')
+          ? 'major-fintech'
+          : subTopicId.startsWith('sub-hlt')
+            ? 'major-health'
+            : subTopicId
+              ? 'major-ai'
+              : ''),
+  );
+
+  const rawStatus = String(
+    raw.status || raw.approval_status || (raw.is_locked ? 'approved' : 'pending'),
+  ).toLowerCase();
+  const status: 'pending' | 'approved' | 'rejected' =
+    rawStatus === 'approved'
+      ? 'approved'
+      : rawStatus === 'rejected'
+        ? 'rejected'
+        : 'pending';
+
+  const memberCount =
+    typeof raw.memberCount === 'number'
+      ? raw.memberCount
+      : typeof raw.member_count === 'number'
+        ? raw.member_count
+        : Math.max(1, members.length);
+
+  const createdRaw = String(raw.createdAt || raw.created_at || new Date().toISOString());
+
+  return {
+    id,
+    name,
+    description: String(
+      raw.description ||
+        `Giải pháp kỹ thuật do đội thi ${name} phát triển tại Hackathon.`,
+    ),
+    inviteCode,
+    leaderId,
+    leaderName,
+    leaderEmail,
+    university,
+    majorTopicId,
+    subTopicId: subTopicId || undefined,
+    topicId: subTopicId || undefined,
+    status,
+    rejectionReason:
+      typeof raw.rejectionReason === 'string'
+        ? raw.rejectionReason
+        : typeof raw.rejection_reason === 'string'
+          ? raw.rejection_reason
+          : undefined,
+    memberCount,
+    repoUrl:
+      typeof raw.repoUrl === 'string' && raw.repoUrl
+        ? raw.repoUrl
+        : typeof raw.repo_url === 'string' && raw.repo_url
+          ? raw.repo_url
+          : undefined,
+    latestCommitSha:
+      typeof raw.latestCommitSha === 'string' ? raw.latestCommitSha : undefined,
+    checkpointsCompleted:
+      typeof raw.checkpointsCompleted === 'number'
+        ? raw.checkpointsCompleted
+        : typeof raw.checkpoints_completed === 'number'
+          ? raw.checkpoints_completed
+          : 0,
+    totalCheckpoints:
+      typeof raw.totalCheckpoints === 'number'
+        ? raw.totalCheckpoints
+        : typeof raw.total_checkpoints === 'number'
+          ? raw.total_checkpoints
+          : 3,
+    averageScore:
+      typeof raw.averageScore === 'number' ? raw.averageScore : null,
+    createdAt: createdRaw.slice(0, 10),
+    members,
+  };
+}
+
 function loadPersistedAdminTeams(): EnrichedAdminTeam[] {
   if (typeof window === 'undefined') return ADMIN_TEAMS_MOCK_DATA;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      const parsed = JSON.parse(raw) as EnrichedAdminTeam[];
+      const parsed = JSON.parse(raw) as unknown[];
       if (Array.isArray(parsed)) {
-        return parsed;
+        return parsed.map(normalizeAdminTeam);
       }
     }
   } catch {
@@ -54,12 +205,13 @@ export const adminTeamsApi = {
     storeTeams: Team[] = [],
   ): Promise<EnrichedAdminTeam[]> => {
     try {
-      const res = await axiosClient.get<ApiResponse<EnrichedAdminTeam[]>>(
+      const res = await axiosClient.get<ApiResponse<unknown[]>>(
         '/admin/teams',
       );
       if (res.data?.success && Array.isArray(res.data.data)) {
-        savePersistedAdminTeams(res.data.data);
-        return res.data.data;
+        const normalized = res.data.data.map(normalizeAdminTeam);
+        savePersistedAdminTeams(normalized);
+        return normalized;
       }
     } catch {
       // Fallback to persisted mock data when backend is offline
@@ -71,24 +223,7 @@ export const adminTeamsApi = {
     for (const st of storeTeams) {
       const existingIndex = merged.findIndex((m) => m.id === st.id);
       if (existingIndex === -1) {
-        merged.unshift({
-          ...st,
-          university:
-            st.members[0]?.school ||
-            st.members[0]?.university ||
-            'ĐH Bách Khoa Hà Nội (HUST)',
-          leaderEmail:
-            st.members[0]?.email || 'leader@hackflow.dev',
-          majorTopicId: st.subTopicId?.startsWith('sub-iot')
-            ? 'major-iot'
-            : st.subTopicId?.startsWith('sub-fin')
-              ? 'major-fintech'
-              : st.subTopicId?.startsWith('sub-hlt')
-                ? 'major-health'
-                : 'major-ai',
-          checkpointsCompleted: 0,
-          totalCheckpoints: 3,
-        });
+        merged.unshift(normalizeAdminTeam(st));
       }
     }
 
@@ -103,23 +238,31 @@ export const adminTeamsApi = {
     payload: AdminTeamUpsertPayload,
   ): Promise<EnrichedAdminTeam> => {
     try {
-      const res = await axiosClient.post<ApiResponse<EnrichedAdminTeam>>(
+      const res = await axiosClient.post<ApiResponse<unknown>>(
         '/admin/teams',
         {
           name: payload.name.trim(),
           inviteCode: payload.inviteCode.trim().toUpperCase(),
+          invite_code: payload.inviteCode.trim().toUpperCase(),
           leaderName: payload.leaderName.trim(),
+          leader_name: payload.leaderName.trim(),
           leaderEmail: payload.leaderEmail.trim(),
+          leader_email: payload.leaderEmail.trim(),
           university: payload.university.trim(),
           majorTopicId: payload.majorTopicId,
+          major_topic_id: payload.majorTopicId,
           subTopicId: payload.subTopicId,
+          sub_topic_id: payload.subTopicId,
+          selected_topic_id: payload.subTopicId,
           memberCount: payload.memberCount,
+          member_count: payload.memberCount,
           repoUrl: payload.repoUrl?.trim() || undefined,
+          repo_url: payload.repoUrl?.trim() || undefined,
           description: payload.description.trim(),
         },
       );
       if (res.data?.data) {
-        const created = res.data.data;
+        const created = normalizeAdminTeam(res.data.data);
         const current = loadPersistedAdminTeams();
         savePersistedAdminTeams([created, ...current.filter((t) => t.id !== created.id)]);
         return created;
@@ -205,23 +348,31 @@ export const adminTeamsApi = {
     payload: AdminTeamUpsertPayload,
   ): Promise<EnrichedAdminTeam> => {
     try {
-      const res = await axiosClient.put<ApiResponse<EnrichedAdminTeam>>(
+      const res = await axiosClient.put<ApiResponse<unknown>>(
         `/admin/teams/${teamId}`,
         {
           name: payload.name.trim(),
           inviteCode: payload.inviteCode.trim().toUpperCase(),
+          invite_code: payload.inviteCode.trim().toUpperCase(),
           leaderName: payload.leaderName.trim(),
+          leader_name: payload.leaderName.trim(),
           leaderEmail: payload.leaderEmail.trim(),
+          leader_email: payload.leaderEmail.trim(),
           university: payload.university.trim(),
           majorTopicId: payload.majorTopicId,
+          major_topic_id: payload.majorTopicId,
           subTopicId: payload.subTopicId,
+          sub_topic_id: payload.subTopicId,
+          selected_topic_id: payload.subTopicId,
           memberCount: payload.memberCount,
+          member_count: payload.memberCount,
           repoUrl: payload.repoUrl?.trim() || undefined,
+          repo_url: payload.repoUrl?.trim() || undefined,
           description: payload.description.trim(),
         },
       );
       if (res.data?.data) {
-        const updatedTeam = res.data.data;
+        const updatedTeam = normalizeAdminTeam(res.data.data);
         const current = loadPersistedAdminTeams();
         savePersistedAdminTeams(
           current.map((t) => (t.id === teamId ? updatedTeam : t)),
@@ -268,11 +419,11 @@ export const adminTeamsApi = {
    */
   approveTeam: async (teamId: string): Promise<EnrichedAdminTeam> => {
     try {
-      const res = await axiosClient.patch<ApiResponse<EnrichedAdminTeam>>(
+      const res = await axiosClient.patch<ApiResponse<unknown>>(
         `/admin/teams/${teamId}/approve`,
       );
       if (res.data?.data) {
-        const updated = res.data.data;
+        const updated = normalizeAdminTeam(res.data.data);
         const current = loadPersistedAdminTeams();
         savePersistedAdminTeams(
           current.map((t) => (t.id === teamId ? updated : t)),
@@ -303,12 +454,13 @@ export const adminTeamsApi = {
   bulkApproveTeams: async (teamIds: string[]): Promise<EnrichedAdminTeam[]> => {
     try {
       await axiosClient.post('/admin/teams/bulk-approve', { team_ids: teamIds });
-      const res = await axiosClient.get<ApiResponse<EnrichedAdminTeam[]>>(
+      const res = await axiosClient.get<ApiResponse<unknown[]>>(
         '/admin/teams',
       );
-      if (res.data?.data) {
-        savePersistedAdminTeams(res.data.data);
-        return res.data.data;
+      if (res.data?.data && Array.isArray(res.data.data)) {
+        const normalized = res.data.data.map(normalizeAdminTeam);
+        savePersistedAdminTeams(normalized);
+        return normalized;
       }
     } catch {
       // Fallback below
@@ -332,12 +484,12 @@ export const adminTeamsApi = {
     reason: string,
   ): Promise<EnrichedAdminTeam> => {
     try {
-      const res = await axiosClient.patch<ApiResponse<EnrichedAdminTeam>>(
+      const res = await axiosClient.patch<ApiResponse<unknown>>(
         `/admin/teams/${teamId}/reject`,
         { reason },
       );
       if (res.data?.data) {
-        const updated = res.data.data;
+        const updated = normalizeAdminTeam(res.data.data);
         const current = loadPersistedAdminTeams();
         savePersistedAdminTeams(
           current.map((t) => (t.id === teamId ? updated : t)),
@@ -377,11 +529,21 @@ export const adminTeamsApi = {
   },
 
   /**
-   * Reset persisted teams back to the default mock dataset.
+   * Reset persisted teams and reload from backend.
    */
   resetMockTeams: async (): Promise<EnrichedAdminTeam[]> => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem(STORAGE_KEY);
+    }
+    try {
+      const res = await axiosClient.get<ApiResponse<unknown[]>>('/admin/teams');
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const normalized = res.data.data.map(normalizeAdminTeam);
+        savePersistedAdminTeams(normalized);
+        return normalized;
+      }
+    } catch {
+      // ignore offline
     }
     savePersistedAdminTeams(ADMIN_TEAMS_MOCK_DATA);
     return ADMIN_TEAMS_MOCK_DATA;
