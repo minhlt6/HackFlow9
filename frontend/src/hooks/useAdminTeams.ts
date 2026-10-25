@@ -57,7 +57,7 @@ export const adminTeamFormSchema = z.object({
   memberCount: z
     .number()
     .int('Số lượng thành viên phải là số nguyên.')
-    .min(1, 'Số lượng thành viên tối thiểu là 1 người.')
+    .min(3, 'Theo quy chế Hackathon, mỗi đội phải có tối thiểu 3 thành viên.')
     .max(5, 'Theo quy chế Hackathon, mỗi đội không được vượt quá 5 thành viên.'),
   repoUrl: z
     .string()

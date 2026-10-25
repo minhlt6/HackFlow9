@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
@@ -12,8 +13,76 @@ import {
   Trash2,
 } from 'lucide-react';
 
-export const AdminMentorsJudgesPage: React.FC = () => {
+interface JudgeRosterItem {
+  id: string;
+  name: string;
+  email: string;
+  specialization: string;
+  assignedCount: number;
+  avatar: string;
+}
 
+interface MentorRosterItem {
+  id: string;
+  name: string;
+  email: string;
+  topic: string;
+  openTickets: number;
+  avatar: string;
+}
+
+const PERSONNEL_STORAGE_KEY = 'hackflow_admin_personnel_v1';
+
+const DEFAULT_JUDGES: JudgeRosterItem[] = [
+  {
+    id: 'judge-1',
+    name: 'TS. Nguyễn Hoàng Giám Khảo',
+    email: 'judge.tech@hackathon.org',
+    specialization: 'AI Architecture & System Evaluation',
+    assignedCount: 0,
+    avatar: 'N',
+  },
+];
+
+const DEFAULT_MENTORS: MentorRosterItem[] = [
+  {
+    id: 'mentor-1',
+    name: 'ThS. Phạm Cố Vấn AI',
+    email: 'mentor.ai@ailab.org.vn',
+    topic: 'AI, Cloud & System Architecture',
+    openTickets: 0,
+    avatar: 'P',
+  },
+];
+
+const loadCachedPersonnel = (): { judges: JudgeRosterItem[]; mentors: MentorRosterItem[] } => {
+  try {
+    const raw = localStorage.getItem(PERSONNEL_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as {
+        judges?: JudgeRosterItem[];
+        mentors?: MentorRosterItem[];
+      };
+      return {
+        judges: Array.isArray(parsed.judges) ? parsed.judges : DEFAULT_JUDGES,
+        mentors: Array.isArray(parsed.mentors) ? parsed.mentors : DEFAULT_MENTORS,
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { judges: DEFAULT_JUDGES, mentors: DEFAULT_MENTORS };
+};
+
+const saveCachedPersonnel = (judges: JudgeRosterItem[], mentors: MentorRosterItem[]) => {
+  try {
+    localStorage.setItem(PERSONNEL_STORAGE_KEY, JSON.stringify({ judges, mentors }));
+  } catch {
+    // ignore
+  }
+};
+
+export const AdminMentorsJudgesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'judges' | 'mentors'>('judges');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [name, setName] = useState('');
@@ -21,88 +90,154 @@ export const AdminMentorsJudgesPage: React.FC = () => {
   const [specialization, setSpecialization] = useState('Computer Vision & LLMs');
   const [alert, setAlert] = useState<string | null>(null);
 
-  const [judges, setJudges] = useState<Array<{
-    id: string;
-    name: string;
-    email: string;
-    specialization: string;
-    assignedCount: number;
-    avatar: string;
-  }>>([
-    {
-      id: 'judge-1',
-      name: 'TS. Nguyễn Hoàng Giám Khảo',
-      email: 'judge.tech@hackathon.org',
-      specialization: 'AI Architecture & System Evaluation',
-      assignedCount: 0,
-      avatar: 'N',
-    },
-  ]);
+  const [judges, setJudges] = useState<JudgeRosterItem[]>(() => loadCachedPersonnel().judges);
+  const [mentors, setMentors] = useState<MentorRosterItem[]>(() => loadCachedPersonnel().mentors);
 
-  const [mentors, setMentors] = useState<Array<{
-    id: string;
-    name: string;
-    email: string;
-    topic: string;
-    openTickets: number;
-    avatar: string;
-  }>>([
-    {
-      id: 'mentor-1',
-      name: 'ThS. Phạm Cố Vấn AI',
-      email: 'mentor.ai@ailab.org.vn',
-      topic: 'AI, Cloud & System Architecture',
-      openTickets: 0,
-      avatar: 'P',
-    },
-  ]);
+  useEffect(() => {
+    let active = true;
+    apiClient
+      .get('/admin/personnel')
+      .then((res) => {
+        if (!active) return;
+        const rawList = res.data?.data ?? res.data;
+        if (Array.isArray(rawList)) {
+          const nextJudges: JudgeRosterItem[] = [];
+          const nextMentors: MentorRosterItem[] = [];
+          for (const item of rawList as Array<Record<string, unknown>>) {
+            const role = String(item.role ?? '').toLowerCase();
+            const fullName = String(item.full_name ?? item.name ?? 'Chuyên gia');
+            const itemEmail = String(item.email ?? '');
+            const spec = String(item.specialty ?? 'AI Architecture & System Evaluation');
+            const assignedTeams = Array.isArray(item.assigned_team_ids)
+              ? item.assigned_team_ids.length
+              : 0;
+            const avatarChar = fullName.trim().charAt(0).toUpperCase() || 'U';
+            if (role === 'judge') {
+              nextJudges.push({
+                id: String(item.id),
+                name: fullName,
+                email: itemEmail,
+                specialization: spec,
+                assignedCount: assignedTeams,
+                avatar: avatarChar,
+              });
+            } else if (role === 'mentor') {
+              nextMentors.push({
+                id: String(item.id),
+                name: fullName,
+                email: itemEmail,
+                topic: spec,
+                openTickets: 0,
+                avatar: avatarChar,
+              });
+            }
+          }
+          setJudges(nextJudges);
+          setMentors(nextMentors);
+          saveCachedPersonnel(nextJudges, nextMentors);
+        }
+      })
+      .catch(() => {
+        // Keep cached state when offline
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const handleDeleteJudge = (id: string, judgeName: string) => {
+  const handleDeleteJudge = async (id: string, judgeName: string, judgeEmail?: string) => {
     if (window.confirm(`Xác nhận xóa giám khảo "${judgeName}"?`)) {
-      setJudges((prev) => prev.filter((j) => j.id !== id));
+      const nextJudges = judges.filter(
+        (j) => j.id !== id && (!judgeEmail || j.email.toLowerCase() !== judgeEmail.toLowerCase()),
+      );
+      setJudges(nextJudges);
+      saveCachedPersonnel(nextJudges, mentors);
+      try {
+        await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
+          params: judgeEmail ? { email: judgeEmail } : undefined,
+        });
+      } catch {
+        // Ignore if offline
+      }
       setAlert(`Đã xóa giám khảo ${judgeName}`);
       setTimeout(() => setAlert(null), 3000);
     }
   };
 
-  const handleDeleteMentor = (id: string, mentorName: string) => {
+  const handleDeleteMentor = async (id: string, mentorName: string, mentorEmail?: string) => {
     if (window.confirm(`Xác nhận xóa cố vấn "${mentorName}"?`)) {
-      setMentors((prev) => prev.filter((m) => m.id !== id));
+      const nextMentors = mentors.filter(
+        (m) => m.id !== id && (!mentorEmail || m.email.toLowerCase() !== mentorEmail.toLowerCase()),
+      );
+      setMentors(nextMentors);
+      saveCachedPersonnel(judges, nextMentors);
+      try {
+        await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
+          params: mentorEmail ? { email: mentorEmail } : undefined,
+        });
+      } catch {
+        // Ignore if offline
+      }
       setAlert(`Đã xóa cố vấn ${mentorName}`);
       setTimeout(() => setAlert(null), 3000);
     }
   };
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
 
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+    const cleanSpec = specialization.trim();
+    const roleToCreate = activeTab === 'judges' ? 'judge' : 'mentor';
+    let createdId = `${roleToCreate}-${Date.now()}`;
+
+    try {
+      const res = await apiClient.post('/admin/personnel', {
+        full_name: cleanName,
+        email: cleanEmail,
+        role: roleToCreate,
+        specialty: cleanSpec,
+      });
+      const payload = res.data?.data ?? res.data;
+      if (payload?.id) {
+        createdId = String(payload.id);
+      }
+    } catch {
+      // Fallback to local ID if offline
+    }
+
     if (activeTab === 'judges') {
-      setJudges((prev) => [
-        ...prev,
+      const nextJudges = [
+        ...judges.filter((j) => j.email.toLowerCase() !== cleanEmail.toLowerCase()),
         {
-          id: `judge-${Date.now()}`,
-          name: name.trim(),
-          email: email.trim(),
-          specialization: specialization.trim(),
+          id: createdId,
+          name: cleanName,
+          email: cleanEmail,
+          specialization: cleanSpec,
           assignedCount: 0,
-          avatar: name.trim().charAt(0).toUpperCase(),
+          avatar: cleanName.charAt(0).toUpperCase(),
         },
-      ]);
-      setAlert(`Đã gửi thư mời Ban Giám Khảo tới ${email}!`);
+      ];
+      setJudges(nextJudges);
+      saveCachedPersonnel(nextJudges, mentors);
+      setAlert(`Đã gửi thư mời Ban Giám Khảo tới ${cleanEmail}!`);
     } else {
-      setMentors((prev) => [
-        ...prev,
+      const nextMentors = [
+        ...mentors.filter((m) => m.email.toLowerCase() !== cleanEmail.toLowerCase()),
         {
-          id: `mentor-${Date.now()}`,
-          name: name.trim(),
-          email: email.trim(),
-          topic: specialization.trim(),
+          id: createdId,
+          name: cleanName,
+          email: cleanEmail,
+          topic: cleanSpec,
           openTickets: 0,
-          avatar: name.trim().charAt(0).toUpperCase(),
+          avatar: cleanName.charAt(0).toUpperCase(),
         },
-      ]);
-      setAlert(`Đã gửi thư mời Cố vấn chuyên môn tới ${email}!`);
+      ];
+      setMentors(nextMentors);
+      saveCachedPersonnel(judges, nextMentors);
+      setAlert(`Đã gửi thư mời Cố vấn chuyên môn tới ${cleanEmail}!`);
     }
 
     setIsInviteOpen(false);
@@ -218,7 +353,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleDeleteJudge(j.id, j.name)}
+                    onClick={() => void handleDeleteJudge(j.id, j.name, j.email)}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                     title="Xóa giám khảo"
                   >
@@ -257,7 +392,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleDeleteMentor(m.id, m.name)}
+                    onClick={() => void handleDeleteMentor(m.id, m.name, m.email)}
                     className="p-1.5 rounded-lg text-muted-foreground hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
                     title="Xóa cố vấn"
                   >

@@ -111,7 +111,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
         subTopicId: resolvedSubId,
         memberCount: Math.min(
           5,
-          Math.max(1, editingTeam.memberCount ?? editingTeam.members.length ?? 3),
+          Math.max(3, editingTeam.memberCount ?? editingTeam.members.length ?? 3),
         ),
         repoUrl: editingTeam.repoUrl || '',
         description:
@@ -285,11 +285,26 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
                 <Input
                   id="team-form-members"
                   type="number"
-                  min={1}
-                  max={10}
+                  min={3}
+                  max={5}
+                  step={1}
                   hasError={Boolean(errors.memberCount)}
                   disabled={isSubmitting}
-                  {...register('memberCount', { valueAsNumber: true })}
+                  {...register('memberCount', {
+                    valueAsNumber: true,
+                    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                      const raw = Number(e.target.value);
+                      if (!Number.isNaN(raw) && e.target.value !== '') {
+                        if (raw > 5) {
+                          e.target.value = '5';
+                          setValue('memberCount', 5, { shouldValidate: true });
+                        } else if (raw < 3 && raw >= 0) {
+                          e.target.value = '3';
+                          setValue('memberCount', 3, { shouldValidate: true });
+                        }
+                      }
+                    },
+                  })}
                 />
                 {errors.memberCount && (
                   <p role="alert" className="text-xs font-medium text-destructive">

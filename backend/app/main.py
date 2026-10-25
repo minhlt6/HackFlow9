@@ -48,8 +48,8 @@ async def _seed_default_accounts() -> None:
         ("admin@hackflow.com", "Admin HackFlow", "admin", "approved", "admin-com"),
         ("judge.tech@hackathon.org", "TS. Nguyễn Hoàng Giám Khảo", "judge", "approved", "judge-hf"),
         ("mentor.ai@ailab.org.vn", "ThS. Phạm Cố Vấn AI", "mentor", "approved", "mentor-hf"),
-        ("leader@cybersamurai.team", "Trần Quốc Bảo", "candidate", "approved", "quocbao-dev"),
-        ("member@cybersamurai.team", "Lê Hoàng Nam", "candidate", "approved", "hoangnam-fe"),
+        ("leader@cybersamurai.team", "Nguyễn Văn Minh", "candidate", "approved", "minh-leader"),
+        ("member@cybersamurai.team", "Trần Thị Thảo", "candidate", "approved", "thao-member"),
         ("member2@cybersamurai.team", "Nguyễn Minh Châu", "candidate", "approved", "minhchau-ai"),
     ]
     default_pw_hash = hash_password("123456")
@@ -75,6 +75,8 @@ async def _seed_default_accounts() -> None:
                     existing.hashed_password = default_pw_hash
                 if existing.approval_status != approval_status:
                     existing.approval_status = approval_status
+                if email == "leader@cybersamurai.team" and existing.full_name == "Trần Quốc Bảo":
+                    existing.full_name = "Nguyễn Văn Minh"
 
         await session.commit()
 

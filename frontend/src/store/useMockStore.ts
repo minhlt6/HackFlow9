@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import apiClient from '../api/axiosClient';
+import { useAuthStore } from './useAuthStore';
 import type {
   User,
   Team,
@@ -69,7 +70,7 @@ interface MockStoreState {
   isAuthenticated: boolean;
   switchPersona: (persona: 'admin' | 'leader' | 'member' | 'pending' | 'rejected' | 'mentor' | 'judge') => void;
   logout: () => void;
-  updateCurrentUserProfile: (profile: Partial<User>) => void;
+  updateCurrentUserProfile: (profile: Partial<User>, skipBackendSync?: boolean) => void;
 
   // Hackathon Configuration
   config: HackathonConfig;
@@ -82,8 +83,8 @@ interface MockStoreState {
   whitelist: WhitelistEntry[];
   addWhitelistEntry: (email: string, note?: string) => void;
   bulkImportWhitelist: (emails: string[], note?: string) => number;
-  toggleWhitelistActive: (id: string) => void;
-  removeWhitelistEntry: (id: string) => void;
+  toggleWhitelistActive: (id: string, email?: string) => void;
+  removeWhitelistEntry: (id: string, email?: string) => void;
 
   // Pending Candidates
   pendingCandidates: User[];
@@ -174,7 +175,13 @@ interface MockStoreState {
   // Announcements
   announcements: Announcement[];
   addAnnouncement: (title: string, content: string, isPinned?: boolean) => void;
-  broadcastAnnouncement: (title: string, content: string, targetRole?: 'all' | 'candidates' | 'judges' | 'mentors') => void;
+  broadcastAnnouncement: (
+    title: string,
+    content: string,
+    targetRole?: 'all' | 'candidates' | 'judges' | 'mentors',
+    priority?: 'info' | 'warning' | 'urgent',
+    skipBackendSync?: boolean,
+  ) => void;
   deleteAnnouncement: (id: string) => void;
 
   // Reset & Sync
@@ -193,6 +200,36 @@ interface MockStoreState {
   setUserPledge: (userId: string, pledged: boolean) => void;
 }
 
+const mergeUserWithAuthStore = (baseUser: User): User => {
+  try {
+    let authUser = useAuthStore.getState?.()?.user;
+    if (!authUser && typeof window !== 'undefined') {
+      const rawAuth = localStorage.getItem('auth-storage');
+      if (rawAuth) {
+        const parsed = JSON.parse(rawAuth) as { state?: { user?: User } };
+        authUser = parsed?.state?.user ?? null;
+      }
+    }
+    if (
+      authUser &&
+      authUser.role === baseUser.role &&
+      (!authUser.email ||
+        !baseUser.email ||
+        authUser.email.toLowerCase() === baseUser.email.toLowerCase())
+    ) {
+      return {
+        ...baseUser,
+        ...authUser,
+        university: authUser.university ?? authUser.school ?? baseUser.university,
+        school: authUser.school ?? authUser.university ?? baseUser.school,
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return baseUser;
+};
+
 const getInitialTabSession = () => {
   if (typeof window === 'undefined') {
     return {
@@ -206,7 +243,7 @@ const getInitialTabSession = () => {
     const sessionAuth = sessionStorage.getItem('hackflow_session_auth');
     if (sessionPersona && mockUsers[sessionPersona]) {
       return {
-        currentUser: mockUsers[sessionPersona],
+        currentUser: mergeUserWithAuthStore(mockUsers[sessionPersona]),
         activeRolePersona: sessionPersona as MockStoreState['activeRolePersona'],
         isAuthenticated: sessionAuth === 'true',
       };
@@ -215,7 +252,7 @@ const getInitialTabSession = () => {
     const localAuth = localStorage.getItem('hackflow_session_auth');
     if (localPersona && mockUsers[localPersona]) {
       return {
-        currentUser: mockUsers[localPersona],
+        currentUser: mergeUserWithAuthStore(mockUsers[localPersona]),
         activeRolePersona: localPersona as MockStoreState['activeRolePersona'],
         isAuthenticated: localAuth === 'true',
       };
@@ -289,7 +326,18 @@ export const useMockStore = create<MockStoreState>()(
       isAuthenticated: initialSession.isAuthenticated,
 
       switchPersona: (persona) => {
-        const targetUser = mockUsers[persona] || mockUsers.admin;
+        const baseMockUser = mockUsers[persona] || mockUsers.admin;
+        const curr = get().currentUser;
+        const sameCurr =
+          get().activeRolePersona === persona &&
+          curr &&
+          curr.role === baseMockUser.role &&
+          (!curr.email ||
+            !baseMockUser.email ||
+            curr.email.toLowerCase() === baseMockUser.email.toLowerCase());
+        const targetUser = mergeUserWithAuthStore(
+          sameCurr ? { ...baseMockUser, ...curr } : baseMockUser,
+        );
         const isDone = !!get().onboardingCompletedUsers[targetUser.id];
         if (typeof window !== 'undefined') {
           sessionStorage.setItem('hackflow_session_persona', persona);
@@ -319,7 +367,7 @@ export const useMockStore = create<MockStoreState>()(
         });
       },
 
-      updateCurrentUserProfile: (profile) => {
+      updateCurrentUserProfile: (profile, skipBackendSync = false) => {
         set((state) => {
           const nextUser = {
             ...state.currentUser,
@@ -349,17 +397,28 @@ export const useMockStore = create<MockStoreState>()(
             teams: nextTeams,
           };
         });
-        const curr = get().currentUser;
-        void apiClient
-          .post('/users/profile', {
-            full_name: profile.fullName || curr.fullName,
-            student_id: profile.studentId ?? curr.studentId,
-            school: profile.university || profile.school || curr.university || curr.school,
-            phone: profile.phone ?? curr.phone,
-            skills: profile.skills ?? curr.skills,
-            bio: profile.bio ?? curr.bio,
-          })
-          .catch(() => {});
+        if (!skipBackendSync) {
+          const curr = get().currentUser;
+          useAuthStore.getState().updateUser({
+            fullName: curr.fullName,
+            studentId: curr.studentId,
+            university: curr.university,
+            school: curr.school,
+            phone: curr.phone,
+            skills: curr.skills,
+            bio: curr.bio,
+          });
+          void apiClient
+            .post('/users/profile', {
+              full_name: profile.fullName || curr.fullName,
+              student_id: profile.studentId ?? curr.studentId,
+              school: profile.university || profile.school || curr.university || curr.school,
+              phone: profile.phone ?? curr.phone,
+              skills: profile.skills ?? curr.skills,
+              bio: profile.bio ?? curr.bio,
+            })
+            .catch(() => {});
+        }
       },
 
       // Onboarding Wizard & Guided Setup
@@ -503,15 +562,23 @@ export const useMockStore = create<MockStoreState>()(
         return validEntries.length;
       },
 
-      toggleWhitelistActive: (id) => {
+      toggleWhitelistActive: (id, email) => {
+        const emailLower = email?.trim().toLowerCase();
         set((state) => ({
-          whitelist: state.whitelist.map((w) => (w.id === id ? { ...w, isActive: !w.isActive } : w)),
+          whitelist: state.whitelist.map((w) =>
+            w.id === id || (emailLower && w.email.toLowerCase() === emailLower)
+              ? { ...w, isActive: !w.isActive }
+              : w,
+          ),
         }));
       },
 
-      removeWhitelistEntry: (id) => {
+      removeWhitelistEntry: (id, email) => {
+        const emailLower = email?.trim().toLowerCase();
         set((state) => ({
-          whitelist: state.whitelist.filter((w) => w.id !== id),
+          whitelist: state.whitelist.filter(
+            (w) => w.id !== id && (!emailLower || w.email.toLowerCase() !== emailLower),
+          ),
         }));
       },
 
@@ -1511,7 +1578,13 @@ export const useMockStore = create<MockStoreState>()(
           .catch(() => {});
       },
 
-      broadcastAnnouncement: (title, content, targetRole = 'all') => {
+      broadcastAnnouncement: (
+        title,
+        content,
+        targetRole = 'all',
+        priority = 'info',
+        skipBackendSync = false,
+      ) => {
         const tempId = `ann-${Date.now()}`;
         const newAnn: Announcement = {
           id: tempId,
@@ -1525,24 +1598,26 @@ export const useMockStore = create<MockStoreState>()(
           isPinned: false,
         };
         set((state) => ({ announcements: [newAnn, ...state.announcements] }));
-        void apiClient
-          .post('/announcements', {
-            title,
-            content,
-            is_pinned: false,
-            priority: 'info',
-            target_audience: targetRole || 'all',
-          })
-          .then((res) => {
-            const payload = (res.data as { data?: { id?: string }; id?: string })?.data ?? res.data;
-            const realId = (payload as { id?: string })?.id;
-            if (realId) {
-              set((state) => ({
-                announcements: state.announcements.map((a) => (a.id === tempId ? { ...a, id: String(realId) } : a)),
-              }));
-            }
-          })
-          .catch(() => {});
+        if (!skipBackendSync) {
+          void apiClient
+            .post('/announcements', {
+              title,
+              content,
+              is_pinned: false,
+              priority,
+              target_audience: targetRole || 'all',
+            })
+            .then((res) => {
+              const payload = (res.data as { data?: { id?: string }; id?: string })?.data ?? res.data;
+              const realId = (payload as { id?: string })?.id;
+              if (realId) {
+                set((state) => ({
+                  announcements: state.announcements.map((a) => (a.id === tempId ? { ...a, id: String(realId) } : a)),
+                }));
+              }
+            })
+            .catch(() => {});
+        }
       },
 
       deleteAnnouncement: (id) => {
@@ -1556,7 +1631,9 @@ export const useMockStore = create<MockStoreState>()(
             ? (raw as { data: unknown }).data
             : raw;
 
-        const roleNow = get().currentUser.role || get().activeRolePersona;
+        const authUserNow = useAuthStore.getState?.()?.user;
+        const roleNow: string = authUserNow?.role || get().currentUser.role || get().activeRolePersona;
+        const approvalNow = authUserNow?.approvalStatus || get().currentUser.approvalStatus;
         const [
           topicsRes,
           checkpointsRes,
@@ -1574,7 +1651,12 @@ export const useMockStore = create<MockStoreState>()(
           apiClient.get('/rubrics'),
           apiClient.get('/announcements'),
           apiClient.get('/teams'),
-          apiClient.get('/tickets'),
+          roleNow === 'admin' || roleNow === 'mentor'
+            ? apiClient.get('/tickets')
+            : (roleNow === 'candidate' || roleNow === 'leader' || roleNow === 'member') &&
+                approvalNow === 'approved'
+              ? apiClient.get('/tickets/me')
+              : Promise.resolve({ data: null }),
           apiClient.get('/submissions'),
           roleNow === 'judge' || roleNow === 'admin'
             ? apiClient.get('/evaluations/submissions')
@@ -1906,7 +1988,7 @@ export const useMockStore = create<MockStoreState>()(
               !baseUser.email ||
               String(meObj.email).toLowerCase() === baseUser.email.toLowerCase()
             ) {
-              updates.currentUser = {
+              const syncedUser: User = {
                 ...baseUser,
                 id: String(meObj.id ?? baseUser.id),
                 fullName: String(meObj.full_name ?? baseUser.fullName),
@@ -1922,6 +2004,18 @@ export const useMockStore = create<MockStoreState>()(
                   ? String(meObj.github_username)
                   : baseUser.githubUsername,
               };
+              updates.currentUser = syncedUser;
+              useAuthStore.getState().updateUser({
+                id: syncedUser.id,
+                fullName: syncedUser.fullName,
+                studentId: syncedUser.studentId,
+                university: syncedUser.university,
+                school: syncedUser.school,
+                phone: syncedUser.phone,
+                skills: syncedUser.skills,
+                bio: syncedUser.bio,
+                githubUsername: syncedUser.githubUsername,
+              });
             }
           }
         }
@@ -1979,8 +2073,20 @@ export const useMockStore = create<MockStoreState>()(
           const tabPersona = sessionStorage.getItem('hackflow_session_persona');
           const tabAuth = sessionStorage.getItem('hackflow_session_auth');
           if (tabPersona && mockUsers[tabPersona]) {
+            const baseMockUser = mockUsers[tabPersona];
+            const existingCurr =
+              state.currentUser &&
+              state.currentUser.role === baseMockUser.role &&
+              (!state.currentUser.email ||
+                !baseMockUser.email ||
+                state.currentUser.email.toLowerCase() === baseMockUser.email.toLowerCase())
+                ? state.currentUser
+                : undefined;
             state.activeRolePersona = tabPersona as MockStoreState['activeRolePersona'];
-            state.currentUser = mockUsers[tabPersona];
+            state.currentUser = mergeUserWithAuthStore({
+              ...baseMockUser,
+              ...(existingCurr || {}),
+            });
             state.isAuthenticated = tabAuth === 'true';
           }
         }

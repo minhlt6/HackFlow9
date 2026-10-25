@@ -289,14 +289,17 @@ export const OnboardingPage: React.FC = () => {
 
     // Lưu ngay vào localStorage & Store để đồng bộ toàn hệ thống
     saveProfileFormToStorage(cleanedForm, user?.email || activeUser.email, user?.id || activeUser.id);
-    updateMockUserProfile({
-      fullName: cleanedForm.fullName,
-      studentId: cleanedForm.studentId,
-      university: cleanedForm.university,
-      school: cleanedForm.university,
-      phone: cleanedForm.phone,
-      skills: cleanedForm.skills,
-    });
+    updateMockUserProfile(
+      {
+        fullName: cleanedForm.fullName,
+        studentId: cleanedForm.studentId,
+        university: cleanedForm.university,
+        school: cleanedForm.university,
+        phone: cleanedForm.phone,
+        skills: cleanedForm.skills,
+      },
+      true,
+    );
 
     setLoading(true);
     try {

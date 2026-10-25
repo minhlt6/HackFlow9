@@ -29,6 +29,19 @@ class WhitelistRepository:
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
+    async def get_by_id_or_email(
+        self, db: AsyncSession, id_or_email: str, email_hint: Optional[str] = None
+    ) -> Optional[WhitelistEntry]:
+        entry = await self.get_by_id(db, id_or_email)
+        if entry:
+            return entry
+        lookup_email = (email_hint or id_or_email).lower().strip()
+        if "@" in lookup_email:
+            stmt = select(WhitelistEntry).where(WhitelistEntry.email == lookup_email)
+            result = await db.execute(stmt)
+            return result.scalar_one_or_none()
+        return None
+
     async def get_all(
         self, db: AsyncSession, include_inactive: bool = False
     ) -> Sequence[WhitelistEntry]:
@@ -93,10 +106,10 @@ class WhitelistRepository:
         return results
 
     async def deactivate(
-        self, db: AsyncSession, entry_id: str
+        self, db: AsyncSession, entry_id: str, email_hint: Optional[str] = None
     ) -> Optional[WhitelistEntry]:
         """Soft-delete: set is_active=False."""
-        entry = await self.get_by_id(db, entry_id)
+        entry = await self.get_by_id_or_email(db, entry_id, email_hint=email_hint)
         if not entry:
             return None
         entry.is_active = False
@@ -104,13 +117,22 @@ class WhitelistRepository:
         await db.flush()
         return entry
 
+    async def delete_permanently(
+        self, db: AsyncSession, entry_id: str, email_hint: Optional[str] = None
+    ) -> Optional[WhitelistEntry]:
+        """Hard-delete a whitelist entry from database."""
+        entry = await self.get_by_id_or_email(db, entry_id, email_hint=email_hint)
+        if not entry:
+            return None
+        await db.delete(entry)
+        await db.flush()
+        return entry
+
     async def reactivate(
-        self, db: AsyncSession, entry_id: str
+        self, db: AsyncSession, entry_id: str, email_hint: Optional[str] = None
     ) -> Optional[WhitelistEntry]:
         """Re-enable a previously deactivated entry."""
-        stmt = select(WhitelistEntry).where(WhitelistEntry.id == entry_id)
-        result = await db.execute(stmt)
-        entry = result.scalar_one_or_none()
+        entry = await self.get_by_id_or_email(db, entry_id, email_hint=email_hint)
         if not entry:
             return None
         entry.is_active = True

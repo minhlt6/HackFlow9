@@ -131,15 +131,26 @@ export const AdminWhitelistPage: React.FC = () => {
   };
 
   const handleToggleActive = async (item: WhitelistEntry) => {
-    toggleWhitelistActive(item.id);
+    const emailLower = item.email.toLowerCase();
+    toggleWhitelistActive(item.id, item.email);
     setBackendWhitelist((prev) =>
-      prev.map((w) => (w.id === item.id ? { ...w, isActive: !w.isActive } : w)),
+      prev.map((w) =>
+        w.id === item.id || w.email.toLowerCase() === emailLower
+          ? { ...w, isActive: !w.isActive }
+          : w,
+      ),
     );
     try {
       if (item.isActive) {
-        await axiosClient.delete(`/admin/whitelist/${item.id}`);
+        await axiosClient.delete(`/admin/whitelist/${encodeURIComponent(item.id)}`, {
+          params: { email: item.email },
+        });
       } else {
-        await axiosClient.patch(`/admin/whitelist/${item.id}/reactivate`);
+        await axiosClient.patch(
+          `/admin/whitelist/${encodeURIComponent(item.id)}/reactivate`,
+          undefined,
+          { params: { email: item.email } },
+        );
       }
     } catch {
       // Ignore if mock-only
@@ -148,13 +159,20 @@ export const AdminWhitelistPage: React.FC = () => {
 
   const handleDelete = async (id: string, email: string) => {
     if (window.confirm(`Xóa email ${email} khỏi danh sách Whitelist?`)) {
-      removeWhitelistEntry(id);
-      setBackendWhitelist((prev) => prev.filter((w) => w.id !== id));
+      const emailLower = email.toLowerCase();
+      removeWhitelistEntry(id, email);
+      setBackendWhitelist((prev) =>
+        prev.filter((w) => w.id !== id && w.email.toLowerCase() !== emailLower),
+      );
       try {
-        await axiosClient.delete(`/admin/whitelist/${id}`);
+        await axiosClient.delete(`/admin/whitelist/${encodeURIComponent(id)}`, {
+          params: { permanent: true, email },
+        });
       } catch {
         // Ignore if mock-only
       }
+      setAlert(`Đã xóa ${email} khỏi danh sách Whitelist thành công!`);
+      setTimeout(() => setAlert(null), 3000);
     }
   };
 

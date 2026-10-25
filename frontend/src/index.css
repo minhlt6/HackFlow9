@@ -123,6 +123,36 @@ input[type='password']::-ms-clear {
   display: none;
 }
 
+/* Fix browser autofill (Chrome/Edge/Chromium) overriding dark inputs with white background & black text (BUG-07) */
+.login-dark-input:-webkit-autofill,
+.login-dark-input:-webkit-autofill:hover,
+.login-dark-input:-webkit-autofill:focus,
+.login-dark-input:-webkit-autofill:active,
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+  box-shadow: 0 0 0 1000px #0f172a inset !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+  color: #f1f5f9 !important;
+  caret-color: #f1f5f9 !important;
+  border-color: #334155;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+html:not(.dark) input:not(.login-dark-input):-webkit-autofill,
+html:not(.dark) input:not(.login-dark-input):-webkit-autofill:hover,
+html:not(.dark) input:not(.login-dark-input):-webkit-autofill:focus,
+html:not(.dark) input:not(.login-dark-input):-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px #ffffff inset !important;
+  box-shadow: 0 0 0 1000px #ffffff inset !important;
+  -webkit-text-fill-color: #0f172a !important;
+  color: #0f172a !important;
+  caret-color: #0f172a !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
 /* Custom subtle scrollbars for high-density data tables and sidebars */
 ::-webkit-scrollbar {
   width: 6px;

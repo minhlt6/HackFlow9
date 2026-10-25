@@ -26,9 +26,24 @@ DEFAULT_DEMO_ACCOUNTS: Dict[str, Tuple[str, str, str]] = {
     "admin@hackflow.com": ("Admin HackFlow", "admin", "admin-com"),
     "judge.tech@hackathon.org": ("TS. Nguyễn Hoàng Giám Khảo", "judge", "judge-hf"),
     "mentor.ai@ailab.org.vn": ("ThS. Phạm Cố Vấn AI", "mentor", "mentor-hf"),
-    "leader@cybersamurai.team": ("Trần Quốc Bảo", "candidate", "quocbao-dev"),
-    "member@cybersamurai.team": ("Lê Hoàng Nam", "candidate", "hoangnam-fe"),
+    "leader@cybersamurai.team": ("Nguyễn Văn Minh", "candidate", "minh-leader"),
+    "member@cybersamurai.team": ("Trần Thị Thảo", "candidate", "thao-member"),
     "member2@cybersamurai.team": ("Nguyễn Minh Châu", "candidate", "minhchau-ai"),
+}
+
+LOGIN_EMAIL_ALIASES: Dict[str, str] = {
+    "admin@hackflow.io": "admin@hackflow.dev",
+    "judge@hackflow.io": "judge.tech@hackathon.org",
+    "mentor@hackflow.io": "mentor.ai@ailab.org.vn",
+}
+
+DEMO_PASSWORD_ALIASES = {
+    "123",
+    "Admin@2026",
+    "Admin@123456",
+    "Judge@123456",
+    "Mentor@123456",
+    "Candidate@123",
 }
 
 
@@ -59,9 +74,15 @@ class AuthService:
         Authenticate local accounts (Admin, Judge, Mentor, or local Candidate)
         using email and password.
         """
-        clean_email = email.lower().strip()
+        raw_email = email.lower().strip()
+        clean_email = LOGIN_EMAIL_ALIASES.get(raw_email, raw_email)
+        effective_password = (
+            "123456"
+            if clean_email in DEFAULT_DEMO_ACCOUNTS and password in DEMO_PASSWORD_ALIASES
+            else password
+        )
         user = await user_repo.get_by_email(db, clean_email)
-        if not user and clean_email in DEFAULT_DEMO_ACCOUNTS and password == "123456":
+        if not user and clean_email in DEFAULT_DEMO_ACCOUNTS and effective_password == "123456":
             full_name, role_val, gh_user = DEFAULT_DEMO_ACCOUNTS[clean_email]
             user = User(
                 email=clean_email,
@@ -79,7 +100,7 @@ class AuthService:
         if not user or not user.hashed_password:
             raise UnauthorizedException(message="Email hoặc mật khẩu không chính xác.")
 
-        if not verify_password(password, user.hashed_password):
+        if not verify_password(effective_password, user.hashed_password):
             raise UnauthorizedException(message="Email hoặc mật khẩu không chính xác.")
 
         if not user.is_active:

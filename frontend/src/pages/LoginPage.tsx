@@ -20,6 +20,13 @@ interface BackendUser {
   github_username?: string;
   avatarUrl?: string;
   avatar_url?: string;
+  studentId?: string;
+  student_id?: string;
+  university?: string;
+  school?: string;
+  phone?: string;
+  skills?: string[];
+  bio?: string;
 }
 
 interface AuthResponse {
@@ -36,7 +43,9 @@ const IDENTIFIER_ALIASES: Record<string, string> = {
   admin: 'admin@hackflow.dev',
   'admin@hackflow.io': 'admin@hackflow.dev',
   judge: 'judge.tech@hackathon.org',
+  'judge@hackflow.io': 'judge.tech@hackathon.org',
   mentor: 'mentor.ai@ailab.org.vn',
+  'mentor@hackflow.io': 'mentor.ai@ailab.org.vn',
   leader: 'leader@cybersamurai.team',
   candidate: 'leader@cybersamurai.team',
   user: 'leader@cybersamurai.team',
@@ -53,6 +62,11 @@ const normalizeAuthResponse = (response: AuthResponse): { user: User; token: str
   const fullName = backendUser?.fullName || backendUser?.full_name || backendUser?.name || backendUser?.github_username;
   const githubUsername = backendUser?.githubUsername || backendUser?.github_username;
   const avatarUrl = backendUser?.avatarUrl || backendUser?.avatar_url;
+  const studentId = backendUser?.studentId || backendUser?.student_id;
+  const school = backendUser?.school || backendUser?.university;
+  const phone = backendUser?.phone;
+  const skills = Array.isArray(backendUser?.skills) ? backendUser?.skills : undefined;
+  const bio = backendUser?.bio;
   const token = payload.token || payload.access_token;
   if (!backendUser?.id || !backendUser.email || !fullName || !token || !role || !roles.includes(role as UserRole) || !approvalStatus || !statuses.includes(approvalStatus as ApprovalStatus)) {
     return null;
@@ -67,6 +81,12 @@ const normalizeAuthResponse = (response: AuthResponse): { user: User; token: str
       approvalStatus: approvalStatus as ApprovalStatus,
       githubUsername,
       avatarUrl,
+      studentId,
+      university: school,
+      school,
+      phone,
+      skills,
+      bio,
     },
   };
 };
@@ -148,14 +168,24 @@ const syncMockStoreWithUser = (user: User) => {
   else targetPersona = 'leader';
 
   mockStore.switchPersona(targetPersona);
-  mockStore.updateCurrentUserProfile({
-    fullName: user.fullName,
-    email: user.email,
-    role: user.role,
-    approvalStatus: user.approvalStatus,
-    githubUsername: user.githubUsername,
-    avatarUrl: user.avatarUrl,
-  });
+  mockStore.updateCurrentUserProfile(
+    {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      approvalStatus: user.approvalStatus,
+      githubUsername: user.githubUsername,
+      avatarUrl: user.avatarUrl,
+      studentId: user.studentId,
+      university: user.university || user.school,
+      school: user.school || user.university,
+      phone: user.phone,
+      skills: user.skills,
+      bio: user.bio,
+    },
+    true,
+  );
 };
 
 export const LoginPage: React.FC = () => {
@@ -207,7 +237,15 @@ export const LoginPage: React.FC = () => {
     const rawIdentifier = identifier.trim().toLowerCase();
     const userClean = IDENTIFIER_ALIASES[rawIdentifier] || rawIdentifier;
     const rawPass = password.trim();
-    const passClean = rawPass === '123' || rawPass === 'Admin@2026' ? '123456' : rawPass;
+    const DEMO_PASS_ALIASES = new Set([
+      '123',
+      'Admin@2026',
+      'Admin@123456',
+      'Judge@123456',
+      'Mentor@123456',
+      'Candidate@123',
+    ]);
+    const passClean = DEMO_PASS_ALIASES.has(rawPass) ? '123456' : rawPass;
 
     if (!userClean || !passClean) {
       setErrorMessage('Vui lòng nhập đầy đủ tài khoản/email và mật khẩu.');
@@ -351,11 +389,13 @@ export const LoginPage: React.FC = () => {
                     <div className="relative">
                       <input
                         type="text"
+                        name="username"
+                        autoComplete="username"
                         value={identifier}
                         onChange={(e) => setIdentifier(e.target.value)}
                         placeholder="Nhập email hoặc tên tài khoản..."
                         required
-                        className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-3 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
+                        className="login-dark-input w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-3 pl-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
                       />
                       <UserRound size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     </div>
@@ -368,11 +408,13 @@ export const LoginPage: React.FC = () => {
                     <div className="relative">
                       <input
                         type={showPassword ? 'text' : 'password'}
+                        name="password"
+                        autoComplete="current-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
                         required
-                        className="w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-3 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
+                        className="login-dark-input w-full rounded-[12px] border border-[#334155] bg-[#0F172A] px-4 py-3 pl-11 pr-11 text-sm text-slate-100 placeholder-slate-500 outline-none transition-all duration-200 focus:border-[#6366F1] focus:ring-1 focus:ring-[#6366F1]"
                       />
                       <Lock size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                       <button

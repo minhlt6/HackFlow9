@@ -1,4 +1,6 @@
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, Depends, Query
 from pydantic import BaseModel, Field
@@ -33,8 +35,39 @@ from app.services.team_service import team_service
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
 # Metadata store for AdminTeam extra display fields (description, approval_status, rejection_reason)
+ADMIN_META_STORE_PATH = Path(__file__).resolve().parents[4] / "admin_meta_store.json"
 _TEAM_ADMIN_META: Dict[str, Dict[str, Any]] = {}
 _PERSONNEL_EXTRA_META: Dict[str, Dict[str, Any]] = {}
+
+
+def _load_admin_meta_store() -> None:
+    try:
+        if ADMIN_META_STORE_PATH.exists():
+            raw = json.loads(ADMIN_META_STORE_PATH.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                if isinstance(raw.get("teams"), dict):
+                    _TEAM_ADMIN_META.update(raw["teams"])
+                if isinstance(raw.get("personnel"), dict):
+                    _PERSONNEL_EXTRA_META.update(raw["personnel"])
+    except Exception:
+        pass
+
+
+def _save_admin_meta_store() -> None:
+    try:
+        ADMIN_META_STORE_PATH.write_text(
+            json.dumps(
+                {"teams": _TEAM_ADMIN_META, "personnel": _PERSONNEL_EXTRA_META},
+                ensure_ascii=False,
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
+_load_admin_meta_store()
 
 
 class AdminTeamMemberInput(BaseModel):
@@ -458,6 +491,7 @@ async def create_admin_team(
         "selected_topic_name": body.selected_topic_name,
         "selected_track": body.selected_track,
     }
+    _save_admin_meta_store()
 
     loaded = await _load_team_full(db, team_id_str)
     return success_response(
@@ -606,6 +640,7 @@ async def update_admin_team(
                     await db.delete(m_rem)
 
     await db.commit()
+    _save_admin_meta_store()
     db.expire_all()
     loaded = await _load_team_full(db, str(team.id))
     return success_response(
@@ -634,6 +669,7 @@ async def approve_admin_team(
     meta["rejection_reason"] = None
     meta["approved_at"] = datetime.now(timezone.utc).isoformat()
     await db.commit()
+    _save_admin_meta_store()
     db.expire_all()
     loaded = await _load_team_full(db, str(team.id))
 
@@ -681,6 +717,7 @@ async def bulk_approve_admin_teams(
         approved_count += 1
 
     await db.commit()
+    _save_admin_meta_store()
     all_serialized = [_serialize_admin_team(t) for t in teams]
     return success_response(
         data={
@@ -712,6 +749,7 @@ async def reject_admin_team(
     meta["approval_status"] = "rejected"
     meta["rejection_reason"] = body.reason.strip() if body.reason else "Bị từ chối bởi BTC"
     await db.commit()
+    _save_admin_meta_store()
     db.expire_all()
     loaded = await _load_team_full(db, str(team.id))
 
@@ -743,6 +781,7 @@ async def delete_admin_team(
     await db.delete(team)
     await db.commit()
     _TEAM_ADMIN_META.pop(team_id, None)
+    _save_admin_meta_store()
 
     return success_response(
         data={"deleted_id": team_id},
@@ -768,7 +807,7 @@ async def list_personnel(
         allowed_roles = [role.strip().lower()]
     stmt = (
         select(User)
-        .where(User.role.in_(allowed_roles))
+        .where(User.role.in_(allowed_roles), User.is_active.is_(True))
         .order_by(User.created_at.asc())
     )
     res = await db.execute(stmt)
@@ -858,6 +897,7 @@ async def create_personnel(
             )
 
     await db.commit()
+    _save_admin_meta_store()
     await db.refresh(user_obj)
     return success_response(
         data={
@@ -876,6 +916,17 @@ async def create_personnel(
     )
 
 
+_DEFAULT_SEEDED_PERSONNEL_EMAILS = {
+    "judge.tech@hackathon.org",
+    "mentor.ai@ailab.org.vn",
+}
+
+_MOCK_PERSONNEL_ID_TO_EMAIL = {
+    "judge-1": "judge.tech@hackathon.org",
+    "mentor-1": "mentor.ai@ailab.org.vn",
+}
+
+
 @router.delete(
     "/personnel/{user_id}",
     response_model=ApiResponse[Dict[str, str]],
@@ -883,16 +934,36 @@ async def create_personnel(
 )
 async def delete_personnel(
     user_id: str,
+    email: Optional[str] = Query(None, description="Email dự phòng nếu user_id là mock ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
     u = await user_repo.get_by_id(db, user_id)
+    lookup_email = (
+        email
+        or _MOCK_PERSONNEL_ID_TO_EMAIL.get(user_id)
+        or (user_id if "@" in user_id else None)
+    )
+    if not u and lookup_email:
+        u = await user_repo.get_by_email(db, lookup_email.strip().lower())
     if not u:
+        if user_id.startswith(("judge-", "mentor-")):
+            return success_response(data={"id": user_id}, message="Đã xóa nhân sự thành công.")
         raise NotFoundException(message="Không tìm thấy nhân sự.")
-    await db.delete(u)
+    uid_str = str(u.id)
+    assign_stmt = select(JudgeAssignment).where(JudgeAssignment.judge_id == uid_str)
+    assign_res = await db.execute(assign_stmt)
+    for a in assign_res.scalars().all():
+        await db.delete(a)
+    if u.email.lower() in _DEFAULT_SEEDED_PERSONNEL_EMAILS:
+        u.is_active = False
+        db.add(u)
+    else:
+        await db.delete(u)
     await db.commit()
-    _PERSONNEL_EXTRA_META.pop(user_id, None)
-    return success_response(data={"id": user_id}, message="Đã xóa nhân sự thành công.")
+    _PERSONNEL_EXTRA_META.pop(uid_str, None)
+    _save_admin_meta_store()
+    return success_response(data={"id": uid_str}, message="Đã xóa nhân sự thành công.")
 
 
 # ─── Whitelist Management ────────────────────────────────────────────────────
@@ -995,20 +1066,41 @@ async def bulk_add_whitelist(
 @router.delete(
     "/whitelist/{entry_id}",
     response_model=ApiResponse[WhitelistDeactivateResponse],
-    summary="Vô hiệu hóa 1 email khỏi Whitelist",
+    summary="Xóa hoặc vô hiệu hóa 1 email khỏi Whitelist",
 )
 async def deactivate_whitelist_entry(
     entry_id: str,
+    permanent: bool = Query(False, description="Nếu True sẽ xóa hẳn bản ghi khỏi Database"),
+    email: Optional[str] = Query(None, description="Địa chỉ email dự phòng nếu entry_id là mock ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ) -> ApiResponse[WhitelistDeactivateResponse]:
-    """BTC vô hiệu hóa (soft-delete) 1 email khỏi Whitelist."""
-    entry = await whitelist_repo.deactivate(db, entry_id)
+    """BTC xóa hẳn (permanent=True) hoặc vô hiệu hóa (soft-delete) 1 email khỏi Whitelist."""
+    if permanent:
+        entry = await whitelist_repo.delete_permanently(db, entry_id, email_hint=email)
+        if entry:
+            await db.commit()
+            return success_response(
+                data=WhitelistDeactivateResponse(id=str(entry.id), email=entry.email, is_active=False),
+                message="Email đã được xóa khỏi whitelist.",
+            )
+        # Nếu bản ghi chỉ tồn tại ở mock client (ví dụ wl-1..wl-8), trả về 200 OK để không văng lỗi 404
+        return success_response(
+            data=WhitelistDeactivateResponse(id=entry_id, email=email or entry_id, is_active=False),
+            message="Email đã được xóa khỏi danh sách whitelist.",
+        )
+
+    entry = await whitelist_repo.deactivate(db, entry_id, email_hint=email)
     if not entry:
+        if email or entry_id.startswith("wl-"):
+            return success_response(
+                data=WhitelistDeactivateResponse(id=entry_id, email=email or entry_id, is_active=False),
+                message="Email đã bị vô hiệu hóa khỏi whitelist.",
+            )
         raise NotFoundException(message="Không tìm thấy entry Whitelist.")
     await db.commit()
     return success_response(
-        data=WhitelistDeactivateResponse(id=entry_id, email=entry.email, is_active=False),
+        data=WhitelistDeactivateResponse(id=str(entry.id), email=entry.email, is_active=False),
         message="Email đã bị vô hiệu hóa khỏi whitelist.",
     )
 
@@ -1020,16 +1112,22 @@ async def deactivate_whitelist_entry(
 )
 async def reactivate_whitelist_entry(
     entry_id: str,
+    email: Optional[str] = Query(None, description="Địa chỉ email dự phòng nếu entry_id là mock ID"),
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ) -> ApiResponse[WhitelistDeactivateResponse]:
     """BTC kích hoạt lại email đã tắt trong Whitelist."""
-    entry = await whitelist_repo.reactivate(db, entry_id)
+    entry = await whitelist_repo.reactivate(db, entry_id, email_hint=email)
     if not entry:
+        if email or entry_id.startswith("wl-"):
+            return success_response(
+                data=WhitelistDeactivateResponse(id=entry_id, email=email or entry_id, is_active=True),
+                message="Email đã được kích hoạt lại trong whitelist.",
+            )
         raise NotFoundException(message="Không tìm thấy entry Whitelist.")
     await db.commit()
     return success_response(
-        data=WhitelistDeactivateResponse(id=entry_id, email=entry.email, is_active=True),
+        data=WhitelistDeactivateResponse(id=str(entry.id), email=entry.email, is_active=True),
         message="Email đã được kích hoạt lại trong whitelist.",
     )
 
@@ -1206,6 +1304,7 @@ async def update_personnel(
 
     db.add(u)
     await db.commit()
+    _save_admin_meta_store()
     await db.refresh(u)
     return success_response(
         data={

@@ -21,22 +21,34 @@ const DEFAULT_BIO =
 
 export const CandidateProfilePage: React.FC = () => {
   const { currentUser, teams, updateCurrentUserProfile, syncFromBackend } = useMockStore();
+  const authUser = useAuthStore((s) => s.user);
   const updateAuthUser = useAuthStore((s) => s.updateUser);
 
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
 
-  const [fullName, setFullName] = useState(currentUser.fullName);
-  const [university, setUniversity] = useState(
-    currentUser.university || currentUser.school || 'Đại học Bách Khoa Hà Nội',
-  );
-  const [studentId, setStudentId] = useState(currentUser.studentId || '2023-CS-0842');
-  const [phone, setPhone] = useState(currentUser.phone || '');
-  const [skillsInput, setSkillsInput] = useState(
-    Array.isArray(currentUser.skills) && currentUser.skills.length > 0
-      ? currentUser.skills.join(', ')
-      : 'React, TypeScript, Python, FastAPI',
-  );
-  const [bio, setBio] = useState(currentUser.bio || DEFAULT_BIO);
+  const resolvedName = authUser?.fullName || currentUser.fullName;
+  const resolvedUniversity =
+    authUser?.university ||
+    authUser?.school ||
+    currentUser.university ||
+    currentUser.school ||
+    'Đại học Bách Khoa Hà Nội';
+  const resolvedStudentId = authUser?.studentId || currentUser.studentId || '2023-CS-0842';
+  const resolvedPhone = authUser?.phone ?? currentUser.phone ?? '';
+  const resolvedSkillsArray =
+    Array.isArray(authUser?.skills) && authUser.skills.length > 0
+      ? authUser.skills
+      : Array.isArray(currentUser.skills) && currentUser.skills.length > 0
+      ? currentUser.skills
+      : ['React', 'TypeScript', 'Python', 'FastAPI'];
+  const resolvedBio = authUser?.bio || currentUser.bio || DEFAULT_BIO;
+
+  const [fullName, setFullName] = useState(resolvedName);
+  const [university, setUniversity] = useState(resolvedUniversity);
+  const [studentId, setStudentId] = useState(resolvedStudentId);
+  const [phone, setPhone] = useState(resolvedPhone);
+  const [skillsInput, setSkillsInput] = useState(resolvedSkillsArray.join(', '));
+  const [bio, setBio] = useState(resolvedBio);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
@@ -45,14 +57,25 @@ export const CandidateProfilePage: React.FC = () => {
     void syncFromBackend?.().then(() => {
       if (!mounted) return;
       const u = useMockStore.getState().currentUser;
-      setFullName(u.fullName);
-      setUniversity(u.university || u.school || 'Đại học Bách Khoa Hà Nội');
-      setStudentId(u.studentId || '2023-CS-0842');
-      if (u.phone !== undefined) setPhone(u.phone);
-      if (Array.isArray(u.skills) && u.skills.length > 0) {
-        setSkillsInput(u.skills.join(', '));
+      const au = useAuthStore.getState().user;
+      setFullName(au?.fullName || u.fullName);
+      setUniversity(
+        au?.university || au?.school || u.university || u.school || 'Đại học Bách Khoa Hà Nội',
+      );
+      setStudentId(au?.studentId || u.studentId || '2023-CS-0842');
+      const nextPhone = au?.phone ?? u.phone;
+      if (nextPhone !== undefined) setPhone(nextPhone);
+      const nextSkills =
+        Array.isArray(au?.skills) && au.skills.length > 0
+          ? au.skills
+          : Array.isArray(u.skills) && u.skills.length > 0
+          ? u.skills
+          : null;
+      if (nextSkills) {
+        setSkillsInput(nextSkills.join(', '));
       }
-      if (u.bio) setBio(u.bio);
+      const nextBio = au?.bio || u.bio;
+      if (nextBio) setBio(nextBio);
     });
     return () => {
       mounted = false;
@@ -60,11 +83,11 @@ export const CandidateProfilePage: React.FC = () => {
   }, [syncFromBackend]);
 
   const isDirty =
-    fullName !== currentUser.fullName ||
-    university !== (currentUser.university || currentUser.school || 'Đại học Bách Khoa Hà Nội') ||
-    studentId !== (currentUser.studentId || '2023-CS-0842') ||
-    phone !== (currentUser.phone || '') ||
-    bio !== (currentUser.bio || DEFAULT_BIO);
+    fullName !== resolvedName ||
+    university !== resolvedUniversity ||
+    studentId !== resolvedStudentId ||
+    phone !== resolvedPhone ||
+    bio !== resolvedBio;
 
   const blocker = useUnsavedChangesWarning(isDirty);
 
@@ -98,7 +121,7 @@ export const CandidateProfilePage: React.FC = () => {
       skills: parsedSkills,
       bio: bio.trim(),
     };
-    updateCurrentUserProfile(profileUpdates);
+    updateCurrentUserProfile(profileUpdates, true);
     updateAuthUser(profileUpdates);
     setIsSaving(false);
     setIsSaved(true);
@@ -130,26 +153,26 @@ export const CandidateProfilePage: React.FC = () => {
       <div className="rounded-[16px] border border-border bg-card p-6 lg:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row items-center gap-5 pb-6 border-b border-border">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#6366F1] text-white text-3xl font-bold tracking-tight shadow-lg shadow-[#6366F1]/30">
-            {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : 'U'}
+            {resolvedName ? resolvedName.charAt(0).toUpperCase() : 'U'}
           </div>
 
           <div className="space-y-1.5 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
-              <h2 className="text-xl font-bold text-foreground">{currentUser.fullName}</h2>
+              <h2 className="text-xl font-bold text-foreground">{resolvedName}</h2>
               <Badge variant="indigo">
-                {currentUser.teamRole === 'leader' ? 'Đội Trưởng' : 'Thành Viên'}
+                {currentUser.teamRole === 'leader' || currentUser.roleInTeam === 'leader' ? 'Đội Trưởng' : 'Thành Viên'}
               </Badge>
               <Badge variant="success">Tài Khoản Đã Xác Thực</Badge>
             </div>
             <p className="text-xs text-muted-foreground flex items-center justify-center sm:justify-start gap-2">
               <span className="flex items-center gap-1">
                 <GithubIcon size={13} />
-                <span>@{currentUser.githubUsername || 'github_user'}</span>
+                <span>@{authUser?.githubUsername || currentUser.githubUsername || 'github_user'}</span>
               </span>
               <span>•</span>
               <span className="flex items-center gap-1">
                 <Mail size={13} />
-                <span>{currentUser.email}</span>
+                <span>{authUser?.email || currentUser.email}</span>
               </span>
             </p>
           </div>

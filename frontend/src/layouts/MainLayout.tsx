@@ -19,6 +19,7 @@ const SNAP_COLLAPSE_THRESHOLD = 120;
 export const MainLayout: React.FC = () => {
   const { user, logout } = useAuthStore();
   const {
+    currentUser,
     config,
     announcements,
     pendingCandidates,
@@ -79,15 +80,24 @@ export const MainLayout: React.FC = () => {
     }
 
     switchPersona(targetPersona);
-    updateCurrentUserProfile({
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      role: user.role,
-      approvalStatus: user.approvalStatus,
-      githubUsername: user.githubUsername,
-      avatarUrl: user.avatarUrl,
-    });
+    updateCurrentUserProfile(
+      {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        role: user.role,
+        approvalStatus: user.approvalStatus,
+        githubUsername: user.githubUsername,
+        avatarUrl: user.avatarUrl,
+        studentId: user.studentId,
+        university: user.university || user.school,
+        school: user.school || user.university,
+        phone: user.phone,
+        skills: user.skills,
+        bio: user.bio,
+      },
+      true,
+    );
     void useMockStore.getState().syncFromBackend?.();
   }, [user, switchPersona, updateCurrentUserProfile]);
 
@@ -144,8 +154,8 @@ export const MainLayout: React.FC = () => {
     navigate('/login');
   };
 
-  const displayName = user?.fullName || 'Nguyễn Văn Minh';
-  const displayEmail = user?.email || 'leader@cybersamurai.team';
+  const displayName = user?.fullName || currentUser?.fullName || 'Nguyễn Văn Minh';
+  const displayEmail = user?.email || currentUser?.email || 'leader@cybersamurai.team';
   const currentRole = user?.role || 'candidate';
   const isApproved =
     currentRole !== 'candidate' || user?.approvalStatus === 'approved';

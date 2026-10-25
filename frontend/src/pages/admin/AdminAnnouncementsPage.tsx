@@ -165,8 +165,8 @@ export const AdminAnnouncementsPage: React.FC = () => {
           priority,
         });
 
-        // Đồng bộ store local dự phòng
-        broadcastAnnouncement(title.trim(), content.trim(), targetRole);
+        // Đồng bộ store local dự phòng (không gọi lại POST /announcements lần 2)
+        broadcastAnnouncement(title.trim(), content.trim(), targetRole, priority, true);
         showAlert('Đã phát thông báo mới tới toàn hệ thống thành công!');
       }
 
@@ -195,7 +195,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
         if (editingItem) {
           showAlert('Đã cập nhật thông báo cục bộ (chế độ offline).');
         } else {
-          broadcastAnnouncement(title.trim(), content.trim(), targetRole);
+          broadcastAnnouncement(title.trim(), content.trim(), targetRole, priority, true);
           showAlert('Đã phát thông báo mới cục bộ (chế độ offline).');
         }
         setIsAddOpen(false);

@@ -117,13 +117,28 @@ export const TopNav: React.FC<TopNavProps> = ({
           role: payload.user.role || targetUser.role,
           approvalStatus: payload.user.approval_status || targetUser.approvalStatus,
           githubUsername: payload.user.github_username || targetUser.githubUsername,
+          studentId: payload.user.student_id || targetUser.studentId,
+          university: payload.user.school || targetUser.university,
+          school: payload.user.school || targetUser.school,
+          phone: payload.user.phone || targetUser.phone,
+          skills: Array.isArray(payload.user.skills) ? payload.user.skills : targetUser.skills,
+          bio: payload.user.bio || targetUser.bio,
         };
         login(authenticatedUser, payload.access_token);
-        useMockStore.getState().updateCurrentUserProfile({
-          id: authenticatedUser.id,
-          email: authenticatedUser.email,
-          fullName: authenticatedUser.fullName,
-        });
+        useMockStore.getState().updateCurrentUserProfile(
+          {
+            id: authenticatedUser.id,
+            email: authenticatedUser.email,
+            fullName: authenticatedUser.fullName,
+            studentId: authenticatedUser.studentId,
+            university: authenticatedUser.university,
+            school: authenticatedUser.school,
+            phone: authenticatedUser.phone,
+            skills: authenticatedUser.skills,
+            bio: authenticatedUser.bio,
+          },
+          true,
+        );
         useMockStore.getState().syncFromBackend?.();
         navigate(targetPath);
         return;

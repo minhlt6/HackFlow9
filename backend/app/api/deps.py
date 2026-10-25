@@ -15,11 +15,11 @@ DEV_PERSONA_TOKENS: Dict[str, Tuple[str, str, str, str]] = {
     "mock-jwt-token-admin": ("admin@hackflow.dev", "BTC HackFlow Administrator", "admin", "admin-dev"),
     "mock-jwt-token-judge": ("judge.tech@hackathon.org", "TS. Nguyễn Hoàng Giám Khảo", "judge", "judge-hf"),
     "mock-jwt-token-mentor": ("mentor.ai@ailab.org.vn", "ThS. Phạm Cố Vấn AI", "mentor", "mentor-hf"),
-    "mock-jwt-token-leader": ("leader@cybersamurai.team", "Trần Quốc Bảo", "candidate", "quocbao-dev"),
-    "mock-jwt-token-member": ("member@cybersamurai.team", "Lê Hoàng Nam", "candidate", "hoangnam-fe"),
+    "mock-jwt-token-leader": ("leader@cybersamurai.team", "Nguyễn Văn Minh", "candidate", "minh-leader"),
+    "mock-jwt-token-member": ("member@cybersamurai.team", "Trần Thị Thảo", "candidate", "thao-member"),
     "mock-jwt-token-member2": ("member2@cybersamurai.team", "Nguyễn Minh Thư", "candidate", "minhthu-ai"),
-    "mock-jwt-token-candidate_leader": ("leader@cybersamurai.team", "Trần Quốc Bảo", "candidate", "quocbao-dev"),
-    "mock-jwt-token-candidate_member": ("member@cybersamurai.team", "Lê Hoàng Nam", "candidate", "hoangnam-fe"),
+    "mock-jwt-token-candidate_leader": ("leader@cybersamurai.team", "Nguyễn Văn Minh", "candidate", "minh-leader"),
+    "mock-jwt-token-candidate_member": ("member@cybersamurai.team", "Trần Thị Thảo", "candidate", "thao-member"),
 }
 
 

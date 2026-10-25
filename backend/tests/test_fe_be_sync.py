@@ -274,3 +274,129 @@ async def test_full_fe_be_integration_flows(client: AsyncClient):
         assert r2.status_code == 403
         r3 = await client.get("/api/v1/admin/personnel", headers=non_admin_hdr)
         assert r3.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_hf57_bug_bash_regression_suite(client: AsyncClient):
+    """
+    Regression test suite for all 7 bugs reported in Notion HF-57:
+    - BUG-02: /admin/personnel delete judge/mentor persists in DB across reloads (including mock ID judge-1)
+    - BUG-03: Candidate /tickets/me returns 200 OK without 403 Forbidden
+    - BUG-04: /admin/whitelist permanent delete removes entry from DB and handles mock IDs without 404
+    - BUG-05: /admin/teams rejects member_count > 5 with 400 Bad Request
+    - BUG-06: /announcements creates a single announcement with the requested priority
+    - BUG-07 & BUG-08: Login with demo aliases & Profile update persists full_name across /auth/me reloads
+    """
+    admin_headers = {"Authorization": "Bearer mock-jwt-token-admin"}
+
+    # BUG-07 & BUG-08: Login with demo alias credentials and update profile
+    res_login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "leader@cybersamurai.team", "password": "Candidate@123"},
+    )
+    assert res_login.status_code == 200
+    leader_token = res_login.json()["data"]["access_token"]
+    leader_auth = {"Authorization": f"Bearer {leader_token}"}
+    assert res_login.json()["data"]["user"]["full_name"] == "Nguyễn Văn Minh"
+
+    res_prof = await client.post(
+        "/api/v1/users/profile",
+        headers=leader_auth,
+        json={
+            "full_name": "Nguyễn Văn Min",
+            "student_id": "20225555",
+            "school": "ĐH Bách Khoa Hà Nội",
+            "phone": "0912345678",
+            "skills": ["React", "FastAPI"],
+            "bio": "Team Leader CyberSamurai",
+        },
+    )
+    assert res_prof.status_code == 200
+    assert res_prof.json()["data"]["user"]["full_name"] == "Nguyễn Văn Min"
+
+    # Simulate F5 reload fetching /api/v1/auth/me
+    res_me = await client.get("/api/v1/auth/me", headers=leader_auth)
+    assert res_me.status_code == 200
+    assert res_me.json()["data"]["full_name"] == "Nguyễn Văn Min"
+    assert res_me.json()["data"]["student_id"] == "20225555"
+
+    # BUG-03: Candidate calls /api/v1/tickets/me -> 200 OK
+    res_tickets_me = await client.get("/api/v1/tickets/me", headers=leader_auth)
+    assert res_tickets_me.status_code == 200
+
+    # BUG-02: /admin/personnel delete default judge (even via mock ID judge-1) persists in DB
+    await client.get("/api/v1/evaluations/submissions", headers={"Authorization": "Bearer mock-jwt-token-judge"})
+    res_list_before = await client.get("/api/v1/admin/personnel", headers=admin_headers)
+    assert res_list_before.status_code == 200
+    assert any(p["email"] == "judge.tech@hackathon.org" for p in res_list_before.json()["data"])
+
+    res_del_judge = await client.delete(
+        "/api/v1/admin/personnel/judge-1?email=judge.tech@hackathon.org",
+        headers=admin_headers,
+    )
+    assert res_del_judge.status_code == 200
+
+    res_list_after = await client.get("/api/v1/admin/personnel", headers=admin_headers)
+    assert res_list_after.status_code == 200
+    assert not any(p["email"] == "judge.tech@hackathon.org" for p in res_list_after.json()["data"])
+
+    # BUG-04: /admin/whitelist permanent delete & mock ID delete without 404
+    res_wl_add = await client.post(
+        "/api/v1/admin/whitelist",
+        headers=admin_headers,
+        json={"email": "phuongly.test@uet.vnu.edu.vn", "note": "Test BUG-04"},
+    )
+    assert res_wl_add.status_code == 201
+    wl_id = res_wl_add.json()["data"]["id"]
+
+    res_wl_del = await client.delete(
+        f"/api/v1/admin/whitelist/{wl_id}?permanent=true&email=phuongly.test@uet.vnu.edu.vn",
+        headers=admin_headers,
+    )
+    assert res_wl_del.status_code == 200
+
+    res_wl_list = await client.get("/api/v1/admin/whitelist?include_inactive=true", headers=admin_headers)
+    assert res_wl_list.status_code == 200
+    assert not any(w["email"] == "phuongly.test@uet.vnu.edu.vn" for w in res_wl_list.json()["data"])
+
+    # Mock ID wl-1 delete must also return 200 OK (no 404 Not Found)
+    res_wl_mock_del = await client.delete(
+        "/api/v1/admin/whitelist/wl-1?permanent=true&email=leader@cybersamurai.team",
+        headers=admin_headers,
+    )
+    assert res_wl_mock_del.status_code == 200
+
+    # BUG-05: /admin/teams rejects member_count > 5
+    res_team_over = await client.post(
+        "/api/v1/admin/teams",
+        headers=admin_headers,
+        json={
+            "name": "OverQuotaTeam",
+            "inviteCode": "OVER99",
+            "leaderName": "Leader Over",
+            "leaderEmail": "over@hust.edu.vn",
+            "memberCount": 6,
+            "description": "Testing over quota team size validation",
+        },
+    )
+    assert res_team_over.status_code == 400
+
+    # BUG-06: /api/v1/announcements creates exactly 1 announcement with selected priority
+    res_ann_create = await client.post(
+        "/api/v1/announcements",
+        headers=admin_headers,
+        json={
+            "title": "Thông báo Khẩn cấp BUG-06",
+            "content": "Kiểm tra không bị nhân đôi thông báo",
+            "priority": "urgent",
+        },
+    )
+    assert res_ann_create.status_code == 201
+    res_ann_list = await client.get("/api/v1/announcements?page=1&page_size=50", headers=admin_headers)
+    assert res_ann_list.status_code == 200
+    matched_anns = [
+        a for a in res_ann_list.json()["data"]["items"] if a["title"] == "Thông báo Khẩn cấp BUG-06"
+    ]
+    assert len(matched_anns) == 1
+    assert matched_anns[0]["priority"] == "urgent"
+
