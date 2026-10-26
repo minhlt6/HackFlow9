@@ -1,3 +1,4 @@
+from app.core.config import settings
 import copy
 import logging
 from datetime import datetime, timezone
@@ -236,7 +237,7 @@ class SubmissionService:
             )
 
         # ── Bước 2.2 & Mục 3: Kiểm tra trạng thái Checkpoint & Công thức Time-Gated + Grace Period ──
-        server_timestamp = ensure_utc(payload.simulate_time or datetime.now(timezone.utc))
+        server_timestamp = ensure_utc((payload.simulate_time if settings.demo_enabled else None) or datetime.now(timezone.utc))
         gate_info = checkpoint_service.calculate_time_gate_info(checkpoint, now=server_timestamp)
         grace_sec = gate_info.get("grace_period_seconds", 5)
 

@@ -65,12 +65,6 @@ export const SupportTickets: React.FC = () => {
     currentUser,
     teams,
     tickets: mockTickets,
-    createTicket: storeCreateTicket,
-    claimTicket: storeClaimTicket,
-    replyTicket: storeReplyTicket,
-    resolveTicket: storeResolveTicket,
-    closeTicket: storeCloseTicket,
-    reopenTicket: storeReopenTicket,
   } = useMockStore();
 
   const isCandidate = user?.role === 'candidate';
@@ -127,7 +121,8 @@ export const SupportTickets: React.FC = () => {
       }
       return true;
     }
-    return false;
+    showAlert(defaultMessage + ' Vui lòng kiểm tra kết nối và thử lại.', 'error');
+    return true;
   }, [showAlert]);
 
   // Đồng bộ dữ liệu lấy từ API vào state
@@ -143,13 +138,13 @@ export const SupportTickets: React.FC = () => {
         const mapped: SupportTicket[] = rawItems.map((item: Record<string, unknown>) => {
           const id = String(item.id || '');
           const teamId = String(item.team_id || item.teamId || '');
-          const creatorId = String(item.user_id || item.creatorId || '');
+          const creatorId = String(item.created_by || item.user_id || item.creatorId || '');
           const assignedTo = item.assigned_to ? String(item.assigned_to) : null;
           const assignedMentorId = assignedTo || (item.assignedMentorId ? String(item.assignedMentorId) : null);
 
           return {
             id,
-            ticketCode: (item.ticketCode as string) || `#TCK-${id.slice(0, 6).toUpperCase()}`,
+            ticketCode: (item.ticket_code as string) || (item.ticketCode as string) || `#TCK-${id.slice(0, 6).toUpperCase()}`,
             teamId,
             teamName:
               (item.teamName as string) ||
@@ -189,7 +184,7 @@ export const SupportTickets: React.FC = () => {
     } finally {
       setIsFetchingApi(false);
     }
-  }, [isCandidate, currentUser, teams]);
+  }, [isCandidate, currentUser.id, currentUser.fullName, teams]);
 
   useEffect(() => {
     // Defer to a microtask so setState inside fetchTicketsFromApi is not called synchronously in the effect body
@@ -204,12 +199,17 @@ export const SupportTickets: React.FC = () => {
   // ==========================================
   // CANDIDATE DATA & FILTERING
   // ==========================================
-  const myTeam = teams.find((t) => t.id === currentUser.teamId) || teams[0];
+  const myTeam = currentUser.teamId ? teams.find((t) => t.id === currentUser.teamId) : undefined;
   const candidateTickets = useMemo(() => {
+    if (isCandidate && apiTickets !== null) {
+      return apiTickets;
+    }
     return currentTickets.filter(
-      (t) => t.teamId === myTeam?.id || t.creatorId === currentUser.id,
+      (t) =>
+        (Boolean(myTeam?.id) && t.teamId === myTeam?.id) ||
+        (Boolean(currentUser.id) && t.creatorId === currentUser.id),
     );
-  }, [currentTickets, myTeam?.id, currentUser.id]);
+  }, [isCandidate, apiTickets, currentTickets, myTeam?.id, currentUser.id]);
 
   const [candidateFilter, setCandidateFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('all');
   const filteredCandidateTickets = useMemo(() => {
@@ -352,7 +352,6 @@ export const SupportTickets: React.FC = () => {
       });
 
       const serverTicket = res?.data || res;
-      storeCreateTicket(newTitle.trim(), newContent.trim(), newPriority, newCategory);
       await fetchTicketsFromApi();
 
       if (serverTicket?.id) {
@@ -365,23 +364,8 @@ export const SupportTickets: React.FC = () => {
       setNewPriority('normal');
       setFormErrors({});
       showAlert(`Tạo ticket hỗ trợ thành công! Cố vấn sẽ sớm phản hồi.`);
-      return;
     } catch (err: unknown) {
-      const handled = handleApiError(err, 'Tạo ticket thất bại');
-      if (handled) return;
-    }
-
-    // Local mock fallback
-    const res = storeCreateTicket(newTitle.trim(), newContent.trim(), newPriority, newCategory);
-    if (res.success && res.ticket) {
-      setSelectedTicketId(res.ticket.id);
-      setIsCreateOpen(false);
-      setNewTitle('');
-      setNewContent('');
-      setNewCategory('technical');
-      setNewPriority('normal');
-      setFormErrors({});
-      showAlert(`Tạo ticket hỗ trợ ${res.ticket.ticketCode || res.ticket.id} thành công! Cố vấn sẽ sớm phản hồi.`);
+      handleApiError(err, 'Tạo ticket thất bại');
     }
   };
 
@@ -390,18 +374,11 @@ export const SupportTickets: React.FC = () => {
     if (!activeTicket) return;
     try {
       await ticketService.updateTicket(activeTicket.id, { action: 'accept' });
-      storeClaimTicket(activeTicket.id);
       await fetchTicketsFromApi();
       showAlert(`Bạn đã tiếp nhận xử lý Ticket #${activeTicket.ticketCode || activeTicket.id}!`);
-      return;
     } catch (err: unknown) {
-      const handled = handleApiError(err, 'Không thể tiếp nhận ticket');
-      if (handled) return;
+      handleApiError(err, 'Không thể tiếp nhận ticket');
     }
-
-    // Local mock fallback
-    storeClaimTicket(activeTicket.id);
-    showAlert(`Bạn đã tiếp nhận xử lý Ticket #${activeTicket.ticketCode || activeTicket.id}!`);
   };
 
   // Mentor Resolve Ticket (action: 'resolve', validate 422 MISSING_TICKET_RESPONSE)
@@ -422,20 +399,12 @@ export const SupportTickets: React.FC = () => {
         action: 'resolve',
         response: finalResponse,
       });
-      storeResolveTicket(activeTicket.id, finalResponse);
       setMentorResponseText('');
       await fetchTicketsFromApi();
       showAlert(`Đã gửi phản hồi và chuyển trạng thái Ticket #${activeTicket.ticketCode || activeTicket.id} sang "Đã giải quyết"!`);
-      return;
     } catch (err: unknown) {
-      const handled = handleApiError(err, 'Không thể giải quyết ticket');
-      if (handled) return;
+      handleApiError(err, 'Không thể giải quyết ticket');
     }
-
-    // Local mock fallback
-    storeResolveTicket(activeTicket.id, finalResponse);
-    setMentorResponseText('');
-    showAlert(`Đã gửi phản hồi và chuyển trạng thái Ticket #${activeTicket.ticketCode || activeTicket.id} sang "Đã giải quyết"!`);
   };
 
   // Chat Reply (SRS HF-37 Mục 3.4: action: 'update_response')
@@ -449,38 +418,23 @@ export const SupportTickets: React.FC = () => {
         action: 'update_response',
         response: trimmed,
       });
-      storeReplyTicket(activeTicket.id, trimmed);
       setReplyText('');
       await fetchTicketsFromApi();
       showAlert('Đã gửi phản hồi trao đổi trong ticket thành công!');
-      return;
     } catch (err: unknown) {
-      const handled = handleApiError(err, 'Không thể gửi tin nhắn trao đổi');
-      if (handled) return;
+      handleApiError(err, 'Không thể gửi tin nhắn trao đổi');
     }
-
-    // Local mock fallback
-    storeReplyTicket(activeTicket.id, trimmed);
-    setReplyText('');
-    showAlert('Đã gửi phản hồi trao đổi trong ticket thành công!');
   };
 
   // Candidate Confirm & Close Ticket (action: 'close')
   const handleCloseTicket = async (ticketId: string) => {
     try {
       await ticketService.updateTicket(ticketId, { action: 'close' });
-      storeCloseTicket(ticketId);
       await fetchTicketsFromApi();
       showAlert('Đã xác nhận và đóng ticket thành công! Cảm ơn bạn.');
-      return;
     } catch (err: unknown) {
-      const handled = handleApiError(err, 'Không thể đóng ticket');
-      if (handled) return;
+      handleApiError(err, 'Không thể đóng ticket');
     }
-
-    // Local mock fallback
-    storeCloseTicket(ticketId);
-    showAlert('Đã xác nhận và đóng ticket thành công! Cảm ơn bạn.');
   };
 
   // Candidate Reopen Ticket within 48h (action: 'reopen')
@@ -504,18 +458,11 @@ export const SupportTickets: React.FC = () => {
 
     try {
       await ticketService.updateTicket(ticketId, { action: 'reopen' });
-      storeReopenTicket(ticketId);
       await fetchTicketsFromApi();
       showAlert('Đã mở lại ticket thành công! Trạng thái chuyển về "Đang xử lý".');
-      return;
     } catch (err: unknown) {
-      const handled = handleApiError(err, 'Không thể mở lại ticket');
-      if (handled) return;
+      handleApiError(err, 'Không thể mở lại ticket');
     }
-
-    // Local mock fallback
-    storeReopenTicket(ticketId);
-    showAlert('Đã mở lại ticket thành công! Trạng thái chuyển về "Đang xử lý".');
   };
 
   // Mentor Escalate to Admin Queue (action: 'escalate' per SRS HF-37 Mục 3.8)

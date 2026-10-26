@@ -15,6 +15,7 @@ import { CheckpointSubmissionForm } from '../../components/CheckpointSubmissionF
 import { SubmissionHistoryTable } from '../../components/SubmissionHistoryTable';
 import { checkpointApi } from '../../api/checkpointApi';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useMockStore } from '../../store/useMockStore';
 import {
   type CheckpointWithSubmission,
   type Submission,
@@ -113,6 +114,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
 
     // 2. Đẩy bài nộp mới lên đầu bảng lịch sử nộp bài (HF-31)
     setSubmissions((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
+    void useMockStore.getState().syncFromBackend?.();
   };
 
   const getStatusBadge = (status?: string) => {

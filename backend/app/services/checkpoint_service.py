@@ -183,6 +183,8 @@ class CheckpointService:
         info = cls.calculate_time_gate_info(checkpoint, now)
         return CheckpointResponse(
             id=str(checkpoint.id),
+            weight=checkpoint.weight,
+            display_order=checkpoint.display_order,
             title=checkpoint.title,
             description=checkpoint.description,
             start_time=info["start_time"],
@@ -387,6 +389,8 @@ class CheckpointService:
             is_final_checkpoint=data.is_final_checkpoint,
             grace_period_seconds=data.grace_period_seconds,
             submission_fields=fields_dump,
+            weight=data.weight or 0,
+            display_order=data.display_order or 0,
         )
         await db.commit()
         await db.refresh(checkpoint)
@@ -407,6 +411,10 @@ class CheckpointService:
         old_start = ensure_utc(cp.start_time)
 
         update_fields = {}
+        if data.weight is not None:
+            update_fields["weight"] = data.weight
+        if data.display_order is not None:
+            update_fields["display_order"] = data.display_order
         if data.title is not None:
             update_fields["title"] = data.title.strip()
         if data.description is not None:

@@ -21,20 +21,13 @@ import {
   ShieldCheck,
   Edit3,
   Share2,
-  Sliders,
-  ChevronUp,
-  ChevronDown,
 } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { Card } from '../components/Card';
-import {
-  fetchMockTeam,
-  mockCreateTeamApi,
-  mockJoinTeamApi,
-} from '../mocks/mockTeams';
+
 import { teamsApi } from '../api/teamsApi';
 import apiClient from '../api/axiosClient';
 import type { TeamDetails, TeamMember } from '../types/team';
@@ -43,43 +36,31 @@ import { useMockStore } from '../store/useMockStore';
 
 type PreviewMode = 'no_team' | 'in_team' | 'full' | 'loading' | 'error';
 
-const TEAM_STORAGE_KEY = 'hackflow_team_details_clean_v1';
-
-const loadInitialTeam = (): TeamDetails | null => {
-  try {
-    const raw = localStorage.getItem(TEAM_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as TeamDetails | null;
-      if (parsed && Array.isArray(parsed.members)) {
-        const hasLeader = parsed.members.some((m) => m.role === 'leader');
-        if (!hasLeader && parsed.members.length > 0) {
-          parsed.members = parsed.members.map((m, idx) => ({
-            ...m,
-            role: m.user_id === parsed.leader_id || idx === 0 ? 'leader' : 'member',
-          }));
-        }
-        return parsed;
-      }
-    }
-  } catch {
-    // ignore storage errors
-  }
-  return null;
-};
+const loadInitialTeam = (): TeamDetails | null => null;
 
 export const TeamsPage: React.FC = () => {
   const navigate = useNavigate();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const currentUser = useAuthStore((state) => state.user);
+  const config = useMockStore((state) => state.config);
   const transferTeamLeaderInStore = useMockStore((state) => state.transferTeamLeader);
   const removeTeamMemberInStore = useMockStore((state) => state.removeTeamMember);
+  const minTeamSize = Math.max(
+    1,
+    Number(config?.minTeamMembers ?? config?.minTeamSize ?? 3),
+  );
+  const maxTeamSize = Math.max(
+    minTeamSize,
+    Number(config?.maxTeamMembers ?? config?.maxTeamSize ?? 5),
+  );
 
   // State dữ liệu đội thi
 const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
-  const [previewMode, setPreviewMode] = useState<PreviewMode>('no_team');
-  const [isDevOpen, setIsDevOpen] = useState<boolean>(false);
+  const [, setPreviewMode] = useState<PreviewMode>('no_team');
 
   // Thành viên đang đăng nhập / đóng vai xem trang (mặc định khớp email user hoặc Nguyễn Văn Minh)
-  const [activeMemberId, setActiveMemberId] = useState<string>(() => {
+  const [, setActiveMemberId] = useState<string>(() => {
     const initial = loadInitialTeam();
     if (initial && currentUser?.email) {
       const matched = initial.members.find(
@@ -92,15 +73,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
 
   const setTeam = (nextTeam: TeamDetails | null) => {
     setTeamState(nextTeam);
-    try {
-      if (nextTeam) {
-        localStorage.setItem(TEAM_STORAGE_KEY, JSON.stringify(nextTeam));
-      } else {
-        localStorage.removeItem(TEAM_STORAGE_KEY);
-      }
-    } catch {
-      // ignore storage errors
-    }
+
   };
 
   // Đồng bộ thông tin đội thi khi mở trang hoặc khi có cập nhật đề tài
@@ -122,13 +95,13 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
           return;
         }
       } catch {
-        // Fallback local
+        if (isMounted) setErrorMessage('Không thể tải đội thi. Vui lòng thử lại.');
       }
     };
     void loadTeam();
 
     const handleTeamUpdate = () => {
-      setTeam(loadInitialTeam());
+      void loadTeam();
     };
     window.addEventListener('hackflow_team_updated', handleTeamUpdate);
     return () => {
@@ -140,7 +113,6 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
 
   // Loading & Error states
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Toast feedback
   const [toast, setToast] = useState<{
@@ -187,11 +159,10 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
 
   // Xác định thành viên hiện tại (Bạn) và người đang cầm quyền Đội Trưởng
   const selfMember: TeamMember | null = team
-    ? team.members.find((m) => m.id === activeMemberId) ||
+    ? team.members.find((m) => m.user_id === currentUser?.id) ||
       team.members.find(
         (m) => currentUser?.email && m.email.toLowerCase() === currentUser.email.toLowerCase(),
       ) ||
-      team.members[0] ||
       null
     : null;
 
@@ -228,13 +199,14 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
 
     setIsLoading(true);
     try {
-      const result = await fetchMockTeam(mode, 300);
-      setTeam(result);
+      const result = await teamsApi.getMyTeam();
+      setTeam(result ?? null);
       if (result && result.members.length > 0) {
         setActiveMemberId(result.members[0].id);
       }
+      void useMockStore.getState().syncFromBackend?.();
     } catch {
-      setErrorMessage('Đã xảy ra lỗi khi tải dữ liệu đội thi.');
+      setErrorMessage('Đã xảy ra lỗi khi tải dữ liệu đội thi từ máy chủ.');
     } finally {
       setIsLoading(false);
     }
@@ -273,11 +245,11 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
     try {
       let created: TeamDetails;
       try {
-        created = await teamsApi.createTeam({ team_name: trimmed });
+        created = await teamsApi.createTeam({ team_name: trimmed, description: newTeamDesc.trim() });
       } catch (apiErr: unknown) {
         const apiMsg = (apiErr as { response?: { data?: { message?: string } } })?.response?.data?.message;
         if (apiMsg) throw new Error(apiMsg, { cause: apiErr });
-        created = await mockCreateTeamApi({ team_name: trimmed });
+        throw apiErr;
       }
       if (newTeamDesc.trim()) {
         created.description = newTeamDesc.trim();
@@ -325,7 +297,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
       } catch (apiErr: unknown) {
         const apiMsg = (apiErr as { response?: { data?: { message?: string } } })?.response?.data?.message;
         if (apiMsg) throw new Error(apiMsg, { cause: apiErr });
-        joined = await mockJoinTeamApi({ invite_code: cleaned });
+        throw apiErr;
       }
       setTeam(joined);
       if (currentUser?.email) {
@@ -349,16 +321,19 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   };
 
   // Cập nhật mô tả đội (chỉ Đội Trưởng)
-  const handleUpdateTeamInfo = (e: React.FormEvent) => {
+  const handleUpdateTeamInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!team || !isLeader) {
       showToast('Chỉ Đội Trưởng mới có quyền chỉnh sửa thông tin đội thi.', 'error');
       return;
     }
-    setTeam({
-      ...team,
-      description: editDesc,
-    });
+    try {
+      const response = await apiClient.patch('/teams/me', { description: editDesc });
+      setTeam(response.data.data);
+    } catch {
+      showToast('Không thể cập nhật mô tả đội thi.', 'error');
+      return;
+    }
     setIsEditOpen(false);
     showToast('Đã cập nhật thông tin giới thiệu đội thi!', 'success');
   };
@@ -385,16 +360,8 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
         setTeam(res.data.data);
       }
     } catch {
-      const updatedMembers = team.members.map((m) => ({
-        ...m,
-        role: (m.id === transferTarget.id ? 'leader' : 'member') as 'leader' | 'member',
-      }));
-
-      setTeam({
-        ...team,
-        leader_id: transferTarget.user_id,
-        members: updatedMembers,
-      });
+      showToast('Không thể cập nhật đội thi. Vui lòng thử lại.', 'error');
+      return;
     }
 
     transferTeamLeaderInStore(team.id, transferTarget.user_id);
@@ -428,12 +395,8 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
         setTeam(res.data.data);
       }
     } catch {
-      const updatedMembers = team.members.filter((m) => m.id !== removeTarget.id);
-      setTeam({
-        ...team,
-        member_count: updatedMembers.length,
-        members: updatedMembers,
-      });
+      showToast('Không thể cập nhật đội thi. Vui lòng thử lại.', 'error');
+      return;
     }
 
     removeTeamMemberInStore(team.id, removeTarget.user_id);
@@ -458,7 +421,8 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
     try {
       await apiClient.post('/teams/leave');
     } catch {
-      // ignore if offline
+      showToast('Không thể rời đội thi. Vui lòng thử lại.', 'error');
+      return;
     }
     setTeam(null);
     setPreviewMode('no_team');
@@ -488,136 +452,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
         </div>
       )}
 
-      {/* FLOATING DEV TOOLBAR NHỎ GỌN Ở GÓC DƯỚI BÊN PHẢI (KHÔNG ĐÈ LÊN SIDEBAR VÀ NÚT ĐĂNG XUẤT) */}
-      <div className="fixed bottom-6 right-6 z-40">
-        {!isDevOpen ? (
-          <button
-            type="button"
-            onClick={() => setIsDevOpen(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/40 dark:bg-slate-900/60 hover:bg-accent border border-border text-muted-foreground hover:text-foreground text-xs shadow-xl transition-all cursor-pointer group"
-          >
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="font-mono text-primary">DoD Switcher</span>
-            <ChevronUp size={13} className="text-muted-foreground group-hover:-translate-y-0.5 transition-transform" />
-          </button>
-        ) : (
-          <div className="rounded-xl border border-border bg-muted/40 dark:bg-slate-900/60 backdrop-blur-md p-3 shadow-2xl space-y-2 w-72 animate-in fade-in slide-in-from-bottom-2 duration-150">
-            <div className="flex items-center justify-between pb-1.5 border-b border-border">
-              <span className="text-[11px] font-bold text-primary font-mono flex items-center gap-1.5">
-                <Sliders size={13} />
-                <span>HF-16 DoD State Switcher</span>
-              </span>
-              <button
-                type="button"
-                onClick={() => setIsDevOpen(false)}
-                className="text-muted-foreground hover:text-foreground p-0.5 rounded cursor-pointer"
-                title="Thu nhỏ"
-              >
-                <ChevronDown size={14} />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-1 text-[11px]">
-              <button
-                type="button"
-                onClick={() => handleSwitchPreviewMode('no_team')}
-                className={`px-2 py-1 rounded text-left truncate cursor-pointer ${
-                  previewMode === 'no_team' && !errorMessage
-                    ? 'bg-[#6366F1] text-white'
-                    : 'bg-card text-muted-foreground hover:bg-accent'
-                }`}
-              >
-                1. Chưa có đội
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchPreviewMode('in_team')}
-                className={`px-2 py-1 rounded text-left truncate cursor-pointer ${
-                  previewMode === 'in_team' && !errorMessage
-                    ? 'bg-[#6366F1] text-white'
-                    : 'bg-card text-muted-foreground hover:bg-accent'
-                }`}
-              >
-                2. Đã có đội (3/4)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchPreviewMode('full')}
-                className={`px-2 py-1 rounded text-left truncate cursor-pointer ${
-                  previewMode === 'full' && !errorMessage
-                    ? 'bg-[#6366F1] text-white'
-                    : 'bg-card text-muted-foreground hover:bg-accent'
-                }`}
-              >
-                3. Đủ 4 người
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchPreviewMode('loading')}
-                className={`px-2 py-1 rounded text-left truncate cursor-pointer ${
-                  previewMode === 'loading'
-                    ? 'bg-[#6366F1] text-white'
-                    : 'bg-card text-muted-foreground hover:bg-accent'
-                }`}
-              >
-                4. Loading
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSwitchPreviewMode('error')}
-                className={`col-span-2 px-2 py-1 rounded text-center cursor-pointer ${
-                  errorMessage
-                    ? 'bg-rose-600 text-white'
-                    : 'bg-card text-muted-foreground hover:bg-accent'
-                }`}
-              >
-                5. Lỗi kết nối API (500)
-              </button>
-            </div>
 
-            {team && team.members.length > 0 && (
-              <div className="pt-2 border-t border-border space-y-1.5">
-                <span className="text-[10px] uppercase tracking-wider font-mono text-muted-foreground block">
-                  Góc nhìn thành viên (Ai là &quot;Bạn&quot;):
-                </span>
-                <div className="space-y-1">
-                  {team.members.map((m) => {
-                    const active = selfMember?.id === m.id;
-                    const memberIsLeader = isMemberLeader(m);
-                    return (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          setActiveMemberId(m.id);
-                          showToast(
-                            `Đang xem với tư cách: ${m.full_name} (${memberIsLeader ? 'Đội Trưởng' : 'Thành viên'})`,
-                            'info',
-                          );
-                        }}
-                        className={`w-full px-2.5 py-1.5 rounded-lg text-[11px] flex items-center justify-between transition-colors cursor-pointer ${
-                          active
-                            ? 'bg-[#6366F1]/25 border border-[#6366F1]/50 text-foreground font-semibold'
-                            : 'bg-card text-muted-foreground hover:bg-accent'
-                        }`}
-                      >
-                        <span className="truncate">{m.full_name}</span>
-                        {memberIsLeader ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30 shrink-0">
-                            <Crown size={10} />
-                            <span>Đội Trưởng</span>
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground shrink-0">Thành viên</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -628,7 +463,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
             Quản Lý Đội Thi
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Quy định đội thi từ 3 đến 5 thành viên. Mỗi thành viên chỉ thuộc duy nhất một đội.
+            Quy định đội thi: tối thiểu {team?.min_members || minTeamSize} thành viên (để được chọn đề tài) và tối đa {team?.max_members || maxTeamSize} thành viên. Mỗi thí sinh chỉ thuộc duy nhất một đội.
           </p>
         </div>
 
@@ -700,11 +535,13 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
                     <h2 className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl text-foreground">
                       {team.team_name}
                     </h2>
-                    <Badge variant="success">
-                      Đã Phê Duyệt
+                    <Badge variant={team.members.length >= (team.min_members || minTeamSize) ? 'success' : 'warning'}>
+                      {team.members.length >= (team.min_members || minTeamSize)
+                        ? 'Đủ điều kiện chọn đề tài'
+                        : `Cần tối thiểu ${team.min_members || minTeamSize} TV để chọn đề tài`}
                     </Badge>
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#6366F1]/15 text-primary border border-[#6366F1]/30 font-mono">
-                      {team.members.length}/{team.max_members} Thành viên
+                      {team.members.length}/{team.max_members || maxTeamSize} Thành viên (Tối thiểu {team.min_members || minTeamSize})
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
@@ -1084,10 +921,16 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
                   <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-700 dark:text-amber-400">
                     <p className="font-semibold text-xs flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
                       <AlertCircle size={14} className="text-amber-700 dark:text-amber-400" />
-                      <span>Chưa đăng ký đề tài thi đấu</span>
+                      <span>
+                        {team.members.length < (team.min_members || minTeamSize)
+                          ? `Chưa đủ thành viên tối thiểu (${team.members.length}/${team.min_members || minTeamSize})`
+                          : 'Chưa đăng ký đề tài thi đấu'}
+                      </span>
                     </p>
                     <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 leading-relaxed">
-                      Đội của bạn hiện chưa chọn đề tài. Hãy truy cập danh mục để chọn đề tài nghiên cứu phù hợp trước khi hết slot.
+                      {team.members.length < (team.min_members || minTeamSize)
+                        ? `Đội cần tối thiểu ${team.min_members || minTeamSize} thành viên (tối đa ${team.max_members || maxTeamSize}) mới được phép chọn đề tài. Hãy mời thêm ít nhất ${(team.min_members || minTeamSize) - team.members.length} thành viên nữa.`
+                        : 'Đội của bạn đã đủ số lượng thành viên hợp lệ. Hãy truy cập danh mục để chọn đề tài nghiên cứu phù hợp trước khi hết slot.'}
                     </p>
                   </div>
                 </div>

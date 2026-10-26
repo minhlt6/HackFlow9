@@ -1,6 +1,7 @@
 import { axiosClient } from '../api/axiosClient';
 
 export interface RubricCriterionInput {
+  id?: string;
   title: string;
   description?: string;
   max_score?: number;
@@ -79,21 +80,7 @@ export const evaluationService = {
    * PUT /api/v1/rubrics
    */
   updateRubrics: async (payload: RubricConfigurePayload) => {
-    try {
-      const response = await axiosClient.put('/rubrics', payload);
-      return response.data;
-    } catch {
-      return evaluationService.configureRubrics(payload);
-    }
-  },
-
-  /**
-   * Xóa tiêu chí Rubric (Admin only)
-   * DELETE /api/v1/rubrics/{id}
-   */
-  deleteRubrics: async (id?: string) => {
-    const url = id ? `/rubrics/${id}` : '/rubrics';
-    const response = await axiosClient.delete(url);
+    const response = await axiosClient.post('/rubrics', payload);
     return response.data;
   },
 
@@ -140,7 +127,6 @@ export const {
   getRubrics,
   configureRubrics,
   updateRubrics,
-  deleteRubrics,
   getAnonymousSubmissions,
   submitEvaluation,
   getLeaderboard,

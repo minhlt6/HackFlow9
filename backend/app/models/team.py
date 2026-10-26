@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import Boolean, DateTime, ForeignKey, String
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -25,6 +25,7 @@ class Team(BaseModel):
     __tablename__ = "teams"
 
     team_name: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     invite_code: Mapped[str] = mapped_column(String(16), unique=True, index=True, nullable=False)
     topic_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("topics.id", ondelete="SET NULL"), nullable=True, index=True
@@ -33,6 +34,7 @@ class Team(BaseModel):
         String(36), ForeignKey("subtopics.id", ondelete="SET NULL"), nullable=True, index=True
     )
     is_locked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    admin_meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
 
     # Relationships
     members: Mapped[List["TeamMember"]] = relationship(

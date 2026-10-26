@@ -57,7 +57,7 @@ async def list_announcements(
     Kết quả sắp xếp theo thời gian tạo giảm dần (mới nhất lên trước).
     """
     items, total = await announcement_service.list_announcements(
-        db, page=page, page_size=page_size,
+        db, page=page, page_size=page_size, role=_current_user.role,
     )
     pagination = AnnouncementPaginationResponse(
         items=[AnnouncementResponse.model_validate(item) for item in items],

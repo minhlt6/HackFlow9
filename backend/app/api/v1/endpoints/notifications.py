@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_optional_current_user
+from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.models.announcement import Announcement
 from app.models.user import User
@@ -12,13 +12,23 @@ from app.schemas.response import ApiResponse
 
 router = APIRouter()
 
-# Per-user read and dismiss sets in memory (keyed by user_id or "anonymous")
-_READ_BY_USER: Dict[str, Set[str]] = {}
-_DISMISSED_BY_USER: Dict[str, Set[str]] = {}
+async def _visible_announcement(db: AsyncSession, user: User, notification_id: str):
+    from app.core.exceptions import NotFoundException
+    ann = await db.get(Announcement, notification_id)
+    if not ann or (user.role != "admin" and ann.target_audience not in ("all", user.role)):
+        raise NotFoundException(message="Không tìm thấy thông báo.", error_code="TARGET_NOT_FOUND")
+    return ann
 
 
-def _user_key(user: Optional[User]) -> str:
-    return str(user.id) if user else "anonymous"
+def _receipt_sets(user: User):
+    state = user.notification_state or {}
+    return set(state.get("read", [])), set(state.get("dismissed", []))
+
+
+async def _save_receipts(db: AsyncSession, user: User, read_ids: Set[str], dismissed_ids: Set[str]):
+    user.notification_state = {"read": sorted(read_ids), "dismissed": sorted(dismissed_ids)}
+    db.add(user)
+    await db.commit()
 
 
 def _build_notification_item(
@@ -40,7 +50,7 @@ def _build_notification_item(
         "title": ann.title,
         "content": ann.content,
         "type": priority_val,
-        "target_roles": ["all"],
+        "target_roles": [ann.target_audience],
         "target_team_ids": [],
         "created_by": "BTC HackFlow",
         "created_at": created_at_str,
@@ -60,15 +70,15 @@ async def get_my_notifications(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     stmt = select(Announcement).order_by(Announcement.created_at.desc())
+    if not current_user or current_user.role != "admin":
+        stmt = stmt.where(Announcement.target_audience.in_(["all", current_user.role if current_user else "anonymous"]))
     res = await db.execute(stmt)
     announcements = list(res.scalars().all())
 
-    u_key = _user_key(current_user)
-    read_ids = _READ_BY_USER.setdefault(u_key, set())
-    dismissed_ids = _DISMISSED_BY_USER.setdefault(u_key, set())
+    read_ids, dismissed_ids = _receipt_sets(current_user)
 
     items = [_build_notification_item(a, read_ids, dismissed_ids) for a in announcements]
 
@@ -93,14 +103,15 @@ async def get_my_notifications(
 )
 async def get_unread_count(
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     stmt = select(Announcement).order_by(Announcement.created_at.desc())
+    if not current_user or current_user.role != "admin":
+        stmt = stmt.where(Announcement.target_audience.in_(["all", current_user.role if current_user else "anonymous"]))
     res = await db.execute(stmt)
     announcements = list(res.scalars().all())
 
-    u_key = _user_key(current_user)
-    read_ids = _READ_BY_USER.setdefault(u_key, set())
+    read_ids, dismissed_ids = _receipt_sets(current_user)
 
     unread_items = [a for a in announcements if str(a.id) not in read_ids]
     has_urgent = any((a.priority or "").lower() == "urgent" for a in unread_items)
@@ -121,17 +132,19 @@ async def get_unread_count(
 )
 async def mark_all_as_read(
     db: AsyncSession = Depends(get_db),
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     stmt = select(Announcement.id)
+    if not current_user or current_user.role != "admin":
+        stmt = stmt.where(Announcement.target_audience.in_(["all", current_user.role if current_user else "anonymous"]))
     res = await db.execute(stmt)
     all_ids = {str(r) for r in res.scalars().all()}
 
-    u_key = _user_key(current_user)
-    read_ids = _READ_BY_USER.setdefault(u_key, set())
+    read_ids, dismissed_ids = _receipt_sets(current_user)
     before_len = len(read_ids)
     read_ids.update(all_ids)
     updated_count = max(0, len(read_ids) - before_len)
+    await _save_receipts(db, current_user, read_ids, dismissed_ids)
 
     return ApiResponse.ok(
         data={"updated_count": updated_count},
@@ -146,11 +159,13 @@ async def mark_all_as_read(
 )
 async def mark_as_read(
     notification_id: str,
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    u_key = _user_key(current_user)
-    read_ids = _READ_BY_USER.setdefault(u_key, set())
+    read_ids, dismissed_ids = _receipt_sets(current_user)
+    await _visible_announcement(db, current_user, notification_id)
     read_ids.add(notification_id)
+    await _save_receipts(db, current_user, read_ids, dismissed_ids)
 
     return ApiResponse.ok(
         data={
@@ -169,13 +184,14 @@ async def mark_as_read(
 )
 async def dismiss_notification(
     notification_id: str,
-    current_user: Optional[User] = Depends(get_optional_current_user),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
-    u_key = _user_key(current_user)
-    read_ids = _READ_BY_USER.setdefault(u_key, set())
-    dismissed_ids = _DISMISSED_BY_USER.setdefault(u_key, set())
+    read_ids, dismissed_ids = _receipt_sets(current_user)
+    await _visible_announcement(db, current_user, notification_id)
     read_ids.add(notification_id)
     dismissed_ids.add(notification_id)
+    await _save_receipts(db, current_user, read_ids, dismissed_ids)
 
     return ApiResponse.ok(
         data={

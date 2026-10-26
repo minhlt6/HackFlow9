@@ -17,46 +17,51 @@ import {
 } from 'lucide-react';
 
 export const CandidateFinalSubmissionPage: React.FC = () => {
-  const { currentUser, teams, finalSubmissions, submitFinalProject, config, openWizardAtStep, syncFromBackend } =
+  const { currentUser, teams, finalSubmissions, checkpoints, openWizardAtStep, syncFromBackend } =
     useMockStore();
 
-  const myTeam = teams.find((t) => t.id === currentUser.teamId);
+  const myTeam = currentUser.teamId ? teams.find((t) => t.id === currentUser.teamId) : undefined;
 
-  const existingFinal = finalSubmissions.find((f) => f.teamId === myTeam?.id);
+  const existingFinal = myTeam ? finalSubmissions.find((f) => f.teamId === myTeam.id) : undefined;
 
   const [repoUrl, setRepoUrl] = useState(
-    existingFinal?.repoUrl || 'https://github.com/cybersentinels/ai-diagnosis-copilot',
+    existingFinal?.repoUrl || '',
   );
   const [demoVideoUrl, setDemoVideoUrl] = useState(
-    existingFinal?.demoVideoUrl || 'https://youtube.com/watch?v=demo-health-ai',
+    existingFinal?.demoVideoUrl || '',
   );
   const [slideUrl, setSlideUrl] = useState(
-    existingFinal?.slideUrl || 'https://docs.google.com/presentation/d/demo-pitch-deck',
+    existingFinal?.slideUrl || '',
   );
   const [summary, setSummary] = useState(
-    existingFinal?.summary ||
-      'Giải pháp ứng dụng mô hình Vision-Language Model để hỗ trợ bác sĩ chẩn đoán hình ảnh X-quang và tự động sinh bản tóm tắt bệnh án chuẩn hóa y tế.',
+    existingFinal?.summary || '',
   );
+  const [error, setError] = useState<string | null>(null);
   const [confirmLock, setConfirmLock] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isEditingSubmitted, setIsEditingSubmitted] = useState(false);
   const [successSha, setSuccessSha] = useState<string | null>(null);
-  const [nowMs] = useState(() => Date.now());
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const finalCheckpoint = checkpoints.filter((cp) => cp.isFinalCheckpoint).sort((a, b) => b.deadline.localeCompare(a.deadline))[0];
 
   useEffect(() => {
     void syncFromBackend?.();
   }, [syncFromBackend]);
 
   const isDeadlinePassed =
-    Boolean(config.finalSubmissionDeadline) &&
-    new Date(config.finalSubmissionDeadline).getTime() < nowMs;
+    Boolean(finalCheckpoint?.deadline) &&
+    new Date(finalCheckpoint?.deadline).getTime() < nowMs;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!myTeam) return;
 
     setIsSubmitting(true);
-    let backendSha: string | null = null;
+    setError(null);
     try {
       const apiRes = await apiClient.post('/submissions/final', {
         team_id: myTeam.id,
@@ -65,38 +70,24 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
         slide_url: slideUrl.trim(),
         description: summary.trim(),
       });
-      const dataObj = apiRes.data?.data ?? apiRes.data;
-      if (dataObj?.commit_sha) {
-        backendSha = String(dataObj.commit_sha);
+      const data = apiRes.data.data;
+      if (!data.commit_sha || data.status === 'sha_verification_failed') {
+        setError('Chưa xác minh được commit GitHub. Vui lòng kiểm tra kho mã nguồn và nộp lại.');
+        return;
       }
-    } catch {
-      // Fallback to local store commitSha generation
-    }
-
-    const res = submitFinalProject(
-      myTeam.id,
-      repoUrl.trim(),
-      demoVideoUrl.trim(),
-      slideUrl.trim(),
-      summary.trim(),
-    );
-    const finalSha = backendSha || res.commitSha;
-    if (backendSha) {
-      useMockStore.setState((state) => ({
-        finalSubmissions: state.finalSubmissions.map((f) =>
-          f.teamId === myTeam.id ? { ...f, commitSha: backendSha } : f
-        ),
-      }));
-    }
-    setIsSubmitting(false);
-    setIsEditingSubmitted(false);
-    if (res.success) {
-      setSuccessSha(finalSha);
+      await syncFromBackend?.();
+      setSuccessSha(String(data.commit_sha));
+      setIsEditingSubmitted(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể nộp bài. Vui lòng thử lại.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="space-y-6 ">
+      {error && <div role="alert" className="text-red-500">{error}</div>}
       {/* Top Header */}
       <div>
         <h1
@@ -249,7 +240,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
             </p>
           </div>
         </div>
-      ) : (
+      ) : myTeam ? (
         /* Submission Form */
         <div className="rounded-[16px] border border-border bg-card p-6 lg:p-8 space-y-6">
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -298,7 +289,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
               </div>
               <p>
                 Sau khi nhấn Nộp bài chung cuộc, hệ thống sẽ thực hiện chốt commit SHA tự động. Sau thời hạn{' '}
-                <strong>{new Date(config.finalSubmissionDeadline).toLocaleString('vi-VN')}</strong>, mọi thao tác chỉnh sửa hoặc nộp lại sẽ bị vô hiệu hóa hoàn toàn.
+                <strong>{new Date(finalCheckpoint?.deadline).toLocaleString('vi-VN')}</strong>, mọi thao tác chỉnh sửa hoặc nộp lại sẽ bị vô hiệu hóa hoàn toàn.
               </p>
             </div>
 
@@ -330,7 +321,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
             </div>
           </form>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };

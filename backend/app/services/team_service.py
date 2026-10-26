@@ -48,7 +48,7 @@ class TeamService:
         )
 
     @staticmethod
-    def build_team_response(team: Team) -> TeamResponse:
+    def build_team_response(team: Team, min_members: int = 3, max_members: int = 5) -> TeamResponse:
         """
         Construct a typed TeamResponse with calculated status and member count.
         """
@@ -71,7 +71,7 @@ class TeamService:
         member_count = len(members_resp)
         if team.is_locked:
             status = "LOCKED"
-        elif member_count >= 3:
+        elif min_members <= member_count <= max_members:
             status = "VALID"
         else:
             status = "INCOMPLETE"
@@ -91,12 +91,13 @@ class TeamService:
         return TeamResponse(
             id=str(team.id),
             team_name=team.team_name,
+            description=team.description,
             invite_code=team.invite_code,
             status=status,
             is_locked=team.is_locked,
             member_count=member_count,
-            min_members=3,
-            max_members=5,
+            min_members=min_members,
+            max_members=max_members,
             leader_id=leader_id,
             topic_id=str(team.topic_id) if team.topic_id else None,
             topic_name=topic_name,
@@ -124,6 +125,7 @@ class TeamService:
         db: AsyncSession,
         current_user: User,
         team_name: str,
+        description: Optional[str] = None,
     ) -> TeamResponse:
         cleaned_name = team_name.strip()
         if len(cleaned_name) < 3 or len(cleaned_name) > 50:
@@ -155,12 +157,24 @@ class TeamService:
             invite_code=invite_code,
             leader_id=str(current_user.id),
         )
+        team.description = description
         team_id = str(team.id)
         await db.commit()
         db.expire_all()
 
         loaded = await team_repo.get_by_id(db, team_id)
         return self.build_team_response(loaded)  # type: ignore
+
+    async def update_description(self, db: AsyncSession, user: User, description: str) -> TeamResponse:
+        membership = await team_repo.get_user_membership(db, str(user.id))
+        if not membership or membership.role != TeamMemberRole.LEADER.value:
+            raise ForbiddenException(message="Chỉ đội trưởng được chỉnh sửa đội thi.")
+        team = await team_repo.get_by_id(db, str(membership.team_id))
+        if team.is_locked:
+            raise ForbiddenException(message="Đội thi đã bị khóa.")
+        team.description = description.strip()
+        await db.commit()
+        return self.build_team_response(team)
 
     async def join_team(
         self,
@@ -197,10 +211,14 @@ class TeamService:
                     error_code="TEAM_LOCKED",
                 )
 
+            from app.repositories.topic_repo import topic_repo
+            cfg = await topic_repo.get_config(db)
+            max_team_size = int((cfg.settings_data or {}).get("maxTeamSize", 5)) if (cfg and getattr(cfg, "settings_data", None)) else 5
+            min_team_size = int((cfg.settings_data or {}).get("minTeamSize", 3)) if (cfg and getattr(cfg, "settings_data", None)) else 3
             member_count = await team_repo.count_members(db, team.id)
-            if member_count >= 5:
+            if member_count >= max_team_size:
                 raise ConflictException(
-                    message="Đội thi đã đủ số lượng thành viên tối đa (5 người).",
+                    message=f"Đội thi đã đủ số lượng thành viên tối đa ({max_team_size} người).",
                     error_code="TEAM_FULL",
                 )
 

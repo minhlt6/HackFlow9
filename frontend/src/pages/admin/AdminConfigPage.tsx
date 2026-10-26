@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
+import { toast } from '../../store/useToastStore';
 import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
@@ -45,7 +46,8 @@ export const AdminConfigPage: React.FC = () => {
 
   const [name, setName] = useState(config.name);
   const [currentPhase, setCurrentPhase] = useState(config.currentPhase);
-  const [maxTeamMembers, setMaxTeamMembers] = useState(config.maxTeamMembers || 4);
+  const [minTeamMembers, setMinTeamMembers] = useState(config.minTeamMembers || config.minTeamSize || 3);
+  const [maxTeamMembers, setMaxTeamMembers] = useState(config.maxTeamMembers || config.maxTeamSize || 5);
   const [finalDeadline, setFinalDeadline] = useState(
     config.finalSubmissionDeadline ? config.finalSubmissionDeadline.slice(0, 16) : ''
   );
@@ -61,10 +63,14 @@ export const AdminConfigPage: React.FC = () => {
         if (data && typeof data === 'object') {
           const currCfg = useMockStore.getState().config;
           const nextName = String(data.name ?? data.eventName ?? currCfg.name);
-          const nextMaxTeam = Number(data.maxTeamSize ?? currCfg.maxTeamMembers ?? 5);
+          const nextMinTeam = Number(data.minTeamMembers ?? data.minTeamSize ?? currCfg.minTeamMembers ?? currCfg.minTeamSize ?? 3);
+          const nextMaxTeam = Number(data.maxTeamMembers ?? data.maxTeamSize ?? currCfg.maxTeamMembers ?? currCfg.maxTeamSize ?? 5);
+          const nextPhase = String(data.currentPhase ?? currCfg.currentPhase);
           const nextEnd = String(data.end_time ?? data.endAt ?? currCfg.finalSubmissionDeadline);
           setName(nextName);
+          setMinTeamMembers(nextMinTeam);
           setMaxTeamMembers(nextMaxTeam);
+          if (nextPhase) setCurrentPhase(nextPhase);
           if (nextEnd) {
             setFinalDeadline(nextEnd.slice(0, 16));
           }
@@ -72,6 +78,10 @@ export const AdminConfigPage: React.FC = () => {
             config: {
               ...state.config,
               name: nextName,
+              currentPhase: nextPhase || state.config.currentPhase,
+              minTeamSize: nextMinTeam,
+              minTeamMembers: nextMinTeam,
+              maxTeamSize: nextMaxTeam,
               maxTeamMembers: nextMaxTeam,
               finalSubmissionDeadline: nextEnd || state.config.finalSubmissionDeadline,
               blindJudging: Boolean(data.blindJudgingEnabled ?? state.config.blindJudging),
@@ -89,45 +99,69 @@ export const AdminConfigPage: React.FC = () => {
 
   const initialName = config.name;
   const initialPhase = config.currentPhase;
-  const initialMaxTeam = config.maxTeamMembers || 4;
+  const initialMinTeam = config.minTeamMembers || config.minTeamSize || 3;
+  const initialMaxTeam = config.maxTeamMembers || config.maxTeamSize || 5;
   const initialDeadline = config.finalSubmissionDeadline ? config.finalSubmissionDeadline.slice(0, 16) : '';
 
   const isDirty =
     name !== initialName ||
     currentPhase !== initialPhase ||
+    Number(minTeamMembers) !== Number(initialMinTeam) ||
     Number(maxTeamMembers) !== Number(initialMaxTeam) ||
     finalDeadline !== initialDeadline;
 
   const blocker = useUnsavedChangesWarning(isDirty);
 
-  const handleSaveAndLeave = () => {
-    updateConfig({
-      name,
-      currentPhase,
-      maxTeamMembers: Number(maxTeamMembers),
-      finalSubmissionDeadline: new Date(finalDeadline).toISOString(),
-    });
-    if (blocker.proceed) {
-      blocker.proceed();
+  const handleSaveAndLeave = async () => {
+    if (Number(minTeamMembers) > Number(maxTeamMembers)) {
+      toast.error('Số lượng thành viên tối thiểu không được lớn hơn số lượng tối đa.');
+      return;
+    }
+    try {
+      await updateConfig({
+        name,
+        currentPhase,
+        minTeamSize: Number(minTeamMembers),
+        minTeamMembers: Number(minTeamMembers),
+        maxTeamSize: Number(maxTeamMembers),
+        maxTeamMembers: Number(maxTeamMembers),
+        finalSubmissionDeadline: new Date(finalDeadline).toISOString(),
+      });
+      if (blocker.proceed) {
+        blocker.proceed();
+      }
+    } catch {
+      toast.error('Không thể lưu cấu hình. Vui lòng thử lại.');
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateConfig({
-      name,
-      currentPhase,
-      maxTeamMembers: Number(maxTeamMembers),
-      finalSubmissionDeadline: new Date(finalDeadline).toISOString(),
-    });
-    setAlert('Đã cập nhật cấu hình hệ thống Hackathon thành công!');
-    setTimeout(() => setAlert(null), 3500);
+    if (Number(minTeamMembers) > Number(maxTeamMembers)) {
+      toast.error('Số lượng thành viên tối thiểu không được lớn hơn số lượng tối đa.');
+      return;
+    }
+    try {
+      await updateConfig({
+        name,
+        currentPhase,
+        minTeamSize: Number(minTeamMembers),
+        minTeamMembers: Number(minTeamMembers),
+        maxTeamSize: Number(maxTeamMembers),
+        maxTeamMembers: Number(maxTeamMembers),
+        finalSubmissionDeadline: new Date(finalDeadline).toISOString(),
+      });
+      setAlert('Đã cập nhật cấu hình hệ thống Hackathon thành công!');
+      setTimeout(() => setAlert(null), 3500);
+    } catch {
+      toast.error('Không thể lưu cấu hình. Vui lòng thử lại.');
+    }
   };
 
   const handleResetAll = () => {
     if (
       window.confirm(
-        'Bạn có chắc chắn muốn đặt lại toàn bộ dữ liệu cuộc thi về trạng thái mặc định ban đầu? Toàn bộ đội thi, bài nộp, đề tài và chặng nộp sẽ được đưa về rỗng.'
+        'Tải lại dữ liệu cuộc thi từ máy chủ và xóa bộ nhớ đệm trình duyệt?'
       )
     ) {
       resetAllMockData();
@@ -263,19 +297,35 @@ export const AdminConfigPage: React.FC = () => {
                   </span>
                 </div>
 
-                <div className="flex flex-col gap-1.5">
-                  <Input
-                    label="Số lượng thành viên tối đa mỗi đội *"
-                    type="number"
-                    min={2}
-                    max={8}
-                    value={maxTeamMembers}
-                    onChange={(e) => setMaxTeamMembers(Number(e.target.value))}
-                    required
-                  />
-                  <span className="text-[11px] text-muted-foreground">
-                    Giới hạn số thành viên được phép gia nhập cùng một đội (khuyến nghị 3 - 5 người).
-                  </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <Input
+                      label="Tối thiểu / đội (Để chọn đề tài) *"
+                      type="number"
+                      min={1}
+                      max={maxTeamMembers}
+                      value={minTeamMembers}
+                      onChange={(e) => setMinTeamMembers(Number(e.target.value))}
+                      required
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      Đội thi phải đạt tối thiểu số lượng này mới được phép đăng ký đề tài (mặc định: 3).
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Input
+                      label="Tối đa / đội *"
+                      type="number"
+                      min={minTeamMembers}
+                      max={10}
+                      value={maxTeamMembers}
+                      onChange={(e) => setMaxTeamMembers(Number(e.target.value))}
+                      required
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      Số lượng thành viên tối đa trong một đội thi (mặc định: 5).
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -357,7 +407,7 @@ export const AdminConfigPage: React.FC = () => {
                   {config.isContestStarted ? (
                     <button
                       type="button"
-                      onClick={toggleContestStarted}
+                      onClick={() => { void toggleContestStarted().catch(() => toast.error('Không thể lưu cấu hình. Vui lòng thử lại.')); }}
                       className="w-full sm:w-auto px-4 py-2.5 rounded-[10px] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-amber-950/20"
                     >
                       <Pause size={15} />
@@ -366,7 +416,7 @@ export const AdminConfigPage: React.FC = () => {
                   ) : (
                     <button
                       type="button"
-                      onClick={toggleContestStarted}
+                      onClick={() => { void toggleContestStarted().catch(() => toast.error('Không thể lưu cấu hình. Vui lòng thử lại.')); }}
                       className="w-full sm:w-auto px-5 py-2.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-600/30"
                     >
                       <Play size={15} />
@@ -429,7 +479,7 @@ export const AdminConfigPage: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={toggleBlindJudging}
+                    onClick={() => { void toggleBlindJudging().catch(() => toast.error('Không thể lưu cấu hình. Vui lòng thử lại.')); }}
                     role="switch"
                     aria-checked={config.blindJudgingMode}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
@@ -468,7 +518,7 @@ export const AdminConfigPage: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={toggleResultsPublished}
+                    onClick={() => { void toggleResultsPublished().catch(() => toast.error('Không thể lưu cấu hình. Vui lòng thử lại.')); }}
                     role="switch"
                     aria-checked={config.resultsPublished}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
@@ -550,10 +600,10 @@ export const AdminConfigPage: React.FC = () => {
           <div className="rounded-[16px] border border-rose-500/30 bg-rose-500/10 p-6 space-y-3.5 shadow-lg shadow-rose-950/20">
             <div className="flex items-center gap-2.5 text-rose-700 dark:text-rose-400">
               <AlertTriangle size={18} className="shrink-0" />
-              <h3 className="font-semibold tracking-tight text-foreground text-base">Đặt Lại Dữ Liệu Ban Đầu</h3>
+              <h3 className="font-semibold tracking-tight text-foreground text-base">Tải Lại Dữ Liệu</h3>
             </div>
             <p className="text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
-              Thao tác này sẽ xóa toàn bộ dữ liệu mẫu (đội thi, đề tài, chặng nộp bài, tiêu chí) để bắt đầu giải đấu từ trạng thái hoàn toàn sạch.
+              Xóa bộ nhớ đệm giao diện và tải lại dữ liệu cuộc thi từ máy chủ.
             </p>
             <button
               type="button"
@@ -561,7 +611,7 @@ export const AdminConfigPage: React.FC = () => {
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[10px] border border-rose-500/50 bg-rose-500/20 hover:bg-rose-500/30 text-rose-700 dark:text-rose-400 text-xs font-bold transition-all cursor-pointer shadow-md"
             >
               <RotateCcw size={15} />
-              <span>Xóa Sạch Dữ Liệu Cũ (Đặt Lại Từ Đầu)</span>
+              <span>Tải lại từ máy chủ</span>
             </button>
           </div>
         </div>

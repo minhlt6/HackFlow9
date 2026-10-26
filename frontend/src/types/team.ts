@@ -32,6 +32,7 @@ export interface TeamDetails {
 }
 
 export interface CreateTeamPayload {
+  description?: string;
   team_name: string;
 }
 

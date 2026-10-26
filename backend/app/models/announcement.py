@@ -19,6 +19,7 @@ class Announcement(BaseModel):
     """
     __tablename__ = "announcements"
 
+    target_audience: Mapped[str] = mapped_column(String(32), nullable=False, default="all", server_default="all")
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     priority: Mapped[str] = mapped_column(

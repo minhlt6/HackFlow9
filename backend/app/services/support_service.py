@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+from uuid import uuid4
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -124,7 +126,7 @@ class SupportService:
 
         # Candidate can only perform close or reopen on their own/team ticket
         if user_role == UserRole.CANDIDATE.value:
-            if action not in ("close", "reopen"):
+            if action not in ("close", "reopen", "update_response"):
                 raise ForbiddenException(
                     message="Truy cập trái phép. Chức năng yêu cầu vai trò: mentor, admin.",
                     error_code="FORBIDDEN_ROLE",
@@ -153,6 +155,21 @@ class SupportService:
             exclude={"action", "note", "target_admin_id"},
         )
 
+        if user_role == UserRole.CANDIDATE.value:
+            # A candidate may send a message, never alter assignment, priority or mentor response.
+            update_data = {}
+        if action == "update_response":
+            if ticket.status in (TicketStatus.RESOLVED.value, TicketStatus.CLOSED.value):
+                raise ConflictException(message="Ticket đã đóng hoặc giải quyết. Hãy mở lại trước khi trao đổi.", error_code="INVALID_TICKET_TRANSITION")
+            if not payload.response or not payload.response.strip():
+                raise ValidationException(message="Nội dung trao đổi không được trống.", error_code="MISSING_TICKET_RESPONSE")
+        if payload.response and action in ("update_response", "resolve"):
+            update_data["messages"] = [*(ticket.messages or []), {
+                "id": str(uuid4()), "senderId": str(current_user.id),
+                "senderName": current_user.full_name, "senderRole": user_role,
+                "content": payload.response.strip(), "sentAt": datetime.now(timezone.utc).isoformat(),
+            }]
+
         # Map Frontend/SRS `action` to status & assignment transitions
         if action == "accept":
             if (
@@ -169,7 +186,7 @@ class SupportService:
         elif action == "resolve":
             update_data["status"] = TicketStatus.RESOLVED.value
         elif action == "update_response":
-            if ticket.status == TicketStatus.OPEN.value:
+            if user_role != UserRole.CANDIDATE.value and ticket.status == TicketStatus.OPEN.value:
                 update_data["status"] = TicketStatus.IN_PROGRESS.value
         elif action == "close":
             update_data["status"] = TicketStatus.CLOSED.value

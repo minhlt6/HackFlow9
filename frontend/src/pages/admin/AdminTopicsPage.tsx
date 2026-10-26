@@ -73,14 +73,14 @@ export const AdminTopicsPage: React.FC = () => {
   const fetchTopics = useCallback(async () => {
     try {
       const data = await topicsApi.getTopics();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const mapped = mapTopics(data);
         useMockStore.setState({ majorTopics: mapped });
       }
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         if (err.response) {
-          showAlert(err.response.data?.message || 'Không thể tải danh sách đề tài từ máy chủ.', 'error');
+          showAlert(err.response?.data?.message || 'Không thể tải danh sách đề tài từ máy chủ.', 'error');
         }
       }
     } finally {
@@ -93,14 +93,14 @@ export const AdminTopicsPage: React.FC = () => {
     topicsApi
       .getTopics()
       .then((data) => {
-        if (!ignore && Array.isArray(data) && data.length > 0) {
+        if (!ignore && Array.isArray(data)) {
           const mapped = mapTopics(data);
           useMockStore.setState({ majorTopics: mapped });
         }
       })
       .catch((err: unknown) => {
         if (!ignore && axios.isAxiosError(err) && err.response) {
-          showAlert(err.response.data?.message || 'Không thể tải danh sách đề tài từ máy chủ.', 'error');
+          showAlert(err.response?.data?.message || 'Không thể tải danh sách đề tài từ máy chủ.', 'error');
         }
       });
 
@@ -148,14 +148,9 @@ export const AdminTopicsPage: React.FC = () => {
       showAlert(`Đã thêm lĩnh vực đề tài lớn "${majorTitle}" thành công lên máy chủ!`, 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          addMajorTopic(majorTitle.trim(), majorDescription.trim());
-          showAlert(`Đã thêm lĩnh vực đề tài lớn "${majorTitle}" vào bộ nhớ cục bộ (ngoại tuyến).`, 'info');
-        } else {
-          showAlert(err.response.data?.message || 'Có lỗi xảy ra khi tạo lĩnh vực đề tài.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
+        showAlert(err.response?.data?.message || 'Có lỗi xảy ra khi tạo lĩnh vực đề tài.', 'error');
+        setIsSubmitting(false);
+        return;
       } else {
         addMajorTopic(majorTitle.trim(), majorDescription.trim());
       }
@@ -177,12 +172,7 @@ export const AdminTopicsPage: React.FC = () => {
         showAlert(`Đã xóa lĩnh vực "${displayName}".`, 'success');
       } catch (err: unknown) {
         if (axios.isAxiosError(err)) {
-          if (!err.response) {
-            deleteMajorTopic(id);
-            showAlert(`Đã xóa lĩnh vực "${displayName}" trong bộ nhớ cục bộ.`, 'info');
-          } else {
-            showAlert(err.response.data?.message || 'Có lỗi xảy ra khi xóa đề tài.', 'error');
-          }
+          showAlert(err.response?.data?.message || 'Có lỗi xảy ra khi xóa đề tài.', 'error');
         } else {
           deleteMajorTopic(id);
         }
@@ -205,19 +195,9 @@ export const AdminTopicsPage: React.FC = () => {
       showAlert(`Đã thêm đề tài nhánh mới "${title}" thành công lên máy chủ!`, 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          addSubTopic(selectedMajorId, {
-            title: title.trim(),
-            description: description.trim(),
-            quota,
-            mentorName: mentorName.trim(),
-          });
-          showAlert(`Đã thêm đề tài nhánh mới "${title}" vào bộ nhớ cục bộ.`, 'info');
-        } else {
-          showAlert(err.response.data?.message || 'Có lỗi xảy ra khi tạo đề tài con.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
+        showAlert(err.response?.data?.message || 'Có lỗi xảy ra khi tạo đề tài con.', 'error');
+        setIsSubmitting(false);
+        return;
       } else {
         addSubTopic(selectedMajorId, {
           title: title.trim(),
@@ -250,14 +230,9 @@ export const AdminTopicsPage: React.FC = () => {
       showAlert('Đã cập nhật đề tài nhánh và chỉ tiêu Quota thành công lên máy chủ!', 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          updateSubTopicQuota(editingSubTopic.id, newQuotaValue);
-          showAlert('Đã cập nhật chỉ tiêu Quota trong bộ nhớ cục bộ.', 'info');
-        } else {
-          showAlert(err.response.data?.message || 'Có lỗi xảy ra khi cập nhật hạn ngạch quota.', 'error');
-          setIsSubmitting(false);
-          return;
-        }
+        showAlert(err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật hạn ngạch quota.', 'error');
+        setIsSubmitting(false);
+        return;
       } else {
         updateSubTopicQuota(editingSubTopic.id, newQuotaValue);
       }
@@ -278,7 +253,7 @@ export const AdminTopicsPage: React.FC = () => {
       showAlert(`Đã xóa đề tài nhánh "${subTitle}".`, 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err) && err.response?.data?.message) {
-        showAlert(err.response.data.message, 'error');
+        showAlert(err.response?.data.message, 'error');
       } else {
         showAlert('Không thể xóa đề tài nhánh.', 'error');
       }

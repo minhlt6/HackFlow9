@@ -1,6 +1,6 @@
 from typing import List, Optional
 from fastapi import APIRouter, Depends, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, require_approved
@@ -47,7 +47,7 @@ async def create_team(
     Tạo đội thi mới với người tạo là Leader.
     Chỉ tài khoản APPROVED mới được tạo đội.
     """
-    team = await team_service.create_team(db, current_user, body.team_name)
+    team = await team_service.create_team(db, current_user, body.team_name, body.description)
     return success_response(
         data=team,
         message="Tạo đội thi thành công.",
@@ -168,3 +168,13 @@ async def get_team_by_id(
         data=team,
         message="Lấy chi tiết đội thi thành công.",
     )
+
+
+class TeamDescriptionRequest(BaseModel):
+    description: str = Field(default="", max_length=2000)
+
+
+@router.patch("/me", response_model=ApiResponse[TeamResponse])
+async def update_my_team(body: TeamDescriptionRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_approved())):
+    team = await team_service.update_description(db, current_user, body.description)
+    return success_response(data=team, message="Đã cập nhật mô tả đội thi.")

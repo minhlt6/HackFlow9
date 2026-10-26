@@ -1,9 +1,9 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/useAuthStore';
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/^\/+/, '').replace(/\/+$/, '');
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '');
 const configuredBaseUrl = rawBaseUrl
-  ? /^https?:\/\//i.test(rawBaseUrl)
+  ? rawBaseUrl.startsWith('/') || /^https?:\/\//i.test(rawBaseUrl)
     ? rawBaseUrl
     : `https://${rawBaseUrl}`
   : '';
@@ -34,6 +34,12 @@ axiosClient.interceptors.request.use((config) => {
 axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    const data = error.response?.data;
+    if (data?.error?.message) {
+      data.message = data.error.message;
+      data.error_code = data.error.code;
+      error.message = data.error.message;
+    }
     if (error.response?.status === 401) {
       const token = localStorage.getItem('token');
       const requestUrl = String(error.config?.url || '');

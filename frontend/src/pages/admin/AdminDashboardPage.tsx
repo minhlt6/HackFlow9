@@ -53,10 +53,7 @@ export const AdminDashboardPage: React.FC = () => {
       .then((res) => {
         const list = res.data?.data;
         if (active && Array.isArray(list)) {
-          const mockExtra = pendingCandidates.filter(
-            (m) => !list.some((r) => r.email.toLowerCase() === m.email.toLowerCase()),
-          ).length;
-          setBackendPendingCount(list.length + mockExtra);
+          setBackendPendingCount(list.length);
         }
       })
       .catch(() => {
@@ -68,10 +65,7 @@ export const AdminDashboardPage: React.FC = () => {
       .then((res) => {
         const list = res.data?.data;
         if (active && Array.isArray(list)) {
-          const mockExtra = whitelist.filter(
-            (m) => !list.some((r) => r.email.toLowerCase() === m.email.toLowerCase()),
-          ).length;
-          setBackendWhitelistCount(list.length + mockExtra);
+          setBackendWhitelistCount(list.length);
         }
       })
       .catch(() => {
@@ -103,12 +97,8 @@ export const AdminDashboardPage: React.FC = () => {
               variant={config.isContestStarted ? 'outline' : 'success'}
               size="sm"
               onClick={() => {
-                toggleContestStarted();
-                toast.info(
-                  config.isContestStarted
-                    ? 'Đã tạm dừng đồng hồ đếm ngược cuộc thi'
-                    : 'Đã kích hoạt đồng hồ đếm ngược cuộc thi',
-                );
+                void toggleContestStarted().catch(() => toast.error('Không thể lưu thay đổi. Vui lòng thử lại.'));
+
               }}
             >
               {config.isContestStarted ? <Pause size={15} /> : <Play size={15} />}
@@ -124,12 +114,8 @@ export const AdminDashboardPage: React.FC = () => {
               variant={config.blindJudgingMode ? 'secondary' : 'outline'}
               size="sm"
               onClick={() => {
-                toggleBlindJudging();
-                toast.info(
-                  config.blindJudgingMode
-                    ? 'Đã tắt chế độ chấm ẩn danh'
-                    : 'Đã bật chế độ chấm ẩn danh (Blind Judging)',
-                );
+                void toggleBlindJudging().catch(() => toast.error('Không thể lưu thay đổi. Vui lòng thử lại.'));
+
               }}
             >
               {config.blindJudgingMode ? <EyeOff size={15} /> : <Eye size={15} />}
@@ -145,12 +131,8 @@ export const AdminDashboardPage: React.FC = () => {
               variant="primary"
               size="sm"
               onClick={() => {
-                toggleResultsPublished();
-                toast.success(
-                  config.resultsPublished
-                    ? 'Đã chuyển bảng xếp hạng về chế độ bảo mật'
-                    : 'Đã công bố bảng xếp hạng toàn cuộc thi',
-                );
+                void toggleResultsPublished().catch(() => toast.error('Không thể lưu thay đổi. Vui lòng thử lại.'));
+
               }}
             >
               <Trophy size={15} />

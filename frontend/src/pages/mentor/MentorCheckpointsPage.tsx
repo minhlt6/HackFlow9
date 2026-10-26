@@ -35,19 +35,7 @@ export const MentorCheckpointsPage: React.FC = () => {
           </p>
         </div>
 
-        {/* RBAC Security Demo Button */}
-        <Button
-          variant="secondary"
-          onClick={() =>
-            handleTriggerForbidden(
-              'GET /api/v1/evaluations/judge-sheets & GET /api/v1/submissions/source-code (Quyền bị chặn đối với vai trò CỐ VẤN CHUYÊN MÔN)',
-            )
-          }
-          className="gap-2 border-rose-500/50 text-rose-700 dark:text-rose-400 hover:bg-rose-500/10"
-        >
-          <Lock size={15} />
-          <span>Thử Nghiệm Phân Quyền Bảo Mật</span>
-        </Button>
+
       </div>
 
       {/* RBAC Notice Banner */}

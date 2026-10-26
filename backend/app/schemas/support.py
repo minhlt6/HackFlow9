@@ -64,7 +64,19 @@ class TicketUpdate(BaseModel):
     )
 
 
+class TicketMessage(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: str = "msg-1"
+    senderId: Optional[str] = ""
+    senderName: Optional[str] = ""
+    senderRole: Optional[str] = "candidate"
+    content: str = ""
+    sentAt: Optional[str] = "" 
+
+
 class TicketResponse(BaseModel):
+    messages: list[TicketMessage] = Field(default_factory=list)
     """Schema for returning support ticket information."""
     id: str
     team_id: Optional[str] = None

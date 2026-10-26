@@ -4,6 +4,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.config import settings
 from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.core.security import decode_access_token, hash_password
 from app.models.user import ApprovalStatus, User, UserRole
@@ -57,7 +58,7 @@ async def get_current_user(
         raise UnauthorizedException(message="Yêu cầu xác thực: Thiếu Bearer Token.")
 
     token = credentials.credentials
-    if token in DEV_PERSONA_TOKENS:
+    if settings.demo_enabled and token in DEV_PERSONA_TOKENS:
         persona_user = await _resolve_dev_persona_user(db, token)
         if persona_user:
             return persona_user
@@ -91,7 +92,7 @@ async def get_optional_current_user(
     if not credentials or not credentials.credentials:
         return None
     token = credentials.credentials
-    if token in DEV_PERSONA_TOKENS:
+    if settings.demo_enabled and token in DEV_PERSONA_TOKENS:
         return await _resolve_dev_persona_user(db, token)
     payload = decode_access_token(token)
     if not payload:

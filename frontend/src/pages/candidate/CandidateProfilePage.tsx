@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { apiClient } from '../../api/axiosClient';
@@ -52,7 +52,10 @@ export const CandidateProfilePage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
+  const initializedRef = useRef(false);
   useEffect(() => {
+    if (initializedRef.current) return;
+    initializedRef.current = true;
     let mounted = true;
     void syncFromBackend?.().then(() => {
       if (!mounted) return;
@@ -109,7 +112,9 @@ export const CandidateProfilePage: React.FC = () => {
         bio: bio.trim(),
       });
     } catch {
-      // Fallback to local store persistence if offline
+      window.alert('Không thể lưu hồ sơ. Vui lòng thử lại.');
+      setIsSaving(false);
+      return;
     }
 
     const profileUpdates = {
@@ -160,7 +165,17 @@ export const CandidateProfilePage: React.FC = () => {
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
               <h2 className="text-xl font-bold text-foreground">{resolvedName}</h2>
               <Badge variant="indigo">
-                {currentUser.teamRole === 'leader' || currentUser.roleInTeam === 'leader' ? 'Đội Trưởng' : 'Thành Viên'}
+                {(authUser?.role || currentUser.role) === 'admin'
+                  ? 'Ban Quản Trị (BTC)'
+                  : (authUser?.role || currentUser.role) === 'judge'
+                  ? 'Ban Giám Khảo'
+                  : (authUser?.role || currentUser.role) === 'mentor'
+                  ? 'Cố Vấn Chuyên Môn'
+                  : currentUser.teamRole === 'leader' || currentUser.roleInTeam === 'leader'
+                  ? 'Đội Trưởng'
+                  : myTeam
+                  ? 'Thành Viên Đội Thi'
+                  : 'Thí Sinh Độc Lập'}
               </Badge>
               <Badge variant="success">Tài Khoản Đã Xác Thực</Badge>
             </div>

@@ -28,6 +28,8 @@ class UserResponse(BaseModel):
     phone: Optional[str] = None
     skills: Optional[list[str]] = None
     bio: Optional[str] = None
+    onboarding_completed: Optional[bool] = None
+    pledged: Optional[bool] = None
     is_active: bool = True
 
     model_config = {"from_attributes": True}
@@ -57,6 +59,13 @@ class ProfileUpdateRequest(BaseModel):
     phone: Optional[str] = Field(None, description="Số điện thoại liên hệ")
     skills: Optional[list[str]] = Field(None, description="Danh sách kỹ năng")
     bio: Optional[str] = Field(None, description="Giới thiệu bản thân & chuyên môn")
+    onboarding_completed: Optional[bool] = Field(None, description="Trạng thái hoàn tất hướng dẫn nghiệp vụ")
+    pledged: Optional[bool] = Field(None, description="Trạng thái ký cam kết liêm chính")
+
+
+class OnboardingStatusUpdateRequest(BaseModel):
+    onboarding_completed: Optional[bool] = Field(None, description="Trạng thái hoàn tất hướng dẫn nghiệp vụ")
+    pledged: Optional[bool] = Field(None, description="Trạng thái ký cam kết liêm chính")
 
 
 class ProfileUpdateResponse(BaseModel):

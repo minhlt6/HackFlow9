@@ -1,7 +1,7 @@
-import React, { useMemo, useEffect } from 'react';
-import { useMockStore, normalizeScoreTo100 } from '../store/useMockStore';
+import React, { useState, useEffect } from 'react';
+import { useMockStore } from '../store/useMockStore';
 import { useAuthStore } from '../store/useAuthStore';
-import { evaluationService } from '../services/evaluationService';
+import { evaluationService, type LeaderboardEntry } from '../services/evaluationService';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import {
@@ -17,68 +17,31 @@ import {
 } from 'lucide-react';
 
 export const Scoreboard: React.FC = () => {
-  const { config, teams, majorTopics, evaluations, toggleResultsPublished, rubricCriteria } =
+  const { config } =
     useMockStore();
   const { user } = useAuthStore();
   const isAdmin = user?.role === 'admin';
 
-  // Fetch leaderboard from API on mount (handled with fallback to store)
+  const [rows, setRows] = useState<LeaderboardEntry[]>([]);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    const fetchLeaderboard = async () => {
-      try {
-        await evaluationService.getLeaderboard();
-      } catch (err: unknown) {
-        const axiosErr = err as { response?: { status?: number } };
-        if (axiosErr?.response?.status === 403) {
-          // Backend returned 403 RESULTS_NOT_PUBLISHED
-        }
-      }
-    };
-    fetchLeaderboard();
-  }, []);
-
-  // Compute team scores and check score discrepancy strictly from actual scores (> 15 pts)
-  const teamsWithScores = useMemo(() => {
-    return teams.map((team) => {
-      const teamEvals = evaluations.filter((e) => e.teamId === team.id && !e.isDraft);
-
-      const normalizedScores = teamEvals.map((e) =>
-        normalizeScoreTo100(e.totalScore, e.scores, rubricCriteria),
-      );
-
-      const avgScore =
-        normalizedScores.length > 0
-          ? normalizedScores.reduce((acc, curr) => acc + curr, 0) / normalizedScores.length
-          : 0;
-
-      // Discrepancy check: (maxScore - minScore) > 15 strictly from evaluation data
-      let hasDiscrepancy = false;
-      if (normalizedScores.length >= 2) {
-        const maxScore = Math.max(...normalizedScores);
-        const minScore = Math.min(...normalizedScores);
-        if (maxScore - minScore > 15) {
-          hasDiscrepancy = true;
-        }
-      }
-
-      let subTopicTitle = 'Chưa chọn';
-      for (const mt of majorTopics) {
-        const sub = mt.subTopics.find((s) => s.id === team.subTopicId);
-        if (sub) {
-          subTopicTitle = sub.title.replace(/\s*&\s*/g, ' và ');
-          break;
-        }
-      }
-
-      return {
-        ...team,
-        subTopicTitle,
-        avgScore: Math.round(avgScore * 10) / 10,
-        evalCount: teamEvals.length,
-        hasDiscrepancy,
-      };
-    }).sort((a, b) => b.avgScore - a.avgScore);
-  }, [teams, evaluations, rubricCriteria, majorTopics]);
+    let active = true;
+    evaluationService.getLeaderboard().then((response) => {
+      if (!active) return;
+      const data = response.data;
+      setRows(data.leaderboard || []);
+      useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: Boolean(data.is_result_published) } }));
+    }).catch((err: unknown) => {
+      if (!active) return;
+      setRows([]);
+      setError(err instanceof Error ? err.message : 'Không thể tải bảng xếp hạng.');
+    });
+    return () => { active = false; };
+  }, [config.resultsPublished]);
+  const teamsWithScores = rows.map((row) => ({
+    id: row.team_id, name: row.team_name, subTopicTitle: row.topic_title,
+    avgScore: row.final_score, evalCount: row.eval_count, hasDiscrepancy: Boolean(row.has_discrepancy),
+  }));
 
   // Handle Admin publishing / unpublishing
   const handlePublishToggle = async () => {
@@ -86,13 +49,15 @@ export const Scoreboard: React.FC = () => {
     try {
       await evaluationService.publishLeaderboard({ is_result_published: nextStatus });
     } catch {
-      // Local fallback
+      window.alert('Không thể công bố kết quả. Vui lòng thử lại.');
+      return;
     }
-    toggleResultsPublished();
+    useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: nextStatus } }));
   };
 
   return (
     <div className="space-y-6 ">
+      {error && <div role="alert" className="text-red-500">{error}</div>}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

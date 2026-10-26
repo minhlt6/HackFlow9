@@ -9,6 +9,7 @@ export interface ProfileForm {
 }
 
 export interface ProfilePayload {
+  bio?: string;
   full_name: string;
   student_id: string;
   school: string;

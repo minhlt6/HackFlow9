@@ -105,3 +105,9 @@ temp/
 # Notion Integration Module (chỉ dùng local, KHÔNG push Git)
 # ============================================================
 notion-module/
+.codegraph/
+
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

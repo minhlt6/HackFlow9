@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
+import { useMockStore } from '../../store/useMockStore';
 import { getLeaderboard, publishLeaderboard } from '../../services/evaluationService';
 import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
@@ -34,7 +34,7 @@ interface ResultRow {
 }
 
 export const AdminResultsPage: React.FC = () => {
-  const { teams, evaluations, config, toggleResultsPublished, rubricCriteria, syncFromBackend } = useMockStore();
+  const { teams, config, syncFromBackend } = useMockStore();
 
   const [alert, setAlert] = useState<string | null>(null);
   const [apiRows, setApiRows] = useState<ResultRow[] | null>(null);
@@ -76,7 +76,7 @@ export const AdminResultsPage: React.FC = () => {
             : Array.isArray(rawData)
               ? rawData
               : [];
-        if (!Array.isArray(entriesRaw) || entriesRaw.length === 0) return;
+        if (!Array.isArray(entriesRaw)) return;
         const mapped: ResultRow[] = (entriesRaw as Array<Record<string, unknown>>).map((entry) => {
           const tId = String(entry.team_id ?? entry.teamId ?? '');
           const tName = String(entry.team_name ?? entry.teamName ?? '');
@@ -112,41 +112,7 @@ export const AdminResultsPage: React.FC = () => {
     };
   }, [teams, refreshTick]);
 
-  const fallbackRows: ResultRow[] = teams.map((team) => {
-    const teamEvals = evaluations.filter((e) => e.teamId === team.id && !e.isDraft);
-    const normalizedScores = teamEvals.map((e) =>
-      normalizeScoreTo100(e.totalScore, e.scores, rubricCriteria)
-    );
-    const avgScore =
-      normalizedScores.length > 0
-        ? normalizedScores.reduce((sum, s) => sum + s, 0) / normalizedScores.length
-        : 0;
-    const maxSpread =
-      normalizedScores.length >= 2
-        ? Math.round((Math.max(...normalizedScores) - Math.min(...normalizedScores)) * 10) / 10
-        : 0;
-
-    return {
-      teamId: team.id,
-      submissionId: team.id,
-      teamName: team.name,
-      leaderName: team.leaderName || 'Trưởng nhóm',
-      evalCount: teamEvals.length,
-      avgScore: Math.round(avgScore * 10) / 10,
-      hasDiscrepancy: maxSpread > 15,
-      maxSpread,
-      judges: teamEvals.map((ev) => ({
-        judgeId: ev.judgeId,
-        judgeName: ev.judgeName,
-        score: normalizeScoreTo100(ev.totalScore, ev.scores, rubricCriteria),
-        evaluationId: ev.id,
-      })),
-    };
-  });
-
-  const teamScoreRows = (apiRows && apiRows.length > 0 ? [...apiRows] : [...fallbackRows]).sort(
-    (a, b) => b.avgScore - a.avgScore
-  );
+  const teamScoreRows = apiRows || [];
 
   const handleExportCsv = () => {
     const headers = ['Hang', 'Doi Thi', 'Doi Truong', 'So Luot Cham', 'Diem TB (Thang 100)', 'Do Lech Max', 'Canh Bao Lech Diem'];
@@ -183,12 +149,13 @@ export const AdminResultsPage: React.FC = () => {
 
   const handleTogglePublish = async () => {
     const nextPublished = !config.resultsPublished;
-    toggleResultsPublished();
     try {
       await publishLeaderboard({ is_result_published: nextPublished });
     } catch {
-      // Fallback already handled by toggleResultsPublished (/admin/config)
+      setAlert('Không thể công bố kết quả. Vui lòng thử lại.');
+      return;
     }
+    useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: nextPublished } }));
     setAlert(
       nextPublished
         ? 'Đã công bố bảng xếp hạng chính thức cho toàn bộ thí sinh!'
@@ -225,7 +192,9 @@ export const AdminResultsPage: React.FC = () => {
         judge_id: unlockTarget.judgeId || undefined,
       });
     } catch {
-      // Also update local store state so UI reflects unlock immediately
+      setAlert('Không thể mở khóa phiếu chấm. Vui lòng thử lại.');
+      setUnlocking(false);
+      return;
     }
     useMockStore.setState((state) => ({
       evaluations: state.evaluations.map((ev) =>

@@ -1,5 +1,3 @@
-from datetime import datetime, timedelta, timezone
-import hashlib
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, Query, Request
 from pydantic import BaseModel, model_validator
@@ -9,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user
 from app.core.database import get_db
 from app.core.exceptions import BadRequestException, ForbiddenException
-from app.models.checkpoint import Checkpoint, Submission, SubmissionStatus
+from app.models.checkpoint import Checkpoint
 from app.models.user import User, UserRole
 from app.repositories.team_repo import team_repo
 from app.schemas.response import ApiResponse, success_response
@@ -82,97 +80,27 @@ async def submit_final_project(
         if not mem or str(mem.team_id) != str(effective_team_id):
             raise ForbiddenException(message="Bạn không thuộc đội thi này.")
 
-    # Ensure a Final Checkpoint exists
-    cp_stmt = select(Checkpoint).where(Checkpoint.is_final_checkpoint == True).limit(1)  # noqa: E712
-    cp_res = await db.execute(cp_stmt)
+    cp_res = await db.execute(select(Checkpoint).where(Checkpoint.is_final_checkpoint == True).order_by(Checkpoint.deadline.desc()).limit(1))
     final_cp = cp_res.scalar_one_or_none()
-    now_utc = datetime.now(timezone.utc)
-
     if not final_cp:
-        final_cp = Checkpoint(
-            title="Bàn giao Sản phẩm Cuối cùng (Final Submission)",
-            description="Cổng nộp mã nguồn GitHub, Slide thuyết trình và Video Demo chung cuộc.",
-            start_time=now_utc - timedelta(hours=2),
-            deadline=now_utc + timedelta(days=7),
-            is_active=True,
-            is_final_checkpoint=True,
-            grace_period_seconds=5,
-        )
-        db.add(final_cp)
-        await db.flush()
-
-    clean_repo = body.github_url.strip()
-    clean_demo = (body.demo_url or "").strip() or None
-    clean_slide = (body.slide_url or "").strip() or None
-    clean_desc = (body.description or "").strip() or None
-    sha_val = (
-        body.commit_sha.strip()
-        if body.commit_sha and body.commit_sha.strip()
-        else hashlib.sha1(f"{clean_repo}:{now_utc.isoformat()}".encode("utf-8")).hexdigest()[:40]
-    )
-
-    sub_data = {
-        "repo_url": clean_repo,
-        "demo_url": clean_demo or "",
-        "slide_url": clean_slide or "",
-        "description": clean_desc or "",
-    }
-
-    sub_stmt = select(Submission).where(
-        Submission.team_id == str(effective_team_id),
-        Submission.checkpoint_id == str(final_cp.id),
-    )
-    sub_res = await db.execute(sub_stmt)
-    existing_sub = sub_res.scalar_one_or_none()
-
-    if existing_sub:
-        existing_sub.submitted_by = str(current_user.id)
-        existing_sub.repo_url = clean_repo
-        existing_sub.demo_url = clean_demo or clean_slide
-        existing_sub.commit_sha = sha_val
-        existing_sub.submission_data = sub_data
-        existing_sub.note = clean_desc
-        existing_sub.status = SubmissionStatus.SUBMITTED.value
-        existing_sub.version = (existing_sub.version or 1) + 1
-        existing_sub.submitted_at = now_utc
-        target_sub = existing_sub
-    else:
-        target_sub = Submission(
+        raise BadRequestException(message="BTC chưa cấu hình chặng nộp bài chung cuộc.")
+    submission, message = await submission_service.submit_checkpoint(
+        db=db,
+        user=current_user,
+        payload=SubmissionCreateRequest(
             checkpoint_id=str(final_cp.id),
-            team_id=str(effective_team_id),
-            submitted_by=str(current_user.id),
-            repo_url=clean_repo,
-            demo_url=clean_demo or clean_slide,
-            commit_sha=sha_val,
-            submission_data=sub_data,
-            note=clean_desc,
-            status=SubmissionStatus.SUBMITTED.value,
-            grace_period_applied=False,
-            version=1,
-            version_history=[],
-            submitted_at=now_utc,
-        )
-        db.add(target_sub)
-
-    await db.commit()
-    await db.refresh(target_sub)
-
-    return success_response(
-        data={
-            "id": str(target_sub.id),
-            "submission_id": str(target_sub.id),
-            "team_id": str(target_sub.team_id),
-            "checkpoint_id": str(target_sub.checkpoint_id),
-            "github_url": clean_repo,
-            "repo_url": clean_repo,
-            "commit_sha": sha_val,
-            "demo_url": clean_demo or "",
-            "slide_url": clean_slide or "",
-            "description": clean_desc or "",
-            "submitted_at": now_utc.isoformat(),
-        },
-        message="Bàn giao sản phẩm cuối cùng thành công.",
+            repo_url=body.github_url,
+            demo_url=body.demo_url,
+            slide_url=body.slide_url,
+            submission_data={
+                "repo_url": body.github_url,
+                "demo_url": body.demo_url or "",
+                "slide_url": body.slide_url or "",
+                "description": body.description or "",
+            },
+        ),
     )
+    return success_response(data=submission.model_dump(), message=message)
 
 
 @router.post(

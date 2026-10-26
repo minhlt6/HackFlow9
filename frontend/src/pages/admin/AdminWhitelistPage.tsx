@@ -23,7 +23,6 @@ interface BackendWhitelistItem {
 
 export const AdminWhitelistPage: React.FC = () => {
   const {
-    whitelist,
     addWhitelistEntry,
     bulkImportWhitelist,
     toggleWhitelistActive,
@@ -37,7 +36,7 @@ export const AdminWhitelistPage: React.FC = () => {
   const [singleEmail, setSingleEmail] = useState('');
   const [singleNote, setSingleNote] = useState('Sinh viên Khóa K20');
   const [bulkText, setBulkText] = useState(
-    'candidate1@uet.vnu.edu.vn\ncandidate2@fpt.edu.vn\ncandidate3@hust.edu.vn',
+    '',
   );
   const [alert, setAlert] = useState<string | null>(null);
 
@@ -48,6 +47,15 @@ export const AdminWhitelistPage: React.FC = () => {
       );
       const list = res.data?.data;
       if (Array.isArray(list)) {
+        useMockStore.setState({
+          whitelist: list.map((w) => ({
+            id: w.id,
+            email: w.email,
+            note: w.note || undefined,
+            isActive: w.is_active,
+            addedAt: w.created_at ? w.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+          })),
+        });
         setBackendWhitelist(
           list.map((w) => ({
             id: w.id,
@@ -70,13 +78,7 @@ export const AdminWhitelistPage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [fetchBackendWhitelist]);
 
-  const combinedWhitelist: WhitelistEntry[] = [
-    ...backendWhitelist,
-    ...whitelist.filter(
-      (mockItem) =>
-        !backendWhitelist.some((realItem) => realItem.email.toLowerCase() === mockItem.email.toLowerCase()),
-    ),
-  ];
+  const combinedWhitelist: WhitelistEntry[] = backendWhitelist;
 
   const filtered = combinedWhitelist.filter(
     (w) =>
@@ -90,7 +92,6 @@ export const AdminWhitelistPage: React.FC = () => {
     const noteClean = singleNote.trim();
     if (!emailClean) return;
 
-    addWhitelistEntry(emailClean, noteClean);
     setIsAddOpen(false);
     setSingleEmail('');
     try {
@@ -100,8 +101,11 @@ export const AdminWhitelistPage: React.FC = () => {
       });
       await fetchBackendWhitelist();
     } catch {
-      // Ignore if offline
+      setAlert('Không thể lưu thay đổi. Vui lòng thử lại.');
+      await fetchBackendWhitelist();
+      return;
     }
+    addWhitelistEntry(emailClean, noteClean);
     setAlert(`Đã thêm ${emailClean} vào Whitelist thành công!`);
     setTimeout(() => setAlert(null), 3000);
   };
@@ -115,7 +119,7 @@ export const AdminWhitelistPage: React.FC = () => {
 
     if (emails.length === 0) return;
 
-    const count = bulkImportWhitelist(emails, 'Import danh sách sinh viên hợp lệ');
+
     setIsBulkOpen(false);
     try {
       await axiosClient.post('/admin/whitelist/bulk', {
@@ -124,22 +128,17 @@ export const AdminWhitelistPage: React.FC = () => {
       });
       await fetchBackendWhitelist();
     } catch {
-      // Ignore if offline
+      setAlert('Không thể lưu thay đổi. Vui lòng thử lại.');
+      await fetchBackendWhitelist();
+      return;
     }
+    const count = bulkImportWhitelist(emails, 'Import danh sách sinh viên hợp lệ');
     setAlert(`Đã import thành công ${count || emails.length} email mới vào Whitelist!`);
     setTimeout(() => setAlert(null), 3000);
   };
 
   const handleToggleActive = async (item: WhitelistEntry) => {
     const emailLower = item.email.toLowerCase();
-    toggleWhitelistActive(item.id, item.email);
-    setBackendWhitelist((prev) =>
-      prev.map((w) =>
-        w.id === item.id || w.email.toLowerCase() === emailLower
-          ? { ...w, isActive: !w.isActive }
-          : w,
-      ),
-    );
     try {
       if (item.isActive) {
         await axiosClient.delete(`/admin/whitelist/${encodeURIComponent(item.id)}`, {
@@ -152,25 +151,36 @@ export const AdminWhitelistPage: React.FC = () => {
           { params: { email: item.email } },
         );
       }
+      toggleWhitelistActive(item.id, item.email);
+      setBackendWhitelist((prev) =>
+        prev.map((w) =>
+          w.id === item.id || w.email.toLowerCase() === emailLower
+            ? { ...w, isActive: !w.isActive }
+            : w,
+        ),
+      );
     } catch {
-      // Ignore if mock-only
+      setAlert('Không thể lưu thay đổi. Vui lòng thử lại.');
+      await fetchBackendWhitelist();
     }
   };
 
   const handleDelete = async (id: string, email: string) => {
     if (window.confirm(`Xóa email ${email} khỏi danh sách Whitelist?`)) {
       const emailLower = email.toLowerCase();
-      removeWhitelistEntry(id, email);
-      setBackendWhitelist((prev) =>
-        prev.filter((w) => w.id !== id && w.email.toLowerCase() !== emailLower),
-      );
       try {
         await axiosClient.delete(`/admin/whitelist/${encodeURIComponent(id)}`, {
           params: { permanent: true, email },
         });
       } catch {
-        // Ignore if mock-only
+        setAlert('Không thể lưu thay đổi. Vui lòng thử lại.');
+        await fetchBackendWhitelist();
+        return;
       }
+      removeWhitelistEntry(id, email);
+      setBackendWhitelist((prev) =>
+        prev.filter((w) => w.id !== id && w.email.toLowerCase() !== emailLower),
+      );
       setAlert(`Đã xóa ${email} khỏi danh sách Whitelist thành công!`);
       setTimeout(() => setAlert(null), 3000);
     }

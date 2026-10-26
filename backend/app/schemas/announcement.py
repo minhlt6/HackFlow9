@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -16,6 +16,7 @@ class AnnouncementCreate(BaseModel):
     """Schema for creating a new announcement (POST request body)."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    target_audience: Literal["all", "candidate", "judge", "mentor"] = "all"
     title: str = Field(
         ...,
         min_length=1,
@@ -48,6 +49,7 @@ class AnnouncementUpdate(BaseModel):
     """Schema for updating an announcement (PUT request body). All fields optional."""
     model_config = ConfigDict(str_strip_whitespace=True)
 
+    target_audience: Optional[Literal["all", "candidate", "judge", "mentor"]] = None
     title: Optional[str] = Field(
         None,
         min_length=1,
@@ -82,6 +84,7 @@ class AnnouncementResponse(BaseModel):
     title: str
     content: str
     priority: str
+    target_audience: str = "all"
     created_at: datetime
     updated_at: datetime
 

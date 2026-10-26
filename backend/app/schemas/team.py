@@ -64,6 +64,7 @@ class TeamMemberResponse(BaseModel):
 
 
 class TeamResponse(BaseModel):
+    description: Optional[str] = None
     id: str
     team_name: str
     invite_code: str

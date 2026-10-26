@@ -15,6 +15,7 @@ import {
   Trash2,
   Crown,
   GitCommit,
+  Shuffle,
   SlidersHorizontal,
 } from 'lucide-react';
 import { PageHeader } from '../../components/layout/PageHeader';
@@ -44,27 +45,21 @@ import { TeamDetailDialog } from '../../components/admin/TeamDetailDialog';
 import {
   useAdminTeams,
   type AdminTeamFormValues,
-  type AdminTeamsViewMode,
 } from '../../hooks/useAdminTeams';
-import type { EnrichedAdminTeam } from '../../mocks/adminTeamsMockData';
+import type { EnrichedAdminTeam } from '../../api/adminTeamsApi';
 import { toast } from '../../store/useToastStore';
-
-const VIEW_MODES: Array<{ id: AdminTeamsViewMode; label: string }> = [
-  { id: 'normal', label: 'Hoạt động chuẩn (12 đội)' },
-  { id: 'loading', label: 'Skeleton Loading' },
-  { id: 'empty', label: 'Empty State' },
-  { id: 'error', label: 'API Error (500)' },
-  { id: 'permission_denied', label: '403 Permission Denied' },
-];
 
 export const AdminTeamsPage: React.FC = () => {
   const {
     teams,
     filteredTeams,
+    candidatesDirectory,
+    unassignedCandidates,
     majorTopics,
     metrics,
     isLoading,
     isMutating,
+    isAutoMatching,
     error,
     viewMode,
     setViewMode,
@@ -80,6 +75,7 @@ export const AdminTeamsPage: React.FC = () => {
     loadTeams,
     handleCreateTeam,
     handleUpdateTeam,
+    handleAutoMatchTeams,
     handleApproveTeam,
     handleBulkApprove,
     handleRejectTeam,
@@ -450,7 +446,10 @@ export const AdminTeamsPage: React.FC = () => {
         description="Kiểm duyệt tư cách hợp lệ của các đội thi, đối soát định biên thành viên (3–5 người), theo dõi kho mã nguồn GitHub và phân bổ đề tài Hackathon."
         badge={
           <Badge variant="indigo">
-            {metrics.totalTeams} đội • {metrics.totalParticipants} thí sinh
+            {metrics.totalTeams} đội • {metrics.totalParticipants} thí sinh trong đội
+            {unassignedCandidates.length > 0
+              ? ` • ${unassignedCandidates.length} thí sinh lẻ`
+              : ''}
           </Badge>
         }
         actions={
@@ -466,6 +465,21 @@ export const AdminTeamsPage: React.FC = () => {
             </Button>
             <Button
               type="button"
+              variant="secondary"
+              size="sm"
+              disabled={unassignedCandidates.length === 0 || isMutating}
+              isLoading={isAutoMatching}
+              loadingText="Đang ghép đội..."
+              onClick={() => void handleAutoMatchTeams()}
+              title="Tự động ghép toàn bộ thí sinh đã đăng nhập nhưng chưa có đội thành các đội 3–5 người"
+            >
+              <Shuffle size={15} />
+              <span>
+                Ghép đội ngẫu nhiên ({unassignedCandidates.length} thí sinh lẻ)
+              </span>
+            </Button>
+            <Button
+              type="button"
               variant="primary"
               size="sm"
               onClick={openCreateModal}
@@ -477,42 +491,67 @@ export const AdminTeamsPage: React.FC = () => {
         }
       />
 
-      {/* Interactive UI State Inspector Bar for Design System Verification */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-2.5 shadow-xs">
+      {/* Operational Banner for Unassigned Solo Candidates */}
+      {unassignedCandidates.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
+              <Users size={15} className="text-amber-600 shrink-0" />
+              <span>
+                Hiện có {unassignedCandidates.length} thí sinh đã đăng nhập & được phê duyệt nhưng chưa có đội thi:
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {unassignedCandidates.slice(0, 8).map((c) => (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-0.5 text-[11px] font-medium text-foreground"
+                >
+                  <span>{c.fullName}</span>
+                  <span className="font-mono text-muted-foreground">({c.email})</span>
+                </span>
+              ))}
+              {unassignedCandidates.length > 8 && (
+                <span className="text-xs text-muted-foreground">
+                  +{unassignedCandidates.length - 8} thí sinh khác
+                </span>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              isLoading={isAutoMatching}
+              loadingText="Đang ghép..."
+              onClick={() => void handleAutoMatchTeams()}
+            >
+              <Shuffle size={14} />
+              <span>Ghép ngẫu nhiên tất cả ngay</span>
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Toolbar đồng bộ trực tiếp với CSDL */}
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-2 shadow-xs">
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <SlidersHorizontal size={14} className="text-primary" />
-          <span className="font-semibold text-foreground">
-            Chế độ kiểm thử trạng thái giao diện (UI States):
+          <span>
+            Dữ liệu đội thi và danh bạ thí sinh đang được đồng bộ thời gian thực từ cơ sở dữ liệu hệ thống.
           </span>
         </div>
-
-        <div className="flex flex-wrap items-center gap-1.5">
-          {VIEW_MODES.map((mode) => (
-            <button
-              key={mode.id}
-              type="button"
-              onClick={() => setViewMode(mode.id)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                viewMode === mode.id
-                  ? 'bg-primary text-primary-foreground shadow-xs'
-                  : 'bg-muted/60 text-muted-foreground hover:bg-accent hover:text-foreground'
-              }`}
-            >
-              {mode.label}
-            </button>
-          ))}
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs"
-            onClick={() => void handleResetDemoDataset()}
-          >
-            <RotateCcw size={12} />
-            <span>Khôi phục gốc</span>
-          </Button>
-        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => void handleResetDemoDataset()}
+        >
+          <RotateCcw size={12} />
+          <span>Làm mới từ CSDL</span>
+        </Button>
       </div>
 
       {/* Permission Denied State (403) */}
@@ -644,6 +683,7 @@ export const AdminTeamsPage: React.FC = () => {
         onOpenChange={setIsFormOpen}
         editingTeam={editingTeam}
         majorTopics={majorTopics}
+        candidatesDirectory={candidatesDirectory}
         isSubmitting={isMutating}
         onSubmitForm={handleFormSubmit}
       />

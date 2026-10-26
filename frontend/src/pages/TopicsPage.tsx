@@ -21,8 +21,7 @@ import { Modal } from '../components/Modal';
 import { topicsApi, extractApiErrorMessage } from '../api/topicsApi';
 import { teamsApi } from '../api/teamsApi';
 import { useAuthStore } from '../store/useAuthStore';
-import { INITIAL_MOCK_TOPICS } from '../mocks/mockTopics';
-import { getStoredMockTeam, saveStoredMockTeam } from '../mocks/mockTeams';
+import { useMockStore } from '../store/useMockStore';
 import type { Topic, Subtopic } from '../types/topic';
 import type { TeamDetails } from '../types/team';
 
@@ -99,21 +98,20 @@ export const TopicsPage: React.FC = () => {
     return role === 'TEAM_LEADER' || role === 'LEADER';
   }, [currentUser, team]);
 
-  const isDemoTeamUser = useMemo(() => {
-    if (!currentUser) {
-      return typeof window !== 'undefined' && window.location.pathname.startsWith('/preview-');
-    }
-    const email = currentUser.email.toLowerCase();
-    return (
-      email === 'leader@cybersamurai.team' ||
-      email === 'member@cybersamurai.team' ||
-      email === 'member2@cybersamurai.team'
-    );
-  }, [currentUser]);
 
+
+  const config = useMockStore((state) => state.config);
+  const minTeamSize = Math.max(
+    1,
+    Number(team?.min_members ?? config?.minTeamMembers ?? config?.minTeamSize ?? 3),
+  );
+  const maxTeamSize = Math.max(
+    minTeamSize,
+    Number(team?.max_members ?? config?.maxTeamMembers ?? config?.maxTeamSize ?? 5),
+  );
   const hasTeam = Boolean(team && team.id);
-  const memberCount = team?.member_count || 0;
-  const isTeamValid = memberCount >= 3;
+  const memberCount = team?.member_count ?? team?.members?.length ?? 0;
+  const isTeamValid = memberCount >= minTeamSize && memberCount <= maxTeamSize;
   const currentSelectedTopicId = team?.topic_id || null;
 
   // Load data
@@ -126,16 +124,17 @@ export const TopicsPage: React.FC = () => {
 
     try {
       const remoteTopics = await topicsApi.getTopics();
-      loadedTopics = Array.isArray(remoteTopics) ? remoteTopics : INITIAL_MOCK_TOPICS;
+      loadedTopics = Array.isArray(remoteTopics) ? remoteTopics : [];
     } catch {
-      loadedTopics = INITIAL_MOCK_TOPICS;
+      loadedTopics = [];
+      setFetchError('Không thể tải đề tài. Vui lòng thử lại.');
     }
 
     try {
       const res = await teamsApi.getMyTeam();
-      loadedTeam = res || (isDemoTeamUser ? getStoredMockTeam() : null);
+      loadedTeam = res;
     } catch {
-      loadedTeam = isDemoTeamUser || import.meta.env.DEV ? getStoredMockTeam() : null;
+      loadedTeam = null;
     }
 
     if (loadedTeam && loadedTeam.topic_id && !loadedTeam.topic_name) {
@@ -148,7 +147,7 @@ export const TopicsPage: React.FC = () => {
     setTopics(loadedTopics);
     setTeam(loadedTeam);
     setIsLoading(false);
-  }, [isDemoTeamUser]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -158,16 +157,17 @@ export const TopicsPage: React.FC = () => {
 
       try {
         const remoteTopics = await topicsApi.getTopics();
-        loadedTopics = Array.isArray(remoteTopics) ? remoteTopics : INITIAL_MOCK_TOPICS;
+        loadedTopics = Array.isArray(remoteTopics) ? remoteTopics : [];
       } catch {
-        loadedTopics = INITIAL_MOCK_TOPICS;
+        loadedTopics = [];
+      setFetchError('Không thể tải đề tài. Vui lòng thử lại.');
       }
 
       try {
         const res = await teamsApi.getMyTeam();
-        loadedTeam = res || (isDemoTeamUser ? getStoredMockTeam() : null);
+        loadedTeam = res;
       } catch {
-        loadedTeam = isDemoTeamUser || import.meta.env.DEV ? getStoredMockTeam() : null;
+        loadedTeam = null;
       }
 
       if (loadedTeam && loadedTeam.topic_id && !loadedTeam.topic_name) {
@@ -188,7 +188,7 @@ export const TopicsPage: React.FC = () => {
     return () => {
       isMounted = false;
     };
-  }, [isDemoTeamUser]);
+  }, []);
 
   // Toggle subtopics accordion
   const toggleSubtopics = (topicId: string) => {
@@ -255,7 +255,6 @@ export const TopicsPage: React.FC = () => {
     let registeredSubtopicId = selectedSubtopicId || null;
 
     try {
-      try {
         const response = await topicsApi.selectTopic({
           topic_id: selectedTopicToRegister.id,
           subtopic_id: selectedSubtopicId || null,
@@ -263,18 +262,7 @@ export const TopicsPage: React.FC = () => {
         registeredTitle = response.topic_title;
         registeredTopicId = response.topic_id;
         registeredSubtopicId = response.subtopic_id || null;
-      } catch (err: unknown) {
-        const status =
-          typeof err === 'object' && err !== null && 'response' in err
-            ? (err as { response?: { status?: number } }).response?.status
-            : undefined;
-        const hasHttpResponse = Boolean(status);
-        const canFallbackDemo = isDemoTeamUser && (status === 404 || status === 403);
 
-        if ((hasHttpResponse && !canFallbackDemo) || (!import.meta.env.DEV && !canFallbackDemo)) {
-          throw err;
-        }
-      }
 
       showToast(`Đăng ký đề tài "${registeredTitle}" thành công!`, 'success');
 
@@ -288,7 +276,6 @@ export const TopicsPage: React.FC = () => {
               subtopic_id: registeredSubtopicId,
             }
           : prev;
-        saveStoredMockTeam(updated);
         return updated;
       });
 
@@ -310,6 +297,7 @@ export const TopicsPage: React.FC = () => {
       );
 
       setSelectedTopicToRegister(null);
+      void useMockStore.getState().syncFromBackend?.();
     } catch (err: unknown) {
       const errorMsg = extractApiErrorMessage(
         err,
@@ -338,22 +326,10 @@ export const TopicsPage: React.FC = () => {
     setCancelError(null);
 
     try {
-      try {
         await topicsApi.cancelTopic({
           team_id: team?.id || null,
         });
-      } catch (err: unknown) {
-        const status =
-          typeof err === 'object' && err !== null && 'response' in err
-            ? (err as { response?: { status?: number } }).response?.status
-            : undefined;
-        const hasHttpResponse = Boolean(status);
-        const canFallbackDemo = isDemoTeamUser && (status === 404 || status === 403);
 
-        if ((hasHttpResponse && !canFallbackDemo) || (!import.meta.env.DEV && !canFallbackDemo)) {
-          throw err;
-        }
-      }
 
       showToast(`Đã hủy đăng ký đề tài "${topicToCancel.title}" thành công.`, 'success');
 
@@ -367,7 +343,6 @@ export const TopicsPage: React.FC = () => {
               subtopic_id: null,
             }
           : prev;
-        saveStoredMockTeam(updated);
         return updated;
       });
 
@@ -389,6 +364,7 @@ export const TopicsPage: React.FC = () => {
       );
 
       setTopicToCancel(null);
+      void useMockStore.getState().syncFromBackend?.();
     } catch (err: unknown) {
       const errorMsg = extractApiErrorMessage(
         err,
@@ -516,16 +492,18 @@ export const TopicsPage: React.FC = () => {
             <Users size={20} className="text-amber-700 dark:text-amber-400 shrink-0" />
             <div className="text-xs sm:text-sm">
               <p className="font-semibold text-amber-700 dark:text-amber-400">
-                Đội thi chưa đủ điều kiện tối thiểu ({memberCount}/3 thành viên)
+                {memberCount < minTeamSize
+                  ? `Đội thi chưa đủ số lượng thành viên tối thiểu (${memberCount}/${minTeamSize} thành viên — Tối đa ${maxTeamSize})`
+                  : `Đội thi vượt quá số lượng thành viên tối đa (${memberCount}/${maxTeamSize} thành viên)`}
               </p>
               <p className="text-amber-700 dark:text-amber-400 mt-0.5">
-                Theo quy định của cuộc thi, đội thi cần tối thiểu 3 thành viên để Đội trưởng có thể đăng ký đề tài.
+                Theo quy định của BTC, đội thi phải có tối thiểu {minTeamSize} thành viên và tối đa {maxTeamSize} thành viên thì Đội trưởng mới được phép đăng ký đề tài.
               </p>
             </div>
           </div>
           <Link to="/teams">
             <Button variant="secondary" size="sm" className="whitespace-nowrap">
-              <span>Mời thêm thành viên</span>
+              <span>Quản lý thành viên</span>
               <ArrowRight size={13} />
             </Button>
           </Link>
@@ -838,9 +816,13 @@ export const TopicsPage: React.FC = () => {
                       size="sm"
                       disabled
                       className="w-full py-2 opacity-50 cursor-not-allowed text-xs"
-                      title="Đội thi cần tối thiểu 3 thành viên"
+                      title={`Đội thi cần từ ${minTeamSize} đến ${maxTeamSize} thành viên để chọn đề tài`}
                     >
-                      <span>Cần tối thiểu 3 thành viên</span>
+                      <span>
+                        {memberCount < minTeamSize
+                          ? `Cần tối thiểu ${minTeamSize} thành viên (${memberCount}/${minTeamSize})`
+                          : `Tối đa ${maxTeamSize} thành viên (${memberCount}/${maxTeamSize})`}
+                      </span>
                     </Button>
                   ) : !isLeader ? (
                     <Button

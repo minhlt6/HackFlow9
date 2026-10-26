@@ -128,7 +128,7 @@ const saveProfileFormToStorage = (
 export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, updateUser, login } = useAuthStore();
+  const { user, updateUser } = useAuthStore();
   const updateMockUserProfile = useMockStore((state) => state.updateCurrentUserProfile);
 
   const activeUser = user || {
@@ -216,7 +216,7 @@ export const OnboardingPage: React.FC = () => {
       }
 
       if (!user) {
-        login(activeUser, 'mock-dev-token-2026');
+        navigate('/login', { replace: true });
       } else {
         const savedLocal = loadSavedProfileForm(user);
         setStatus(user.approvalStatus || 'pending');
@@ -361,30 +361,7 @@ export const OnboardingPage: React.FC = () => {
         ? error.response?.data?.message
         : null;
 
-      // Nếu có lỗi 4xx tường minh từ server thì hiển thị, ngược lại (offline/mock/network) vẫn lưu thành công trên local
-      if (apiErrorMsg && axios.isAxiosError(error) && error.response && error.response.status < 500 && error.response.status !== 401) {
-        setErrorMessage(apiErrorMsg);
-      } else {
-        const currentStatus = (user?.approvalStatus || status || 'approved') as ApprovalStatus;
-        const currentRole = (user?.role || 'candidate') as UserRole;
-        setStatus(currentStatus);
-        updateUser({
-          fullName: cleanedForm.fullName,
-          studentId: cleanedForm.studentId,
-          university: cleanedForm.university,
-          school: cleanedForm.university,
-          phone: cleanedForm.phone,
-          skills: cleanedForm.skills,
-          approvalStatus: currentStatus,
-          role: currentRole,
-        });
-        if (currentStatus === 'approved' && location.pathname === '/onboarding') {
-          setSuccessMessage('Hồ sơ đã được duyệt thành công! Đang chuyển hướng đến không gian thi đấu...');
-          window.setTimeout(() => navigate(rolePaths[currentRole], { replace: true }), 900);
-        } else {
-          setSuccessMessage('Đã lưu và đồng bộ thông tin hồ sơ cá nhân & kỹ năng chuyên môn thành công!');
-        }
-      }
+      setErrorMessage(apiErrorMsg || 'Không thể lưu hồ sơ. Vui lòng kiểm tra kết nối và thử lại.');
     } finally {
       setLoading(false);
     }

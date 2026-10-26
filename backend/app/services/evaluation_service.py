@@ -2,6 +2,8 @@ from datetime import datetime, timezone
 import hashlib
 from typing import Any, Dict, List, Optional, Tuple
 from fastapi import status
+from sqlalchemy import select
+from app.models.config import HackathonConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -224,6 +226,8 @@ class EvaluationService:
         """
         self._ensure_judge_or_admin(current_user)
 
+        config = (await self.db.execute(select(HackathonConfig).order_by(HackathonConfig.created_at.asc()))).scalars().first()
+        blind = (config.settings_data or {}).get("blindJudgingEnabled", True) if config else True
         submissions = await self.repo.list_final_checkpoint_submissions()
         has_assignments = await self.repo.has_any_judge_assignments()
 
@@ -314,6 +318,9 @@ class EvaluationService:
                 }
             )
 
+        if not blind:
+            for item, sub in zip(items, submissions):
+                item["team_name"] = sub.team.team_name if sub.team else item["anonymous_team_code"]
         return {"submissions": items}
 
     async def get_blind_submission_detail(
@@ -384,7 +391,7 @@ class EvaluationService:
             )
 
         submission = await self.repo.get_submission_by_id_or_team(payload.submission_id)
-        if submission is None and payload.team_id:
+        if settings.demo_enabled and submission is None and payload.team_id:
             submission = await self.repo.ensure_final_submission_for_team(
                 payload.team_id, str(current_user.id)
             )

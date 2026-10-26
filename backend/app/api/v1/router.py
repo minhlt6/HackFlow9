@@ -26,6 +26,7 @@ api_router.include_router(example.router)
 # Sprint 1 modules
 api_router.include_router(auth.router, prefix="/auth", tags=["Auth (HF-19)"])
 api_router.include_router(auth.users_router, prefix="/users", tags=["Auth (HF-19)"])
+api_router.include_router(admin.public_router)
 api_router.include_router(admin.router, prefix="", tags=["Admin"])
 api_router.include_router(teams.router, prefix="/teams", tags=["Teams (HF-20)"])
 api_router.include_router(topics.router, prefix="/topics", tags=["Topics (HF-21)"])

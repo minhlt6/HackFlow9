@@ -28,6 +28,7 @@ class AnnouncementRepository:
         *,
         skip: int = 0,
         limit: int = 10,
+        role: Optional[str] = None,
     ) -> List[Announcement]:
         """Fetch a page of announcements ordered by created_at descending (newest first)."""
         stmt = (
@@ -36,13 +37,17 @@ class AnnouncementRepository:
             .offset(skip)
             .limit(limit)
         )
+        if role != "admin":
+            stmt = stmt.where(Announcement.target_audience.in_(["all", role or "anonymous"]))
         result = await db.execute(stmt)
         return list(result.scalars().all())
 
     @staticmethod
-    async def count(db: AsyncSession) -> int:
+    async def count(db: AsyncSession, role: Optional[str] = None) -> int:
         """Count total number of announcements."""
         stmt = select(func.count()).select_from(Announcement)
+        if role != "admin":
+            stmt = stmt.where(Announcement.target_audience.in_(["all", role or "anonymous"]))
         result = await db.execute(stmt)
         return result.scalar() or 0
 
@@ -53,12 +58,14 @@ class AnnouncementRepository:
         title: str,
         content: str,
         priority: str,
+        target_audience: str = "all",
     ) -> Announcement:
         """Insert a new announcement into the database."""
         announcement = Announcement(
             title=title.strip(),
             content=content.strip(),
             priority=priority,
+            target_audience=target_audience,
         )
         db.add(announcement)
         await db.commit()

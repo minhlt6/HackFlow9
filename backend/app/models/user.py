@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import Boolean, String, Text
+from sqlalchemy import Boolean, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -30,6 +30,8 @@ class User(BaseModel):
     """
     __tablename__ = "users"
 
+    notification_state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
+    profile_meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     hashed_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)

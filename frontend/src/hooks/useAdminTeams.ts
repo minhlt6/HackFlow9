@@ -3,8 +3,9 @@ import { z } from 'zod';
 import {
   adminTeamsApi,
   type AdminTeamUpsertPayload,
+  type CandidateDirectoryEntry,
+  type EnrichedAdminTeam,
 } from '../api/adminTeamsApi';
-import type { EnrichedAdminTeam } from '../mocks/adminTeamsMockData';
 import { useMockStore } from '../store/useMockStore';
 import { toast } from '../store/useToastStore';
 
@@ -28,24 +29,30 @@ export const adminTeamFormSchema = z.object({
       /^[A-Za-z0-9-]{4,12}$/,
       'Mã mời phải bao gồm 4–12 ký tự chữ cái hoặc chữ số (VD: HF2026).',
     ),
-  leaderName: z
-    .string()
-    .trim()
-    .min(2, 'Vui lòng nhập họ và tên đội trưởng (tối thiểu 2 ký tự).')
-    .max(60, 'Họ tên đội trưởng tối đa 60 ký tự.'),
   leaderEmail: z
     .string()
     .trim()
-    .min(1, 'Vui lòng nhập địa chỉ email của đội trưởng.')
+    .min(1, 'Vui lòng chọn hoặc nhập địa chỉ email của đội trưởng.')
     .refine(
       (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
-      'Địa chỉ email không đúng định dạng hợp lệ (VD: leader@university.edu.vn).',
+      'Địa chỉ email đội trưởng không đúng định dạng hợp lệ.',
     ),
-  university: z
-    .string()
-    .trim()
-    .min(2, 'Vui lòng nhập tên trường đại học hoặc đơn vị.')
-    .max(100, 'Tên đơn vị tối đa 100 ký tự.'),
+  leaderName: z.string().trim().optional(),
+  university: z.string().trim().optional(),
+  memberEmails: z
+    .array(
+      z
+        .string()
+        .trim()
+        .refine(
+          (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+          'Địa chỉ email thành viên không hợp lệ.',
+        ),
+    )
+    .max(
+      4,
+      'Theo quy chế Hackathon, tối đa 4 thành viên cùng Đội trưởng (= 5 người/đội).',
+    ),
   majorTopicId: z
     .string()
     .trim()
@@ -57,14 +64,17 @@ export const adminTeamFormSchema = z.object({
   memberCount: z
     .number()
     .int('Số lượng thành viên phải là số nguyên.')
-    .min(3, 'Theo quy chế Hackathon, mỗi đội phải có tối thiểu 3 thành viên.')
+    .min(3, 'Đội thi cần tối thiểu 3 thành viên (1 Đội trưởng + 2 Thành viên).')
     .max(5, 'Theo quy chế Hackathon, mỗi đội không được vượt quá 5 thành viên.'),
   repoUrl: z
     .string()
     .trim()
     .optional()
     .refine(
-      (val) => !val || val.startsWith('https://github.com/') || val.startsWith('http://github.com/'),
+      (val) =>
+        !val ||
+        val.startsWith('https://github.com/') ||
+        val.startsWith('http://github.com/'),
       'Đường dẫn kho mã nguồn phải bắt đầu bằng https://github.com/',
     ),
   description: z
@@ -78,7 +88,6 @@ export type AdminTeamFormValues = z.infer<typeof adminTeamFormSchema>;
 
 export function useAdminTeams() {
   const {
-    teams: storeTeams,
     majorTopics,
     approveTeamRegistration,
     rejectTeamRegistration,
@@ -86,8 +95,12 @@ export function useAdminTeams() {
   } = useMockStore();
 
   const [teams, setTeams] = useState<EnrichedAdminTeam[]>([]);
+  const [candidatesDirectory, setCandidatesDirectory] = useState<
+    CandidateDirectoryEntry[]
+  >([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isMutating, setIsMutating] = useState<boolean>(false);
+  const [isAutoMatching, setIsAutoMatching] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<AdminTeamsViewMode>('normal');
 
@@ -97,12 +110,25 @@ export function useAdminTeams() {
   const [trackFilter, setTrackFilter] = useState<string>('all');
   const [complianceFilter, setComplianceFilter] = useState<string>('all');
 
+  const refreshCandidateDirectory = useCallback(async () => {
+    try {
+      const directory = await adminTeamsApi.getCandidateDirectory();
+      setCandidatesDirectory(directory);
+    } catch {
+      // Non-blocking fallback
+    }
+  }, []);
+
   const loadTeams = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await adminTeamsApi.getAllTeams(storeTeams);
+      const [result, directory] = await Promise.all([
+        adminTeamsApi.getAllTeams(),
+        adminTeamsApi.getCandidateDirectory().catch(() => []),
+      ]);
       setTeams(result);
+      setCandidatesDirectory(directory);
     } catch (err) {
       const msg =
         err instanceof Error
@@ -112,15 +138,18 @@ export function useAdminTeams() {
     } finally {
       setIsLoading(false);
     }
-  }, [storeTeams]);
+  }, []);
 
   useEffect(() => {
     let active = true;
-    adminTeamsApi
-      .getAllTeams(storeTeams)
-      .then((result) => {
+    Promise.all([
+      adminTeamsApi.getAllTeams(),
+      adminTeamsApi.getCandidateDirectory().catch(() => []),
+    ])
+      .then(([result, directory]) => {
         if (active) {
           setTeams(result);
+          setCandidatesDirectory(directory);
           setError(null);
         }
       })
@@ -141,7 +170,15 @@ export function useAdminTeams() {
     return () => {
       active = false;
     };
-  }, [storeTeams]);
+  }, []);
+
+  const unassignedCandidates = useMemo(
+    () =>
+      candidatesDirectory.filter(
+        (c) => !c.hasTeam && c.approval_status === 'approved',
+      ),
+    [candidatesDirectory],
+  );
 
   const getSubTopicMeta = useCallback(
     (subTopicId?: string) => {
@@ -163,7 +200,11 @@ export function useAdminTeams() {
         }
         if (major.id === subTopicId) {
           return {
-            subTopicTitle: major.subTopics[0]?.title || major.title || major.name || 'Đề tài chính',
+            subTopicTitle:
+              major.subTopics[0]?.title ||
+              major.title ||
+              major.name ||
+              'Đề tài chính',
             majorTopicTitle: major.title || major.name || 'Lĩnh vực chuyên môn',
             majorTopicId: major.id,
           };
@@ -233,8 +274,9 @@ export function useAdminTeams() {
       pendingCount,
       rejectedOrFlaggedCount,
       totalParticipants,
+      unassignedCount: unassignedCandidates.length,
     };
-  }, [teams]);
+  }, [teams, unassignedCandidates.length]);
 
   // Actions
   const handleCreateTeam = async (
@@ -245,12 +287,16 @@ export function useAdminTeams() {
       const payload: AdminTeamUpsertPayload = {
         ...values,
         inviteCode: values.inviteCode.toUpperCase(),
+        memberCount: Math.max(Number(values.memberCount) || 3, 1 + values.memberEmails.length),
+        memberEmails: values.memberEmails,
+        member_emails: values.memberEmails,
       };
       const created = await adminTeamsApi.createTeam(payload);
       setTeams((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
+      await refreshCandidateDirectory();
       void syncFromBackend?.();
       toast.success(
-        `Đã khởi tạo đội thi "${created.name}"`,
+        `Đã khởi tạo đội thi "${created.name}" (${created.memberCount} thành viên)`,
         `Mã mời: ${created.inviteCode} • Đội trưởng: ${created.leaderName}`,
       );
       return true;
@@ -273,13 +319,17 @@ export function useAdminTeams() {
       const payload: AdminTeamUpsertPayload = {
         ...values,
         inviteCode: values.inviteCode.toUpperCase(),
+        memberCount: Math.max(Number(values.memberCount) || 3, 1 + values.memberEmails.length),
+        memberEmails: values.memberEmails,
+        member_emails: values.memberEmails,
       };
       const updated = await adminTeamsApi.updateTeam(teamId, payload);
       setTeams((prev) => prev.map((t) => (t.id === teamId ? updated : t)));
+      await refreshCandidateDirectory();
       void syncFromBackend?.();
       toast.success(
         `Đã cập nhật hồ sơ đội "${updated.name}"`,
-        'Thông tin đội trưởng, quy mô thành viên và đề tài đã được lưu.',
+        `Quy mô hiện tại: ${updated.memberCount}/5 thành viên • Đề tài đã lưu.`,
       );
       return true;
     } catch (err) {
@@ -288,6 +338,31 @@ export function useAdminTeams() {
       toast.error('Cập nhật thất bại', msg);
       return false;
     } finally {
+      setIsMutating(false);
+    }
+  };
+
+  const handleAutoMatchTeams = async (): Promise<void> => {
+    setIsAutoMatching(true);
+    setIsMutating(true);
+    try {
+      const { message } = await adminTeamsApi.autoMatchTeams({
+        target_team_size: 4,
+        fill_incomplete_teams: true,
+        auto_assign_topics: true,
+        auto_approve: true,
+      });
+      await loadTeams();
+      void syncFromBackend?.();
+      toast.success('Ghép đội ngẫu nhiên thành công!', message);
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Không thể ghép đội ngẫu nhiên cho thí sinh lẻ.';
+      toast.error('Không thể ghép đội ngẫu nhiên', msg);
+    } finally {
+      setIsAutoMatching(false);
       setIsMutating(false);
     }
   };
@@ -364,10 +439,11 @@ export function useAdminTeams() {
     try {
       await adminTeamsApi.deleteTeam(team.id);
       setTeams((prev) => prev.filter((t) => t.id !== team.id));
+      await refreshCandidateDirectory();
       void syncFromBackend?.();
       toast.info(
         `Đã xóa đội thi "${team.name}"`,
-        'Bản ghi đăng ký đã được gỡ khỏi danh sách cuộc thi.',
+        'Bản ghi đăng ký đã được gỡ khỏi danh sách cuộc thi và giải phóng các thành viên.',
       );
       return true;
     } catch (err) {
@@ -382,8 +458,7 @@ export function useAdminTeams() {
   const handleResetDemoDataset = async () => {
     setIsLoading(true);
     try {
-      const fresh = await adminTeamsApi.resetMockTeams();
-      setTeams(fresh);
+      await loadTeams();
       setViewMode('normal');
       setSearchQuery('');
       setStatusFilter('all');
@@ -391,8 +466,8 @@ export function useAdminTeams() {
       setComplianceFilter('all');
       void syncFromBackend?.();
       toast.info(
-        `Đã đồng bộ lại dữ liệu (${fresh.length} đội thi)`,
-        'Danh sách đội thi đã được tải mới từ máy chủ.',
+        `Đã đồng bộ lại dữ liệu từ CSDL`,
+        'Danh sách đội thi và thí sinh đã được tải mới từ máy chủ.',
       );
     } finally {
       setIsLoading(false);
@@ -453,10 +528,13 @@ export function useAdminTeams() {
   return {
     teams,
     filteredTeams,
+    candidatesDirectory,
+    unassignedCandidates,
     majorTopics,
     metrics,
     isLoading: isLoading || viewMode === 'loading',
     isMutating,
+    isAutoMatching,
     error:
       viewMode === 'error'
         ? 'Không thể kết nối tới dịch vụ quản lý đội thi (HTTP 500 Internal Server Error — PostgreSQL Connection Pool Timeout).'
@@ -475,6 +553,7 @@ export function useAdminTeams() {
     loadTeams,
     handleCreateTeam,
     handleUpdateTeam,
+    handleAutoMatchTeams,
     handleApproveTeam,
     handleBulkApprove,
     handleRejectTeam,

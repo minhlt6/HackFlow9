@@ -78,11 +78,11 @@ class AuthService:
         clean_email = LOGIN_EMAIL_ALIASES.get(raw_email, raw_email)
         effective_password = (
             "123456"
-            if clean_email in DEFAULT_DEMO_ACCOUNTS and password in DEMO_PASSWORD_ALIASES
+            if settings.demo_enabled and clean_email in DEFAULT_DEMO_ACCOUNTS and password in DEMO_PASSWORD_ALIASES
             else password
         )
         user = await user_repo.get_by_email(db, clean_email)
-        if not user and clean_email in DEFAULT_DEMO_ACCOUNTS and effective_password == "123456":
+        if settings.demo_enabled and not user and clean_email in DEFAULT_DEMO_ACCOUNTS and effective_password == "123456":
             full_name, role_val, gh_user = DEFAULT_DEMO_ACCOUNTS[clean_email]
             user = User(
                 email=clean_email,
@@ -175,7 +175,7 @@ class AuthService:
         avatar_url: Optional[str] = None
         github_username: Optional[str] = None
 
-        is_test_mock_code = code.startswith(("unknown_code_", "whitelist_code_", "dev_mock_"))
+        is_test_mock_code = settings.demo_enabled and code.startswith(("unknown_code_", "whitelist_code_", "dev_mock_"))
         if settings.GITHUB_CLIENT_ID and settings.GITHUB_CLIENT_SECRET and not is_test_mock_code:
             target_redirect_uri = (redirect_uri or "").strip() or settings.GITHUB_REDIRECT_URI
 
@@ -222,6 +222,8 @@ class AuthService:
                     primary_email = next((e["email"] for e in emails_data if e.get("primary")), None)
                     email = primary_email or email or (emails_data[0]["email"] if emails_data else None)
         else:
+            if not settings.demo_enabled:
+                raise BadRequestException(message="GitHub OAuth chưa được cấu hình.")
             # Development fallback / mock when credentials are placeholders
             github_id = f"dev-gh-{code}"
             github_username = f"github_user_{code}"

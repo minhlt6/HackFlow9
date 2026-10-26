@@ -1,15 +1,10 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Menu,
   EyeOff,
   Sun,
   Moon,
-  UserCog,
-  ShieldCheck,
-  Scale,
-  GraduationCap,
-  User,
 } from 'lucide-react';
 import {
   Breadcrumb,
@@ -19,21 +14,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '../ui/breadcrumb';
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from '../ui/dropdown-menu';
 import { NotificationBell } from '../NotificationBell';
 import { useThemeStore } from '../../store/useThemeStore';
 import { useAuthStore } from '../../store/useAuthStore';
-import { useMockStore } from '../../store/useMockStore';
-import { mockUsers } from '../../mock/mockData';
-import apiClient from '../../api/axiosClient';
-import type { Announcement, User as AppUser } from '../../types';
+import type { Announcement } from '../../types';
 
 const SEGMENT_LABELS: Record<string, string> = {
   admin: 'Quản trị',
@@ -80,10 +64,8 @@ export const TopNav: React.FC<TopNavProps> = ({
   onOpenMobileMenu,
 }) => {
   const { theme, toggleTheme } = useThemeStore();
-  const { user, login } = useAuthStore();
-  const { switchPersona } = useMockStore();
+  const { user } = useAuthStore();
   const location = useLocation();
-  const navigate = useNavigate();
 
   const displayInitial = displayName.charAt(0).toUpperCase();
 
@@ -94,61 +76,6 @@ export const TopNav: React.FC<TopNavProps> = ({
     const label = SEGMENT_LABELS[seg] || seg;
     return { label, href };
   });
-
-  const handleQuickRoleSwitch = async (
-    personaKey: 'admin' | 'leader' | 'member' | 'judge' | 'mentor',
-    targetPath: string,
-  ) => {
-    const targetUser = mockUsers[personaKey];
-    if (!targetUser) return;
-    switchPersona(personaKey);
-    try {
-      const res = await apiClient.post('/auth/login', {
-        email: targetUser.email,
-        password: '123456',
-      });
-      const payload = res.data?.data;
-      if (payload?.access_token && payload?.user) {
-        const authenticatedUser: AppUser = {
-          ...targetUser,
-          id: String(payload.user.id),
-          email: payload.user.email || targetUser.email,
-          fullName: payload.user.full_name || targetUser.fullName,
-          role: payload.user.role || targetUser.role,
-          approvalStatus: payload.user.approval_status || targetUser.approvalStatus,
-          githubUsername: payload.user.github_username || targetUser.githubUsername,
-          studentId: payload.user.student_id || targetUser.studentId,
-          university: payload.user.school || targetUser.university,
-          school: payload.user.school || targetUser.school,
-          phone: payload.user.phone || targetUser.phone,
-          skills: Array.isArray(payload.user.skills) ? payload.user.skills : targetUser.skills,
-          bio: payload.user.bio || targetUser.bio,
-        };
-        login(authenticatedUser, payload.access_token);
-        useMockStore.getState().updateCurrentUserProfile(
-          {
-            id: authenticatedUser.id,
-            email: authenticatedUser.email,
-            fullName: authenticatedUser.fullName,
-            studentId: authenticatedUser.studentId,
-            university: authenticatedUser.university,
-            school: authenticatedUser.school,
-            phone: authenticatedUser.phone,
-            skills: authenticatedUser.skills,
-            bio: authenticatedUser.bio,
-          },
-          true,
-        );
-        useMockStore.getState().syncFromBackend?.();
-        navigate(targetPath);
-        return;
-      }
-    } catch {
-      // Fallback to dev persona token if offline
-    }
-    login(targetUser, `mock-jwt-token-${personaKey}`);
-    navigate(targetPath);
-  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-card/95 backdrop-blur-xs px-4 sm:px-6">
@@ -224,69 +151,6 @@ export const TopNav: React.FC<TopNavProps> = ({
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>Live Sync</span>
         </div>
-
-        {/* Role Persona Switcher */}
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            className="h-8 gap-1.5 rounded-md border border-border bg-secondary px-2.5 text-xs font-medium text-secondary-foreground hover:bg-accent"
-            title="Chuyển nhanh vai trò kiểm thử"
-          >
-            <UserCog size={14} className="text-primary" />
-            <span className="hidden sm:inline">Vai trò:</span>
-            <span className="font-semibold uppercase font-mono text-[11px]">
-              {user?.role || 'admin'}
-            </span>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Chuyển cổng vai trò (Demo)</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={() => handleQuickRoleSwitch('admin', '/admin/teams')}
-            >
-              <ShieldCheck size={14} className="text-primary" />
-              <div className="flex flex-col">
-                <span>Quản trị viên (Admin)</span>
-                <span className="text-[10px] text-muted-foreground">Toàn quyền quản trị hệ thống</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleQuickRoleSwitch('judge', '/judge/dashboard')}
-            >
-              <Scale size={14} className="text-amber-500" />
-              <div className="flex flex-col">
-                <span>Giám khảo (Judge)</span>
-                <span className="text-[10px] text-muted-foreground">Hội đồng chấm thi độc lập</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleQuickRoleSwitch('mentor', '/mentor/dashboard')}
-            >
-              <GraduationCap size={14} className="text-purple-500" />
-              <div className="flex flex-col">
-                <span>Cố vấn (Mentor)</span>
-                <span className="text-[10px] text-muted-foreground">Hỗ trợ kỹ thuật & Helpdesk</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleQuickRoleSwitch('leader', '/dashboard')}
-            >
-              <User size={14} className="text-emerald-500" />
-              <div className="flex flex-col">
-                <span>Thí sinh (Team Leader)</span>
-                <span className="text-[10px] text-muted-foreground">leader@cybersamurai.team</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleQuickRoleSwitch('member', '/dashboard')}
-            >
-              <User size={14} className="text-sky-500" />
-              <div className="flex flex-col">
-                <span>Thí sinh (Thành viên)</span>
-                <span className="text-[10px] text-muted-foreground">member@cybersamurai.team</span>
-              </div>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
 
         {/* Theme Toggle (Light mode default / Dark mode supported) */}
         <button

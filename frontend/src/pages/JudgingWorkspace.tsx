@@ -170,6 +170,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
         onAlert('Lỗi [403 FORBIDDEN_NOT_ASSIGNED_JUDGE]: Giám khảo không được phân công chấm bài này!');
         return;
       }
+      onAlert('Không thể lưu điểm. Vui lòng thử lại.');
+      return;
     }
 
     // Persist in local store
@@ -247,6 +249,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
         setIsConfirmModalOpen(false);
         return;
       }
+      onAlert('Không thể lưu điểm. Vui lòng thử lại.');
+      return;
     }
 
     saveEvaluation(
@@ -279,7 +283,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
         judge_id: existingEval?.judgeId || currentUser.id,
       });
     } catch {
-      // Fallback to local unlock if offline
+      onAlert('Không thể mở khóa phiếu chấm. Vui lòng thử lại.');
+      return;
     }
     saveEvaluation(
       team.id,
@@ -581,7 +586,7 @@ export const JudgingWorkspace: React.FC = () => {
       if (existing) {
         judgingStatus = existing.isDraft ? 'draft' : 'locked';
       }
-      const anonCode = `Team #${(team.id.replace(/\D/g, '') || (idx + 1).toString()).padStart(4, '0')}`;
+      const anonCode = user?.role === 'judge' ? team.name : `Team #${idx + 1}`;
       return {
         ...team,
         judgingStatus,
@@ -589,7 +594,7 @@ export const JudgingWorkspace: React.FC = () => {
         evalItem: existing,
       };
     });
-  }, [teams, evaluations, currentUser.id]);
+  }, [teams, evaluations, currentUser.id, user?.role]);
 
   // Filtered teams list based on active status filter
   const filteredTeams = useMemo(() => {
@@ -602,11 +607,10 @@ export const JudgingWorkspace: React.FC = () => {
   });
   const [leftTab, setLeftTab] = useState<'code' | 'video' | 'slides' | 'checkpoints'>('code');
 
-  // Derive active team cleanly without useEffect setState cascading renders
+  // Derive active team strictly from filteredTeams so empty filters never fall back to a locked team (BUG-11)
   const activeTeamId =
     filteredTeams.find((t) => t.id === selectedTeamId)?.id ||
     filteredTeams[0]?.id ||
-    teams[0]?.id ||
     '';
 
   const selectTeam = (id: string) => {
@@ -614,15 +618,12 @@ export const JudgingWorkspace: React.FC = () => {
     setSearchParams({ teamId: id });
   };
 
-  const selectedTeam =
-    filteredTeams.find((t) => t.id === activeTeamId) ||
-    teams.find((t) => t.id === activeTeamId) ||
-    teams[0];
+  const selectedTeam = filteredTeams.find((t) => t.id === activeTeamId);
 
   const teamSubTopic = majorTopics
     ?.flatMap((m) => m.subTopics || [])
     ?.find((s) => s.id === selectedTeam?.subTopicId);
-  const teamTopicTitle = (teamSubTopic?.title || 'Chưa cập nhật đề tài').replace(/\s*&\s*/g, ' và ');
+  const teamTopicTitle = (teamSubTopic?.title || selectedTeam?.description || 'Chưa cập nhật đề tài').replace(/\s*&\s*/g, ' và ');
 
   const finalSub = finalSubmissions.find((f) => f.teamId === selectedTeam?.id);
   const teamCheckpoints = submissions.filter((s) => s.teamId === selectedTeam?.id);
@@ -646,7 +647,7 @@ export const JudgingWorkspace: React.FC = () => {
   const currentTeamData = teamsWithStatus.find((t) => t.id === selectedTeam?.id);
   const displayName = config.blindJudgingMode
     ? currentTeamData?.anonCode || `Team #${(currentTeamIndex + 1).toString().padStart(4, '0')}`
-    : selectedTeam?.name;
+    : selectedTeam?.name || '';
 
   const commitSha = finalSub?.commitSha || 'c8d4e2f89a1b2c3d';
 
@@ -783,11 +784,30 @@ export const JudgingWorkspace: React.FC = () => {
       {/* Main Split-screen 50/50 Body */}
       {!selectedTeam ? (
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <div className="max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm space-y-2">
-            <h3 className="text-base font-semibold text-foreground">Chưa có đội thi hoặc bài nộp nào</h3>
+          <div className="max-w-md rounded-2xl border border-border bg-card p-8 shadow-sm space-y-3">
+            <h3 className="text-base font-semibold text-foreground">
+              {teams.length > 0 && statusFilter !== 'all'
+                ? 'Không có bài thi nào trong bộ lọc này'
+                : 'Chưa có đội thi hoặc bài nộp nào'}
+            </h3>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Hệ thống hiện chưa có đội thi nào đăng ký hoặc nộp sản phẩm để chấm điểm. Vui lòng quay lại sau khi các đội thi hoàn tất nộp bài.
+              {teams.length > 0 && statusFilter !== 'all'
+                ? `Hiện không có đội thi nào thuộc trạng thái "${
+                    statusFilter === 'unscored'
+                      ? 'Chưa chấm'
+                      : statusFilter === 'draft'
+                      ? 'Bản nháp'
+                      : 'Đã khóa điểm'
+                  }".`
+                : 'Hệ thống hiện chưa có đội thi nào đăng ký hoặc nộp sản phẩm để chấm điểm. Vui lòng quay lại sau khi các đội thi hoàn tất nộp bài.'}
             </p>
+            {teams.length > 0 && statusFilter !== 'all' && (
+              <div className="pt-1">
+                <Button variant="secondary" size="sm" onClick={() => setStatusFilter('all')}>
+                  Xem tất cả đội thi ({teams.length})
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : (

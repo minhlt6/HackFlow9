@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Float, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -26,6 +26,8 @@ class Checkpoint(BaseModel):
     """
     __tablename__ = "checkpoints"
 
+    weight: Mapped[float] = mapped_column(Float, nullable=False, default=0, server_default="0")
+    display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     title: Mapped[str] = mapped_column(String(128), index=True, nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

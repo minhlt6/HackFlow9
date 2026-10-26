@@ -3,7 +3,7 @@ from httpx import AsyncClient
 
 
 @pytest.mark.asyncio
-async def test_full_fe_be_integration_flows(client: AsyncClient):
+async def test_full_fe_be_integration_flows(client: AsyncClient, monkeypatch):
     """
     End-to-end verification of all Frontend <-> Backend synchronized APIs:
     - Dev persona token fallback & auto-provisioning
@@ -127,6 +127,18 @@ async def test_full_fe_be_integration_flows(client: AsyncClient):
     assert res_sel.status_code == 200
     assert res_sel.json()["data"]["subtopic_id"] == subtopic_id
 
+    # Final submission requires an explicitly configured final checkpoint and verified GitHub SHA.
+    from datetime import datetime, timedelta, timezone
+    from unittest.mock import AsyncMock
+    from app.services.github_service import github_service
+    from tests.test_submissions import make_mock_verify_response
+    now = datetime.now(timezone.utc)
+    final_cp = await client.post("/api/v1/checkpoints", headers=admin_headers, json={
+        "title": "Final MVP", "start_time": (now-timedelta(hours=1)).isoformat(),
+        "deadline": (now+timedelta(hours=1)).isoformat(), "is_final_checkpoint": True,
+    })
+    assert final_cp.status_code == 201
+    monkeypatch.setattr(github_service, "fetch_head_commit", AsyncMock(return_value=make_mock_verify_response()))
     # Final Submission
     res_final = await client.post(
         "/api/v1/submissions/final",

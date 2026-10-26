@@ -130,16 +130,12 @@ export const AdminCriteriaPage: React.FC = () => {
       }
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          setCriteriaList(useMockStore.getState().rubricCriteria);
-        } else {
-          const msg =
-            err.response.data?.message ||
-            (err.response.status === 403
-              ? 'Yêu cầu quyền Quản trị viên (Admin) để tải tiêu chí.'
-              : 'Không thể tải danh sách tiêu chí từ máy chủ.');
-          showAlert(msg, 'error');
-        }
+        const msg =
+          err.response?.data?.message ||
+          (err.response?.status === 403
+            ? 'Yêu cầu quyền Quản trị viên (Admin) để tải tiêu chí.'
+            : 'Không thể tải danh sách tiêu chí từ máy chủ.');
+        showAlert(msg, 'error');
       } else {
         setCriteriaList(useMockStore.getState().rubricCriteria);
       }
@@ -178,16 +174,12 @@ export const AdminCriteriaPage: React.FC = () => {
       .catch((err: unknown) => {
         if (ignore) return;
         if (axios.isAxiosError(err)) {
-          if (!err.response) {
-            setCriteriaList(useMockStore.getState().rubricCriteria);
-          } else {
-            const msg =
-              err.response.data?.message ||
-              (err.response.status === 403
-                ? 'Yêu cầu quyền Quản trị viên (Admin) để tải tiêu chí.'
-                : 'Không thể tải danh sách tiêu chí từ máy chủ.');
-            showAlert(msg, 'error');
-          }
+          const msg =
+            err.response?.data?.message ||
+            (err.response?.status === 403
+              ? 'Yêu cầu quyền Quản trị viên (Admin) để tải tiêu chí.'
+              : 'Không thể tải danh sách tiêu chí từ máy chủ.');
+          showAlert(msg, 'error');
         } else {
           setCriteriaList(useMockStore.getState().rubricCriteria);
         }
@@ -211,6 +203,7 @@ export const AdminCriteriaPage: React.FC = () => {
       const payload: RubricConfigurePayload = {
         name: 'HackFlow Final Rubric',
         criteria: newCriteria.map((c, idx) => ({
+          id: c.id,
           title: c.name.trim(),
           description: c.description.trim() || undefined,
           max_score: Number(c.maxScore) > 0 ? Number(c.maxScore) : 10,
@@ -246,17 +239,9 @@ export const AdminCriteriaPage: React.FC = () => {
       return true;
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          // Network disconnect fallback
-          setCriteriaList(newCriteria);
-          useMockStore.setState({ rubricCriteria: newCriteria });
-          showAlert('Mất kết nối máy chủ: Đã lưu tạm cấu hình tiêu chí vào bộ nhớ cục bộ.', 'info');
-          return true;
-        }
-
-        const status = err.response.status;
-        const errCode = err.response.data?.error_code;
-        const serverMsg = err.response.data?.message;
+        const status = err.response?.status;
+        const errCode = err.response?.data?.error_code;
+        const serverMsg = err.response?.data?.message;
 
         if (status === 409 || errCode === 'RUBRIC_LOCKED_BY_EVALUATIONS') {
           showAlert(

@@ -1,5 +1,4 @@
 import json
-import os
 from functools import lru_cache
 from typing import List, Optional, Union
 from pydantic import field_validator
@@ -16,6 +15,12 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
+    ENABLE_DEMO_DATA: bool = False
+
+    @property
+    def demo_enabled(self) -> bool:
+        return self.ENABLE_DEMO_DATA and self.ENVIRONMENT in {"development", "test"}
+
 
     # CORS Configuration
     CORS_ORIGINS: Union[List[str], str] = [
@@ -49,15 +54,10 @@ class Settings(BaseSettings):
         """
         Ensure the database URL uses the asyncpg driver for async SQLAlchemy.
         Converts 'postgresql://' or 'postgres://' to 'postgresql+asyncpg://'.
-        Automatically falls back to SQLite if an IPv6-only Supabase Direct host
-        (db.<ref>.supabase.co) is detected on an IPv4-only Railway container.
+        Keeps the configured database target; connection failures must remain visible.
         """
         url = (self.DATABASE_URL or "").strip()
         if not url or url == "sqlite":
-            return "sqlite+aiosqlite:///./hackflow.db"
-        if "@db." in url and ".supabase.co" in url and (
-            os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_SERVICE_ID")
-        ):
             return "sqlite+aiosqlite:///./hackflow.db"
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)

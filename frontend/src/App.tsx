@@ -11,7 +11,6 @@ import { CandidateCheckpointsPage } from './pages/candidate/candidateCheckpoints
 import { TopicsPage } from './pages/TopicsPage';
 import { CandidateFinalSubmissionPage } from './pages/candidate/CandidateFinalSubmissionPage';
 import { CandidateProfilePage } from './pages/candidate/CandidateProfilePage';
-import { UIPreviewPage } from './pages/UIPreviewPage';
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuthStore } from './store/useAuthStore';
@@ -148,51 +147,6 @@ const router = createBrowserRouter([
       { path: '/login', element: <LoginPage /> },
       { path: '/auth/callback', element: <AuthCallback /> },
       { path: '/rejected', element: <RejectedAccountPage /> },
-      {
-        path: '/preview-teams',
-        element: (
-          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-            <TeamsPage />
-          </div>
-        ),
-      },
-      {
-        path: '/preview-topics',
-        element: (
-          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-            <TopicsPage />
-          </div>
-        ),
-      },
-      {
-        path: '/preview-checkpoints',
-        element: (
-          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-            <CandidateCheckpointsPage />
-          </div>
-        ),
-      },
-      {
-        path: '/preview-ui',
-        element: <UIPreviewPage />,
-      },
-      {
-        path: '/preview-judging',
-        element: (
-          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-            <JudgingWorkspace />
-          </div>
-        ),
-      },
-      {
-        path: '/preview-tickets',
-        element: (
-          <div className="min-h-screen bg-background text-foreground p-4 sm:p-6 lg:p-8">
-            <SupportTickets />
-          </div>
-        ),
-      },
-
       {
         element: <MainLayout />,
         children: [

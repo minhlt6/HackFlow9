@@ -16,7 +16,7 @@ class CheckpointRepository:
         db: AsyncSession,
         only_active: bool = False,
     ) -> List[Checkpoint]:
-        stmt = select(Checkpoint).order_by(Checkpoint.start_time.asc())
+        stmt = select(Checkpoint).order_by(Checkpoint.display_order.asc(), Checkpoint.start_time.asc())
         if only_active:
             stmt = stmt.where(Checkpoint.is_active.is_(True))
         result = await db.execute(stmt)
@@ -46,9 +46,13 @@ class CheckpointRepository:
         is_final_checkpoint: bool = False,
         grace_period_seconds: int = 5,
         submission_fields: Optional[Any] = None,
+        weight: float = 0,
+        display_order: int = 0,
     ) -> Checkpoint:
         checkpoint = Checkpoint(
             title=title.strip(),
+            weight=weight,
+            display_order=display_order,
             start_time=start_time,
             deadline=deadline,
             description=description,

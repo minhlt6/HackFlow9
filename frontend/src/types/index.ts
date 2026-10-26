@@ -123,6 +123,7 @@ export interface CheckpointSubmission {
 }
 
 export interface Checkpoint {
+  isFinalCheckpoint?: boolean;
   id: string;
   title?: string;
   name?: string;
@@ -248,6 +249,7 @@ export interface HackathonConfig {
   name: string;
   currentPhase: string;
   finalSubmissionDeadline: string;
+  minTeamMembers?: number;
   maxTeamMembers: number;
   blindJudgingMode?: boolean;
   blindJudging?: boolean;

@@ -31,57 +31,6 @@ interface MentorRosterItem {
   avatar: string;
 }
 
-const PERSONNEL_STORAGE_KEY = 'hackflow_admin_personnel_v1';
-
-const DEFAULT_JUDGES: JudgeRosterItem[] = [
-  {
-    id: 'judge-1',
-    name: 'TS. Nguyễn Hoàng Giám Khảo',
-    email: 'judge.tech@hackathon.org',
-    specialization: 'AI Architecture & System Evaluation',
-    assignedCount: 0,
-    avatar: 'N',
-  },
-];
-
-const DEFAULT_MENTORS: MentorRosterItem[] = [
-  {
-    id: 'mentor-1',
-    name: 'ThS. Phạm Cố Vấn AI',
-    email: 'mentor.ai@ailab.org.vn',
-    topic: 'AI, Cloud & System Architecture',
-    openTickets: 0,
-    avatar: 'P',
-  },
-];
-
-const loadCachedPersonnel = (): { judges: JudgeRosterItem[]; mentors: MentorRosterItem[] } => {
-  try {
-    const raw = localStorage.getItem(PERSONNEL_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw) as {
-        judges?: JudgeRosterItem[];
-        mentors?: MentorRosterItem[];
-      };
-      return {
-        judges: Array.isArray(parsed.judges) ? parsed.judges : DEFAULT_JUDGES,
-        mentors: Array.isArray(parsed.mentors) ? parsed.mentors : DEFAULT_MENTORS,
-      };
-    }
-  } catch {
-    // ignore
-  }
-  return { judges: DEFAULT_JUDGES, mentors: DEFAULT_MENTORS };
-};
-
-const saveCachedPersonnel = (judges: JudgeRosterItem[], mentors: MentorRosterItem[]) => {
-  try {
-    localStorage.setItem(PERSONNEL_STORAGE_KEY, JSON.stringify({ judges, mentors }));
-  } catch {
-    // ignore
-  }
-};
-
 export const AdminMentorsJudgesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'judges' | 'mentors'>('judges');
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -90,8 +39,8 @@ export const AdminMentorsJudgesPage: React.FC = () => {
   const [specialization, setSpecialization] = useState('Computer Vision & LLMs');
   const [alert, setAlert] = useState<string | null>(null);
 
-  const [judges, setJudges] = useState<JudgeRosterItem[]>(() => loadCachedPersonnel().judges);
-  const [mentors, setMentors] = useState<MentorRosterItem[]>(() => loadCachedPersonnel().mentors);
+  const [judges, setJudges] = useState<JudgeRosterItem[]>([]);
+  const [mentors, setMentors] = useState<MentorRosterItem[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -134,7 +83,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           }
           setJudges(nextJudges);
           setMentors(nextMentors);
-          saveCachedPersonnel(nextJudges, nextMentors);
+
         }
       })
       .catch(() => {
@@ -151,14 +100,18 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         (j) => j.id !== id && (!judgeEmail || j.email.toLowerCase() !== judgeEmail.toLowerCase()),
       );
       setJudges(nextJudges);
-      saveCachedPersonnel(nextJudges, mentors);
+
       try {
         await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
           params: judgeEmail ? { email: judgeEmail } : undefined,
         });
       } catch {
-        // Ignore if offline
+        setJudges(judges);
+        setMentors(mentors);
+        setAlert('Không thể xóa nhân sự. Vui lòng thử lại.');
+        return;
       }
+      setJudges(nextJudges);
       setAlert(`Đã xóa giám khảo ${judgeName}`);
       setTimeout(() => setAlert(null), 3000);
     }
@@ -170,14 +123,18 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         (m) => m.id !== id && (!mentorEmail || m.email.toLowerCase() !== mentorEmail.toLowerCase()),
       );
       setMentors(nextMentors);
-      saveCachedPersonnel(judges, nextMentors);
+
       try {
         await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
           params: mentorEmail ? { email: mentorEmail } : undefined,
         });
       } catch {
-        // Ignore if offline
+        setJudges(judges);
+        setMentors(mentors);
+        setAlert('Không thể xóa nhân sự. Vui lòng thử lại.');
+        return;
       }
+      setMentors(nextMentors);
       setAlert(`Đã xóa cố vấn ${mentorName}`);
       setTimeout(() => setAlert(null), 3000);
     }
@@ -205,7 +162,8 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         createdId = String(payload.id);
       }
     } catch {
-      // Fallback to local ID if offline
+      setAlert('Không thể tạo nhân sự. Vui lòng thử lại.');
+      return;
     }
 
     if (activeTab === 'judges') {
@@ -221,8 +179,8 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         },
       ];
       setJudges(nextJudges);
-      saveCachedPersonnel(nextJudges, mentors);
-      setAlert(`Đã gửi thư mời Ban Giám Khảo tới ${cleanEmail}!`);
+
+      setAlert(`Đã thêm Ban Giám Khảo ${cleanEmail}!`);
     } else {
       const nextMentors = [
         ...mentors.filter((m) => m.email.toLowerCase() !== cleanEmail.toLowerCase()),
@@ -236,7 +194,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         },
       ];
       setMentors(nextMentors);
-      saveCachedPersonnel(judges, nextMentors);
+
       setAlert(`Đã gửi thư mời Cố vấn chuyên môn tới ${cleanEmail}!`);
     }
 

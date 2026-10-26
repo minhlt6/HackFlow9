@@ -29,7 +29,7 @@ import {
 } from '../ui/table';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import type { EnrichedAdminTeam } from '../../mocks/adminTeamsMockData';
+import type { EnrichedAdminTeam } from '../../api/adminTeamsApi';
 
 export interface TeamDetailDialogProps {
   team: EnrichedAdminTeam | null;

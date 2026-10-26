@@ -31,9 +31,7 @@ const PRIORITY_BADGES: Record<string, { label: string; variant: BadgeVariant }> 
 
 export const AdminAnnouncementsPage: React.FC = () => {
   const {
-    announcements: mockAnnouncements,
     broadcastAnnouncement,
-    deleteAnnouncement: storeDeleteAnnouncement,
   } = useMockStore();
 
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
@@ -67,21 +65,11 @@ export const AdminAnnouncementsPage: React.FC = () => {
         return;
       }
     } catch {
-      // Fallback to local mock announcements if backend is offline / mock mode
-      const fallbackList: AnnouncementItem[] = mockAnnouncements.map((m) => ({
-        id: m.id,
-        title: m.title,
-        content: m.content,
-        priority: 'info',
-        created_at: m.createdAt || new Date().toISOString(),
-        sender: m.sender || m.author || 'Ban Tổ Chức',
-        targetRole: m.targetRole || 'all',
-      }));
-      setAnnouncements(fallbackList);
+      showAlert("Không thể tải thông báo từ máy chủ.", "error");
     } finally {
       setIsLoading(false);
     }
-  }, [mockAnnouncements]);
+  }, [showAlert]);
 
   useEffect(() => {
     let ignore = false;
@@ -94,16 +82,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
       })
       .catch(() => {
         if (!ignore) {
-          const fallbackList: AnnouncementItem[] = mockAnnouncements.map((m) => ({
-            id: m.id,
-            title: m.title,
-            content: m.content,
-            priority: 'info',
-            created_at: m.createdAt || new Date().toISOString(),
-            sender: m.sender || m.author || 'Ban Tổ Chức',
-            targetRole: m.targetRole || 'all',
-          }));
-          setAnnouncements(fallbackList);
+          showAlert("Không thể tải thông báo từ máy chủ.", "error");
         }
       })
       .finally(() => {
@@ -113,7 +92,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
     return () => {
       ignore = true;
     };
-  }, [mockAnnouncements]);
+  }, [showAlert]);
 
   // Reset form
   const resetForm = () => {
@@ -154,6 +133,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
           title: title.trim(),
           content: content.trim(),
           priority,
+          target_audience: targetRole === "all" ? "all" : targetRole.replace(/s$/, ""),
         });
 
         showAlert(`Đã cập nhật thông báo "${title.trim()}" thành công!`);
@@ -163,6 +143,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
           title: title.trim(),
           content: content.trim(),
           priority,
+          target_audience: targetRole === "all" ? "all" : targetRole.replace(/s$/, ""),
         });
 
         // Đồng bộ store local dự phòng (không gọi lại POST /announcements lần 2)
@@ -191,17 +172,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
           'error'
         );
       } else {
-        // Fallback local mock mode if offline
-        if (editingItem) {
-          showAlert('Đã cập nhật thông báo cục bộ (chế độ offline).');
-        } else {
-          broadcastAnnouncement(title.trim(), content.trim(), targetRole, priority, true);
-          showAlert('Đã phát thông báo mới cục bộ (chế độ offline).');
-        }
-        setIsAddOpen(false);
-        resetForm();
-        loadAnnouncements();
-        useNotificationStore.getState().fetchNotifications();
+        showAlert('Không thể lưu thông báo. Vui lòng thử lại.', 'error');
       }
     } finally {
       setIsSubmitting(false);
@@ -234,8 +205,8 @@ export const AdminAnnouncementsPage: React.FC = () => {
       }
 
       // Fallback local delete
-      storeDeleteAnnouncement(id);
-      showAlert(`Đã xóa thông báo "${annTitle}" (chế độ offline).`);
+      showAlert('Không thể xóa thông báo. Vui lòng thử lại.', 'error');
+      return;
     }
 
     await loadAnnouncements();

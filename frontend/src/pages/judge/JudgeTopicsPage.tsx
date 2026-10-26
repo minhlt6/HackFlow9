@@ -40,7 +40,7 @@ export const JudgeTopicsPage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {m.subTopics.map((sub) => {
-                const registeredTeams = teams.filter((t) => t.subTopicId === sub.id);
+                const registeredTeams = teams.filter((t) => t.subTopicId === sub.id || t.description === sub.title);
 
                 return (
                   <div
@@ -57,7 +57,7 @@ export const JudgeTopicsPage: React.FC = () => {
                     <div className="pt-2 border-t border-border flex items-center justify-between text-xs">
                       <span className="text-muted-foreground flex items-center gap-1">
                         <Users size={13} />
-                        <span>Đội đăng ký: {registeredTeams.length} / {sub.quota}</span>
+                        <span>Đội đăng ký: {registeredTeams.length} / {sub.maxTeamsQuota ?? sub.quota ?? 0}</span>
                       </span>
 
                       {registeredTeams.length > 0 && (

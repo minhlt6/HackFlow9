@@ -24,7 +24,7 @@ export const MentorTeamsPage: React.FC = () => {
           Đội Thi Thuộc Lĩnh Vực Phụ Trách
         </h1>
         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-          Danh sách các đội thi đăng ký đề tài trong lĩnh vực Trí Tuệ Nhân Tạo & Y Tế Số.
+          Danh sách các đội thi và đề tài đăng ký để theo dõi, hỗ trợ.
         </p>
       </div>
 

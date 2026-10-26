@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import TYPE_CHECKING, Optional
-from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy import ForeignKey, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -48,6 +48,7 @@ class SupportTicket(BaseModel):
         String(16), default=TicketPriority.NORMAL.value, nullable=False
     )
     category: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    messages: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
     response: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships

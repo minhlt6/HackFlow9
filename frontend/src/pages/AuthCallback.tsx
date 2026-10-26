@@ -152,6 +152,7 @@ export const AuthCallback: React.FC = () => {
 
         login(user, token);
         syncMockStoreWithUser(user);
+        void useMockStore.getState().syncFromBackend?.();
         navigate(getRedirectPath(user), { replace: true });
       } catch {
         processedOAuthCodes.delete(code);

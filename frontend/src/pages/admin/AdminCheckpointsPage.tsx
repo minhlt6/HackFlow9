@@ -433,6 +433,7 @@ interface RawCheckpoint {
   requirements?: string | string[];
   weight?: number;
   is_active?: boolean;
+  is_final_checkpoint?: boolean;
   status?: string;
   submission_fields?: RawFieldConfig[];
 }
@@ -443,8 +444,6 @@ export const AdminCheckpointsPage: React.FC = () => {
     checkpoints,
     submissions,
     teams,
-    reorderCheckpoints,
-    sortCheckpointsByDeadline,
   } = useMockStore();
 
   const [loading, setLoading] = useState(false);
@@ -503,12 +502,13 @@ export const AdminCheckpointsPage: React.FC = () => {
         title: cp.title || cp.name || `Checkpoint ${index + 1}`,
         description: cp.description || '',
         durationMinutes,
-        weight: cp.weight || 25,
+        weight: cp.weight ?? 0,
         requirements: reqs.length > 0 ? reqs : ['Kho mã nguồn GitHub', 'Tài liệu kiến trúc hệ thống'],
         submissionFields: fields,
         deadline: cp.deadline || new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
         startTime: cp.start_time || new Date().toISOString(),
         status: (cp.status as 'upcoming' | 'open' | 'closed') || (cp.is_active ? 'open' : 'closed'),
+        isFinalCheckpoint: Boolean(cp.is_final_checkpoint),
       };
     });
   };
@@ -517,14 +517,14 @@ export const AdminCheckpointsPage: React.FC = () => {
   const loadCheckpoints = useCallback(async () => {
     try {
       const data = await checkpointApi.getCheckpoints();
-      if (Array.isArray(data) && data.length > 0) {
+      if (Array.isArray(data)) {
         const mapped = mapCheckpoints(data as RawCheckpoint[]);
         useMockStore.setState({ checkpoints: mapped });
       }
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         if (err.response) {
-          showAlert(err.response.data?.message || 'Không thể tải danh sách chặng nộp từ máy chủ.', 'error');
+          showAlert(err.response?.data?.message || 'Không thể tải danh sách chặng nộp từ máy chủ.', 'error');
         }
       }
     } finally {
@@ -537,14 +537,14 @@ export const AdminCheckpointsPage: React.FC = () => {
     checkpointApi
       .getCheckpoints()
       .then((data) => {
-        if (!ignore && Array.isArray(data) && data.length > 0) {
+        if (!ignore && Array.isArray(data)) {
           const mapped = mapCheckpoints(data as RawCheckpoint[]);
           useMockStore.setState({ checkpoints: mapped });
         }
       })
       .catch((err: unknown) => {
         if (!ignore && axios.isAxiosError(err) && err.response) {
-          showAlert(err.response.data?.message || 'Không thể tải danh sách chặng nộp từ máy chủ.', 'error');
+          showAlert(err.response?.data?.message || 'Không thể tải danh sách chặng nộp từ máy chủ.', 'error');
         }
       });
 
@@ -640,7 +640,7 @@ export const AdminCheckpointsPage: React.FC = () => {
     setEditTitle(cp.title || cp.name || '');
     setEditDescription(cp.description || '');
     setEditDurationMinutes(cp.durationMinutes || 180);
-    setEditWeight(cp.weight || 25);
+    setEditWeight(cp.weight ?? 0);
     setEditRequirements(
       cp.requirements && cp.requirements.length > 0
         ? [...cp.requirements]
@@ -654,6 +654,27 @@ export const AdminCheckpointsPage: React.FC = () => {
     setEditReqInput('');
   };
 
+  const persistOrder = async (ordered: typeof checkpoints) => {
+    setSubmitting(true);
+    try {
+      await Promise.all(ordered.map((cp, index) => checkpointApi.updateCheckpoint(cp.id, { display_order: index })));
+      await loadCheckpoints();
+      showAlert('Đã lưu thứ tự các chặng.', 'success');
+    } catch {
+      await loadCheckpoints();
+      showAlert('Không thể lưu đầy đủ thứ tự các chặng. Đã tải lại dữ liệu máy chủ.', 'error');
+    } finally { setSubmitting(false); }
+  };
+  const reorderCheckpoints = (from: number, to: number) => {
+    const ordered = [...checkpoints];
+    const [moved] = ordered.splice(from, 1);
+    ordered.splice(to, 0, moved);
+    void persistOrder(ordered);
+  };
+  const sortCheckpointsByDeadline = () => {
+    void persistOrder([...checkpoints].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()));
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCp) return;
@@ -665,6 +686,7 @@ export const AdminCheckpointsPage: React.FC = () => {
 
       const payload: CheckpointUpdatePayload = {
         title: editTitle.trim(),
+        weight: Number(editWeight),
         description: editDescription.trim() || undefined,
         deadline: deadlineDate.toISOString(),
         requirements: editRequirements.join('\n'),
@@ -683,21 +705,7 @@ export const AdminCheckpointsPage: React.FC = () => {
       showAlert(`Đã cập nhật chặng nộp "${editTitle}" thành công lên máy chủ!`, 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          // Offline fallback
-          useMockStore.getState().updateCheckpoint(editingCp.id, {
-            title: editTitle.trim(),
-            description: editDescription.trim(),
-            durationMinutes: Number(editDurationMinutes),
-            weight: Number(editWeight),
-            requirements: editRequirements,
-            submissionFields: editSubmissionFields,
-          });
-          setEditingCp(null);
-          showAlert('Mất kết nối máy chủ: Đã cập nhật tạm vào bộ nhớ cục bộ.', 'info');
-          return;
-        }
-        const msg = err.response.data?.message || 'Có lỗi xảy ra khi cập nhật chặng nộp bài.';
+        const msg = err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật chặng nộp bài.';
         showAlert(msg, 'error');
       } else {
         showAlert('Đã xảy ra lỗi không xác định khi cập nhật.', 'error');
@@ -718,6 +726,8 @@ export const AdminCheckpointsPage: React.FC = () => {
 
       const payload: CheckpointCreatePayload = {
         title: newTitle.trim(),
+        weight: Number(newWeight),
+        display_order: checkpoints.length,
         description: newDescription.trim() || undefined,
         start_time: now.toISOString(),
         deadline: deadlineDate.toISOString(),
@@ -733,7 +743,12 @@ export const AdminCheckpointsPage: React.FC = () => {
         })),
       };
 
-      await checkpointApi.createCheckpoint(payload);
+      const created = await checkpointApi.createCheckpoint(payload);
+      if (insertPosition !== 'end') {
+        const orderedIds = checkpoints.map(cp => cp.id);
+        orderedIds.splice(Number(insertPosition), 0, created.id);
+        await Promise.all(orderedIds.map((id, index) => checkpointApi.updateCheckpoint(id, { display_order: index })));
+      }
       await loadCheckpoints();
 
       setIsAddOpen(false);
@@ -747,26 +762,7 @@ export const AdminCheckpointsPage: React.FC = () => {
       showAlert(`Đã tạo chặng nộp "${newTitle}" thành công lên máy chủ!`, 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
-        if (!err.response) {
-          // Offline fallback
-          const insertIndex = insertPosition === 'end' ? undefined : Number(insertPosition);
-          useMockStore.getState().addCheckpoint(
-            {
-              title: newTitle.trim(),
-              description: newDescription.trim(),
-              durationMinutes: Number(newDurationMinutes),
-              weight: Number(newWeight),
-              requirements: newRequirements,
-              submissionFields: newSubmissionFields,
-              deadline: new Date(Date.now() + Number(newDurationMinutes) * 60 * 1000).toISOString(),
-            },
-            insertIndex
-          );
-          setIsAddOpen(false);
-          showAlert('Mất kết nối máy chủ: Đã lưu tạm chặng nộp vào bộ nhớ cục bộ.', 'info');
-          return;
-        }
-        const msg = err.response.data?.message || 'Có lỗi xảy ra khi tạo chặng nộp bài.';
+        const msg = err.response?.data?.message || 'Có lỗi xảy ra khi tạo chặng nộp bài.';
         showAlert(msg, 'error');
       } else {
         showAlert('Đã xảy ra lỗi không xác định khi tạo chặng nộp.', 'error');
@@ -785,12 +781,7 @@ export const AdminCheckpointsPage: React.FC = () => {
         showAlert(`Đã xóa chặng nộp "${displayTitle}".`, 'success');
       } catch (err: unknown) {
         if (axios.isAxiosError(err)) {
-          if (!err.response) {
-            useMockStore.getState().deleteCheckpoint(id);
-            showAlert(`Đã xóa chặng nộp "${displayTitle}" trong bộ nhớ cục bộ.`, 'info');
-            return;
-          }
-          showAlert(err.response.data?.message || 'Không thể xóa chặng nộp.', 'error');
+          showAlert(err.response?.data?.message || 'Không thể xóa chặng nộp.', 'error');
         } else {
           showAlert('Có lỗi xảy ra khi xóa chặng nộp.', 'error');
         }
@@ -846,9 +837,9 @@ export const AdminCheckpointsPage: React.FC = () => {
           {checkpoints.length > 1 && (
             <Button
               variant="secondary"
+              disabled={submitting}
               onClick={() => {
                 sortCheckpointsByDeadline();
-                showAlert('Đã tự động sắp xếp lại các chặng theo mốc thời hạn (Deadline từ sớm đến muộn)!', 'info');
               }}
               className="gap-2 text-xs"
               title="Tự động sắp xếp các chặng theo thời hạn deadline từ sớm đến muộn"
@@ -931,10 +922,9 @@ export const AdminCheckpointsPage: React.FC = () => {
                     <div className="flex items-center gap-0.5 bg-muted/40 dark:bg-slate-900/60 border border-border rounded-[8px] p-0.5 shadow-sm">
                       <button
                         type="button"
-                        disabled={idx === 0}
+                        disabled={submitting || idx === 0}
                         onClick={() => {
                           reorderCheckpoints(idx, idx - 1);
-                          showAlert(`Đã chuyển chặng "${cp.title}" lên vị trí #${idx}!`, 'info', 2500);
                         }}
                         className="p-1 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all"
                         title={idx === 0 ? 'Đã ở vị trí đầu tiên' : `Di chuyển lên vị trí #${idx}`}
@@ -946,10 +936,9 @@ export const AdminCheckpointsPage: React.FC = () => {
                       </div>
                       <button
                         type="button"
-                        disabled={idx === checkpoints.length - 1}
+                        disabled={submitting || idx === checkpoints.length - 1}
                         onClick={() => {
                           reorderCheckpoints(idx, idx + 1);
-                          showAlert(`Đã chuyển chặng "${cp.title}" xuống vị trí #${idx + 2}!`, 'info', 2500);
                         }}
                         className="p-1 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all"
                         title={idx === checkpoints.length - 1 ? 'Đã ở vị trí cuối cùng' : `Di chuyển xuống vị trí #${idx + 2}`}
@@ -966,7 +955,7 @@ export const AdminCheckpointsPage: React.FC = () => {
                       <Clock size={12} />
                       <span>{duration} phút ({formatDuration(duration)})</span>
                     </Badge>
-                    <Badge variant="indigo">Trọng số {cp.weight || 20}%</Badge>
+                    <Badge variant="indigo">Trọng số {cp.weight ?? 0}%</Badge>
                     <Button
                       variant="secondary"
                       size="sm"

@@ -49,7 +49,7 @@ export const useAuthStore = create<AuthState>()(
 
         // Nếu không bật VITE_MOCK_AUTH mà trong localStorage còn lưu token giả từ bản test cũ,
         // tự động xóa phiên giả để bảo toàn luồng đăng nhập thật.
-        if (!isLocalMockAuth && p?.token === 'mock-leader-token-2026') {
+        if (!isLocalMockAuth && p?.token?.startsWith('mock-')) {
           localStorage.removeItem('token');
           return {
             ...currentState,

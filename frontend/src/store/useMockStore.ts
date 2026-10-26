@@ -17,21 +17,47 @@ import type {
   Announcement,
   HackathonConfig,
 } from '../types';
-import {
-  mockUsers,
-  initialHackathonConfig,
-  initialWhitelist,
-  initialPendingCandidates,
-  initialMajorTopics,
-  initialTeams,
-  initialCheckpoints,
-  initialSubmissions,
-  initialFinalSubmissions,
-  initialRubricCriteria,
-  initialEvaluations,
-  initialSupportTickets,
-  initialAnnouncements,
-} from '../mock/mockData';
+const initialHackathonConfig: HackathonConfig = {
+  name: 'HackFlow AI và DeepTech Hackathon 2026',
+  description: 'Hệ thống quản lý và tổ chức thi đấu Hackathon trực tuyến.',
+  logoUrl: '/hackflow-logo.svg',
+  bannerUrl: '/login-background.png',
+  rules: '1. Mỗi đội thi có từ 3 đến 5 thành viên.\n2. Mỗi đề tài con có giới hạn số lượng đội tối đa (quota).\n3. Mã commit SHA được hệ thống đóng băng tự động tại thời điểm kết thúc hạn nộp.',
+  prizes: [],
+  channels: {
+    fanpage: '',
+    discord: '',
+    email: 'btc@hackflow.dev',
+  },
+  minTeamSize: 3,
+  minTeamMembers: 3,
+  maxTeamSize: 5,
+  maxTeamMembers: 5,
+  currentPhase: 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng',
+  finalSubmissionDeadline: '',
+  blindJudging: true,
+  blindJudgingMode: true,
+  resultsPublished: false,
+  ticketsEnabled: true,
+  registrationStart: '',
+  registrationEnd: '',
+  topicSelectionDeadline: '',
+  contestStart: '',
+  contestEnd: '',
+  isContestStarted: false,
+};
+
+const initialWhitelist: WhitelistEntry[] = [];
+const initialPendingCandidates: User[] = [];
+const initialMajorTopics: MajorTopic[] = [];
+const initialTeams: Team[] = [];
+const initialCheckpoints: Checkpoint[] = [];
+const initialSubmissions: CheckpointSubmission[] = [];
+const initialFinalSubmissions: FinalSubmission[] = [];
+const initialRubricCriteria: RubricCriteria[] = [];
+const initialEvaluations: TeamEvaluation[] = [];
+const initialSupportTickets: SupportTicket[] = [];
+const initialAnnouncements: Announcement[] = [];
 
 /**
  * Standard utility to ensure any score is strictly normalized to the 100-point rubric scale.
@@ -74,10 +100,10 @@ interface MockStoreState {
 
   // Hackathon Configuration
   config: HackathonConfig;
-  updateConfig: (newConfig: Partial<HackathonConfig>) => void;
-  toggleBlindJudging: () => void;
-  toggleResultsPublished: () => void;
-  toggleContestStarted: () => void;
+  updateConfig: (newConfig: Partial<HackathonConfig>) => Promise<void>;
+  toggleBlindJudging: () => Promise<void>;
+  toggleResultsPublished: () => Promise<void>;
+  toggleContestStarted: () => Promise<void>;
 
   // Whitelist
   whitelist: WhitelistEntry[];
@@ -230,42 +256,12 @@ const mergeUserWithAuthStore = (baseUser: User): User => {
   return baseUser;
 };
 
-const getInitialTabSession = () => {
-  if (typeof window === 'undefined') {
-    return {
-      currentUser: mockUsers.admin,
-      activeRolePersona: 'admin' as const,
-      isAuthenticated: false,
-    };
-  }
-  try {
-    const sessionPersona = sessionStorage.getItem('hackflow_session_persona');
-    const sessionAuth = sessionStorage.getItem('hackflow_session_auth');
-    if (sessionPersona && mockUsers[sessionPersona]) {
-      return {
-        currentUser: mergeUserWithAuthStore(mockUsers[sessionPersona]),
-        activeRolePersona: sessionPersona as MockStoreState['activeRolePersona'],
-        isAuthenticated: sessionAuth === 'true',
-      };
-    }
-    const localPersona = localStorage.getItem('hackflow_session_persona');
-    const localAuth = localStorage.getItem('hackflow_session_auth');
-    if (localPersona && mockUsers[localPersona]) {
-      return {
-        currentUser: mergeUserWithAuthStore(mockUsers[localPersona]),
-        activeRolePersona: localPersona as MockStoreState['activeRolePersona'],
-        isAuthenticated: localAuth === 'true',
-      };
-    }
-  } catch {
-    // ignore
-  }
-  return {
-    currentUser: mockUsers.admin,
-    activeRolePersona: 'admin' as const,
-    isAuthenticated: false,
-  };
-};
+const emptyUser: User = { id: '', email: '', fullName: '', role: 'candidate', approvalStatus: 'pending' };
+const getInitialTabSession = () => ({
+  currentUser: useAuthStore.getState().user || emptyUser,
+  activeRolePersona: 'pending' as const,
+  isAuthenticated: useAuthStore.getState().isAuthenticated,
+});
 
 if (typeof window !== 'undefined') {
   try {
@@ -326,7 +322,7 @@ export const useMockStore = create<MockStoreState>()(
       isAuthenticated: initialSession.isAuthenticated,
 
       switchPersona: (persona) => {
-        const baseMockUser = mockUsers[persona] || mockUsers.admin;
+        const baseMockUser = useAuthStore.getState().user || emptyUser;
         const curr = get().currentUser;
         const sameCurr =
           get().activeRolePersona === persona &&
@@ -349,8 +345,8 @@ export const useMockStore = create<MockStoreState>()(
           currentUser: targetUser,
           activeRolePersona: persona,
           isAuthenticated: true,
-          isWizardOpen: !isDone,
-          wizardStep: 1,
+          isWizardOpen: sameCurr ? get().isWizardOpen : (isDone ? false : false),
+          wizardStep: sameCurr ? get().wizardStep : 1,
         });
       },
 
@@ -430,7 +426,10 @@ export const useMockStore = create<MockStoreState>()(
       pledgedUsers: {},
       finishUserOnboarding: (userId) =>
         set((state) => ({
-          onboardingCompletedUsers: { ...state.onboardingCompletedUsers, [userId]: true },
+          onboardingCompletedUsers: (
+            void apiClient.post('/users/onboarding', { onboarding_completed: true }).catch(() => {}),
+            { ...state.onboardingCompletedUsers, [userId]: true }
+          ),
           isWizardOpen: false,
         })),
       resetUserOnboarding: (userId) =>
@@ -442,75 +441,51 @@ export const useMockStore = create<MockStoreState>()(
         })),
       setUserPledge: (userId, pledged) =>
         set((state) => ({
-          pledgedUsers: { ...state.pledgedUsers, [userId]: pledged },
+          pledgedUsers: (
+            void apiClient.post('/users/onboarding', { pledged }).catch(() => {}),
+            { ...state.pledgedUsers, [userId]: pledged }
+          ),
         })),
 
       // Config
       config: initialHackathonConfig,
-      updateConfig: (newConfig) => {
-        set((state) => ({
-          config: { ...state.config, ...newConfig },
-        }));
-        void apiClient
-          .patch('/admin/config', {
-            name: newConfig.name,
-            end_time: newConfig.finalSubmissionDeadline,
-            maxTeamSize: newConfig.maxTeamMembers,
-            status: newConfig.currentPhase,
-            blindJudgingEnabled: newConfig.blindJudgingMode ?? newConfig.blindJudging,
-            is_result_published: newConfig.resultsPublished,
-          })
-          .catch(() => {});
-      },
-      toggleBlindJudging: () => {
-        const next = !get().config.blindJudgingMode;
-        set((state) => ({
-          config: { ...state.config, blindJudging: next, blindJudgingMode: next },
-        }));
-        void apiClient.patch('/admin/config', { blindJudgingEnabled: next }).catch(() => {});
-      },
-      toggleResultsPublished: () => {
-        const next = !get().config.resultsPublished;
-        set((state) => ({
-          config: { ...state.config, resultsPublished: next },
-        }));
-        void apiClient
-          .patch('/admin/config', { is_result_published: next, leaderboardPublished: next })
-          .catch(() => {});
-      },
-      toggleContestStarted: () => {
-        const nextStarted = !get().config.isContestStarted;
-        const now = Date.now();
-        set((state) => {
-          const updatedCheckpoints = nextStarted
-            ? state.checkpoints.map((cp) => {
-                const duration = cp.durationMinutes || 180;
-                return {
-                  ...cp,
-                  deadline: new Date(now + duration * 60 * 1000).toISOString(),
-                  status: 'open' as const,
-                };
-              })
-            : state.checkpoints;
-
-          return {
-            config: {
-              ...state.config,
-              isContestStarted: nextStarted,
-              contestStartedAt: nextStarted ? new Date(now).toISOString() : undefined,
-              currentPhase: nextStarted
-                ? 'Giai đoạn 2: Lập trình tập trung & Chạy nước rút'
-                : 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi',
-            },
-            checkpoints: updatedCheckpoints,
-          };
+      updateConfig: async (newConfig) => {
+        const minVal = newConfig.minTeamMembers ?? newConfig.minTeamSize;
+        const maxVal = newConfig.maxTeamMembers ?? newConfig.maxTeamSize;
+        await apiClient.patch('/admin/config', {
+          name: newConfig.name,
+          end_time: newConfig.finalSubmissionDeadline,
+          minTeamSize: minVal,
+          minTeamMembers: minVal,
+          maxTeamSize: maxVal,
+          maxTeamMembers: maxVal,
+          status: newConfig.currentPhase,
+          currentPhase: newConfig.currentPhase,
+          blindJudgingEnabled: newConfig.blindJudgingMode ?? newConfig.blindJudging,
+          is_result_published: newConfig.resultsPublished,
         });
-        void apiClient
-          .patch('/admin/config', {
-            status: nextStarted ? 'hacking' : 'registration',
-            is_topic_published: true,
-          })
-          .catch(() => {});
+        set((state) => ({
+          config: {
+            ...state.config,
+            ...newConfig,
+            ...(minVal !== undefined ? { minTeamSize: minVal, minTeamMembers: minVal } : {}),
+            ...(maxVal !== undefined ? { maxTeamSize: maxVal, maxTeamMembers: maxVal } : {}),
+          },
+        }));
+      },
+      toggleBlindJudging: async () => {
+        const next = !get().config.blindJudgingMode;
+        await get().updateConfig({ blindJudging: next, blindJudgingMode: next });
+      },
+      toggleResultsPublished: async () => {
+        const next = !get().config.resultsPublished;
+        await apiClient.patch('/admin/leaderboard/publish', { is_result_published: next });
+        set((state) => ({ config: { ...state.config, resultsPublished: next } }));
+      },
+      toggleContestStarted: async () => {
+        const next = !get().config.isContestStarted;
+        await apiClient.patch('/admin/config', { status: next ? 'hacking' : 'registration' });
+        set((state) => ({ config: { ...state.config, isContestStarted: next, currentPhase: next ? 'hacking' : 'registration' } }));
       },
 
       // Whitelist
@@ -584,12 +559,7 @@ export const useMockStore = create<MockStoreState>()(
 
       // Candidates
       pendingCandidates: initialPendingCandidates,
-      approveCandidate: (userId, note = 'Hồ sơ hợp lệ') => {
-        const candidate = get().pendingCandidates.find((c) => c.id === userId);
-        if (candidate) {
-          // Add to whitelist automatically
-          get().addWhitelistEntry(candidate.email, `Đã phê duyệt tài khoản (${note})`);
-        }
+      approveCandidate: (userId) => {
         set((state) => ({
           pendingCandidates: state.pendingCandidates.filter((c) => c.id !== userId),
         }));
@@ -656,6 +626,16 @@ export const useMockStore = create<MockStoreState>()(
           },
         }));
 
+        void apiClient
+          .post('/teams', {
+            team_name: newTeam.name,
+            description: newTeam.description,
+          })
+          .then(() => {
+            void get().syncFromBackend?.();
+          })
+          .catch(() => {});
+
         return { success: true, team: newTeam, message: 'Tạo đội thành công!' };
       },
 
@@ -707,6 +687,13 @@ export const useMockStore = create<MockStoreState>()(
             roleInTeam: 'member',
           },
         }));
+
+        void apiClient
+          .post('/teams/join', { invite_code: code })
+          .then(() => {
+            void get().syncFromBackend?.();
+          })
+          .catch(() => {});
 
         return { success: true, team: updatedTeam, message: `Gia nhập đội ${team.name} thành công!` };
       },
@@ -783,6 +770,7 @@ export const useMockStore = create<MockStoreState>()(
             roleInTeam: undefined,
           },
         }));
+        void apiClient.post('/teams/leave').catch(() => {});
         return true;
       },
 
@@ -1494,13 +1482,15 @@ export const useMockStore = create<MockStoreState>()(
       },
 
       resolveTicket: (ticketId, responseText) => {
+        const finalResp =
+          responseText || 'Vấn đề đã được hỗ trợ và giải quyết hoàn tất.';
         set((state) => ({
           tickets: state.tickets.map((t) =>
             t.id === ticketId
               ? {
                   ...t,
                   status: 'resolved',
-                  response: responseText || t.response || 'Vấn đề đã được hỗ trợ và giải quyết hoàn tất.',
+                  response: responseText || t.response || finalResp,
                   resolvedAt: new Date().toISOString(),
                   updatedAt: new Date().toISOString(),
                 }
@@ -1645,26 +1635,35 @@ export const useMockStore = create<MockStoreState>()(
           judgeSubmRes,
           configRes,
           meRes,
+          pendingCandidatesRes,
+          whitelistRes,
         ] = await Promise.allSettled([
           apiClient.get('/topics'),
           apiClient.get('/checkpoints'),
           apiClient.get('/rubrics'),
           apiClient.get('/announcements'),
-          apiClient.get('/teams'),
+          roleNow === 'judge' ? Promise.resolve({ data: null }) : apiClient.get('/teams'),
           roleNow === 'admin' || roleNow === 'mentor'
             ? apiClient.get('/tickets')
             : (roleNow === 'candidate' || roleNow === 'leader' || roleNow === 'member') &&
                 approvalNow === 'approved'
               ? apiClient.get('/tickets/me')
               : Promise.resolve({ data: null }),
-          apiClient.get('/submissions'),
+          roleNow === 'judge' ? Promise.resolve({ data: null }) : apiClient.get('/submissions'),
           roleNow === 'judge' || roleNow === 'admin'
             ? apiClient.get('/evaluations/submissions')
             : Promise.resolve({ data: null }),
-          roleNow === 'admin' ? apiClient.get('/admin/config') : Promise.resolve({ data: null }),
+          apiClient.get('/config'),
           apiClient.get('/auth/me'),
+          roleNow === 'admin'
+            ? apiClient.get('/admin/candidates/pending')
+            : Promise.resolve({ data: null }),
+          roleNow === 'admin'
+            ? apiClient.get('/admin/whitelist?include_inactive=true')
+            : Promise.resolve({ data: null }),
         ]);
 
+        if (useAuthStore.getState().user?.id !== authUserNow?.id) return;
         const updates: Partial<MockStoreState> = {};
 
         if (topicsRes.status === 'fulfilled') {
@@ -1705,10 +1704,13 @@ export const useMockStore = create<MockStoreState>()(
               return {
                 id: String(cp.id),
                 checkpointNumber: Number(cp.checkpoint_number ?? 1),
+                isFinalCheckpoint: Boolean(cp.is_final_checkpoint),
                 title: String(cp.title ?? ''),
                 description: String(cp.description ?? ''),
                 deadline: deadlineStr,
-                durationMinutes: Number(cp.duration_minutes ?? 60),
+                durationMinutes: Math.max(1, Math.round((deadlineMs - startMs) / 60000)),
+                weight: Number(cp.weight ?? 0),
+                startTime: startStr,
                 status,
               };
             });
@@ -1812,6 +1814,9 @@ export const useMockStore = create<MockStoreState>()(
                   (currUser.email && m.email.toLowerCase() === currUser.email.toLowerCase())
               )
             );
+            if (!matchedTeam) {
+              updates.currentUser = { ...currUser, teamId: undefined, roleInTeam: undefined };
+            }
             if (matchedTeam) {
               const matchedMember = matchedTeam.members.find(
                 (m) =>
@@ -1855,11 +1860,28 @@ export const useMockStore = create<MockStoreState>()(
               mentorName: tk.assignee_name ? String(tk.assignee_name) : undefined,
               assignedMentorId: tk.assigned_to ? String(tk.assigned_to) : undefined,
               assignedMentorName: tk.assignee_name ? String(tk.assignee_name) : undefined,
-              response: tk.resolution_note ? String(tk.resolution_note) : undefined,
+              response: (tk.response ?? tk.resolution_note) ? String(tk.response ?? tk.resolution_note) : undefined,
               createdAt: String(tk.created_at ?? new Date().toISOString()),
               updatedAt: String(tk.updated_at ?? tk.created_at ?? new Date().toISOString()),
-              replies: [],
-              messages: [],
+              replies: Array.isArray(tk.messages)
+                ? (tk.messages as Array<Record<string, unknown>>).map((m, mIdx) => ({
+                    id: String(m.id ?? `rep-${mIdx}`),
+                    authorName: String(m.senderName ?? m.sender_name ?? 'Thành viên'),
+                    authorRole: (String(m.senderRole ?? m.sender_role ?? 'candidate') as NonNullable<SupportTicket['replies']>[number]['authorRole']),
+                    content: String(m.content ?? ''),
+                    createdAt: String(m.sentAt ?? m.created_at ?? ''),
+                  }))
+                : [],
+              messages: Array.isArray(tk.messages)
+                ? (tk.messages as Array<Record<string, unknown>>).map((m, mIdx) => ({
+                    id: String(m.id ?? `msg-${mIdx}`),
+                    senderId: String(m.senderId ?? m.sender_id ?? ''),
+                    senderName: String(m.senderName ?? m.sender_name ?? 'Thành viên'),
+                    senderRole: (String(m.senderRole ?? m.sender_role ?? 'candidate') as NonNullable<SupportTicket['messages']>[number]['senderRole']),
+                    content: String(m.content ?? ''),
+                    sentAt: String(m.sentAt ?? m.created_at ?? new Date().toISOString()),
+                  }))
+                : [],
             }));
           }
         }
@@ -1881,7 +1903,7 @@ export const useMockStore = create<MockStoreState>()(
               const teamId = String(raw.team_id ?? '');
               const cpId = String(raw.checkpoint_id ?? '');
               const submittedAt = String(raw.submitted_at ?? new Date().toISOString());
-              const commitSha = String(raw.commit_sha ?? 'verified');
+              const commitSha = String(raw.commit_sha ?? '');
 
               mappedSubs.push({
                 id: String(raw.id),
@@ -1896,7 +1918,7 @@ export const useMockStore = create<MockStoreState>()(
                 status: 'submitted',
               });
 
-              if (repoUrl || demoUrl || slideUrl) {
+              if ((updates.checkpoints || get().checkpoints).some((cp) => cp.id === cpId && cp.isFinalCheckpoint) && raw.status === 'submitted') {
                 mappedFinals.push({
                   teamId,
                   repoUrl,
@@ -1911,15 +1933,27 @@ export const useMockStore = create<MockStoreState>()(
               }
             }
             updates.submissions = mappedSubs;
-            if (mappedFinals.length > 0) {
-              updates.finalSubmissions = mappedFinals;
-            }
+            updates.finalSubmissions = mappedFinals;
           }
         }
 
         if (judgeSubmRes.status === 'fulfilled' && judgeSubmRes.value.data) {
           const jRaw = unwrap(judgeSubmRes.value.data) as { submissions?: Array<Record<string, unknown>> } | null;
           if (Array.isArray(jRaw?.submissions)) {
+            if (roleNow === 'judge') {
+              updates.teams = jRaw.submissions.map((sub) => ({
+                id: String(sub.submission_id), name: String(sub.team_name ?? sub.anonymous_team_code),
+                description: String(sub.topic_title ?? ''), inviteCode: '', leaderId: '',
+                status: 'approved', members: [], createdAt: String(sub.submitted_at ?? ''),
+              }));
+              updates.finalSubmissions = jRaw.submissions.map((sub) => ({
+                teamId: String(sub.submission_id), repoUrl: String(sub.repo_url ?? ''),
+                demoVideoUrl: String(sub.demo_url ?? ''), slideUrl: String(sub.slide_url ?? ''),
+                summary: String(sub.note ?? ''), commitSha: String(sub.commit_sha ?? ''),
+                submittedAt: String(sub.submitted_at ?? ''), status: 'submitted',
+              }));
+              updates.submissions = [];
+            }
             const currJudge = get().currentUser;
             const knownSubs = updates.submissions || get().submissions;
             const mappedEvals: TeamEvaluation[] = [];
@@ -1930,7 +1964,7 @@ export const useMockStore = create<MockStoreState>()(
               const matchedSub = knownSubs.find(
                 (s) => s.id === subId || (js.repo_url && s.repoUrl === String(js.repo_url))
               );
-              const resolvedTeamId = matchedSub?.teamId || subId;
+              const resolvedTeamId = roleNow === 'judge' ? subId : matchedSub?.teamId || subId;
               const rawEvals = Array.isArray(js.my_evaluations)
                 ? (js.my_evaluations as Array<Record<string, unknown>>)
                 : [];
@@ -1968,7 +2002,9 @@ export const useMockStore = create<MockStoreState>()(
                 details,
               });
             }
-            if (mappedEvals.length > 0) {
+            if (roleNow === 'judge') {
+              updates.evaluations = mappedEvals;
+            } else if (mappedEvals.length > 0) {
               const existingOtherEvals = get().evaluations.filter(
                 (e) =>
                   !mappedEvals.some(
@@ -1991,6 +2027,8 @@ export const useMockStore = create<MockStoreState>()(
               const syncedUser: User = {
                 ...baseUser,
                 id: String(meObj.id ?? baseUser.id),
+                role: (meObj.role as User['role']) || baseUser.role,
+                approvalStatus: (meObj.approval_status as User['approvalStatus']) || baseUser.approvalStatus,
                 fullName: String(meObj.full_name ?? baseUser.fullName),
                 studentId: meObj.student_id ? String(meObj.student_id) : baseUser.studentId,
                 university: meObj.school ? String(meObj.school) : baseUser.university,
@@ -2005,7 +2043,19 @@ export const useMockStore = create<MockStoreState>()(
                   : baseUser.githubUsername,
               };
               updates.currentUser = syncedUser;
-              useAuthStore.getState().updateUser({
+              if (typeof meObj.onboarding_completed === 'boolean') {
+                updates.onboardingCompletedUsers = {
+                  ...get().onboardingCompletedUsers,
+                  [syncedUser.id]: meObj.onboarding_completed,
+                };
+              }
+              if (typeof meObj.pledged === 'boolean') {
+                updates.pledgedUsers = {
+                  ...get().pledgedUsers,
+                  [syncedUser.id]: meObj.pledged,
+                };
+              }
+              const authPatch = {
                 id: syncedUser.id,
                 fullName: syncedUser.fullName,
                 studentId: syncedUser.studentId,
@@ -2015,7 +2065,11 @@ export const useMockStore = create<MockStoreState>()(
                 skills: syncedUser.skills,
                 bio: syncedUser.bio,
                 githubUsername: syncedUser.githubUsername,
-              });
+              };
+              const auth = useAuthStore.getState();
+              if (auth.user && Object.entries(authPatch).some(([key, value]) => JSON.stringify(auth.user?.[key as keyof User]) !== JSON.stringify(value))) {
+                auth.updateUser(authPatch);
+              }
             }
           }
         }
@@ -2024,15 +2078,74 @@ export const useMockStore = create<MockStoreState>()(
           const cfgObj = unwrap(configRes.value.data) as Record<string, unknown> | null;
           if (cfgObj && typeof cfgObj === 'object') {
             const currCfg = get().config;
+            const phaseMap: Record<string, string> = {
+              registration: 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi',
+              team_formation: 'Giai đoạn 2: Thành lập Đội thi & Chọn Đề tài',
+              hacking: 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng',
+              judging: 'Giai đoạn 4: Chấm điểm Độc lập & Bảo vệ Chung kết',
+              completed: 'Giai đoạn 5: Công bố Kết quả & Vinh danh Chung cuộc',
+            };
+            const rawPhaseStr = String(cfgObj.currentPhase ?? cfgObj.status ?? currCfg.currentPhase);
+            const mappedPhase = phaseMap[rawPhaseStr.toLowerCase()] || rawPhaseStr;
+            const minMembersVal = Math.max(
+              1,
+              Number(cfgObj.minTeamMembers ?? cfgObj.minTeamSize ?? currCfg.minTeamMembers ?? currCfg.minTeamSize ?? 3),
+            );
+            const maxMembersVal = Math.max(
+              minMembersVal,
+              Number(cfgObj.maxTeamMembers ?? cfgObj.maxTeamSize ?? currCfg.maxTeamMembers ?? currCfg.maxTeamSize ?? 5),
+            );
             updates.config = {
               ...currCfg,
               name: String(cfgObj.name ?? cfgObj.eventName ?? currCfg.name),
+              currentPhase: mappedPhase,
+              isContestStarted: cfgObj.status === 'hacking' || mappedPhase.includes('Giai đoạn 3'),
+              contestStart: String(cfgObj.start_time ?? ''),
+              contestEnd: String(cfgObj.end_time ?? ''),
               blindJudging: Boolean(cfgObj.blindJudgingEnabled ?? currCfg.blindJudging),
               blindJudgingMode: Boolean(cfgObj.blindJudgingEnabled ?? currCfg.blindJudgingMode),
               resultsPublished: Boolean(cfgObj.is_result_published ?? cfgObj.leaderboardPublished ?? currCfg.resultsPublished),
-              maxTeamMembers: Number(cfgObj.maxTeamSize ?? currCfg.maxTeamMembers ?? 5),
+              minTeamSize: minMembersVal,
+              minTeamMembers: minMembersVal,
+              maxTeamSize: maxMembersVal,
+              maxTeamMembers: maxMembersVal,
               finalSubmissionDeadline: String(cfgObj.end_time ?? cfgObj.endAt ?? currCfg.finalSubmissionDeadline),
             };
+          }
+        }
+
+        if (pendingCandidatesRes.status === 'fulfilled' && pendingCandidatesRes.value.data) {
+          const pendingList = unwrap(pendingCandidatesRes.value.data);
+          if (Array.isArray(pendingList)) {
+            updates.pendingCandidates = (pendingList as Array<Record<string, unknown>>).map((c) => ({
+              id: String(c.id ?? ''),
+              email: String(c.email ?? ''),
+              fullName: String(c.full_name ?? c.github_username ?? c.email ?? ''),
+              role: 'candidate' as const,
+              approvalStatus: 'pending' as const,
+              githubUsername: c.github_username ? String(c.github_username) : undefined,
+              avatarUrl: c.avatar_url ? String(c.avatar_url) : undefined,
+              studentId: c.student_id ? String(c.student_id) : undefined,
+              university: c.school ? String(c.school) : undefined,
+              school: c.school ? String(c.school) : undefined,
+              phone: c.phone ? String(c.phone) : undefined,
+              skills: Array.isArray(c.skills) ? (c.skills as string[]) : undefined,
+            }));
+          }
+        }
+
+        if (whitelistRes.status === 'fulfilled' && whitelistRes.value.data) {
+          const wlList = unwrap(whitelistRes.value.data);
+          if (Array.isArray(wlList)) {
+            updates.whitelist = (wlList as Array<Record<string, unknown>>).map((w) => ({
+              id: String(w.id ?? ''),
+              email: String(w.email ?? ''),
+              note: w.note ? String(w.note) : undefined,
+              isActive: Boolean(w.is_active ?? true),
+              addedAt: typeof w.created_at === 'string' && w.created_at.length >= 10
+                ? w.created_at.slice(0, 10)
+                : new Date().toISOString().slice(0, 10),
+            }));
           }
         }
 
@@ -2044,7 +2157,7 @@ export const useMockStore = create<MockStoreState>()(
       // Reset
       resetAllMockData: () => {
         set({
-          currentUser: mockUsers.admin,
+          currentUser: useAuthStore.getState().user || emptyUser,
           activeRolePersona: 'admin',
           isAuthenticated: false,
           config: initialHackathonConfig,
@@ -2067,30 +2180,20 @@ export const useMockStore = create<MockStoreState>()(
       },
     }),
     {
-      name: 'hackflow-clean-setup-v1', // Full contest setup mock data
-      onRehydrateStorage: () => (state) => {
-        if (typeof window !== 'undefined' && state) {
-          const tabPersona = sessionStorage.getItem('hackflow_session_persona');
-          const tabAuth = sessionStorage.getItem('hackflow_session_auth');
-          if (tabPersona && mockUsers[tabPersona]) {
-            const baseMockUser = mockUsers[tabPersona];
-            const existingCurr =
-              state.currentUser &&
-              state.currentUser.role === baseMockUser.role &&
-              (!state.currentUser.email ||
-                !baseMockUser.email ||
-                state.currentUser.email.toLowerCase() === baseMockUser.email.toLowerCase())
-                ? state.currentUser
-                : undefined;
-            state.activeRolePersona = tabPersona as MockStoreState['activeRolePersona'];
-            state.currentUser = mergeUserWithAuthStore({
-              ...baseMockUser,
-              ...(existingCurr || {}),
-            });
-            state.isAuthenticated = tabAuth === 'true';
-          }
-        }
-      },
+      name: 'hackflow-ui-preferences-v2',
+      partialize: (state) => ({ onboardingCompletedUsers: state.onboardingCompletedUsers, pledgedUsers: state.pledgedUsers }),
+      merge: (saved, current) => ({ ...current, ...(saved as Pick<MockStoreState, 'onboardingCompletedUsers' | 'pledgedUsers'>) }),
     }
   )
 );
+
+useAuthStore.subscribe((state, previous) => {
+  if (state.user?.id !== previous.user?.id) {
+    useMockStore.setState({
+      currentUser: state.user || emptyUser,
+      isAuthenticated: state.isAuthenticated,
+      teams: [], submissions: [], finalSubmissions: [], evaluations: [], tickets: [],
+      announcements: [], whitelist: [], pendingCandidates: [],
+    });
+  }
+});

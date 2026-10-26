@@ -27,8 +27,9 @@ class CheckpointCreateRequest(BaseModel):
     description: Optional[str] = Field(None, description="Mô tả chi tiết yêu cầu mốc nộp bài")
     start_time: Optional[datetime] = Field(None, description="Thời điểm mở cổng nộp bài (ISO 8601 UTC)")
     deadline: datetime = Field(..., description="Hạn chót đóng cổng nộp bài (ISO 8601 UTC)")
+    display_order: Optional[int] = Field(None, ge=0)
     duration_minutes: Optional[int] = Field(None, description="Thời lượng mở cổng (phút)")
-    weight: Optional[float] = Field(None, description="Trọng số (tùy chọn)")
+    weight: Optional[float] = Field(None, ge=0, le=100, description="Trọng số (tùy chọn)")
     requirements: Optional[str] = Field(None, description="Chi tiết các tiêu chí/tệp cần nộp (Markdown)")
     is_active: bool = Field(True, description="Trạng thái kích hoạt mốc checkpoint của BTC")
     is_final_checkpoint: bool = Field(False, description="True: Checkpoint chốt sản phẩm cuối cùng; False: Checkpoint trung gian")
@@ -59,8 +60,9 @@ class CheckpointUpdateRequest(BaseModel):
     description: Optional[str] = None
     start_time: Optional[datetime] = None
     deadline: Optional[datetime] = None
+    display_order: Optional[int] = Field(None, ge=0)
     duration_minutes: Optional[int] = None
-    weight: Optional[float] = None
+    weight: Optional[float] = Field(None, ge=0, le=100)
     requirements: Optional[str] = None
     is_active: Optional[bool] = None
     is_final_checkpoint: Optional[bool] = None
@@ -82,6 +84,8 @@ class CheckpointValidateWindowRequest(BaseModel):
 # ─── Response Schemas ────────────────────────────────────────────────────────
 
 class CheckpointResponse(BaseModel):
+    weight: float = 0
+    display_order: int = 0
     id: str
     title: str
     description: Optional[str] = None

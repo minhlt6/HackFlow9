@@ -26,7 +26,7 @@ interface BackendPendingCandidate {
 }
 
 export const AdminApprovalsPage: React.FC = () => {
-  const { pendingCandidates, approveCandidate, rejectCandidate } = useMockStore();
+  const { approveCandidate, rejectCandidate } = useMockStore();
   const [backendPending, setBackendPending] = useState<User[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -43,6 +43,22 @@ export const AdminApprovalsPage: React.FC = () => {
       const res = await axiosClient.get<{ data?: BackendPendingCandidate[] }>('/admin/candidates/pending');
       const list = res.data?.data;
       if (Array.isArray(list)) {
+        useMockStore.setState({
+          pendingCandidates: list.map((c) => ({
+            id: c.id,
+            email: c.email,
+            fullName: c.full_name || c.github_username || c.email,
+            role: 'candidate',
+            approvalStatus: 'pending',
+            githubUsername: c.github_username || undefined,
+            avatarUrl: c.avatar_url || undefined,
+            studentId: c.student_id || undefined,
+            university: c.school || undefined,
+            school: c.school || undefined,
+            phone: c.phone || undefined,
+            skills: Array.isArray(c.skills) ? c.skills : undefined,
+          })),
+        });
         setBackendPending(
           list.map((c) => ({
             id: c.id,
@@ -75,13 +91,7 @@ export const AdminApprovalsPage: React.FC = () => {
   }, [fetchBackendPending]);
 
   // Merge real backend pending candidates with mock pending candidates (deduplicating by email)
-  const combinedCandidates: User[] = [
-    ...backendPending,
-    ...pendingCandidates.filter(
-      (mockCand) =>
-        !backendPending.some((realCand) => realCand.email.toLowerCase() === mockCand.email.toLowerCase()),
-    ),
-  ];
+  const combinedCandidates: User[] = backendPending;
 
   const filteredCandidates = combinedCandidates.filter(
     (c) =>
@@ -91,16 +101,17 @@ export const AdminApprovalsPage: React.FC = () => {
   );
 
   const handleApprove = async (id: string, name: string) => {
-    approveCandidate(id);
-    setBackendPending((prev) => prev.filter((c) => c.id !== id));
     try {
       await axiosClient.post(`/admin/candidates/${id}/approval`, {
         action: 'approve',
         note: 'Phê duyệt bởi BTC trên giao diện Admin',
       });
     } catch {
-      // Ignore if candidate is mock-only
+      setAlertMsg('Không thể lưu phê duyệt. Vui lòng thử lại.');
+      return;
     }
+    approveCandidate(id);
+    setBackendPending((prev) => prev.filter((c) => c.id !== id));
     setAlertMsg(`Đã phê duyệt tài khoản của thí sinh ${name}!`);
     setTimeout(() => setAlertMsg(null), 3000);
   };
@@ -110,9 +121,6 @@ export const AdminApprovalsPage: React.FC = () => {
     if (!rejectingCandidateId) return;
 
     const targetId = rejectingCandidateId;
-    rejectCandidate(targetId, rejectReason);
-    setBackendPending((prev) => prev.filter((c) => c.id !== targetId));
-    setRejectingCandidateId(null);
 
     try {
       await axiosClient.post(`/admin/candidates/${targetId}/approval`, {
@@ -120,9 +128,13 @@ export const AdminApprovalsPage: React.FC = () => {
         note: rejectReason,
       });
     } catch {
-      // Ignore if candidate is mock-only
+      setAlertMsg('Không thể lưu phê duyệt. Vui lòng thử lại.');
+      return;
     }
 
+    rejectCandidate(targetId, rejectReason);
+    setBackendPending((prev) => prev.filter((c) => c.id !== targetId));
+    setRejectingCandidateId(null);
     setAlertMsg('Đã từ chối tài khoản thí sinh.');
     setTimeout(() => setAlertMsg(null), 3000);
   };

@@ -1,5 +1,3 @@
-import json
-from pathlib import Path
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +9,7 @@ from app.schemas.auth import (
     GitHubOAuthCallbackRequest,
     GitHubOAuthUrlResponse,
     LoginRequest,
+    OnboardingStatusUpdateRequest,
     ProfileUpdateRequest,
     ProfileUpdateResponse,
     RegisterRequest,
@@ -23,37 +22,20 @@ from app.services.auth_service import auth_service
 router = APIRouter()
 users_router = APIRouter()
 
-PROFILE_STORE_PATH = Path(__file__).resolve().parents[4] / "user_profiles.json"
-
-
-def _load_profile_store() -> dict:
-    try:
-        if PROFILE_STORE_PATH.exists():
-            return json.loads(PROFILE_STORE_PATH.read_text(encoding="utf-8"))
-    except Exception:
-        pass
-    return {}
-
-
-def _save_profile_store(data: dict) -> None:
-    try:
-        PROFILE_STORE_PATH.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
-    except Exception:
-        pass
-
 
 def _build_user_response(user: User) -> UserResponse:
     resp = UserResponse.model_validate(user)
-    store = _load_profile_store()
-    extra = store.get(user.id) or store.get(user.email.lower())
+    extra = user.profile_meta if isinstance(getattr(user, "profile_meta", None), dict) else {}
     if isinstance(extra, dict):
         resp.student_id = extra.get("student_id")
         resp.school = extra.get("school")
         resp.phone = extra.get("phone")
         resp.skills = extra.get("skills")
         resp.bio = extra.get("bio")
+        if "onboarding_completed" in extra:
+            resp.onboarding_completed = bool(extra.get("onboarding_completed"))
+        if "pledged" in extra:
+            resp.pledged = bool(extra.get("pledged"))
     return resp
 
 
@@ -199,16 +181,14 @@ async def update_user_profile(
     Lưu thông tin hồ sơ cá nhân của thí sinh tại màn hình Onboarding hoặc Hồ sơ cá nhân.
     """
     current_user.full_name = req.full_name.strip()
-    db.add(current_user)
-    await db.commit()
-    await db.refresh(current_user)
-
-    store = _load_profile_store()
-    existing_extra = store.get(current_user.id) or store.get(current_user.email.lower()) or {}
-    if not isinstance(existing_extra, dict):
-        existing_extra = {}
+    existing_extra = (
+        dict(current_user.profile_meta)
+        if isinstance(getattr(current_user, "profile_meta", None), dict)
+        else {}
+    )
 
     extra_payload = {
+        **existing_extra,
         "student_id": (
             req.student_id.strip()
             if req.student_id is not None
@@ -234,10 +214,21 @@ async def update_user_profile(
             if req.bio is not None
             else existing_extra.get("bio", "")
         ),
+        "onboarding_completed": (
+            bool(req.onboarding_completed)
+            if req.onboarding_completed is not None
+            else bool(existing_extra.get("onboarding_completed", False))
+        ),
+        "pledged": (
+            bool(req.pledged)
+            if req.pledged is not None
+            else bool(existing_extra.get("pledged", False))
+        ),
     }
-    store[current_user.id] = extra_payload
-    store[current_user.email.lower()] = extra_payload
-    _save_profile_store(store)
+    current_user.profile_meta = extra_payload
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
 
     msg = (
         "Hồ sơ đã được duyệt thành công!"
@@ -269,6 +260,43 @@ async def test_admin_access(
     return success_response(
         data={"user_id": admin_user.id, "role": admin_user.role},
         message="Chào mừng Admin.",
+    )
+
+
+@users_router.post(
+    "/onboarding",
+    response_model=ApiResponse[UserResponse],
+    summary="Cập nhật tiến độ Hướng dẫn nghiệp vụ & Cam kết liêm chính cho mọi vai trò",
+)
+@router.post(
+    "/onboarding",
+    response_model=ApiResponse[UserResponse],
+    summary="Cập nhật tiến độ Hướng dẫn nghiệp vụ & Cam kết liêm chính (Auth alias)",
+)
+async def update_onboarding_status(
+    req: OnboardingStatusUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> ApiResponse[UserResponse]:
+    existing_extra = (
+        dict(current_user.profile_meta)
+        if isinstance(getattr(current_user, "profile_meta", None), dict)
+        else {}
+    )
+
+    if req.onboarding_completed is not None:
+        existing_extra["onboarding_completed"] = bool(req.onboarding_completed)
+    if req.pledged is not None:
+        existing_extra["pledged"] = bool(req.pledged)
+
+    current_user.profile_meta = existing_extra
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+
+    return success_response(
+        data=_build_user_response(current_user),
+        message="Đã cập nhật trạng thái hướng dẫn nghiệp vụ thành công.",
     )
 
 

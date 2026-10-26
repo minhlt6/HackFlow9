@@ -12,10 +12,32 @@ interface ThemeState {
 const applyThemeToDom = (theme: ThemeMode) => {
   if (typeof document === 'undefined') return;
   const root = document.documentElement;
+  const disableTransitions = document.createElement('style');
+  disableTransitions.appendChild(
+    document.createTextNode(
+      '*, *::before, *::after { transition: none !important; animation-duration: 0s !important; }',
+    ),
+  );
+  document.head.appendChild(disableTransitions);
+
   if (theme === 'dark') {
     root.classList.add('dark');
   } else {
     root.classList.remove('dark');
+  }
+
+  // Force synchronous reflow before re-enabling transitions on next frame
+  void window.getComputedStyle(root).opacity;
+  if (typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        if (disableTransitions.parentNode) {
+          disableTransitions.parentNode.removeChild(disableTransitions);
+        }
+      });
+    });
+  } else if (disableTransitions.parentNode) {
+    disableTransitions.parentNode.removeChild(disableTransitions);
   }
 };
 

@@ -25,6 +25,7 @@ class AnnouncementService:
             title=payload.title,
             content=payload.content,
             priority=payload.priority.value,
+            target_audience=payload.target_audience,
         )
 
     async def list_announcements(
@@ -33,13 +34,14 @@ class AnnouncementService:
         *,
         page: int = 1,
         page_size: int = 10,
+        role: str = "admin",
     ) -> Tuple[List[Announcement], int]:
         """
         Return a paginated list of announcements (newest first) with total count.
         """
         skip = (page - 1) * page_size
-        items = await announcement_repo.get_multi(db, skip=skip, limit=page_size)
-        total = await announcement_repo.count(db)
+        items = await announcement_repo.get_multi(db, skip=skip, limit=page_size, role=role)
+        total = await announcement_repo.count(db, role=role)
         return items, total
 
     async def get_or_404(

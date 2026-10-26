@@ -311,11 +311,23 @@ class TopicService:
                     error_code="TEAM_LOCKED",
                 )
 
-            # Verify team has at least 3 members (VALID status requirement) or is Admin-approved
+            # Verify team meets configurable minTeamSize and maxTeamSize before selecting a topic
+            min_team_size = int((config.settings_data or {}).get("minTeamSize", 3)) if (config and getattr(config, "settings_data", None)) else 3
+            max_team_size = int((config.settings_data or {}).get("maxTeamSize", 5)) if (config and getattr(config, "settings_data", None)) else 5
+            if min_team_size < 1:
+                min_team_size = 3
+            if max_team_size < min_team_size:
+                max_team_size = max(5, min_team_size)
+
             member_count = await team_repo.count_members(db, team.id)
-            if member_count < 3 and str(getattr(team, "status", "")).upper() != "APPROVED":
+            if member_count < min_team_size and str(getattr(team, "status", "")).upper() != "APPROVED":
                 raise ConflictException(
-                    message=f"Đội thi chưa đủ điều kiện (cần tối thiểu 3 thành viên, hiện có {member_count}).",
+                    message=f"Đội thi chưa đủ điều kiện chọn đề tài (cần tối thiểu {min_team_size} thành viên, tối đa {max_team_size} thành viên; hiện có {member_count}).",
+                    error_code="TEAM_NOT_VALID",
+                )
+            if member_count > max_team_size:
+                raise ConflictException(
+                    message=f"Đội thi vượt quá số lượng thành viên tối đa ({max_team_size} thành viên; hiện có {member_count}).",
                     error_code="TEAM_NOT_VALID",
                 )
 

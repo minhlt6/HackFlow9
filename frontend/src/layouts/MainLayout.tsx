@@ -6,6 +6,7 @@ import { Toaster } from '../components/ui/toast';
 import { NotificationBanner } from '../components/NotificationBanner';
 import { UrgentNotificationModal } from '../components/UrgentNotificationModal';
 import { InfoToast } from '../components/InfoToast';
+import { MandatoryOnboardingWizard } from '../components/common/MandatoryOnboardingWizard';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMockStore } from '../store/useMockStore';
 import { useThemeStore } from '../store/useThemeStore';
@@ -99,7 +100,8 @@ export const MainLayout: React.FC = () => {
       true,
     );
     void useMockStore.getState().syncFromBackend?.();
-  }, [user, switchPersona, updateCurrentUserProfile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, user?.role, user?.approvalStatus, switchPersona, updateCurrentUserProfile]);
 
   // Interactive drag-to-resize handler for Sidebar
   const handleStartResize = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -192,7 +194,7 @@ export const MainLayout: React.FC = () => {
         }
         className={cn(
           'flex-1 flex flex-col min-w-0 lg:pl-[var(--sidebar-offset)]',
-          !isResizing && 'transition-all duration-200',
+          !isResizing && 'transition-[padding] duration-200',
         )}
       >
         <TopNav
@@ -201,8 +203,11 @@ export const MainLayout: React.FC = () => {
             'HackFlow AI và DeepTech Hackathon 2026'
           }
           currentPhase={
-            config?.currentPhase ||
-            'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng'
+            !config?.currentPhase ||
+            config.currentPhase === 'hacking' ||
+            config.currentPhase === 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi'
+              ? 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng'
+              : config.currentPhase
           }
           blindJudgingMode={config?.blindJudgingMode}
           announcements={announcements}
@@ -224,6 +229,7 @@ export const MainLayout: React.FC = () => {
 
       {/* Blocking Urgent Modal, Info Toast & Design System Toaster */}
       <UrgentNotificationModal />
+      <MandatoryOnboardingWizard />
       <InfoToast />
       <Toaster />
     </div>

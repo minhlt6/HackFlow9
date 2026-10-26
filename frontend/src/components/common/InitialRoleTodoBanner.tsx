@@ -179,6 +179,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
     roleBadge = 'Dành cho Cố vấn chuyên môn';
     roleIcon = <GraduationCap size={18} className="text-sky-600 dark:text-sky-400" />;
     subtitle = 'Đồng hành và hỗ trợ giải đáp kỹ thuật cho các đội thi trong suốt cuộc thi';
+    const isMentorPledged = Boolean(pledgedUsers[currentUser.id]);
 
     items = [
       {
@@ -195,8 +196,8 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         stepNum: 2,
         title: 'Bước 2: Quy tắc ứng xử & Cam kết thời gian phản hồi',
         description: 'Tiếp nhận vé hỗ trợ trong 30 phút và tuân thủ nguyên tắc định hướng kỹ thuật.',
-        isCompleted: true,
-        actionLabel: 'Xem quy chế',
+        isCompleted: isMentorPledged,
+        actionLabel: isMentorPledged ? 'Đã cam kết SLA' : 'Xem & Cam kết SLA',
         icon: <HelpCircle size={15} className="text-primary" />,
       },
     ];

@@ -74,3 +74,19 @@ async def client():
         yield ac
     fastapi_app.dependency_overrides.clear()
 
+
+
+@pytest.fixture(autouse=True)
+def enable_test_personas(monkeypatch):
+    """Legacy demo fixtures are explicitly enabled only inside the isolated test suite."""
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "ENVIRONMENT", "test")
+    monkeypatch.setattr(settings, "ENABLE_DEMO_DATA", True)
+
+
+@pytest.fixture(autouse=True)
+def isolate_sidecar_storage(monkeypatch):
+    """Reset in-memory admin metadata caches between tests."""
+    from app.api.v1.endpoints import admin
+    monkeypatch.setattr(admin, "_TEAM_ADMIN_META", {})
+    monkeypatch.setattr(admin, "_PERSONNEL_EXTRA_META", {})
