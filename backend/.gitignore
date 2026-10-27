@@ -44,3 +44,5 @@ htmlcov/
 # Database / SQLite
 *.db
 *.sqlite3
+
+!hackflow.db
