@@ -111,3 +111,4 @@ notion-module/
 *.db-journal
 *.db-wal
 *.db-shm
+!backend/hackflow.db

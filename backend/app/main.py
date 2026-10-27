@@ -346,7 +346,19 @@ async def _seed_default_accounts() -> None:
                         )
                         await session.flush()
 
-            sample_teams_spec = [
+            sample_teams_spec = []
+            if not existing_teams:
+                sample_teams_spec.append(
+                    (
+                        "CyberSamurai",
+                        "He thong tuong lua AI phat hien bat thuong giao dich eKYC va co lap tan cong Zero-day thoi gian thuc.",
+                        "CS2026",
+                        2 if len(all_subtopics) > 2 else 0,
+                        ["leader@cybersamurai.team", "member@cybersamurai.team", "member2@cybersamurai.team"],
+                        "DH Bach Khoa Ha Noi (HUST)",
+                    )
+                )
+            sample_teams_spec.extend([
                 (
                     "NeuralCrafters",
                     "Nền tảng AI chẩn đoán sớm bất thường ảnh X-Quang phổi kết hợp LLM giải thích lâm sàng.",
@@ -363,7 +375,7 @@ async def _seed_default_accounts() -> None:
                     ["ly.duong@neu.edu.vn", "kiet.vo@hcmut.edu.vn", "phuong.ngo@fpt.edu.vn"],
                     "ĐH Kinh Tế Quốc Dân (NEU)",
                 ),
-            ]
+            ])
 
             for t_name, t_desc, inv_code, sub_idx, mem_emails, uni_name in sample_teams_spec:
                 if t_name.lower() in teams_by_name:
