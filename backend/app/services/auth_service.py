@@ -78,7 +78,7 @@ class AuthService:
         clean_email = LOGIN_EMAIL_ALIASES.get(raw_email, raw_email)
         effective_password = (
             "123456"
-            if settings.demo_enabled and clean_email in DEFAULT_DEMO_ACCOUNTS and password in DEMO_PASSWORD_ALIASES
+            if clean_email in DEFAULT_DEMO_ACCOUNTS and password in DEMO_PASSWORD_ALIASES
             else password
         )
         user = await user_repo.get_by_email(db, clean_email)

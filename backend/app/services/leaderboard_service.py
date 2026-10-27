@@ -71,7 +71,16 @@ class LeaderboardService:
             .order_by(Submission.submitted_at.asc(), Submission.created_at.asc())
         )
         result = await self.db.execute(stmt)
-        return list(result.scalars().all())
+        all_subs = list(result.scalars().all())
+        return [
+            s
+            for s in all_subs
+            if not (
+                s.team
+                and isinstance(getattr(s.team, "admin_meta", None), dict)
+                and str(s.team.admin_meta.get("approval_status", "")).lower() == "rejected"
+            )
+        ]
 
     async def _list_submitted_evaluations(
         self, submission_ids: List[str]
@@ -84,6 +93,20 @@ class LeaderboardService:
                 Evaluation.submission_id.in_(submission_ids),
                 Evaluation.status == EvaluationStatus.SUBMITTED.value,
             )
+            .options(selectinload(Evaluation.judge))
+            .order_by(Evaluation.evaluated_at.asc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
+
+    async def _list_all_evaluations(
+        self, submission_ids: List[str]
+    ) -> List[Evaluation]:
+        if not submission_ids:
+            return []
+        stmt = (
+            select(Evaluation)
+            .where(Evaluation.submission_id.in_(submission_ids))
             .options(selectinload(Evaluation.judge))
             .order_by(Evaluation.evaluated_at.asc())
         )
@@ -110,11 +133,18 @@ class LeaderboardService:
         submissions = await self._list_final_submissions()
         submission_ids = [s.id for s in submissions]
         submitted_evals = await self._list_submitted_evaluations(submission_ids)
+        all_evals = await self._list_all_evaluations(submission_ids)
 
         # Group evaluations by submission_id -> judge_id -> list[Evaluation]
         evals_by_sub_and_judge: Dict[str, Dict[str, List[Evaluation]]] = {}
         for ev in submitted_evals:
             evals_by_sub_and_judge.setdefault(ev.submission_id, {}).setdefault(
+                ev.judge_id, []
+            ).append(ev)
+
+        all_evals_by_sub_and_judge: Dict[str, Dict[str, List[Evaluation]]] = {}
+        for ev in all_evals:
+            all_evals_by_sub_and_judge.setdefault(ev.submission_id, {}).setdefault(
                 ev.judge_id, []
             ).append(ev)
 
@@ -129,11 +159,13 @@ class LeaderboardService:
                     topic_title = sub.team.topic.title
 
             judge_groups = evals_by_sub_and_judge.get(sub.id, {})
+            all_judge_groups = all_evals_by_sub_and_judge.get(sub.id, {})
             judge_scores_list: List[Dict[str, Any]] = []
             judge_totals: List[float] = []
+            draft_judge_totals: List[float] = []
             top_criterion_scores: List[float] = []
 
-            for judge_id, j_evals in judge_groups.items():
+            for judge_id, j_evals in all_judge_groups.items():
                 score_tuples = [
                     (
                         e.score,
@@ -144,22 +176,30 @@ class LeaderboardService:
                     if e.criteria_id in criteria_map
                 ]
                 s_j = calculate_weighted_score(score_tuples)
-                judge_totals.append(s_j)
+                is_submitted = any(
+                    e.status == EvaluationStatus.SUBMITTED.value for e in j_evals
+                )
+                if is_submitted:
+                    judge_totals.append(s_j)
+                else:
+                    draft_judge_totals.append(s_j)
 
                 judge_name = (
                     j_evals[0].judge.full_name
                     if j_evals and j_evals[0].judge
                     else None
                 )
-                judge_scores_list.append(
-                    {
-                        "judge_id": judge_id,
-                        "judge_name": judge_name,
-                        "total_score": s_j,
-                    }
-                )
+                if is_submitted:
+                    judge_scores_list.append(
+                        {
+                            "judge_id": judge_id,
+                            "judge_name": judge_name,
+                            "total_score": s_j,
+                            "status": "submitted",
+                        }
+                    )
 
-                if top_criterion is not None:
+                if is_submitted and top_criterion is not None:
                     top_ev = next(
                         (e for e in j_evals if e.criteria_id == top_criterion.id),
                         None,
@@ -173,6 +213,12 @@ class LeaderboardService:
                         top_criterion_scores.append(0.0)
 
             m_count = len(judge_totals)
+            draft_count = len(draft_judge_totals)
+            draft_score = (
+                round(sum(draft_judge_totals) / draft_count, 2)
+                if draft_count > 0
+                else 0.0
+            )
             if m_count == 0:
                 final_score = 0.0
                 max_spread = 0.0
@@ -214,7 +260,11 @@ class LeaderboardService:
                     "topic_title": topic_title,
                     "final_score": final_score,
                     "total_score": final_score,
+                    "draft_score": draft_score,
                     "eval_count": m_count,
+                    "draft_eval_count": draft_count,
+                    "has_locked_evaluations": m_count > 0,
+                    "has_draft_evaluations": draft_count > 0,
                     "max_spread": max_spread,
                     "std_dev": std_dev,
                     "top_criteria_score": top_criteria_score,

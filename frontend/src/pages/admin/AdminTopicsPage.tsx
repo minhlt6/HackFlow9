@@ -4,6 +4,7 @@ import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 import { Input } from '../../components/Input';
 import {
   Lightbulb,
@@ -133,6 +134,8 @@ export const AdminTopicsPage: React.FC = () => {
   const [editSubDesc, setEditSubDesc] = useState('');
   const [newQuotaValue, setNewQuotaValue] = useState(3);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteMajorTarget, setDeleteMajorTarget] = useState<{ id: string; name: string } | null>(null);
+  const [deleteSubTopicTarget, setDeleteSubTopicTarget] = useState<{ id: string; title: string } | null>(null);
 
   const handleAddMajor = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,20 +166,25 @@ export const AdminTopicsPage: React.FC = () => {
     setMajorDescription('');
   };
 
-  const handleDeleteMajor = async (id: string, name?: string) => {
-    const displayName = name || 'lĩnh vực này';
-    if (window.confirm(`Bạn có chắc muốn xóa lĩnh vực "${displayName}" cùng toàn bộ đề tài nhánh?`)) {
-      try {
-        await topicsApi.deleteTopic(id);
-        await fetchTopics();
-        showAlert(`Đã xóa lĩnh vực "${displayName}".`, 'success');
-      } catch (err: unknown) {
-        if (axios.isAxiosError(err)) {
-          showAlert(err.response?.data?.message || 'Có lỗi xảy ra khi xóa đề tài.', 'error');
-        } else {
-          deleteMajorTopic(id);
-        }
+  const handleDeleteMajor = (id: string, name?: string) => {
+    setDeleteMajorTarget({ id, name: name || 'lĩnh vực này' });
+  };
+
+  const executeDeleteMajor = async () => {
+    if (!deleteMajorTarget) return;
+    const { id, name: displayName } = deleteMajorTarget;
+    try {
+      await topicsApi.deleteTopic(id);
+      await fetchTopics();
+      showAlert(`Đã xóa lĩnh vực "${displayName}".`, 'success');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        showAlert(err.response?.data?.message || 'Có lỗi xảy ra khi xóa đề tài.', 'error');
+      } else {
+        deleteMajorTopic(id);
       }
+    } finally {
+      setDeleteMajorTarget(null);
     }
   };
 
@@ -243,10 +251,13 @@ export const AdminTopicsPage: React.FC = () => {
     setEditingSubTopic(null);
   };
 
-  const handleDeleteSubTopic = async (subId: string, subTitle: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa đề tài nhánh "${subTitle}"?`)) {
-      return;
-    }
+  const handleDeleteSubTopic = (subId: string, subTitle: string) => {
+    setDeleteSubTopicTarget({ id: subId, title: subTitle });
+  };
+
+  const executeDeleteSubTopic = async () => {
+    if (!deleteSubTopicTarget) return;
+    const { id: subId, title: subTitle } = deleteSubTopicTarget;
     try {
       await topicsApi.deleteSubtopic(subId);
       await fetchTopics();
@@ -257,6 +268,8 @@ export const AdminTopicsPage: React.FC = () => {
       } else {
         showAlert('Không thể xóa đề tài nhánh.', 'error');
       }
+    } finally {
+      setDeleteSubTopicTarget(null);
     }
   };
 
@@ -638,6 +651,30 @@ export const AdminTopicsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteMajorTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteMajorTarget(null);
+        }}
+        title={`Xóa lĩnh vực đề tài "${deleteMajorTarget?.name || ''}"?`}
+        description="Hành động này sẽ xóa lĩnh vực đề tài cùng toàn bộ các đề tài nhánh bên trong. Không thể xóa nếu đã có đội thi đăng ký."
+        confirmLabel="Xác nhận xóa lĩnh vực"
+        variant="destructive"
+        onConfirm={executeDeleteMajor}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteSubTopicTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteSubTopicTarget(null);
+        }}
+        title={`Xóa đề tài nhánh "${deleteSubTopicTarget?.title || ''}"?`}
+        description="Đề tài nhánh này sẽ bị gỡ khỏi danh mục lựa chọn của các đội thi. Thao tác này không thể hoàn tác."
+        confirmLabel="Xác nhận xóa đề tài"
+        variant="destructive"
+        onConfirm={executeDeleteSubTopic}
+      />
     </div>
   );
 };

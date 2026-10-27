@@ -133,3 +133,28 @@ async def test_checkpoint_buttons_persist_weight_and_order(client):
     assert updated.json()["data"]["weight"] == 65
     listing = await client.get("/api/v1/checkpoints", headers=headers)
     assert [cp["id"] for cp in listing.json()["data"]] == [ids[1], ids[0]]
+
+@pytest.mark.asyncio
+async def test_production_lifespan_falls_back_to_sqlite_on_gaierror(monkeypatch):
+    import socket
+    import app.main as main_module
+    import app.core.database as db_module
+
+    monkeypatch.setattr(settings, "ENVIRONMENT", "production")
+    calls = {"count": 0, "switched": False}
+
+    async def fake_seed():
+        calls["count"] += 1
+        if calls["count"] == 1:
+            raise socket.gaierror(-2, "Name or service not known")
+
+    def fake_switch():
+        calls["switched"] = True
+
+    monkeypatch.setattr(main_module, "_seed_default_accounts", fake_seed)
+    monkeypatch.setattr(db_module, "switch_to_sqlite_fallback", fake_switch)
+
+    async with main_module.lifespan(main_module.app):
+        assert calls["switched"] is True
+        assert calls["count"] == 2
+

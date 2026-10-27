@@ -3,6 +3,7 @@ import { useMockStore } from '../../store/useMockStore';
 import { axiosClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 import { Input } from '../../components/Input';
 import type { WhitelistEntry } from '../../types';
 import {
@@ -39,6 +40,8 @@ export const AdminWhitelistPage: React.FC = () => {
     '',
   );
   const [alert, setAlert] = useState<string | null>(null);
+  const [deleteWlTarget, setDeleteWlTarget] = useState<{ id: string; email: string } | null>(null);
+  const [deactivateWlTarget, setDeactivateWlTarget] = useState<WhitelistEntry | null>(null);
 
   const fetchBackendWhitelist = useCallback(async () => {
     try {
@@ -137,7 +140,7 @@ export const AdminWhitelistPage: React.FC = () => {
     setTimeout(() => setAlert(null), 3000);
   };
 
-  const handleToggleActive = async (item: WhitelistEntry) => {
+  const executeToggleActive = async (item: WhitelistEntry) => {
     const emailLower = item.email.toLowerCase();
     try {
       if (item.isActive) {
@@ -165,25 +168,38 @@ export const AdminWhitelistPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string, email: string) => {
-    if (window.confirm(`Xóa email ${email} khỏi danh sách Whitelist?`)) {
-      const emailLower = email.toLowerCase();
-      try {
-        await axiosClient.delete(`/admin/whitelist/${encodeURIComponent(id)}`, {
-          params: { permanent: true, email },
-        });
-      } catch {
-        setAlert('Không thể lưu thay đổi. Vui lòng thử lại.');
-        await fetchBackendWhitelist();
-        return;
-      }
-      removeWhitelistEntry(id, email);
-      setBackendWhitelist((prev) =>
-        prev.filter((w) => w.id !== id && w.email.toLowerCase() !== emailLower),
-      );
-      setAlert(`Đã xóa ${email} khỏi danh sách Whitelist thành công!`);
-      setTimeout(() => setAlert(null), 3000);
+  const handleToggleActive = async (item: WhitelistEntry) => {
+    if (item.isActive) {
+      setDeactivateWlTarget(item);
+      return;
     }
+    await executeToggleActive(item);
+  };
+
+  const handleDelete = (id: string, email: string) => {
+    setDeleteWlTarget({ id, email });
+  };
+
+  const executeDeleteWl = async () => {
+    if (!deleteWlTarget) return;
+    const { id, email } = deleteWlTarget;
+    setDeleteWlTarget(null);
+    const emailLower = email.toLowerCase();
+    try {
+      await axiosClient.delete(`/admin/whitelist/${encodeURIComponent(id)}`, {
+        params: { permanent: true, email },
+      });
+    } catch {
+      setAlert('Không thể lưu thay đổi. Vui lòng thử lại.');
+      await fetchBackendWhitelist();
+      return;
+    }
+    removeWhitelistEntry(id, email);
+    setBackendWhitelist((prev) =>
+      prev.filter((w) => w.id !== id && w.email.toLowerCase() !== emailLower),
+    );
+    setAlert(`Đã xóa ${email} khỏi danh sách Whitelist thành công!`);
+    setTimeout(() => setAlert(null), 3000);
   };
 
   return (
@@ -353,6 +369,35 @@ export const AdminWhitelistPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deactivateWlTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeactivateWlTarget(null);
+        }}
+        title={`Tạm khóa email "${deactivateWlTarget?.email || ''}"?`}
+        description="Sau khi tạm khóa, email này sẽ không được tự động kích hoạt khi đăng nhập mới qua GitHub OAuth cho đến khi được kích hoạt lại."
+        confirmLabel="Xác nhận tạm khóa"
+        variant="warning"
+        onConfirm={async () => {
+          if (!deactivateWlTarget) return;
+          const target = deactivateWlTarget;
+          setDeactivateWlTarget(null);
+          await executeToggleActive(target);
+        }}
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteWlTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteWlTarget(null);
+        }}
+        title={`Xóa vĩnh viễn "${deleteWlTarget?.email || ''}" khỏi Whitelist?`}
+        description="Địa chỉ email này sẽ bị xóa hoàn toàn khỏi danh sách hợp lệ của cuộc thi. Thao tác này không thể hoàn tác."
+        confirmLabel="Xác nhận xóa"
+        variant="destructive"
+        onConfirm={executeDeleteWl}
+      />
     </div>
   );
 };

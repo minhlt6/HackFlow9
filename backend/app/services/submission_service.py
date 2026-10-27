@@ -220,6 +220,24 @@ class SubmissionService:
 
         team_id = str(membership.team_id)
 
+        team_obj = await team_repo.get_by_id(db, team_id)
+        team_meta = team_obj.admin_meta if (team_obj and isinstance(getattr(team_obj, "admin_meta", None), dict)) else {}
+        if str(team_meta.get("approval_status", "")).lower() == "rejected":
+            reason_str = team_meta.get("rejection_reason") or "Không đạt điều kiện xét duyệt của Ban Tổ Chức."
+            raise ForbiddenException(
+                message=f"Đội thi của bạn đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu (Lý do: {reason_str}), không thể nộp bài.",
+                error_code="TEAM_REJECTED",
+            )
+
+        team_obj = await team_repo.get_by_id(db, team_id)
+        team_meta = team_obj.admin_meta if (team_obj and isinstance(getattr(team_obj, "admin_meta", None), dict)) else {}
+        if str(team_meta.get("approval_status", "")).lower() == "rejected":
+            reason_str = team_meta.get("rejection_reason") or "Không đạt điều kiện xét duyệt của Ban Tổ Chức."
+            raise ForbiddenException(
+                message=f"Đội thi của bạn đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu (Lý do: {reason_str}), không thể nộp bài.",
+                error_code="TEAM_REJECTED",
+            )
+
         # ── Xác định checkpoint_id ──
         checkpoint_id = (checkpoint_id_override or payload.checkpoint_id or "").strip()
         if not checkpoint_id:

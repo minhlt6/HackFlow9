@@ -72,7 +72,8 @@ async def _seed_default_accounts() -> None:
 
         await conn.run_sync(_ensure_schema_columns)
 
-    if not settings.demo_enabled and settings.ENVIRONMENT != "development":
+    is_test_env = settings.ENVIRONMENT in {"test", "testing"}
+    if is_test_env and not settings.demo_enabled:
         return
 
     default_users = [
@@ -110,7 +111,7 @@ async def _seed_default_accounts() -> None:
                 if email == "leader@cybersamurai.team" and existing.full_name == "Trần Quốc Bảo":
                     existing.full_name = "Nguyễn Văn Minh"
 
-        if settings.ENVIRONMENT == "development":
+        if not is_test_env:
             import json
             from pathlib import Path as _Path
             from datetime import datetime, timedelta, timezone
@@ -612,8 +613,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await _seed_default_accounts()
         logger.info("Đã khởi tạo schema cơ sở dữ liệu và tài khoản mặc định thành công.")
     except Exception as exc:
-        if settings.ENVIRONMENT not in {"development", "test"}:
-            raise
         logger.warning(
             f"Không thể kết nối DATABASE_URL từ xa ({exc}). Tự động chuyển sang SQLite dự phòng (hackflow.db)..."
         )

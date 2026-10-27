@@ -8,6 +8,7 @@ import {
 import { Button } from '../../components/Button';
 import { Badge, type BadgeVariant } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 import { Input } from '../../components/Input';
 import {
   Megaphone,
@@ -37,6 +38,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
   const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteAnnTarget, setDeleteAnnTarget] = useState<{ id: string; title: string } | null>(null);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Modal State for Add & Edit
@@ -180,10 +182,14 @@ export const AdminAnnouncementsPage: React.FC = () => {
   };
 
   // Xóa thông báo: DELETE /api/v1/announcements/{id}
-  const handleDelete = async (id: string, annTitle: string) => {
-    if (!window.confirm(`Xác nhận xóa thông báo "${annTitle}" khỏi hệ thống?`)) {
-      return;
-    }
+  const handleDelete = (id: string, annTitle: string) => {
+    setDeleteAnnTarget({ id, title: annTitle });
+  };
+
+  const executeDeleteAnnouncement = async () => {
+    if (!deleteAnnTarget) return;
+    const { id, title: annTitle } = deleteAnnTarget;
+    setDeleteAnnTarget(null);
 
     try {
       await notificationsApi.deleteAnnouncement(id);
@@ -204,13 +210,11 @@ export const AdminAnnouncementsPage: React.FC = () => {
         return;
       }
 
-      // Fallback local delete
       showAlert('Không thể xóa thông báo. Vui lòng thử lại.', 'error');
       return;
     }
 
     await loadAnnouncements();
-    // Đồng bộ tức thì với chuông thông báo
     useNotificationStore.getState().fetchNotifications();
   };
 
@@ -453,6 +457,18 @@ export const AdminAnnouncementsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteAnnTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteAnnTarget(null);
+        }}
+        title={`Xóa thông báo "${deleteAnnTarget?.title || ''}"?`}
+        description="Thông báo này sẽ bị gỡ khỏi bảng tin hệ thống và danh sách chuông thông báo của toàn bộ người dùng."
+        confirmLabel="Xác nhận xóa thông báo"
+        variant="destructive"
+        onConfirm={executeDeleteAnnouncement}
+      />
     </div>
   );
 };

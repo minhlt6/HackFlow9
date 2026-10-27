@@ -78,7 +78,16 @@ class EvaluationRepository:
             .order_by(Submission.submitted_at.asc(), Submission.created_at.asc())
         )
         result = await self.db.execute(stmt)
-        return list(result.scalars().all())
+        all_subs = list(result.scalars().all())
+        return [
+            s
+            for s in all_subs
+            if not (
+                s.team
+                and isinstance(getattr(s.team, "admin_meta", None), dict)
+                and str(s.team.admin_meta.get("approval_status", "")).lower() == "rejected"
+            )
+        ]
 
     async def get_submission_by_id_or_team(
         self, submission_or_team_id: str

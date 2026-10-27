@@ -69,6 +69,8 @@ class TeamResponse(BaseModel):
     team_name: str
     invite_code: str
     status: str
+    approval_status: Optional[str] = None
+    rejection_reason: Optional[str] = None
     is_locked: bool = False
     member_count: int
     min_members: int = 3

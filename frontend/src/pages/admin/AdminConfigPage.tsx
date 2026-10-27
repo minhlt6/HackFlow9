@@ -29,6 +29,7 @@ import {
 
 import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 
 export const AdminConfigPage: React.FC = () => {
   const {
@@ -52,6 +53,9 @@ export const AdminConfigPage: React.FC = () => {
     config.finalSubmissionDeadline ? config.finalSubmissionDeadline.slice(0, 16) : ''
   );
   const [alert, setAlert] = useState<string | null>(null);
+  const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
+  const [isContestToggleConfirmOpen, setIsContestToggleConfirmOpen] = useState(false);
+  const [isPublishToggleConfirmOpen, setIsPublishToggleConfirmOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -159,18 +163,17 @@ export const AdminConfigPage: React.FC = () => {
   };
 
   const handleResetAll = () => {
-    if (
-      window.confirm(
-        'Tải lại dữ liệu cuộc thi từ máy chủ và xóa bộ nhớ đệm trình duyệt?'
-      )
-    ) {
-      resetAllMockData();
-      localStorage.removeItem('hackflow-full-setup-v3');
-      localStorage.removeItem('hackflow-full-setup-v2');
-      localStorage.removeItem('hackflow-clean-config-v1');
-      localStorage.removeItem('hackflow-mock-state-v4');
-      window.location.reload();
-    }
+    setIsResetConfirmOpen(true);
+  };
+
+  const executeResetAll = () => {
+    setIsResetConfirmOpen(false);
+    resetAllMockData();
+    localStorage.removeItem('hackflow-full-setup-v3');
+    localStorage.removeItem('hackflow-full-setup-v2');
+    localStorage.removeItem('hackflow-clean-config-v1');
+    localStorage.removeItem('hackflow-mock-state-v4');
+    window.location.reload();
   };
 
   return (
@@ -407,7 +410,7 @@ export const AdminConfigPage: React.FC = () => {
                   {config.isContestStarted ? (
                     <button
                       type="button"
-                      onClick={() => { void toggleContestStarted().catch(() => toast.error('Không thể lưu cấu hình. Vui lòng thử lại.')); }}
+                      onClick={() => setIsContestToggleConfirmOpen(true)}
                       className="w-full sm:w-auto px-4 py-2.5 rounded-[10px] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-amber-950/20"
                     >
                       <Pause size={15} />
@@ -416,7 +419,7 @@ export const AdminConfigPage: React.FC = () => {
                   ) : (
                     <button
                       type="button"
-                      onClick={() => { void toggleContestStarted().catch(() => toast.error('Không thể lưu cấu hình. Vui lòng thử lại.')); }}
+                      onClick={() => setIsContestToggleConfirmOpen(true)}
                       className="w-full sm:w-auto px-5 py-2.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-600/30"
                     >
                       <Play size={15} />
@@ -518,7 +521,7 @@ export const AdminConfigPage: React.FC = () => {
 
                   <button
                     type="button"
-                    onClick={() => { void toggleResultsPublished().catch(() => toast.error('Không thể lưu cấu hình. Vui lòng thử lại.')); }}
+                    onClick={() => setIsPublishToggleConfirmOpen(true)}
                     role="switch"
                     aria-checked={config.resultsPublished}
                     className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
@@ -629,6 +632,66 @@ export const AdminConfigPage: React.FC = () => {
         onSaveAndLeave={handleSaveAndLeave}
         title="Xác Nhận Rời Khỏi Cấu Hình"
         message="Bạn đang có các thông số cấu hình cuộc thi vừa thay đổi chưa được lưu. Nếu rời khỏi trang bây giờ, toàn bộ chỉnh sửa này sẽ bị hủy bỏ."
+      />
+
+      <ConfirmDialog
+        open={isContestToggleConfirmOpen}
+        onOpenChange={setIsContestToggleConfirmOpen}
+        title={
+          config.isContestStarted
+            ? 'Xác nhận Tạm dừng / Dừng cuộc thi?'
+            : 'Xác nhận Phát lệnh Bắt đầu cuộc thi?'
+        }
+        description={
+          config.isContestStarted
+            ? 'Đồng hồ đếm ngược trên màn hình của toàn bộ thí sinh sẽ tạm dừng và hệ thống chuyển về chế độ chờ.'
+            : 'Đồng hồ đếm ngược sẽ được kích hoạt ngay lập tức trên giao diện của toàn bộ thí sinh và mở tiếp nhận bài làm các chặng.'
+        }
+        confirmLabel={config.isContestStarted ? 'Xác nhận tạm dừng' : 'Bắt đầu cuộc thi'}
+        variant={config.isContestStarted ? 'warning' : 'primary'}
+        onConfirm={async () => {
+          setIsContestToggleConfirmOpen(false);
+          try {
+            await toggleContestStarted();
+          } catch {
+            toast.error('Không thể lưu cấu hình. Vui lòng thử lại.');
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={isPublishToggleConfirmOpen}
+        onOpenChange={setIsPublishToggleConfirmOpen}
+        title={
+          config.resultsPublished
+            ? 'Tạm ẩn Bảng xếp hạng đối với thí sinh?'
+            : 'Công bố công khai Bảng xếp hạng cho toàn bộ thí sinh?'
+        }
+        description={
+          config.resultsPublished
+            ? 'Bảng xếp hạng sẽ chuyển về chế độ bảo mật. Chỉ Quản trị viên và Giám khảo mới có thể xem bảng tổng hợp.'
+            : 'Toàn bộ thí sinh sẽ nhìn thấy điểm tổng kết chính thức và thứ hạng của các đội thi trên trang Leaderboard.'
+        }
+        confirmLabel={config.resultsPublished ? 'Xác nhận ẩn bảng điểm' : 'Xác nhận công bố'}
+        variant={config.resultsPublished ? 'warning' : 'primary'}
+        onConfirm={async () => {
+          setIsPublishToggleConfirmOpen(false);
+          try {
+            await toggleResultsPublished();
+          } catch {
+            toast.error('Không thể lưu cấu hình. Vui lòng thử lại.');
+          }
+        }}
+      />
+
+      <ConfirmDialog
+        open={isResetConfirmOpen}
+        onOpenChange={setIsResetConfirmOpen}
+        title="Tải lại dữ liệu từ máy chủ & xóa bộ nhớ đệm?"
+        description="Hệ thống sẽ xóa bộ nhớ đệm (localStorage) trên trình duyệt hiện tại và đồng bộ lại toàn bộ dữ liệu trực tiếp từ cơ sở dữ liệu máy chủ."
+        confirmLabel="Xác nhận tải lại"
+        variant="destructive"
+        onConfirm={executeResetAll}
       />
     </div>
   );

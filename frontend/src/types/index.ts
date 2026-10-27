@@ -52,6 +52,9 @@ export interface Team {
   subTopicId?: string;
   topicId?: string | null;
   status: 'approved' | 'pending' | 'rejected' | 'INCOMPLETE' | 'VALID' | 'APPROVED' | 'REJECTED';
+  approvalStatus?: ApprovalStatus;
+  topicName?: string;
+  maxMembers?: number;
   members: TeamMember[];
   memberCount?: number;
   rejectionReason?: string;

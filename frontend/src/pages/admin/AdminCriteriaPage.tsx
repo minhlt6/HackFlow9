@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 import { Input } from '../../components/Input';
 import {
   Scale,
@@ -91,6 +92,7 @@ export const AdminCriteriaPage: React.FC = () => {
   const [rebalanceMode, setRebalanceMode] = useState<'proportional' | 'equal' | 'none'>('proportional');
 
   const [editingItem, setEditingItem] = useState<RubricCriteria | null>(null);
+  const [deleteCriterionTarget, setDeleteCriterionTarget] = useState<{ id: string; name: string } | null>(null);
   const [alert, setAlert] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
   const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'success', duration = 4000) => {
@@ -443,18 +445,25 @@ export const AdminCriteriaPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string, criterionName: string) => {
-    if (window.confirm(`Xóa tiêu chí "${criterionName}"?`)) {
-      const remaining = criteriaList.filter((c) => c.id !== id);
-      if (remaining.length === 0) {
-        showAlert('Ma trận đánh giá phải có ít nhất 1 tiêu chí!', 'error');
-        return;
-      }
-
-      // Automatically rebalance remaining criteria proportionally
-      const balanced = rebalanceProportional(remaining);
-      await saveToBackend(balanced, `Đã xóa tiêu chí "${criterionName}" và tự động cân đối lại 100%!`);
+  const handleDelete = (id: string, criterionName: string) => {
+    if (criteriaList.length <= 1) {
+      showAlert('Ma trận đánh giá phải có ít nhất 1 tiêu chí!', 'error');
+      return;
     }
+    setDeleteCriterionTarget({ id, name: criterionName });
+  };
+
+  const executeDeleteCriterion = async () => {
+    if (!deleteCriterionTarget) return;
+    const { id, name: criterionName } = deleteCriterionTarget;
+    setDeleteCriterionTarget(null);
+    const remaining = criteriaList.filter((c) => c.id !== id);
+    if (remaining.length === 0) {
+      showAlert('Ma trận đánh giá phải có ít nhất 1 tiêu chí!', 'error');
+      return;
+    }
+    const balanced = rebalanceProportional(remaining);
+    await saveToBackend(balanced, `Đã xóa tiêu chí "${criterionName}" và tự động cân đối lại 100%!`);
   };
 
   const handleQuickRebalance = async (mode: 'proportional' | 'equal') => {
@@ -1007,6 +1016,19 @@ export const AdminCriteriaPage: React.FC = () => {
           </form>
         )}
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteCriterionTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteCriterionTarget(null);
+        }}
+        title={`Xóa tiêu chí chấm điểm "${deleteCriterionTarget?.name || ''}"?`}
+        description="Tiêu chí này sẽ bị gỡ khỏi ma trận Rubric và hệ thống sẽ tự động chuẩn hóa lại tỷ lệ trọng số của các tiêu chí còn lại về đúng 100%."
+        confirmLabel="Xác nhận xóa tiêu chí"
+        variant="destructive"
+        isLoading={saving}
+        onConfirm={executeDeleteCriterion}
+      />
     </div>
   );
 };

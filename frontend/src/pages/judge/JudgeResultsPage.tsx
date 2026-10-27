@@ -3,7 +3,7 @@ import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
 import { Badge } from '../../components/Badge';
 import { Button } from '../../components/Button';
 import { useNavigate } from 'react-router-dom';
-import { Columns } from 'lucide-react';
+import { Columns, Lock } from 'lucide-react';
 
 export const JudgeResultsPage: React.FC = () => {
   const { currentUser, teams, evaluations, rubricCriteria, syncFromBackend } = useMockStore();
@@ -41,9 +41,10 @@ export const JudgeResultsPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-foreground">
-              {teams.map((t) => {
+              {teams.filter((t) => t.status !== 'REJECTED' && t.approvalStatus !== 'rejected').map((t) => {
                 const evalItem = myEvaluations.find((e) => e.teamId === t.id);
                 const hasScore = Boolean(evalItem);
+                const isLocked = Boolean(evalItem && !evalItem.isDraft);
                 const normalizedScore = evalItem
                   ? normalizeScoreTo100(evalItem.totalScore, evalItem.scores, rubricCriteria)
                   : 0;
@@ -75,15 +76,22 @@ export const JudgeResultsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => navigate(`/judge/split-screen?teamId=${t.id}`)}
-                        className="px-2.5 py-1 text-xs gap-1"
-                      >
-                        <Columns size={12} />
-                        <span>{hasScore ? 'Sửa điểm' : 'Chấm ngay'}</span>
-                      </Button>
+                      {isLocked ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground px-2.5 py-1">
+                          <Lock size={12} />
+                          <span>Đã khóa điểm</span>
+                        </span>
+                      ) : (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => navigate(`/judge/split-screen?teamId=${t.id}`)}
+                          className="px-2.5 py-1 text-xs gap-1"
+                        >
+                          <Columns size={12} />
+                          <span>{hasScore ? 'Sửa điểm' : 'Chấm ngay'}</span>
+                        </Button>
+                      )}
                     </td>
                   </tr>
                 );

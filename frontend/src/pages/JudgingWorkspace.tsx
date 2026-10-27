@@ -7,6 +7,7 @@ import { evaluationService, type EvaluationCriteriaScore } from '../services/eva
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/patterns/ConfirmDialog';
 import {
   FileCode,
   Video,
@@ -64,6 +65,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
 }) => {
   const isLocked = Boolean(existingEval && !existingEval.isDraft);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [isUnlockConfirmOpen, setIsUnlockConfirmOpen] = useState(false);
 
   // Scores state: Map criterionId -> score (0 to maxScore) or '' during typing
   const [scores, setScores] = useState<Record<string, number | ''>>(() => {
@@ -270,7 +272,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
     );
   };
 
-  const handleAdminUnlock = async () => {
+  const handleAdminUnlock = async (reason?: string) => {
     if (!isAdmin) return;
     const numericScores: Record<string, number> = {};
     for (const c of rubricCriteria) {
@@ -279,7 +281,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
     }
     try {
       await apiClient.post(`/admin/evaluations/${encodeURIComponent(team.id)}/unlock`, {
-        reason: 'Admin mở khóa trực tiếp trên không gian chấm điểm',
+        reason: reason || 'Admin mở khóa trực tiếp trên không gian chấm điểm',
         judge_id: existingEval?.judgeId || currentUser.id,
       });
     } catch {
@@ -450,7 +452,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleAdminUnlock}
+                onClick={() => setIsUnlockConfirmOpen(true)}
                 className="text-muted-foreground hover:text-amber-300 text-xs border border-amber-500/30"
               >
                 Mở khóa sửa lại (Admin/BTC)
@@ -531,6 +533,23 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={isUnlockConfirmOpen}
+        onOpenChange={setIsUnlockConfirmOpen}
+        title={`Mở khóa phiếu chấm cho "${displayName}"?`}
+        description="Thao tác này sẽ chuyển phiếu chấm đã khóa về lại trạng thái Bản nháp (Draft) để Giám khảo có thể điều chỉnh lại điểm số."
+        confirmLabel="Xác nhận mở khóa"
+        variant="warning"
+        requireReason
+        reasonLabel="Lý do mở khóa phiếu chấm (Audit Log)"
+        defaultReason="Admin mở khóa trực tiếp trên không gian chấm điểm để rà soát lại điểm số."
+        minReasonLength={5}
+        onConfirm={async (reason) => {
+          await handleAdminUnlock(reason);
+          setIsUnlockConfirmOpen(false);
+        }}
+      />
     </div>
   );
 };
@@ -578,7 +597,7 @@ export const JudgingWorkspace: React.FC = () => {
 
   // Teams with their evaluation status for the current judge
   const teamsWithStatus = useMemo(() => {
-    return teams.map((team, idx) => {
+    return teams.filter((team) => team.status !== 'REJECTED' && team.approvalStatus !== 'rejected').map((team, idx) => {
       const existing = evaluations.find(
         (e) => e.teamId === team.id && e.judgeId === currentUser.id,
       );

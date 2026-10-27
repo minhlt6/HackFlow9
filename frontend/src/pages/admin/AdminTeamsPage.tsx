@@ -91,6 +91,8 @@ export const AdminTeamsPage: React.FC = () => {
   const [editingTeam, setEditingTeam] = useState<EnrichedAdminTeam | null>(null);
   const [rejectTarget, setRejectTarget] = useState<EnrichedAdminTeam | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EnrichedAdminTeam | null>(null);
+  const [isAutoMatchConfirmOpen, setIsAutoMatchConfirmOpen] = useState(false);
+  const [bulkApproveTarget, setBulkApproveTarget] = useState<{ rows: EnrichedAdminTeam[]; clear: () => void } | null>(null);
 
   const activeDetailTeam = useMemo(
     () =>
@@ -470,7 +472,7 @@ export const AdminTeamsPage: React.FC = () => {
               disabled={unassignedCandidates.length === 0 || isMutating}
               isLoading={isAutoMatching}
               loadingText="Đang ghép đội..."
-              onClick={() => void handleAutoMatchTeams()}
+              onClick={() => setIsAutoMatchConfirmOpen(true)}
               title="Tự động ghép toàn bộ thí sinh đã đăng nhập nhưng chưa có đội thành các đội 3–5 người"
             >
               <Shuffle size={15} />
@@ -525,7 +527,7 @@ export const AdminTeamsPage: React.FC = () => {
               size="sm"
               isLoading={isAutoMatching}
               loadingText="Đang ghép..."
-              onClick={() => void handleAutoMatchTeams()}
+              onClick={() => setIsAutoMatchConfirmOpen(true)}
             >
               <Shuffle size={14} />
               <span>Ghép ngẫu nhiên tất cả ngay</span>
@@ -643,9 +645,8 @@ export const AdminTeamsPage: React.FC = () => {
                   size="sm"
                   className="h-7 text-xs"
                   isLoading={isMutating}
-                  onClick={async () => {
-                    await handleBulkApprove(selectedRows);
-                    clearSelection();
+                  onClick={() => {
+                    setBulkApproveTarget({ rows: selectedRows, clear: clearSelection });
                   }}
                 >
                   <CheckCircle2 size={13} />
@@ -702,25 +703,67 @@ export const AdminTeamsPage: React.FC = () => {
         onEdit={(team) => openEditModal(team)}
       />
 
-      {/* Reject Team Confirmation Dialog (with mandatory reason validation) */}
+      {/* Reject / Disqualify Team Confirmation Dialog (Option B with mandatory reason validation) */}
       <ConfirmDialog
         open={Boolean(rejectTarget)}
         onOpenChange={(open) => {
           if (!open) setRejectTarget(null);
         }}
-        title={`Từ chối hồ sơ đội thi "${rejectTarget?.name || ''}"`}
-        description="Đội thi bị từ chối sẽ không thể khóa đề tài hoặc nộp bài tại các chặng Checkpoint cho đến khi cập nhật lại hồ sơ hợp lệ."
+        title={
+          rejectTarget?.subTopicId || (rejectTarget?.checkpointsCompleted ?? 0) > 0
+            ? `Từ chối & Đình chỉ tư cách thi đấu đội "${rejectTarget?.name || ''}"`
+            : `Từ chối hồ sơ đội thi "${rejectTarget?.name || ''}"`
+        }
+        description={
+          rejectTarget?.subTopicId || (rejectTarget?.checkpointsCompleted ?? 0) > 0
+            ? 'CẢNH BÁO ĐÌNH CHỈ THI ĐẤU: Đội thi này đã đăng ký đề tài hoặc đã nộp bài Checkpoint. Khi xác nhận từ chối, hệ thống sẽ đình chỉ tư cách thi đấu của đội, khóa quyền chọn đề tài & nộp bài, đồng thời tự động loại đội khỏi danh sách chấm điểm của Giám khảo và Bảng xếp hạng (dữ liệu bài nộp vẫn được bảo toàn để khôi phục nếu duyệt lại).'
+            : 'Đội thi bị từ chối sẽ bị khóa quyền chọn đề tài, không thể nộp bài tại các chặng Checkpoint và bị loại khỏi danh sách chấm thi cũng như Bảng xếp hạng cho đến khi được Ban Tổ Chức phê duyệt lại.'
+        }
         confirmLabel="Xác nhận từ chối"
         variant="warning"
         isLoading={isMutating}
         requireReason
-        reasonLabel="Lý do từ chối hồ sơ"
+        reasonLabel="Lý do từ chối / đình chỉ đội thi"
         defaultReason="Đội thi chưa đủ số lượng thành viên tối thiểu theo quy chế Hackathon (yêu cầu từ 3 đến 5 thành viên hợp lệ)."
         minReasonLength={10}
         onConfirm={async (reason) => {
           if (!rejectTarget || !reason) return;
           const ok = await handleRejectTeam(rejectTarget.id, reason);
           if (ok) setRejectTarget(null);
+        }}
+      />
+
+      {/* Auto-Match Confirmation Dialog */}
+      <ConfirmDialog
+        open={isAutoMatchConfirmOpen}
+        onOpenChange={setIsAutoMatchConfirmOpen}
+        title={`Xác nhận ghép đội ngẫu nhiên (${unassignedCandidates.length} thí sinh lẻ)?`}
+        description="Hệ thống sẽ tự động gom toàn bộ thí sinh đã được phê duyệt nhưng chưa có đội (cùng các đội chưa đủ 3 thành viên) để ghép ngẫu nhiên thành các đội hợp lệ từ 3–5 thành viên."
+        confirmLabel="Xác nhận ghép đội"
+        variant="warning"
+        isLoading={isAutoMatching}
+        onConfirm={async () => {
+          await handleAutoMatchTeams();
+          setIsAutoMatchConfirmOpen(false);
+        }}
+      />
+
+      {/* Bulk Approve Confirmation Dialog */}
+      <ConfirmDialog
+        open={Boolean(bulkApproveTarget)}
+        onOpenChange={(open) => {
+          if (!open) setBulkApproveTarget(null);
+        }}
+        title={`Phê duyệt hàng loạt ${bulkApproveTarget?.rows.length || 0} đội thi đã chọn?`}
+        description="Các đội thi được chọn sẽ chuyển sang trạng thái Đã duyệt (Approved) và được cấp quyền đăng ký đề tài, nộp bài Checkpoint và tham gia chấm điểm."
+        confirmLabel="Xác nhận phê duyệt"
+        variant="primary"
+        isLoading={isMutating}
+        onConfirm={async () => {
+          if (!bulkApproveTarget) return;
+          await handleBulkApprove(bulkApproveTarget.rows);
+          bulkApproveTarget.clear();
+          setBulkApproveTarget(null);
         }}
       />
 

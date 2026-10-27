@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useMockStore } from '../store/useMockStore';
 import { useAuthStore } from '../store/useAuthStore';
 import {
@@ -11,6 +12,7 @@ import type { SupportTicket } from '../types';
 import { Button } from '../components/Button';
 import { Badge, type BadgeVariant } from '../components/Badge';
 import { Modal } from '../components/Modal';
+import { ConfirmDialog } from '../components/patterns/ConfirmDialog';
 import { Input } from '../components/Input';
 import {
   Plus,
@@ -71,6 +73,11 @@ export const SupportTickets: React.FC = () => {
   const isMentor = user?.role === 'mentor';
   const isAdmin = user?.role === 'admin';
   const isMentorOrAdmin = isMentor || isAdmin;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ticketIdParam = searchParams.get('ticketId');
+  const tabParam = searchParams.get('tab');
+  const effectiveMentorId = user?.id || currentUser.id;
+  const effectiveMentorName = user?.fullName || currentUser.fullName;
 
   // Local state for API Tickets & Refreshing
   const [apiTickets, setApiTickets] = useState<SupportTicket[] | null>(null);
@@ -222,33 +229,46 @@ export const SupportTickets: React.FC = () => {
   // Mentor chỉ thấy: (status = open && assigned_to = null) HOẶC (assigned_to = current_user.id)
   // Admin thấy toàn bộ ticket trong hệ thống
   // ==========================================
+  const isTicketAssignedToCurrentMentor = useCallback(
+    (t: SupportTicket) =>
+      Boolean(
+        (effectiveMentorId && t.assignedMentorId === effectiveMentorId) ||
+          (currentUser.id && t.assignedMentorId === currentUser.id) ||
+          (isMentor && Boolean(t.assignedMentorId)),
+      ),
+    [effectiveMentorId, currentUser.id, isMentor],
+  );
+
   const mentorAllowedTickets = useMemo(() => {
     if (isAdmin) return currentTickets;
     return currentTickets.filter(
-      (t) => (!t.assignedMentorId && t.status === 'open') || t.assignedMentorId === currentUser.id,
+      (t) => (!t.assignedMentorId && t.status === 'open') || isTicketAssignedToCurrentMentor(t),
     );
-  }, [currentTickets, isAdmin, currentUser.id]);
+  }, [currentTickets, isAdmin, isTicketAssignedToCurrentMentor]);
 
-  // Tab scope cho Mentor/Admin:
-  // 'unassigned': Chờ tiếp nhận
-  // 'my_assigned': Tôi đang phụ trách
-  // 'all': Toàn bộ hệ thống (dành cho Admin hoặc lọc mở rộng)
-  const [mentorScopeTab, setMentorScopeTab] = useState<'unassigned' | 'my_assigned' | 'all'>(
-    isMentor ? 'unassigned' : 'all',
-  );
+  const [mentorScopeTab, setMentorScopeTab] = useState<'unassigned' | 'my_assigned' | 'all'>(() => {
+    if (tabParam === 'my_assigned' || tabParam === 'unassigned') return tabParam;
+    if (tabParam === 'all' && isAdmin) return 'all';
+    if (ticketIdParam) {
+      const initialTarget = mockTickets.find((t) => t.id === ticketIdParam || t.ticketCode === ticketIdParam);
+      if (initialTarget && (initialTarget.assignedMentorId || initialTarget.status !== 'open')) {
+        return isAdmin ? 'all' : 'my_assigned';
+      }
+    }
+    return isMentor ? 'unassigned' : 'all';
+  });
 
   const [mentorStatusFilter, setMentorStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved' | 'closed'>('all');
   const [mentorPriorityFilter, setMentorPriorityFilter] = useState<'all' | 'urgent' | 'high' | 'normal' | 'low'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Số lượng đếm cho các Tab
   const unassignedCount = useMemo(() => {
     return currentTickets.filter((t) => !t.assignedMentorId && t.status === 'open').length;
   }, [currentTickets]);
 
   const myAssignedCount = useMemo(() => {
-    return currentTickets.filter((t) => t.assignedMentorId === currentUser.id).length;
-  }, [currentTickets, currentUser.id]);
+    return currentTickets.filter((t) => isTicketAssignedToCurrentMentor(t)).length;
+  }, [currentTickets, isTicketAssignedToCurrentMentor]);
 
   const allSystemCount = useMemo(() => {
     return mentorAllowedTickets.length;
@@ -256,23 +276,19 @@ export const SupportTickets: React.FC = () => {
 
   const filteredMentorTickets = useMemo(() => {
     return mentorAllowedTickets.filter((t) => {
-      // 1. Lọc theo Scope Tab
       if (mentorScopeTab === 'unassigned') {
         if (t.assignedMentorId || t.status !== 'open') return false;
       } else if (mentorScopeTab === 'my_assigned') {
-        if (t.assignedMentorId !== currentUser.id) return false;
+        if (!isTicketAssignedToCurrentMentor(t)) return false;
       }
 
-      // 2. Lọc theo Trạng thái phụ
       if (mentorStatusFilter !== 'all' && t.status !== mentorStatusFilter) return false;
 
-      // 3. Lọc theo Mức độ ưu tiên
       if (mentorPriorityFilter !== 'all') {
         const p = t.priority === 'medium' ? 'normal' : t.priority;
         if (p !== mentorPriorityFilter) return false;
       }
 
-      // 4. Lọc theo Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchTitle = t.title.toLowerCase().includes(q);
@@ -283,16 +299,64 @@ export const SupportTickets: React.FC = () => {
 
       return true;
     });
-  }, [mentorAllowedTickets, mentorScopeTab, mentorStatusFilter, mentorPriorityFilter, searchQuery, currentUser.id]);
+  }, [mentorAllowedTickets, mentorScopeTab, mentorStatusFilter, mentorPriorityFilter, searchQuery, isTicketAssignedToCurrentMentor]);
 
-  // ==========================================
-  // SELECTION & ACTIVE TICKET DERIVATION
-  // ==========================================
   const activeList = isCandidate ? filteredCandidateTickets : filteredMentorTickets;
-  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(() => ticketIdParam || null);
+
+  useEffect(() => {
+    if (tabParam === 'my_assigned' || tabParam === 'unassigned') {
+      setMentorScopeTab(tabParam);
+    } else if (tabParam === 'all' && isAdmin) {
+      setMentorScopeTab('all');
+    }
+  }, [tabParam, isAdmin]);
+
+  useEffect(() => {
+    if (!ticketIdParam) return;
+    const matched = currentTickets.find((t) => t.id === ticketIdParam || t.ticketCode === ticketIdParam);
+    if (matched) {
+      setSelectedTicketId(matched.id);
+      if (isMentor) {
+        if (isTicketAssignedToCurrentMentor(matched) || matched.status !== 'open') {
+          setMentorScopeTab('my_assigned');
+        } else if (tabParam !== 'my_assigned') {
+          setMentorScopeTab('unassigned');
+        }
+      }
+      setMentorStatusFilter((prev) => (prev !== 'all' && prev !== matched.status ? 'all' : prev));
+    } else {
+      setSelectedTicketId(ticketIdParam);
+    }
+  }, [ticketIdParam, tabParam, currentTickets, isMentor, isTicketAssignedToCurrentMentor]);
+
+  const handleSelectMentorTab = (tab: 'unassigned' | 'my_assigned' | 'all') => {
+    setMentorScopeTab(tab);
+    setSelectedTicketId(null);
+    if (searchParams.has('ticketId') || searchParams.has('tab')) {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  const handleSelectTicket = (id: string) => {
+    setSelectedTicketId(id);
+    if (searchParams.has('ticketId')) {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('ticketId', id);
+          return next;
+        },
+        { replace: true },
+      );
+    }
+  };
 
   const effectiveTicketId =
     (selectedTicketId && activeList.some((t) => t.id === selectedTicketId) ? selectedTicketId : null) ||
+    (selectedTicketId && isMentorOrAdmin && mentorAllowedTickets.some((t) => t.id === selectedTicketId)
+      ? selectedTicketId
+      : null) ||
     activeList[0]?.id ||
     null;
 
@@ -302,6 +366,8 @@ export const SupportTickets: React.FC = () => {
   // CREATE TICKET MODAL STATE (CANDIDATE)
   // ==========================================
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [closeTicketTargetId, setCloseTicketTargetId] = useState<string | null>(null);
+  const [isEscalateConfirmOpen, setIsEscalateConfirmOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState<TicketCategory>('technical');
   const [newPriority, setNewPriority] = useState<TicketPriority>('normal');
@@ -372,10 +438,35 @@ export const SupportTickets: React.FC = () => {
   // Mentor Claim Ticket (action: 'accept')
   const handleClaimTicket = async () => {
     if (!activeTicket) return;
+    const claimedId = activeTicket.id;
+    const claimedCode = activeTicket.ticketCode || activeTicket.id;
     try {
-      await ticketService.updateTicket(activeTicket.id, { action: 'accept' });
+      await ticketService.updateTicket(claimedId, { action: 'accept' });
+      setSelectedTicketId(claimedId);
+      if (isMentor) {
+        setMentorScopeTab('my_assigned');
+        setSearchParams({ ticketId: claimedId, tab: 'my_assigned' }, { replace: true });
+      }
+      if (mentorStatusFilter !== 'all' && mentorStatusFilter !== 'in_progress') {
+        setMentorStatusFilter('all');
+      }
+      setApiTickets((prev) =>
+        prev
+          ? prev.map((t) =>
+              t.id === claimedId
+                ? {
+                    ...t,
+                    status: 'in_progress',
+                    assignedMentorId: effectiveMentorId,
+                    assignedMentorName: effectiveMentorName,
+                  }
+                : t,
+            )
+          : prev,
+      );
       await fetchTicketsFromApi();
-      showAlert(`Bạn đã tiếp nhận xử lý Ticket #${activeTicket.ticketCode || activeTicket.id}!`);
+      setSelectedTicketId(claimedId);
+      showAlert(`Bạn đã tiếp nhận xử lý Ticket #${claimedCode}!`);
     } catch (err: unknown) {
       handleApiError(err, 'Không thể tiếp nhận ticket');
     }
@@ -427,7 +518,14 @@ export const SupportTickets: React.FC = () => {
   };
 
   // Candidate Confirm & Close Ticket (action: 'close')
-  const handleCloseTicket = async (ticketId: string) => {
+  const handleCloseTicket = (ticketId: string) => {
+    setCloseTicketTargetId(ticketId);
+  };
+
+  const executeCloseTicket = async () => {
+    if (!closeTicketTargetId) return;
+    const ticketId = closeTicketTargetId;
+    setCloseTicketTargetId(null);
     try {
       await ticketService.updateTicket(ticketId, { action: 'close' });
       await fetchTicketsFromApi();
@@ -466,8 +564,14 @@ export const SupportTickets: React.FC = () => {
   };
 
   // Mentor Escalate to Admin Queue (action: 'escalate' per SRS HF-37 Mục 3.8)
-  const handleEscalateTicket = async () => {
+  const handleEscalateTicket = () => {
     if (!activeTicket) return;
+    setIsEscalateConfirmOpen(true);
+  };
+
+  const executeEscalateTicket = async () => {
+    if (!activeTicket) return;
+    setIsEscalateConfirmOpen(false);
     try {
       await ticketService.updateTicket(activeTicket.id, {
         action: 'escalate',
@@ -485,10 +589,12 @@ export const SupportTickets: React.FC = () => {
   };
 
   // Quyền thao tác Resolve và Claim của Mentor
-  const isAssignedToCurrentMentor = Boolean(activeTicket?.assignedMentorId === currentUser.id || isAdmin);
+  const isAssignedToCurrentMentor = Boolean(
+    (activeTicket && isTicketAssignedToCurrentMentor(activeTicket)) || isAdmin,
+  );
   const isAssignedToOtherMentor = Boolean(
     activeTicket?.assignedMentorId &&
-    activeTicket.assignedMentorId !== currentUser.id &&
+    !isTicketAssignedToCurrentMentor(activeTicket) &&
     !isAdmin,
   );
   const isUnassignedOpen = Boolean(activeTicket?.status === 'open' && !activeTicket?.assignedMentorId);
@@ -626,7 +732,7 @@ export const SupportTickets: React.FC = () => {
                     return (
                       <div
                         key={t.id}
-                        onClick={() => setSelectedTicketId(t.id)}
+                        onClick={() => handleSelectTicket(t.id)}
                         className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                           isSelected
                             ? 'bg-card border-[#6366F1] shadow-md shadow-[#6366F1]/10'
@@ -867,7 +973,7 @@ export const SupportTickets: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-2xl bg-[#111827] border border-border">
             <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
               <button
-                onClick={() => setMentorScopeTab('unassigned')}
+                onClick={() => handleSelectMentorTab('unassigned')}
                 className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
                   mentorScopeTab === 'unassigned'
                     ? 'bg-[#A855F7] text-foreground shadow-md shadow-[#A855F7]/25'
@@ -881,7 +987,7 @@ export const SupportTickets: React.FC = () => {
               </button>
 
               <button
-                onClick={() => setMentorScopeTab('my_assigned')}
+                onClick={() => handleSelectMentorTab('my_assigned')}
                 className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
                   mentorScopeTab === 'my_assigned'
                     ? 'bg-[#A855F7] text-foreground shadow-md shadow-[#A855F7]/25'
@@ -896,7 +1002,7 @@ export const SupportTickets: React.FC = () => {
 
               {isAdmin && (
                 <button
-                  onClick={() => setMentorScopeTab('all')}
+                  onClick={() => handleSelectMentorTab('all')}
                   className={`px-3 py-1.5 rounded-xl font-medium flex items-center gap-2 transition-all ${
                     mentorScopeTab === 'all'
                       ? 'bg-[#A855F7] text-foreground shadow-md shadow-[#A855F7]/25'
@@ -985,7 +1091,7 @@ export const SupportTickets: React.FC = () => {
                     return (
                       <div
                         key={t.id}
-                        onClick={() => setSelectedTicketId(t.id)}
+                        onClick={() => handleSelectTicket(t.id)}
                         className={`p-3.5 rounded-xl border text-left cursor-pointer transition-all ${
                           isSelected
                             ? 'bg-card border-[#A855F7] shadow-md shadow-[#A855F7]/10'
@@ -1350,6 +1456,28 @@ export const SupportTickets: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(closeTicketTargetId)}
+        onOpenChange={(open) => {
+          if (!open) setCloseTicketTargetId(null);
+        }}
+        title="Xác nhận đóng Ticket hỗ trợ?"
+        description="Sau khi đóng, ticket này sẽ chuyển sang trạng thái Hoàn tất (Closed). Bạn vẫn có thể mở lại trong vòng 48 giờ nếu sự cố tái diễn."
+        confirmLabel="Xác nhận đóng ticket"
+        variant="primary"
+        onConfirm={executeCloseTicket}
+      />
+
+      <ConfirmDialog
+        open={isEscalateConfirmOpen}
+        onOpenChange={setIsEscalateConfirmOpen}
+        title={`Chuyển giao Ticket #${activeTicket?.ticketCode || activeTicket?.id || ''} lên Ban Tổ Chức?`}
+        description="Ticket sẽ được gỡ phân công hiện tại và chuyển về hàng chờ ưu tiên của Ban Tổ Chức (Admin) để xử lý thẩm quyền cấp cao."
+        confirmLabel="Xác nhận chuyển giao"
+        variant="warning"
+        onConfirm={executeEscalateTicket}
+      />
     </div>
   );
 };

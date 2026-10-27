@@ -5,6 +5,7 @@ import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 import { Input } from '../../components/Input';
 import {
   Download,
@@ -22,6 +23,9 @@ interface ResultRow {
   teamName: string;
   leaderName: string;
   evalCount: number;
+  draftEvalCount: number;
+  hasLockedEvaluations: boolean;
+  hasDraftEvaluations: boolean;
   avgScore: number;
   hasDiscrepancy: boolean;
   maxSpread: number;
@@ -29,6 +33,7 @@ interface ResultRow {
     judgeId: string;
     judgeName: string;
     score: number;
+    status?: 'submitted' | 'draft';
     evaluationId?: string;
   }>;
 }
@@ -37,9 +42,11 @@ export const AdminResultsPage: React.FC = () => {
   const { teams, config, syncFromBackend } = useMockStore();
 
   const [alert, setAlert] = useState<string | null>(null);
+  const [errorAlert, setErrorAlert] = useState<string | null>(null);
   const [apiRows, setApiRows] = useState<ResultRow[] | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
   const [unlockTarget, setUnlockTarget] = useState<{
     teamId: string;
     teamName: string;
@@ -89,16 +96,35 @@ export const AdminResultsPage: React.FC = () => {
           const judgeList = rawJudges.map((jb: Record<string, unknown>, idx: number) => ({
             judgeId: String(jb.judge_id ?? jb.judgeName ?? `judge-${idx + 1}`),
             judgeName: String(jb.judge_name ?? jb.judgeName ?? `Giám khảo #${idx + 1}`),
-            score: Number(jb.total_score ?? jb.totalScore ?? 0),
+            score: Math.round(Number(jb.total_score ?? jb.totalScore ?? 0) * 10) / 10,
+            status: (String(jb.status ?? 'submitted') === 'draft' ? 'draft' : 'submitted') as
+              | 'submitted'
+              | 'draft',
           }));
+          const lockedCount = Number(
+            entry.evaluated_judges_count ??
+              entry.eval_count ??
+              entry.judgeCount ??
+              judgeList.filter((j) => j.status === 'submitted').length
+          );
+          const draftCount = Number(
+            entry.draft_eval_count ?? judgeList.filter((j) => j.status === 'draft').length
+          );
+          const rawFinalScore = Number(entry.final_score ?? entry.averageScore ?? 0);
+          const rawDraftScore = Number(entry.draft_score ?? 0);
+          const displayScore =
+            lockedCount > 0 ? rawFinalScore : draftCount > 0 ? rawDraftScore : rawFinalScore;
           const spread = Number(entry.max_spread ?? entry.max_discrepancy ?? entry.maxSpread ?? 0);
           return {
             teamId: tId,
             submissionId: String(entry.submission_id ?? tId),
             teamName: tName || matchedTeam?.name || 'Đội thi',
             leaderName: matchedTeam?.leaderName || 'Trưởng nhóm',
-            evalCount: Number(entry.evaluated_judges_count ?? entry.eval_count ?? entry.judgeCount ?? judgeList.length),
-            avgScore: Math.round(Number(entry.final_score ?? entry.averageScore ?? 0) * 10) / 10,
+            evalCount: lockedCount,
+            draftEvalCount: draftCount,
+            hasLockedEvaluations: Boolean(entry.has_locked_evaluations ?? lockedCount > 0),
+            hasDraftEvaluations: Boolean(entry.has_draft_evaluations ?? draftCount > 0),
+            avgScore: Math.round(displayScore * 10) / 10,
             hasDiscrepancy: Boolean(entry.has_discrepancy ?? entry.hasDiscrepancy ?? spread > 15),
             maxSpread: spread,
             judges: judgeList,
@@ -115,7 +141,15 @@ export const AdminResultsPage: React.FC = () => {
   const teamScoreRows = apiRows || [];
 
   const handleExportCsv = () => {
-    const headers = ['Hang', 'Doi Thi', 'Doi Truong', 'So Luot Cham', 'Diem TB (Thang 100)', 'Do Lech Max', 'Canh Bao Lech Diem'];
+    const headers = [
+      'Hang',
+      'Doi Thi',
+      'Doi Truong',
+      'So Luot Cham',
+      'Diem TB (Thang 100)',
+      'Do Lech Max',
+      'Canh Bao Lech Diem',
+    ];
     const csvLines = [
       headers.join(','),
       ...teamScoreRows.map((r, idx) =>
@@ -152,7 +186,8 @@ export const AdminResultsPage: React.FC = () => {
     try {
       await publishLeaderboard({ is_result_published: nextPublished });
     } catch {
-      setAlert('Không thể công bố kết quả. Vui lòng thử lại.');
+      setErrorAlert('Không thể công bố kết quả. Vui lòng thử lại.');
+      setTimeout(() => setErrorAlert(null), 3500);
       return;
     }
     useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: nextPublished } }));
@@ -166,14 +201,17 @@ export const AdminResultsPage: React.FC = () => {
   };
 
   const openUnlockModal = (row: ResultRow) => {
-    const firstJudge = row.judges[0];
+    const lockedJudges = row.judges.filter((j) => j.status !== 'draft');
+    const candidateJudges = lockedJudges.length > 0 ? lockedJudges : row.judges;
+    const firstJudge = candidateJudges[0];
+    setErrorAlert(null);
     setUnlockTarget({
       teamId: row.teamId,
       teamName: row.teamName,
       submissionId: row.submissionId || row.teamId,
       judgeId: firstJudge?.judgeId,
       judgeName: firstJudge?.judgeName,
-      judges: row.judges,
+      judges: candidateJudges,
     });
     setUnlockReason('Rà soát chênh lệch điểm giữa các giám khảo');
     setUnlockModalOpen(true);
@@ -183,32 +221,56 @@ export const AdminResultsPage: React.FC = () => {
     e.preventDefault();
     if (!unlockTarget || !unlockReason.trim()) return;
     setUnlocking(true);
+    setErrorAlert(null);
     try {
-      const evalKey = unlockTarget.judgeId
-        ? `${unlockTarget.submissionId || unlockTarget.teamId}:${unlockTarget.judgeId}`
-        : unlockTarget.submissionId || unlockTarget.teamId;
-      await apiClient.post(`/admin/evaluations/${encodeURIComponent(evalKey)}/unlock`, {
+      const targetSubId = unlockTarget.submissionId || unlockTarget.teamId;
+      await apiClient.post(`/admin/evaluations/${encodeURIComponent(targetSubId)}/unlock`, {
         reason: unlockReason.trim(),
         judge_id: unlockTarget.judgeId || undefined,
       });
     } catch {
-      setAlert('Không thể mở khóa phiếu chấm. Vui lòng thử lại.');
+      setErrorAlert('Không thể mở khóa phiếu chấm. Phiếu chấm chưa tồn tại hoặc đã ở trạng thái Nháp.');
+      setTimeout(() => setErrorAlert(null), 4000);
       setUnlocking(false);
       return;
     }
     useMockStore.setState((state) => ({
       evaluations: state.evaluations.map((ev) =>
-        ev.teamId === unlockTarget.teamId &&
+        (ev.teamId === unlockTarget.teamId || ev.teamId === unlockTarget.submissionId) &&
         (!unlockTarget.judgeId || ev.judgeId === unlockTarget.judgeId)
           ? { ...ev, isDraft: true, confirmedAt: undefined }
           : ev
       ),
     }));
+    setApiRows((prev) =>
+      prev
+        ? prev.map((r) => {
+            if (r.teamId !== unlockTarget.teamId && r.submissionId !== unlockTarget.submissionId) {
+              return r;
+            }
+            const nextJudges = r.judges.map((j) =>
+              !unlockTarget.judgeId || j.judgeId === unlockTarget.judgeId
+                ? { ...j, status: 'draft' as const }
+                : j
+            );
+            const lockedCount = nextJudges.filter((j) => j.status === 'submitted').length;
+            const draftCount = nextJudges.filter((j) => j.status === 'draft').length;
+            return {
+              ...r,
+              evalCount: lockedCount,
+              draftEvalCount: draftCount,
+              hasLockedEvaluations: lockedCount > 0,
+              hasDraftEvaluations: draftCount > 0,
+              judges: nextJudges,
+            };
+          })
+        : prev
+    );
     await syncFromBackend?.();
     setRefreshTick((t) => t + 1);
     setUnlocking(false);
     setUnlockModalOpen(false);
-    setAlert(`Đã mở khóa phiếu chấm của đội "${unlockTarget.teamName}" về trạng thái Nháp (Draft).`);
+    setAlert(`Đã mở khóa phiếu chấm của đội "${unlockTarget.teamName}" về trạng thái Nháp (Draft) để Giám khảo chấm lại.`);
     setTimeout(() => setAlert(null), 4000);
   };
 
@@ -233,7 +295,7 @@ export const AdminResultsPage: React.FC = () => {
 
           <Button
             variant="primary"
-            onClick={handleTogglePublish}
+            onClick={() => setPublishConfirmOpen(true)}
             className="gap-2 shadow-lg shadow-[#6366F1]/20"
           >
             {config.resultsPublished ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -248,6 +310,13 @@ export const AdminResultsPage: React.FC = () => {
         <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
           <CheckCircle2 size={15} />
           <span>{alert}</span>
+        </div>
+      )}
+
+      {errorAlert && (
+        <div className="p-3.5 rounded-[10px] bg-red-500/10 border border-red-500/30 text-xs text-red-700 dark:text-red-400 flex items-center gap-2">
+          <AlertTriangle size={15} />
+          <span>{errorAlert}</span>
         </div>
       )}
 
@@ -340,9 +409,13 @@ export const AdminResultsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-center">
-                      <Badge variant={row.evalCount > 0 ? 'success' : 'neutral'}>
-                        {row.evalCount} lượt
-                      </Badge>
+                      {row.evalCount > 0 ? (
+                        <Badge variant="success">{row.evalCount} lượt (Đã khóa)</Badge>
+                      ) : row.hasDraftEvaluations ? (
+                        <Badge variant="cyan">{row.draftEvalCount} lượt (Đang mở khóa)</Badge>
+                      ) : (
+                        <Badge variant="neutral">0 lượt</Badge>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4 text-right font-semibold tracking-tight text-lg text-emerald-700 dark:text-emerald-400 font-mono">
@@ -375,15 +448,21 @@ export const AdminResultsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => openUnlockModal(row)}
-                        className="gap-1.5 text-xs"
-                      >
-                        <Unlock size={13} />
-                        <span>Mở khóa phiếu</span>
-                      </Button>
+                      {row.hasLockedEvaluations ? (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => openUnlockModal(row)}
+                          className="gap-1.5 text-xs"
+                        >
+                          <Unlock size={13} />
+                          <span>Mở khóa phiếu</span>
+                        </Button>
+                      ) : row.hasDraftEvaluations ? (
+                        <Badge variant="cyan">Đã mở khóa (Nháp)</Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">Chưa có phiếu</span>
+                      )}
                     </td>
                   </tr>
                 ))
@@ -458,6 +537,27 @@ export const AdminResultsPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={publishConfirmOpen}
+        onOpenChange={setPublishConfirmOpen}
+        title={
+          config.resultsPublished
+            ? 'Tạm khóa & ẩn Bảng xếp hạng đối với thí sinh?'
+            : 'Công bố chính thức Bảng xếp hạng cho toàn bộ thí sinh?'
+        }
+        description={
+          config.resultsPublished
+            ? 'Sau khi tạm khóa, Bảng xếp hạng sẽ chuyển về chế độ bảo mật nội bộ. Thí sinh sẽ không thể xem điểm số và thứ hạng cho đến khi được công bố lại.'
+            : 'Sau khi công bố, tất cả thí sinh và đội thi hợp lệ sẽ nhìn thấy điểm tổng kết chính thức và thứ hạng chung cuộc trên màn hình Leaderboard.'
+        }
+        confirmLabel={config.resultsPublished ? 'Xác nhận tạm khóa' : 'Xác nhận công bố'}
+        variant={config.resultsPublished ? 'warning' : 'primary'}
+        onConfirm={async () => {
+          await handleTogglePublish();
+          setPublishConfirmOpen(false);
+        }}
+      />
     </div>
   );
 };

@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { evaluationService, type LeaderboardEntry } from '../services/evaluationService';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
+import { ConfirmDialog } from '../components/patterns/ConfirmDialog';
 import {
   Trophy,
   Award,
@@ -24,6 +25,7 @@ export const Scoreboard: React.FC = () => {
 
   const [rows, setRows] = useState<LeaderboardEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
   useEffect(() => {
     let active = true;
     evaluationService.getLeaderboard().then((response) => {
@@ -90,7 +92,7 @@ export const Scoreboard: React.FC = () => {
             <Button
               variant={config.resultsPublished ? 'danger' : 'primary'}
               size="sm"
-              onClick={handlePublishToggle}
+              onClick={() => setPublishConfirmOpen(true)}
               className="gap-2 shadow-md"
             >
               <Globe size={14} />
@@ -326,6 +328,27 @@ export const Scoreboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={publishConfirmOpen}
+        onOpenChange={setPublishConfirmOpen}
+        title={
+          config.resultsPublished
+            ? 'Hủy công bố & ẩn Bảng xếp hạng đối với thí sinh?'
+            : 'Công bố chính thức Bảng xếp hạng chung cuộc?'
+        }
+        description={
+          config.resultsPublished
+            ? 'Bảng xếp hạng sẽ chuyển về chế độ Bản nháp nội bộ (Bảo mật) và ẩn khỏi màn hình của toàn bộ thí sinh.'
+            : 'Toàn bộ thí sinh sẽ có thể xem điểm số tổng kết và thứ hạng chính thức trên màn hình Bảng xếp hạng.'
+        }
+        confirmLabel={config.resultsPublished ? 'Xác nhận ẩn bảng điểm' : 'Xác nhận công bố'}
+        variant={config.resultsPublished ? 'warning' : 'primary'}
+        onConfirm={async () => {
+          await handlePublishToggle();
+          setPublishConfirmOpen(false);
+        }}
+      />
     </div>
   );
 };

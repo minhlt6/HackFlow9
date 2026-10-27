@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { StatCard } from '../../components/common/StatCard';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { useNavigate } from 'react-router-dom';
 import { InitialRoleTodoBanner } from '../../components/common/InitialRoleTodoBanner';
+import { ticketService } from '../../services/ticketService';
 import {
   HelpCircle,
   Users,
@@ -13,11 +14,40 @@ import {
 } from 'lucide-react';
 
 export const MentorDashboardPage: React.FC = () => {
-  const { currentUser, tickets, teams } = useMockStore();
+  const { currentUser, tickets, teams, syncFromBackend } = useMockStore();
   const navigate = useNavigate();
 
-  const openTickets = tickets.filter((t) => t.status !== 'resolved');
-  const claimedByMe = tickets.filter((t) => t.assignedMentorId === currentUser.id);
+  useEffect(() => {
+    void syncFromBackend?.();
+  }, [syncFromBackend]);
+
+  const openTickets = tickets.filter((t) => t.status !== 'resolved' && t.status !== 'closed');
+  const claimedByMe = tickets.filter(
+    (t) => t.assignedMentorId === currentUser.id || Boolean(t.assignedMentorId),
+  );
+
+  const handleProcessTicket = async (ticket: (typeof tickets)[number]) => {
+    if (ticket.status === 'open' && !ticket.assignedMentorId) {
+      try {
+        await ticketService.updateTicket(ticket.id, { action: 'accept' });
+        useMockStore.setState((state) => ({
+          tickets: state.tickets.map((item) =>
+            item.id === ticket.id
+              ? {
+                  ...item,
+                  status: 'in_progress',
+                  assignedMentorId: currentUser.id,
+                  assignedMentorName: currentUser.fullName,
+                }
+              : item,
+          ),
+        }));
+      } catch {
+        // Ignore if already claimed or offline; SupportTickets page will sync
+      }
+    }
+    navigate(`/mentor/tickets?ticketId=${encodeURIComponent(ticket.id)}&tab=my_assigned`);
+  };
 
   return (
     <div className="space-y-6 ">
@@ -76,7 +106,7 @@ export const MentorDashboardPage: React.FC = () => {
           subtitle="Đang trao đổi qua tin nhắn"
           icon={<MessageSquare size={24} />}
           iconColor="purple"
-          onClick={() => navigate('/mentor/tickets')}
+          onClick={() => navigate('/mentor/tickets?tab=my_assigned')}
         />
 
         <StatCard
@@ -128,7 +158,7 @@ export const MentorDashboardPage: React.FC = () => {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => navigate('/mentor/tickets')}
+                onClick={() => void handleProcessTicket(t)}
                 className="gap-1.5 shrink-0"
               >
                 <span>Vào xử lý</span>

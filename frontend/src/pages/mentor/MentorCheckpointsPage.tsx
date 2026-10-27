@@ -1,24 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import { useMockStore } from '../../store/useMockStore';
-import { Button } from '../../components/Button';
-import { RbacForbiddenModal } from '../../components/common/RbacForbiddenModal';
+import { Badge } from '../../components/Badge';
 import {
-  Lock,
   ShieldAlert,
   CheckCircle2,
   Clock,
 } from 'lucide-react';
 
 export const MentorCheckpointsPage: React.FC = () => {
-  const { teams, checkpoints, submissions } = useMockStore();
+  const { teams, checkpoints, submissions, syncFromBackend } = useMockStore();
 
-  const [isForbiddenModalOpen, setIsForbiddenModalOpen] = useState(false);
-  const [attemptedAction, setAttemptedAction] = useState('Truy cập kho lưu trữ mã nguồn GitHub hoặc Bảng điểm chấm thi của Ban Giám Khảo');
-
-  const handleTriggerForbidden = (action: string) => {
-    setAttemptedAction(action);
-    setIsForbiddenModalOpen(true);
-  };
+  useEffect(() => {
+    void syncFromBackend?.();
+  }, [syncFromBackend]);
 
   return (
     <div className="space-y-6 ">
@@ -34,8 +28,6 @@ export const MentorCheckpointsPage: React.FC = () => {
             Cố vấn theo dõi tổng quan tỷ lệ nộp bài của các đội để có phương án hỗ trợ kịp thời.
           </p>
         </div>
-
-
       </div>
 
       {/* RBAC Notice Banner */}
@@ -48,7 +40,7 @@ export const MentorCheckpointsPage: React.FC = () => {
 
       {/* Progress Matrix Table */}
       <div className="rounded-[16px] border border-border bg-card p-6 space-y-4">
-        <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
+        <h3 className="font-semibold tracking-tight text-foreground text-lg">
           Ma Trận Tiến Độ Các Chặng Theo Đội Thi
         </h3>
 
@@ -62,12 +54,16 @@ export const MentorCheckpointsPage: React.FC = () => {
                     CP #{idx + 1}
                   </th>
                 ))}
-                <th className="py-3.5 px-4 text-right">Mã Nguồn Thí Sinh</th>
+                <th className="py-3.5 px-4 text-right">Tổng Tiến Độ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-foreground">
               {teams.map((team) => {
                 const teamSubs = submissions.filter((s) => s.teamId === team.id);
+                const completedCount = checkpoints.filter((cp) =>
+                  teamSubs.some((s) => s.checkpointId === cp.id)
+                ).length;
+                const totalCount = checkpoints.length;
 
                 return (
                   <tr key={team.id} className="hover:bg-accent transition-colors">
@@ -98,19 +94,17 @@ export const MentorCheckpointsPage: React.FC = () => {
                     })}
 
                     <td className="py-3.5 px-4 text-right">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={() =>
-                          handleTriggerForbidden(
-                            `Truy cập kho mã nguồn GitHub bí mật của đội "${team.name}"`,
-                          )
+                      <Badge
+                        variant={
+                          totalCount > 0 && completedCount === totalCount
+                            ? 'success'
+                            : completedCount > 0
+                            ? 'indigo'
+                            : 'neutral'
                         }
-                        className="px-2.5 py-1 text-xs gap-1 border-rose-500/30 text-rose-700 dark:text-rose-400 hover:bg-rose-500/10"
                       >
-                        <Lock size={12} />
-                        <span>Xem Code (Khóa)</span>
-                      </Button>
+                        {completedCount}/{totalCount} chặng
+                      </Badge>
                     </td>
                   </tr>
                 );
@@ -119,14 +113,6 @@ export const MentorCheckpointsPage: React.FC = () => {
           </table>
         </div>
       </div>
-
-      {/* RBAC Forbidden Modal */}
-      <RbacForbiddenModal
-        isOpen={isForbiddenModalOpen}
-        onClose={() => setIsForbiddenModalOpen(false)}
-        attemptedAction={attemptedAction}
-        userRole="mentor"
-      />
     </div>
   );
 };

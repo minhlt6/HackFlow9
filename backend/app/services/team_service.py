@@ -69,7 +69,12 @@ class TeamService:
             )
 
         member_count = len(members_resp)
-        if team.is_locked:
+        meta = team.admin_meta if isinstance(getattr(team, "admin_meta", None), dict) else {}
+        approval_status = str(meta.get("approval_status", "")).lower() or None
+        rejection_reason = meta.get("rejection_reason")
+        if approval_status == "rejected":
+            status = "REJECTED"
+        elif team.is_locked:
             status = "LOCKED"
         elif min_members <= member_count <= max_members:
             status = "VALID"
@@ -94,6 +99,8 @@ class TeamService:
             description=team.description,
             invite_code=team.invite_code,
             status=status,
+            approval_status=approval_status or ("approved" if min_members <= member_count <= max_members else "pending"),
+            rejection_reason=rejection_reason,
             is_locked=team.is_locked,
             member_count=member_count,
             min_members=min_members,
@@ -263,10 +270,11 @@ class TeamService:
             raise NotFoundException(message="Không tìm thấy thành viên trong đội.")
         if str(target_mem.user_id) == str(current_user.id):
             raise BadRequestException(message="Không thể tự xóa chính mình.")
+        team_id_str = str(leader_mem.team_id)
         await db.delete(target_mem)
         await db.commit()
         db.expire_all()
-        loaded = await team_repo.get_by_id(db, str(leader_mem.team_id))
+        loaded = await team_repo.get_by_id(db, team_id_str)
         return self.build_team_response(loaded)  # type: ignore
 
     async def transfer_leader(
@@ -281,11 +289,12 @@ class TeamService:
         target_mem = await team_repo.get_user_membership(db, new_leader_user_id)
         if not target_mem or str(target_mem.team_id) != str(leader_mem.team_id):
             raise NotFoundException(message="Thành viên được chọn không thuộc đội của bạn.")
+        team_id_str = str(leader_mem.team_id)
         leader_mem.role = TeamMemberRole.MEMBER.value
         target_mem.role = TeamMemberRole.LEADER.value
         await db.commit()
         db.expire_all()
-        loaded = await team_repo.get_by_id(db, str(leader_mem.team_id))
+        loaded = await team_repo.get_by_id(db, team_id_str)
         return self.build_team_response(loaded)  # type: ignore
 
     async def get_my_team(

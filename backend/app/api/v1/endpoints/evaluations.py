@@ -140,9 +140,10 @@ async def unlock_evaluation_by_id(
     judge_id = payload.judge_id if payload else None
 
     # 1. Check if evaluation_id is composite "submission_id:judge_id"
-    if ":" in evaluation_id and not judge_id:
+    if ":" in evaluation_id:
         parts = evaluation_id.split(":", 1)
-        submission_id, judge_id = parts[0], parts[1]
+        submission_id = parts[0]
+        judge_id = judge_id or parts[1]
         data = await service.unlock_evaluation(
             submission_id=submission_id,
             judge_id=judge_id,
@@ -185,23 +186,26 @@ async def unlock_evaluation_by_id(
             message="Evaluation unlocked successfully",
         )
 
-    # 4. Find any evaluation matching submission_id == evaluation_id or team_id == evaluation_id
+    # 4. Find all evaluations matching submission_id == evaluation_id or team_id == evaluation_id
     resolved_sub = await service.repo.get_submission_by_id_or_team(evaluation_id)
     target_sub_id = str(resolved_sub.id) if resolved_sub else evaluation_id
     sub_ev_res = await db.execute(
         select(Evaluation).where(Evaluation.submission_id == target_sub_id)
     )
-    sub_ev_row = sub_ev_res.scalars().first()
-    if sub_ev_row:
-        data = await service.unlock_evaluation(
-            submission_id=str(sub_ev_row.submission_id),
-            judge_id=str(sub_ev_row.judge_id),
-            reason=reason,
-            current_user=current_user,
-        )
+    sub_ev_rows = list(sub_ev_res.scalars().all())
+    if sub_ev_rows:
+        distinct_judge_ids = list(dict.fromkeys(str(r.judge_id) for r in sub_ev_rows))
+        last_data = None
+        for j_id in distinct_judge_ids:
+            last_data = await service.unlock_evaluation(
+                submission_id=target_sub_id,
+                judge_id=j_id,
+                reason=reason,
+                current_user=current_user,
+            )
         return ApiResponse(
             success=True,
-            data=data,
+            data=last_data or {},
             message="Evaluation unlocked successfully",
         )
 

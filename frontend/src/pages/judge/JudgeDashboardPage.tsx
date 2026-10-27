@@ -15,6 +15,7 @@ export const JudgeDashboardPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Find evaluations by this judge
+  const activeTeams = teams.filter((t) => t.status !== 'REJECTED' && t.approvalStatus !== 'rejected');
   const judgeEvals = evaluations.filter((e) => e.judgeId === currentUser.id);
 
   const getTopicTitle = (subTopicId?: string) => {
@@ -79,10 +80,10 @@ export const JudgeDashboardPage: React.FC = () => {
       <div className="rounded-[16px] border border-border bg-card p-6 space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-border">
           <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground">
-            Danh Sách Đội Thi Được Phân Công ({teams.length} Đội)
+            Danh Sách Đội Thi Được Phân Công ({activeTeams.length} Đội)
           </h3>
           <span className="text-xs text-muted-foreground">
-            Đã hoàn thành: {judgeEvals.filter((e) => !e.isDraft).length} / {teams.length}
+            Đã hoàn thành: {judgeEvals.filter((e) => !e.isDraft).length} / {activeTeams.length}
           </span>
         </div>
 
@@ -98,7 +99,7 @@ export const JudgeDashboardPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-foreground">
-              {teams.map((team, idx) => {
+              {activeTeams.map((team, idx) => {
                 const evalItem = judgeEvals.find((e) => e.teamId === team.id);
                 const isEvaluated = Boolean(evalItem && !evalItem.isDraft);
                 const isDraft = Boolean(evalItem?.isDraft);

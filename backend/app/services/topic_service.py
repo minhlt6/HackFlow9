@@ -305,6 +305,22 @@ class TopicService:
                     error_code="TEAM_ACCESS_DENIED",
                 )
 
+            team_meta = team.admin_meta if isinstance(getattr(team, "admin_meta", None), dict) else {}
+            if str(team_meta.get("approval_status", "")).lower() == "rejected":
+                reason_str = team_meta.get("rejection_reason") or "Không đạt điều kiện xét duyệt của Ban Tổ Chức."
+                raise ForbiddenException(
+                    message=f"Đội thi của bạn đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu (Lý do: {reason_str}), không thể đăng ký đề tài.",
+                    error_code="TEAM_REJECTED",
+                )
+
+            team_meta = team.admin_meta if isinstance(getattr(team, "admin_meta", None), dict) else {}
+            if str(team_meta.get("approval_status", "")).lower() == "rejected":
+                reason_str = team_meta.get("rejection_reason") or "Không đạt điều kiện xét duyệt của Ban Tổ Chức."
+                raise ForbiddenException(
+                    message=f"Đội thi của bạn đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu (Lý do: {reason_str}), không thể đăng ký đề tài.",
+                    error_code="TEAM_REJECTED",
+                )
+
             if team.is_locked:
                 raise ConflictException(
                     message="Đội thi đã bị khóa, không thể chọn đề tài.",

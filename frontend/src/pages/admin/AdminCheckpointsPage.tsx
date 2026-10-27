@@ -4,6 +4,7 @@ import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 import { Input } from '../../components/Input';
 import {
   CheckSquare,
@@ -448,6 +449,8 @@ export const AdminCheckpointsPage: React.FC = () => {
 
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [deleteCpTarget, setDeleteCpTarget] = useState<{ id: string; title: string } | null>(null);
+  const [discardTarget, setDiscardTarget] = useState<'add' | 'edit' | null>(null);
 
   const [editingCp, setEditingCp] = useState<Checkpoint | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -597,10 +600,7 @@ export const AdminCheckpointsPage: React.FC = () => {
     setNewReqInput('');
   };
 
-  const handleCloseAdd = () => {
-    if (isAddDirty && !window.confirm('Bạn có nội dung chặng nộp chưa lưu. Bạn có chắc muốn đóng và hủy bỏ?')) {
-      return;
-    }
+  const forceCloseAdd = () => {
     setIsAddOpen(false);
     setNewTitle('');
     setNewDescription('');
@@ -610,8 +610,17 @@ export const AdminCheckpointsPage: React.FC = () => {
     setNewSubmissionFields([]);
   };
 
+  const handleCloseAdd = () => {
+    if (isAddDirty) {
+      setDiscardTarget('add');
+      return;
+    }
+    forceCloseAdd();
+  };
+
   const handleCloseEdit = () => {
-    if (isEditDirty && !window.confirm('Bạn có thay đổi chưa lưu cho chặng này. Bạn có chắc muốn đóng và hủy bỏ?')) {
+    if (isEditDirty) {
+      setDiscardTarget('edit');
       return;
     }
     setEditingCp(null);
@@ -772,20 +781,25 @@ export const AdminCheckpointsPage: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string, title?: string) => {
-    const displayTitle = title || 'chặng nộp này';
-    if (window.confirm(`Bạn có chắc muốn xóa/vô hiệu hóa chặng nộp "${displayTitle}"?`)) {
-      try {
-        await checkpointApi.deleteCheckpoint(id);
-        await loadCheckpoints();
-        showAlert(`Đã xóa chặng nộp "${displayTitle}".`, 'success');
-      } catch (err: unknown) {
-        if (axios.isAxiosError(err)) {
-          showAlert(err.response?.data?.message || 'Không thể xóa chặng nộp.', 'error');
-        } else {
-          showAlert('Có lỗi xảy ra khi xóa chặng nộp.', 'error');
-        }
+  const handleDelete = (id: string, title?: string) => {
+    setDeleteCpTarget({ id, title: title || 'chặng nộp này' });
+  };
+
+  const executeDeleteCp = async () => {
+    if (!deleteCpTarget) return;
+    const { id, title: displayTitle } = deleteCpTarget;
+    try {
+      await checkpointApi.deleteCheckpoint(id);
+      await loadCheckpoints();
+      showAlert(`Đã xóa chặng nộp "${displayTitle}".`, 'success');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        showAlert(err.response?.data?.message || 'Không thể xóa chặng nộp.', 'error');
+      } else {
+        showAlert('Có lỗi xảy ra khi xóa chặng nộp.', 'error');
       }
+    } finally {
+      setDeleteCpTarget(null);
     }
   };
 
@@ -1358,6 +1372,34 @@ export const AdminCheckpointsPage: React.FC = () => {
         }}
         title="Xác Nhận Rời Khỏi Trang"
         message="Bạn đang có thay đổi chặng nộp bài chưa được lưu. Nếu rời đi bây giờ, mọi nội dung vừa nhập sẽ bị hủy bỏ."
+      />
+
+      <ConfirmDialog
+        open={Boolean(deleteCpTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeleteCpTarget(null);
+        }}
+        title={`Xóa / Vô hiệu hóa chặng nộp "${deleteCpTarget?.title || ''}"?`}
+        description="Chặng nộp này sẽ bị vô hiệu hóa khỏi danh sách các mốc nộp bài của thí sinh. Vui lòng xác nhận trước khi thực hiện."
+        confirmLabel="Xác nhận xóa chặng"
+        variant="destructive"
+        onConfirm={executeDeleteCp}
+      />
+
+      <ConfirmDialog
+        open={Boolean(discardTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDiscardTarget(null);
+        }}
+        title="Hủy bỏ thay đổi chưa lưu?"
+        description="Bạn có nội dung cấu hình chặng nộp bài chưa được lưu. Nếu đóng cửa sổ này, toàn bộ nội dung vừa nhập sẽ bị hủy bỏ."
+        confirmLabel="Đóng & Hủy thay đổi"
+        variant="warning"
+        onConfirm={() => {
+          if (discardTarget === 'add') forceCloseAdd();
+          if (discardTarget === 'edit') setEditingCp(null);
+          setDiscardTarget(null);
+        }}
       />
     </div>
   );

@@ -3,6 +3,7 @@ import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
 import { Modal } from '../../components/Modal';
+import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 import { Input } from '../../components/Input';
 import {
   GraduationCap,
@@ -38,6 +39,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [specialization, setSpecialization] = useState('Computer Vision & LLMs');
   const [alert, setAlert] = useState<string | null>(null);
+  const [deletePersonnelTarget, setDeletePersonnelTarget] = useState<{ role: 'judge' | 'mentor'; id: string; name: string; email?: string } | null>(null);
 
   const [judges, setJudges] = useState<JudgeRosterItem[]>([]);
   const [mentors, setMentors] = useState<MentorRosterItem[]>([]);
@@ -94,48 +96,52 @@ export const AdminMentorsJudgesPage: React.FC = () => {
     };
   }, []);
 
-  const handleDeleteJudge = async (id: string, judgeName: string, judgeEmail?: string) => {
-    if (window.confirm(`Xác nhận xóa giám khảo "${judgeName}"?`)) {
-      const nextJudges = judges.filter(
-        (j) => j.id !== id && (!judgeEmail || j.email.toLowerCase() !== judgeEmail.toLowerCase()),
-      );
-      setJudges(nextJudges);
-
-      try {
-        await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
-          params: judgeEmail ? { email: judgeEmail } : undefined,
-        });
-      } catch {
-        setJudges(judges);
-        setMentors(mentors);
-        setAlert('Không thể xóa nhân sự. Vui lòng thử lại.');
-        return;
-      }
-      setJudges(nextJudges);
-      setAlert(`Đã xóa giám khảo ${judgeName}`);
-      setTimeout(() => setAlert(null), 3000);
-    }
+  const handleDeleteJudge = (id: string, judgeName: string, judgeEmail?: string) => {
+    setDeletePersonnelTarget({ role: 'judge', id, name: judgeName, email: judgeEmail });
   };
 
-  const handleDeleteMentor = async (id: string, mentorName: string, mentorEmail?: string) => {
-    if (window.confirm(`Xác nhận xóa cố vấn "${mentorName}"?`)) {
-      const nextMentors = mentors.filter(
-        (m) => m.id !== id && (!mentorEmail || m.email.toLowerCase() !== mentorEmail.toLowerCase()),
-      );
-      setMentors(nextMentors);
+  const handleDeleteMentor = (id: string, mentorName: string, mentorEmail?: string) => {
+    setDeletePersonnelTarget({ role: 'mentor', id, name: mentorName, email: mentorEmail });
+  };
 
+  const executeDeletePersonnel = async () => {
+    if (!deletePersonnelTarget) return;
+    const { role, id, name: personName, email: personEmail } = deletePersonnelTarget;
+    setDeletePersonnelTarget(null);
+
+    if (role === 'judge') {
+      const prevJudges = [...judges];
+      const nextJudges = judges.filter(
+        (j) => j.id !== id && (!personEmail || j.email.toLowerCase() !== personEmail.toLowerCase()),
+      );
+      setJudges(nextJudges);
       try {
         await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
-          params: mentorEmail ? { email: mentorEmail } : undefined,
+          params: personEmail ? { email: personEmail } : undefined,
         });
       } catch {
-        setJudges(judges);
-        setMentors(mentors);
+        setJudges(prevJudges);
         setAlert('Không thể xóa nhân sự. Vui lòng thử lại.');
         return;
       }
+      setAlert(`Đã xóa giám khảo ${personName}`);
+      setTimeout(() => setAlert(null), 3000);
+    } else {
+      const prevMentors = [...mentors];
+      const nextMentors = mentors.filter(
+        (m) => m.id !== id && (!personEmail || m.email.toLowerCase() !== personEmail.toLowerCase()),
+      );
       setMentors(nextMentors);
-      setAlert(`Đã xóa cố vấn ${mentorName}`);
+      try {
+        await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
+          params: personEmail ? { email: personEmail } : undefined,
+        });
+      } catch {
+        setMentors(prevMentors);
+        setAlert('Không thể xóa nhân sự. Vui lòng thử lại.');
+        return;
+      }
+      setAlert(`Đã xóa cố vấn ${personName}`);
       setTimeout(() => setAlert(null), 3000);
     }
   };
@@ -414,6 +420,18 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deletePersonnelTarget)}
+        onOpenChange={(open) => {
+          if (!open) setDeletePersonnelTarget(null);
+        }}
+        title={`Xóa ${deletePersonnelTarget?.role === 'judge' ? 'Giám khảo' : 'Cố vấn'} "${deletePersonnelTarget?.name || ''}"?`}
+        description="Nhân sự này sẽ bị thu hồi quyền truy cập Hội đồng Giám khảo / Cố vấn chuyên môn trên hệ thống."
+        confirmLabel="Xác nhận xóa"
+        variant="destructive"
+        onConfirm={executeDeletePersonnel}
+      />
     </div>
   );
 };

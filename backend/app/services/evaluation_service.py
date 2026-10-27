@@ -44,7 +44,9 @@ def calculate_weighted_score(
     total = 0.0
     for score_i, max_score_i, weight_i in scores_with_criteria:
         if max_score_i > 0:
-            total += (float(score_i) / float(max_score_i)) * float(weight_i) * 100.0
+            w = float(weight_i)
+            factor = w if w > 1.0 else (w * 100.0)
+            total += (float(score_i) / float(max_score_i)) * factor
     return round(total, 2)
 
 
@@ -346,6 +348,17 @@ class EvaluationService:
                 error_code="FORBIDDEN_NOT_ASSIGNED_JUDGE",
             )
 
+        if (
+            sub.team
+            and isinstance(getattr(sub.team, "admin_meta", None), dict)
+            and str(sub.team.admin_meta.get("approval_status", "")).lower() == "rejected"
+        ):
+            raise AppException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                message="Đội thi này đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu.",
+                error_code="TEAM_REJECTED",
+            )
+
         if current_user.role == UserRole.JUDGE.value:
             if not await self.repo.is_judge_assigned_to_submission(current_user.id, sub):
                 raise AppException(
@@ -407,6 +420,17 @@ class EvaluationService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 message="You are not assigned to judge this submission",
                 error_code="FORBIDDEN_NOT_ASSIGNED_JUDGE",
+            )
+
+        if (
+            submission.team
+            and isinstance(getattr(submission.team, "admin_meta", None), dict)
+            and str(submission.team.admin_meta.get("approval_status", "")).lower() == "rejected"
+        ):
+            raise AppException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                message="Không thể chấm điểm: Đội thi này đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu.",
+                error_code="TEAM_REJECTED",
             )
 
         if current_user.role == UserRole.JUDGE.value:

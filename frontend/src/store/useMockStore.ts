@@ -1776,12 +1776,19 @@ export const useMockStore = create<MockStoreState>()(
               });
               const leaderMem =
                 members.find((m) => m.roleInTeam === 'leader') || members[0];
-              const rawStatus = String(t.status ?? t.approval_status ?? 'approved').toLowerCase();
+              const rawApproval = String(t.approval_status ?? '').toLowerCase();
+              const rawStatus = String(rawApproval || t.status || 'approved').toLowerCase();
               const status: Team['status'] =
-                rawStatus === 'approved' || rawStatus === 'valid'
-                  ? 'APPROVED'
-                  : rawStatus === 'rejected'
-                    ? 'REJECTED'
+                rawStatus === 'rejected'
+                  ? 'REJECTED'
+                  : rawStatus === 'approved' || rawStatus === 'valid'
+                    ? 'APPROVED'
+                    : 'pending';
+              const approvalStatus: Team['approvalStatus'] =
+                rawStatus === 'rejected'
+                  ? 'rejected'
+                  : rawStatus === 'approved' || rawStatus === 'valid'
+                    ? 'approved'
                     : 'pending';
               const resolvedSubOrTopicId =
                 t.subtopic_id ?? t.selected_subtopic_id ?? t.topic_id ?? t.selected_topic_id;
@@ -1798,6 +1805,8 @@ export const useMockStore = create<MockStoreState>()(
                 topicId: resolvedSubOrTopicId ? String(resolvedSubOrTopicId) : undefined,
                 topicName: resolvedTopicName ? String(resolvedTopicName) : undefined,
                 status,
+                approvalStatus,
+                rejectionReason: t.rejection_reason ? String(t.rejection_reason) : undefined,
                 memberCount: Number(t.member_count ?? members.length),
                 maxMembers: 5,
                 createdAt: String(t.created_at ?? new Date().toISOString()),

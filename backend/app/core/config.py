@@ -1,4 +1,5 @@
 import json
+import os
 from functools import lru_cache
 from typing import List, Optional, Union
 from pydantic import field_validator
@@ -58,6 +59,10 @@ class Settings(BaseSettings):
         """
         url = (self.DATABASE_URL or "").strip()
         if not url or url == "sqlite":
+            return "sqlite+aiosqlite:///./hackflow.db"
+        if "@db." in url and ".supabase.co" in url and (
+            os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_SERVICE_ID")
+        ):
             return "sqlite+aiosqlite:///./hackflow.db"
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)

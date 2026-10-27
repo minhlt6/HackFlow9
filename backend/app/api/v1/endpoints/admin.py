@@ -1295,6 +1295,8 @@ async def reject_admin_team(
     if not team:
         raise NotFoundException(message="Không tìm thấy đội thi.")
 
+    team_id_str = str(team.id)
+    team_name_str = team.team_name
     team.is_locked = False
     _update_team_meta(
         team,
@@ -1305,11 +1307,11 @@ async def reject_admin_team(
     )
     await db.commit()
     db.expire_all()
-    loaded = await _load_team_full(db, str(team.id))
+    loaded = await _load_team_full(db, team_id_str)
 
     return success_response(
         data=_serialize_admin_team(loaded),
-        message=f"Đã từ chối đội thi '{team.team_name}'.",
+        message=f"Đã từ chối đội thi '{team_name_str}'.",
     )
 
 
