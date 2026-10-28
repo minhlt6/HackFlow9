@@ -208,7 +208,7 @@ export const AdminCriteriaPage: React.FC = () => {
     try {
       const payload: RubricConfigurePayload = {
         name: 'HackFlow Final Rubric',
-        allow_override: true,
+        allow_override: false,
         criteria: newCriteria.map((c, idx) => ({
           id: c.id,
           title: c.name.trim(),

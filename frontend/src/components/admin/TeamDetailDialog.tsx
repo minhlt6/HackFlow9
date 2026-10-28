@@ -58,7 +58,7 @@ export const TeamDetailDialog: React.FC<TeamDetailDialogProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="!max-w-2xl">
         <DialogHeader>
           <div className="flex flex-wrap items-center gap-2">
             <DialogTitle>Hồ sơ Đội thi: {team.name}</DialogTitle>
@@ -90,8 +90,13 @@ export const TeamDetailDialog: React.FC<TeamDetailDialogProps> = ({
           {/* Rejection Warning Banner if Rejected */}
           {statusNormalized === 'rejected' && team.rejectionReason && (
             <div className="rounded-md border border-rose-500/35 bg-rose-500/10 p-3 text-xs text-rose-800 dark:text-rose-200 space-y-1">
-              <span className="font-semibold block">Lý do từ chối hồ sơ:</span>
+              <span className="font-semibold block">Lý do từ chối tại lần xét duyệt:</span>
               <p>{team.rejectionReason}</p>
+              {team.lastReview?.decision === 'rejected' ? (
+                <p>Xét duyệt lúc {new Date(team.lastReview.reviewed_at).toLocaleString('vi-VN')},
+                  sĩ số {team.lastReview.member_count} người, quy định {team.lastReview.min_members}–{team.lastReview.max_members} người.</p>
+              ) : <p>Hồ sơ cũ chưa ghi nhận thời điểm và sĩ số tại lần xét duyệt.</p>}
+              <p>Sĩ số hiện tại: {team.members.length} người. Thay đổi thành viên không tự động thay đổi quyết định xét duyệt.</p>
             </div>
           )}
 
@@ -161,14 +166,14 @@ export const TeamDetailDialog: React.FC<TeamDetailDialogProps> = ({
               </h4>
               <Badge
                 variant={
-                  team.members.length >= 3 && team.members.length <= 5
+                  team.members.length >= (team.minMembers ?? 3) && team.members.length <= (team.maxMembers ?? 5)
                     ? 'success'
                     : 'warning'
                 }
               >
-                {team.members.length >= 3 && team.members.length <= 5
-                  ? 'Đạt chuẩn 3–5 thành viên'
-                  : 'Chưa đủ định biên tối thiểu (3 người)'}
+                {team.members.length >= (team.minMembers ?? 3) && team.members.length <= (team.maxMembers ?? 5)
+                  ? `Đạt chuẩn ${team.minMembers ?? 3}–${team.maxMembers ?? 5} thành viên`
+                  : 'Chưa đáp ứng giới hạn thành viên'}
               </Badge>
             </div>
 

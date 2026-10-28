@@ -1,7 +1,18 @@
 import { axiosClient } from './axiosClient';
 import type { ApiResponse, Team, TeamMember } from '../types';
 
+export interface TeamReview {
+  decision: string;
+  reason: string | null;
+  reviewed_at: string;
+  reviewed_by: string;
+  member_count: number;
+  min_members: number;
+  max_members: number;
+}
+
 export interface EnrichedAdminTeam extends Team {
+  lastReview?: TeamReview;
   university: string;
   leaderEmail: string;
   majorTopicId: string;
@@ -181,6 +192,9 @@ function normalizeAdminTeam(rawInput: unknown): EnrichedAdminTeam {
           ? raw.rejection_reason
           : undefined,
     memberCount,
+    minMembers: Number(raw.min_members ?? 3),
+    maxMembers: Number(raw.max_members ?? 5),
+    lastReview: raw.last_review ? raw.last_review as TeamReview : undefined,
     repoUrl:
       typeof raw.repoUrl === 'string' && raw.repoUrl
         ? raw.repoUrl
@@ -274,8 +288,8 @@ export const adminTeamsApi = {
     return normalizeAdminTeam(res.data.data);
   },
   bulkApproveTeams: async (teamIds: string[]): Promise<EnrichedAdminTeam[]> => {
-    await axiosClient.post('/admin/teams/bulk-approve', { team_ids: teamIds });
-    return adminTeamsApi.getAllTeams();
+    const res = await axiosClient.post<ApiResponse<{ teams: unknown[] }>>('/admin/teams/bulk-approve', { team_ids: teamIds });
+    return res.data.data.teams.map(normalizeAdminTeam);
   },
   rejectTeam: async (id: string, reason: string): Promise<EnrichedAdminTeam> => {
     const res = await axiosClient.patch<ApiResponse<unknown>>(`/admin/teams/${id}/reject`, { reason });

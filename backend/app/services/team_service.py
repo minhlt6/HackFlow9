@@ -16,6 +16,7 @@ from app.models.team import Team, TeamMember, TeamMemberRole
 from app.models.user import User
 from app.repositories.team_repo import team_repo
 from app.schemas.team import TeamMemberResponse, TeamResponse
+from app.services.team_policy import get_team_limits, check_member_removal
 
 INVITE_CODE_CHARSET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 
@@ -142,6 +143,19 @@ class TeamService:
             created_at=team.created_at,
         )
 
+    @staticmethod
+    def visible_team(team: TeamResponse, user: User) -> TeamResponse:
+        if user.role != "mentor":
+            return team
+        return team.model_copy(update={
+            "invite_code": "",
+            "members": [m.model_copy(update={"email": "", "github_username": None}) for m in team.members],
+        })
+
+    async def response(self, db: AsyncSession, team: Team) -> TeamResponse:
+        minimum, maximum = await get_team_limits(db)
+        return self.build_team_response(team, minimum, maximum)
+
     async def list_all_teams(self, db: AsyncSession) -> List[TeamResponse]:
         stmt = (
             select(Team)
@@ -154,7 +168,8 @@ class TeamService:
         )
         res = await db.execute(stmt)
         teams = list(res.scalars().all())
-        return [self.build_team_response(t) for t in teams]
+        minimum, maximum = await get_team_limits(db)
+        return [self.build_team_response(t, minimum, maximum) for t in teams]
 
     async def create_team(
         self,
@@ -199,7 +214,7 @@ class TeamService:
         db.expire_all()
 
         loaded = await team_repo.get_by_id(db, team_id)
-        return self.build_team_response(loaded)  # type: ignore
+        return await self.response(db, loaded)  # type: ignore
 
     async def update_description(self, db: AsyncSession, user: User, description: str) -> TeamResponse:
         membership = await team_repo.get_user_membership(db, str(user.id))
@@ -217,7 +232,7 @@ class TeamService:
         await db.commit()
         db.expire_all()
         loaded = await team_repo.get_by_id(db, team_id_str)
-        return self.build_team_response(loaded or team)
+        return await self.response(db, loaded or team)
 
     async def update_member_skills(
         self, db: AsyncSession, current_user: User, target_user_id: str, skills: List[str]
@@ -249,7 +264,7 @@ class TeamService:
         await db.commit()
         db.expire_all()
         loaded = await team_repo.get_by_id(db, team_id_str)
-        return self.build_team_response(loaded or team)
+        return await self.response(db, loaded or team)
 
     async def join_team(
         self,
@@ -271,7 +286,10 @@ class TeamService:
                 error_code="ALREADY_IN_TEAM",
             )
 
-        lock = self._get_team_lock(cleaned_code)
+        initial_team = await team_repo.get_by_invite_code(db, cleaned_code)
+        if not initial_team:
+            raise BadRequestException(message="Mã mời không tồn tại hoặc không hợp lệ.", error_code="INVITE_CODE_INVALID")
+        lock = self._get_team_lock(str(initial_team.id))
         async with lock:
             team = await team_repo.get_by_invite_code(db, cleaned_code, for_update=True)
             if not team:
@@ -286,10 +304,7 @@ class TeamService:
                     error_code="TEAM_LOCKED",
                 )
 
-            from app.repositories.topic_repo import topic_repo
-            cfg = await topic_repo.get_config(db)
-            max_team_size = int((cfg.settings_data or {}).get("maxTeamSize", 5)) if (cfg and getattr(cfg, "settings_data", None)) else 5
-            min_team_size = int((cfg.settings_data or {}).get("minTeamSize", 3)) if (cfg and getattr(cfg, "settings_data", None)) else 3
+            _, max_team_size = await get_team_limits(db)
             member_count = await team_repo.count_members(db, team.id)
             if member_count >= max_team_size:
                 raise ConflictException(
@@ -303,67 +318,74 @@ class TeamService:
 
             db.expire_all()
             loaded = await team_repo.get_by_id(db, team_id)
-            return self.build_team_response(loaded)  # type: ignore
+            return await self.response(db, loaded)  # type: ignore
 
-    async def leave_team(
-        self,
-        db: AsyncSession,
-        current_user: User,
-    ) -> dict:
+    async def leave_team(self, db: AsyncSession, current_user: User) -> dict:
         membership = await team_repo.get_user_membership(db, str(current_user.id))
         if not membership:
             raise BadRequestException(message="Bạn chưa tham gia đội thi nào.")
         team_id = str(membership.team_id)
-        team = await team_repo.get_by_id(db, team_id)
-        await db.delete(membership)
-        await db.flush()
+        async with self._get_team_lock(team_id):
+            team = await team_repo.get_by_id(db, team_id, for_update=True)
+            if not team:
+                raise NotFoundException(message="Không tìm thấy đội thi.")
+            membership = await team_repo.get_user_membership(db, str(current_user.id))
+            if not membership or str(membership.team_id) != team_id:
+                raise ConflictException(message="Thông tin đội đã thay đổi. Vui lòng tải lại.")
+            count = await team_repo.count_members(db, team_id)
+            await check_member_removal(db, team, count)
+            if membership.role == TeamMemberRole.LEADER.value and count > 1:
+                raise ConflictException(message="Vui lòng chuyển quyền Đội trưởng trước khi rời đội.", error_code="LEADER_TRANSFER_REQUIRED")
+            await db.delete(membership)
+            await db.flush()
+            if count == 1:
+                await db.delete(team)
+            await db.commit()
+            return {"team_id": team_id, "left": True}
 
-        remaining = await team_repo.count_members(db, team_id)
-        if remaining == 0 and team:
-            await db.delete(team)
-        await db.commit()
-        return {"team_id": team_id, "left": True}
-
-    async def remove_member(
-        self,
-        db: AsyncSession,
-        current_user: User,
-        member_user_id: str,
-    ) -> TeamResponse:
+    async def remove_member(self, db: AsyncSession, current_user: User, member_user_id: str) -> TeamResponse:
         leader_mem = await team_repo.get_user_membership(db, str(current_user.id))
-        if not leader_mem or leader_mem.role != TeamMemberRole.LEADER.value:
+        if not leader_mem:
             raise ForbiddenException(message="Chỉ đội trưởng mới có quyền xóa thành viên.")
-        target_mem = await team_repo.get_user_membership(db, member_user_id)
-        if not target_mem or str(target_mem.team_id) != str(leader_mem.team_id):
-            raise NotFoundException(message="Không tìm thấy thành viên trong đội.")
-        if str(target_mem.user_id) == str(current_user.id):
-            raise BadRequestException(message="Không thể tự xóa chính mình.")
-        team_id_str = str(leader_mem.team_id)
-        await db.delete(target_mem)
-        await db.commit()
-        db.expire_all()
-        loaded = await team_repo.get_by_id(db, team_id_str)
-        return self.build_team_response(loaded)  # type: ignore
+        team_id = str(leader_mem.team_id)
+        async with self._get_team_lock(team_id):
+            team = await team_repo.get_by_id(db, team_id, for_update=True)
+            if not team:
+                raise NotFoundException(message="Không tìm thấy đội thi.")
+            leader_mem = await team_repo.get_user_membership(db, str(current_user.id))
+            if not leader_mem or str(leader_mem.team_id) != team_id or leader_mem.role != TeamMemberRole.LEADER.value:
+                raise ForbiddenException(message="Chỉ đội trưởng mới có quyền xóa thành viên.")
+            target_mem = await team_repo.get_user_membership(db, member_user_id)
+            if not target_mem or str(target_mem.team_id) != team_id:
+                raise NotFoundException(message="Không tìm thấy thành viên trong đội.")
+            if str(target_mem.user_id) == str(current_user.id):
+                raise BadRequestException(message="Không thể tự xóa chính mình.")
+            await check_member_removal(db, team, await team_repo.count_members(db, team_id))
+            await db.delete(target_mem)
+            await db.commit()
+            db.expire_all()
+            loaded = await team_repo.get_by_id(db, team_id)
+            return await self.response(db, loaded)
 
-    async def transfer_leader(
-        self,
-        db: AsyncSession,
-        current_user: User,
-        new_leader_user_id: str,
-    ) -> TeamResponse:
+    async def transfer_leader(self, db: AsyncSession, current_user: User, new_leader_user_id: str) -> TeamResponse:
         leader_mem = await team_repo.get_user_membership(db, str(current_user.id))
-        if not leader_mem or leader_mem.role != TeamMemberRole.LEADER.value:
+        if not leader_mem:
             raise ForbiddenException(message="Chỉ đội trưởng mới có quyền nhượng quyền.")
-        target_mem = await team_repo.get_user_membership(db, new_leader_user_id)
-        if not target_mem or str(target_mem.team_id) != str(leader_mem.team_id):
-            raise NotFoundException(message="Thành viên được chọn không thuộc đội của bạn.")
-        team_id_str = str(leader_mem.team_id)
-        leader_mem.role = TeamMemberRole.MEMBER.value
-        target_mem.role = TeamMemberRole.LEADER.value
-        await db.commit()
-        db.expire_all()
-        loaded = await team_repo.get_by_id(db, team_id_str)
-        return self.build_team_response(loaded)  # type: ignore
+        team_id = str(leader_mem.team_id)
+        async with self._get_team_lock(team_id):
+            team = await team_repo.get_by_id(db, team_id, for_update=True)
+            leader_mem = await team_repo.get_user_membership(db, str(current_user.id))
+            if not team or not leader_mem or str(leader_mem.team_id) != team_id or leader_mem.role != TeamMemberRole.LEADER.value:
+                raise ForbiddenException(message="Chỉ đội trưởng mới có quyền nhượng quyền.")
+            target_mem = await team_repo.get_user_membership(db, new_leader_user_id)
+            if not target_mem or str(target_mem.team_id) != team_id:
+                raise NotFoundException(message="Thành viên được chọn không thuộc đội của bạn.")
+            leader_mem.role = TeamMemberRole.MEMBER.value
+            target_mem.role = TeamMemberRole.LEADER.value
+            await db.commit()
+            db.expire_all()
+            loaded = await team_repo.get_by_id(db, team_id)
+            return await self.response(db, loaded)
 
     async def get_my_team(
         self,
@@ -373,7 +395,7 @@ class TeamService:
         team = await team_repo.get_user_team(db, str(current_user.id))
         if not team:
             return None
-        return self.build_team_response(team)
+        return await self.response(db, team)
 
     async def get_team_by_id(
         self,
@@ -386,7 +408,7 @@ class TeamService:
                 message="Không tìm thấy đội thi.",
                 error_code="TEAM_NOT_FOUND",
             )
-        return self.build_team_response(team)
+        return await self.response(db, team)
 
 
 team_service = TeamService()

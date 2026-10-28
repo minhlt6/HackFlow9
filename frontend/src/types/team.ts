@@ -18,7 +18,9 @@ export interface TeamDetails {
   team_name: string;
   description?: string;
   invite_code: string;
-  status: 'recruiting' | 'locked' | 'ready' | 'active';
+  status: 'INCOMPLETE' | 'VALID' | 'LOCKED' | 'REJECTED';
+  approval_status?: 'pending' | 'approved' | 'rejected';
+  rejection_reason?: string | null;
   is_locked: boolean;
   member_count: number;
   min_members: number;

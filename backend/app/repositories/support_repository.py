@@ -85,6 +85,7 @@ class SupportRepository:
         assigned_to: Optional[str] = None,
         skip: int = 0,
         limit: int = 100,
+        viewer_mentor_id: Optional[str] = None,
     ) -> List[SupportTicket]:
         """
         Filter tickets by status, priority, category, assigned_to with pagination.
@@ -101,6 +102,9 @@ class SupportRepository:
         if assigned_to is not None:
             stmt = stmt.where(SupportTicket.assigned_to == assigned_to)
 
+        if viewer_mentor_id is not None:
+            stmt = stmt.where(or_(SupportTicket.assigned_to == viewer_mentor_id,
+                                 and_(SupportTicket.assigned_to.is_(None), SupportTicket.status == "open")))
         stmt = stmt.order_by(SupportTicket.created_at.desc()).offset(skip).limit(limit)
         result = await db.execute(stmt)
         return list(result.scalars().all())
@@ -109,6 +113,7 @@ class SupportRepository:
     async def get_by_id(
         db: AsyncSession,
         ticket_id: str,
+        for_update: bool = False,
     ) -> Optional[SupportTicket]:
         """
         Get a support ticket by its UUID primary key.
@@ -118,6 +123,8 @@ class SupportRepository:
             .options(*TICKET_LOAD_OPTIONS)
             .where(SupportTicket.id == ticket_id)
         )
+        if for_update:
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 

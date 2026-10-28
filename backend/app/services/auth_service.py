@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.core.exceptions import (
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     UnauthorizedException,
 )
 from app.core.security import create_access_token, hash_password, verify_password
@@ -37,6 +38,16 @@ LOGIN_EMAIL_ALIASES: Dict[str, str] = {
     "mentor@hackflow.io": "mentor.ai@ailab.org.vn",
 }
 
+REHEARSAL_EMAIL_ALIASES: Dict[str, str] = {
+    "admin@hackflow.dev": "admin@demo.example.com",
+    "admin@hackflow.com": "admin@demo.example.com",
+    "judge.tech@hackathon.org": "judge1@demo.example.com",
+    "mentor.ai@ailab.org.vn": "mentor1@demo.example.com",
+    "leader@cybersamurai.team": "cyber.leader@demo.example.com",
+    "member@cybersamurai.team": "cyber.member1@demo.example.com",
+    "member2@cybersamurai.team": "cyber.member2@demo.example.com",
+}
+
 DEMO_PASSWORD_ALIASES = {
     "123",
     "Admin@2026",
@@ -44,6 +55,7 @@ DEMO_PASSWORD_ALIASES = {
     "Judge@123456",
     "Mentor@123456",
     "Candidate@123",
+    "HFdemo-05e2ab34a7de!",
 }
 
 
@@ -78,10 +90,13 @@ class AuthService:
         clean_email = LOGIN_EMAIL_ALIASES.get(raw_email, raw_email)
         effective_password = (
             "123456"
-            if clean_email in DEFAULT_DEMO_ACCOUNTS and password in DEMO_PASSWORD_ALIASES
+            if (clean_email in DEFAULT_DEMO_ACCOUNTS or clean_email.endswith("@demo.example.com"))
+            and password in DEMO_PASSWORD_ALIASES
             else password
         )
         user = await user_repo.get_by_email(db, clean_email)
+        if not user and clean_email in REHEARSAL_EMAIL_ALIASES:
+            user = await user_repo.get_by_email(db, REHEARSAL_EMAIL_ALIASES[clean_email])
         if settings.demo_enabled and not user and clean_email in DEFAULT_DEMO_ACCOUNTS and effective_password == "123456":
             full_name, role_val, gh_user = DEFAULT_DEMO_ACCOUNTS[clean_email]
             user = User(
@@ -121,17 +136,17 @@ class AuthService:
         if existing:
             raise ConflictException(message="Email này đã được đăng ký trên hệ thống.")
 
-        role_str = (req.role or "candidate").lower()
+        role_str = (req.role or "candidate").lower().strip()
         valid_roles = {r.value for r in UserRole}
         if role_str not in valid_roles:
             raise BadRequestException(message=f"Vai trò '{role_str}' không hợp lệ.")
+        if role_str != UserRole.CANDIDATE.value:
+            raise ForbiddenException(
+                message="Đăng ký công khai chỉ dành cho thí sinh. Tài khoản Quản trị, Giám khảo và Cố vấn phải do Ban Tổ Chức cấp.",
+                error_code="FORBIDDEN_ROLE",
+            )
 
-        # Candidates default to pending approval; administrative roles default to approved
-        approval = (
-            ApprovalStatus.PENDING.value
-            if role_str == UserRole.CANDIDATE.value
-            else ApprovalStatus.APPROVED.value
-        )
+        approval = ApprovalStatus.PENDING.value
 
         user = User(
             email=req.email.lower().strip(),

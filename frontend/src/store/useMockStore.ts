@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import apiClient from '../api/axiosClient';
+import { notificationsApi } from '../api/notificationsApi';
 import { useAuthStore } from './useAuthStore';
 import type {
   User,
@@ -35,8 +36,8 @@ const initialHackathonConfig: HackathonConfig = {
   maxTeamMembers: 5,
   currentPhase: 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng',
   finalSubmissionDeadline: '',
-  blindJudging: true,
-  blindJudgingMode: true,
+  blindJudging: false,
+  blindJudgingMode: false,
   resultsPublished: false,
   ticketsEnabled: true,
   registrationStart: '',
@@ -119,11 +120,6 @@ interface MockStoreState {
 
   // Teams
   teams: Team[];
-  createTeam: (name: string, description: string) => { success: boolean; team?: Team; message: string };
-  joinTeamWithCode: (inviteCode: string) => { success: boolean; team?: Team; message: string };
-  transferTeamLeader: (teamId: string, newLeaderId: string) => boolean;
-  removeTeamMember: (teamId: string, memberId: string) => boolean;
-  leaveTeam: (teamId: string) => boolean;
   approveTeamRegistration: (teamId: string) => void;
   rejectTeamRegistration: (teamId: string, reason: string) => void;
 
@@ -452,24 +448,28 @@ export const useMockStore = create<MockStoreState>()(
       updateConfig: async (newConfig) => {
         const minVal = newConfig.minTeamMembers ?? newConfig.minTeamSize;
         const maxVal = newConfig.maxTeamMembers ?? newConfig.maxTeamSize;
-        await apiClient.patch('/admin/config', {
+        const response = await apiClient.patch('/admin/config', {
           name: newConfig.name,
           end_time: newConfig.finalSubmissionDeadline,
           minTeamSize: minVal,
           minTeamMembers: minVal,
           maxTeamSize: maxVal,
           maxTeamMembers: maxVal,
-          status: newConfig.currentPhase,
           currentPhase: newConfig.currentPhase,
           blindJudgingEnabled: newConfig.blindJudgingMode ?? newConfig.blindJudging,
           is_result_published: newConfig.resultsPublished,
         });
+        const saved = response.data?.data;
+        if (!saved?.id || !saved.end_time) throw new Error('Phản hồi cấu hình không hợp lệ. Vui lòng tải lại trang.');
         set((state) => ({
           config: {
             ...state.config,
             ...newConfig,
-            ...(minVal !== undefined ? { minTeamSize: minVal, minTeamMembers: minVal } : {}),
-            ...(maxVal !== undefined ? { maxTeamSize: maxVal, maxTeamMembers: maxVal } : {}),
+            name: String(saved.name), currentPhase: String(saved.currentPhase),
+            finalSubmissionDeadline: String(saved.end_time),
+            isContestStarted: saved.status === 'hacking',
+            minTeamSize: Number(saved.minTeamSize), minTeamMembers: Number(saved.minTeamMembers),
+            maxTeamSize: Number(saved.maxTeamSize), maxTeamMembers: Number(saved.maxTeamMembers),
           },
         }));
       },
@@ -484,8 +484,9 @@ export const useMockStore = create<MockStoreState>()(
       },
       toggleContestStarted: async () => {
         const next = !get().config.isContestStarted;
-        await apiClient.patch('/admin/config', { status: next ? 'hacking' : 'registration' });
-        set((state) => ({ config: { ...state.config, isContestStarted: next, currentPhase: next ? 'hacking' : 'registration' } }));
+        const response = await apiClient.patch('/admin/config', { status: next ? 'hacking' : 'registration' });
+        const saved = response.data.data;
+        set((state) => ({ config: { ...state.config, isContestStarted: saved.status === 'hacking', currentPhase: String(saved.currentPhase) } }));
       },
 
       // Whitelist
@@ -573,207 +574,6 @@ export const useMockStore = create<MockStoreState>()(
 
       // Teams
       teams: initialTeams,
-      createTeam: (name, description) => {
-        const user = get().currentUser;
-        if (!name.trim()) {
-          return { success: false, message: 'Tên đội thi không được để trống.' };
-        }
-        // Check if name is taken
-        const isTaken = get().teams.some((t) => t.name.toLowerCase() === name.trim().toLowerCase());
-        if (isTaken) {
-          return { success: false, message: 'Tên đội đã tồn tại trong cuộc thi.' };
-        }
-
-        // Generate 6-char unique invite code
-        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-        let inviteCode = '';
-        for (let i = 0; i < 6; i++) {
-          inviteCode += chars.charAt(Math.floor(Math.random() * chars.length));
-        }
-
-        const newTeam: Team = {
-          id: `team-${Date.now()}`,
-          name: name.trim(),
-          description: description.trim() || 'Dự án AI thế hệ mới.',
-          inviteCode,
-          leaderId: user.id,
-          topicId: null,
-          status: 'INCOMPLETE',
-          memberCount: 1,
-          createdAt: new Date().toISOString().split('T')[0],
-          members: [
-            {
-              id: user.id,
-              userId: user.id,
-              fullName: user.fullName,
-              email: user.email,
-              role: 'leader',
-              roleInTeam: 'leader',
-              studentId: user.studentId,
-              school: user.school,
-              skills: user.skills,
-              joinedAt: new Date().toISOString().split('T')[0],
-            },
-          ],
-        };
-
-        set((state) => ({
-          teams: [...state.teams, newTeam],
-          currentUser: {
-            ...state.currentUser,
-            teamId: newTeam.id,
-            roleInTeam: 'leader',
-          },
-        }));
-
-        void apiClient
-          .post('/teams', {
-            team_name: newTeam.name,
-            description: newTeam.description,
-          })
-          .then(() => {
-            void get().syncFromBackend?.();
-          })
-          .catch(() => {});
-
-        return { success: true, team: newTeam, message: 'Tạo đội thành công!' };
-      },
-
-      joinTeamWithCode: (inviteCode) => {
-        const code = inviteCode.trim().toUpperCase();
-        const team = get().teams.find((t) => t.inviteCode.toUpperCase() === code);
-
-        if (!team) {
-          return { success: false, message: 'Mã mời 6 ký tự không chính xác hoặc đội không tồn tại.' };
-        }
-
-        if (team.members.length >= 5) {
-          return { success: false, message: 'Đội thi đã đạt số lượng tối đa 5 thành viên (Quy định BA-01).' };
-        }
-
-        const user = get().currentUser;
-        if (team.members.some((m) => m.userId === user.id)) {
-          return { success: false, message: 'Bạn đã là thành viên của đội này.' };
-        }
-
-        const updatedMembers = [
-          ...team.members,
-          {
-            id: user.id,
-            userId: user.id,
-            fullName: user.fullName,
-            email: user.email,
-            role: 'member' as const,
-            roleInTeam: 'member' as const,
-            studentId: user.studentId,
-            school: user.school,
-            skills: user.skills,
-            joinedAt: new Date().toISOString().split('T')[0],
-          },
-        ];
-
-        const updatedTeam: Team = {
-          ...team,
-          members: updatedMembers,
-          memberCount: updatedMembers.length,
-          status: updatedMembers.length >= 3 ? 'VALID' : 'INCOMPLETE',
-        };
-
-        set((state) => ({
-          teams: state.teams.map((t) => (t.id === team.id ? updatedTeam : t)),
-          currentUser: {
-            ...state.currentUser,
-            teamId: team.id,
-            roleInTeam: 'member',
-          },
-        }));
-
-        void apiClient
-          .post('/teams/join', { invite_code: code })
-          .then(() => {
-            void get().syncFromBackend?.();
-          })
-          .catch(() => {});
-
-        return { success: true, team: updatedTeam, message: `Gia nhập đội ${team.name} thành công!` };
-      },
-
-      transferTeamLeader: (teamId, newLeaderId) => {
-        const team = get().teams.find((t) => t.id === teamId);
-        if (!team) return false;
-
-        const updatedMembers = team.members.map((m) => {
-          if (m.userId === newLeaderId) {
-            return { ...m, roleInTeam: 'leader' as const };
-          }
-          if (m.roleInTeam === 'leader') {
-            return { ...m, roleInTeam: 'member' as const };
-          }
-          return m;
-        });
-
-        set((state) => ({
-          teams: state.teams.map((t) =>
-            t.id === teamId ? { ...t, leaderId: newLeaderId, members: updatedMembers } : t
-          ),
-          currentUser:
-            state.currentUser.id === newLeaderId
-              ? { ...state.currentUser, roleInTeam: 'leader' }
-              : state.currentUser.teamId === teamId && state.currentUser.roleInTeam === 'leader'
-              ? { ...state.currentUser, roleInTeam: 'member' }
-              : state.currentUser,
-        }));
-
-        return true;
-      },
-
-      removeTeamMember: (teamId, memberId) => {
-        const team = get().teams.find((t) => t.id === teamId);
-        if (!team) return false;
-
-        const updatedMembers = team.members.filter((m) => m.userId !== memberId);
-        set((state) => ({
-          teams: state.teams.map((t) =>
-            t.id === teamId
-              ? {
-                  ...t,
-                  members: updatedMembers,
-                  memberCount: updatedMembers.length,
-                  status: updatedMembers.length >= 3 ? 'VALID' : 'INCOMPLETE',
-                }
-              : t
-          ),
-        }));
-        return true;
-      },
-
-      leaveTeam: (teamId) => {
-        const user = get().currentUser;
-        const team = get().teams.find((t) => t.id === teamId);
-        if (!team) return false;
-
-        const updatedMembers = team.members.filter((m) => m.userId !== user.id);
-        set((state) => ({
-          teams: state.teams.map((t) =>
-            t.id === teamId
-              ? {
-                  ...t,
-                  members: updatedMembers,
-                  memberCount: updatedMembers.length,
-                  status: updatedMembers.length >= 3 ? 'VALID' : 'INCOMPLETE',
-                }
-              : t
-          ),
-          currentUser: {
-            ...state.currentUser,
-            teamId: undefined,
-            roleInTeam: undefined,
-          },
-        }));
-        void apiClient.post('/teams/leave').catch(() => {});
-        return true;
-      },
-
       approveTeamRegistration: (teamId) => {
         set((state) => ({
           teams: state.teams.map((t) => (t.id === teamId ? { ...t, status: 'approved', approvalStatus: 'approved' } : t)),
@@ -1641,7 +1441,7 @@ export const useMockStore = create<MockStoreState>()(
           apiClient.get('/topics'),
           apiClient.get('/checkpoints'),
           apiClient.get('/rubrics'),
-          apiClient.get('/announcements'),
+          notificationsApi.listAllAnnouncements().then((items) => ({ data: { data: items } })),
           roleNow === 'judge' ? Promise.resolve({ data: null }) : apiClient.get('/teams'),
           roleNow === 'admin' || roleNow === 'mentor'
             ? apiClient.get('/tickets')
@@ -1679,6 +1479,8 @@ export const useMockStore = create<MockStoreState>()(
                     majorTopicId: String(t.id),
                     title: String(s.title ?? s.name ?? ''),
                     name: String(s.title ?? s.name ?? ''),
+                    mentorId: s.mentor_id ? String(s.mentor_id) : undefined,
+                    mentorName: s.mentor_name ? String(s.mentor_name) : undefined,
                     description: String(s.description ?? ''),
                     maxTeamsQuota: Number(s.max_teams ?? s.maxTeamsQuota ?? 5),
                     currentTeams: Number(s.current_teams ?? s.currentTeams ?? 0),
@@ -1747,7 +1549,8 @@ export const useMockStore = create<MockStoreState>()(
               content: String(a.content ?? ''),
               sender: String(a.sender_name ?? 'Ban Tổ Chức'),
               author: String(a.sender_name ?? 'Ban Tổ Chức'),
-              targetRole: (String(a.target_audience ?? 'all') as Announcement['targetRole']) || 'all',
+              targetRole: (String(a.targetRole ?? 'all') as Announcement['targetRole']),
+              priority: String(a.priority ?? 'info') as Announcement['priority'],
               createdAt: a.created_at
                 ? new Date(String(a.created_at)).toLocaleTimeString('vi-VN') +
                   ' - ' +
@@ -1812,7 +1615,8 @@ export const useMockStore = create<MockStoreState>()(
                 approvalStatus,
                 rejectionReason: t.rejection_reason ? String(t.rejection_reason) : undefined,
                 memberCount: Number(t.member_count ?? members.length),
-                maxMembers: 5,
+                maxMembers: Number(t.max_members),
+                minMembers: Number(t.min_members),
                 createdAt: String(t.created_at ?? new Date().toISOString()),
                 members,
               };
@@ -1894,7 +1698,8 @@ export const useMockStore = create<MockStoreState>()(
               assignedMentorName: tk.assignee_name ? String(tk.assignee_name) : undefined,
               response: (tk.response ?? tk.resolution_note) ? String(tk.response ?? tk.resolution_note) : undefined,
               createdAt: String(tk.created_at ?? new Date().toISOString()),
-              updatedAt: String(tk.updated_at ?? tk.created_at ?? new Date().toISOString()),
+              resolvedAt: tk.resolved_at ? String(tk.resolved_at) : undefined,
+                updatedAt: String(tk.updated_at ?? tk.created_at ?? new Date().toISOString()),
               replies: Array.isArray(tk.messages)
                 ? (tk.messages as Array<Record<string, unknown>>).map((m, mIdx) => ({
                     id: String(m.id ?? `rep-${mIdx}`),

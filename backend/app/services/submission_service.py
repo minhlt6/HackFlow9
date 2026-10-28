@@ -227,15 +227,24 @@ class SubmissionService:
             raise ForbiddenException(
                 message=f"Đội thi của bạn đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu (Lý do: {reason_str}), không thể nộp bài.",
                 error_code="TEAM_REJECTED",
-            )
-
-        team_obj = await team_repo.get_by_id(db, team_id)
-        team_meta = team_obj.admin_meta if (team_obj and isinstance(getattr(team_obj, "admin_meta", None), dict)) else {}
-        if str(team_meta.get("approval_status", "")).lower() == "rejected":
-            reason_str = team_meta.get("rejection_reason") or "Không đạt điều kiện xét duyệt của Ban Tổ Chức."
-            raise ForbiddenException(
-                message=f"Đội thi của bạn đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu (Lý do: {reason_str}), không thể nộp bài.",
-                error_code="TEAM_REJECTED",
+            )
+
+
+
+        team_obj = await team_repo.get_by_id(db, team_id)
+
+        team_meta = team_obj.admin_meta if (team_obj and isinstance(getattr(team_obj, "admin_meta", None), dict)) else {}
+
+        if str(team_meta.get("approval_status", "")).lower() == "rejected":
+
+            reason_str = team_meta.get("rejection_reason") or "Không đạt điều kiện xét duyệt của Ban Tổ Chức."
+
+            raise ForbiddenException(
+
+                message=f"Đội thi của bạn đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu (Lý do: {reason_str}), không thể nộp bài.",
+
+                error_code="TEAM_REJECTED",
+
             )
 
         # ── Xác định checkpoint_id ──
@@ -565,6 +574,13 @@ class SubmissionService:
 
         return self.build_submission_response(working_sub, is_duplicate=False), message
 
+    @staticmethod
+    def progress_only(submission: SubmissionResponse) -> SubmissionResponse:
+        return submission.model_copy(update={
+            "repo_url": None, "demo_url": None, "commit_sha": None,
+            "submission_data": None, "note": None, "feedback": None, "version_history": [],
+        })
+
     async def list_submissions(
         self,
         db: AsyncSession,
@@ -578,6 +594,8 @@ class SubmissionService:
         - Candidates automatically view their own team's submissions.
         - Admin / Judge / Mentor can view all submissions or filter by team_id / checkpoint_id.
         """
+        if user.role == UserRole.JUDGE.value:
+            raise ForbiddenException(message="Vui lòng sử dụng API chấm bài ẩn danh.", error_code="FORBIDDEN_ROLE")
         effective_team_id = team_id
         if user.role == UserRole.CANDIDATE.value:
             membership = await team_repo.get_user_membership(db, str(user.id))
@@ -633,7 +651,7 @@ class SubmissionService:
                         )
                     )
 
-        return results
+        return [self.progress_only(s) for s in results] if user.role == UserRole.MENTOR.value else results
 
     async def get_submission_by_id(
         self,
@@ -641,6 +659,8 @@ class SubmissionService:
         user: User,
         submission_id: str,
     ) -> SubmissionResponse:
+        if user.role == UserRole.JUDGE.value:
+            raise ForbiddenException(message="Vui lòng sử dụng API chấm bài ẩn danh.", error_code="FORBIDDEN_ROLE")
         sub = await submission_repo.get_by_id(db, submission_id)
         if not sub:
             raise NotFoundException(
@@ -656,7 +676,8 @@ class SubmissionService:
                     error_code="FORBIDDEN_SUBMISSION_ACCESS",
                 )
 
-        return self.build_submission_response(sub)
+        response = self.build_submission_response(sub)
+        return self.progress_only(response) if user.role == UserRole.MENTOR.value else response
 
     async def list_audit_logs(
         self,
@@ -668,6 +689,8 @@ class SubmissionService:
         action: Optional[str] = None,
         late_grace_period: Optional[bool] = None,
     ) -> List[AuditLogResponse]:
+        if user.role in (UserRole.MENTOR.value, UserRole.JUDGE.value):
+            raise ForbiddenException(message="Bạn không có quyền xem nhật ký bài nộp.", error_code="FORBIDDEN_ROLE")
         effective_team_id = team_id
         if user.role == UserRole.CANDIDATE.value:
             membership = await team_repo.get_user_membership(db, str(user.id))

@@ -3,6 +3,8 @@ export type TopicStatus = 'AVAILABLE' | 'FULL' | 'CLOSED';
 export interface Subtopic {
   id: string;
   topic_id: string;
+  mentor_id?: string | null;
+  mentor_name?: string | null;
   title: string;
   description?: string | null;
   max_teams: number;

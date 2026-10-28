@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { toast } from '../../store/useToastStore';
 import { apiClient } from '../../api/axiosClient';
@@ -10,7 +10,6 @@ import {
   Settings,
   Save,
   CheckCircle2,
-  EyeOff,
   Calendar,
   Users,
   Trophy,
@@ -27,6 +26,7 @@ import {
   Megaphone,
 } from 'lucide-react';
 
+import { toLocalDateTime, configDeadlineToISO } from '../../utils/configForm';
 import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
 import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
@@ -35,7 +35,6 @@ export const AdminConfigPage: React.FC = () => {
   const {
     config,
     updateConfig,
-    toggleBlindJudging,
     toggleResultsPublished,
     toggleContestStarted,
     resetAllMockData,
@@ -50,8 +49,14 @@ export const AdminConfigPage: React.FC = () => {
   const [minTeamMembers, setMinTeamMembers] = useState(config.minTeamMembers || config.minTeamSize || 3);
   const [maxTeamMembers, setMaxTeamMembers] = useState(config.maxTeamMembers || config.maxTeamSize || 5);
   const [finalDeadline, setFinalDeadline] = useState(
-    config.finalSubmissionDeadline ? config.finalSubmissionDeadline.slice(0, 16) : ''
+    toLocalDateTime(config.finalSubmissionDeadline)
   );
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const savingRef = useRef(false);
+  const [baseline, setBaseline] = useState({ name, currentPhase, minTeamMembers, maxTeamMembers, finalDeadline });
+  const savedDeadlineRef = useRef(config.finalSubmissionDeadline);
   const [alert, setAlert] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isContestToggleConfirmOpen, setIsContestToggleConfirmOpen] = useState(false);
@@ -64,23 +69,29 @@ export const AdminConfigPage: React.FC = () => {
       .then((res) => {
         if (!mounted) return;
         const data = res.data?.data ?? res.data;
+        if (!data?.id || !data.end_time) throw new Error('Phản hồi cấu hình không hợp lệ.');
         if (data && typeof data === 'object') {
+          setHasLoaded(true);
           const currCfg = useMockStore.getState().config;
           const nextName = String(data.name ?? data.eventName ?? currCfg.name);
           const nextMinTeam = Number(data.minTeamMembers ?? data.minTeamSize ?? currCfg.minTeamMembers ?? currCfg.minTeamSize ?? 3);
           const nextMaxTeam = Number(data.maxTeamMembers ?? data.maxTeamSize ?? currCfg.maxTeamMembers ?? currCfg.maxTeamSize ?? 5);
           const nextPhase = String(data.currentPhase ?? currCfg.currentPhase);
           const nextEnd = String(data.end_time ?? data.endAt ?? currCfg.finalSubmissionDeadline);
+          savedDeadlineRef.current = nextEnd;
+          setBaseline({ name: nextName, currentPhase: nextPhase, minTeamMembers: nextMinTeam,
+            maxTeamMembers: nextMaxTeam, finalDeadline: toLocalDateTime(nextEnd) });
           setName(nextName);
           setMinTeamMembers(nextMinTeam);
           setMaxTeamMembers(nextMaxTeam);
           if (nextPhase) setCurrentPhase(nextPhase);
           if (nextEnd) {
-            setFinalDeadline(nextEnd.slice(0, 16));
+            setFinalDeadline(toLocalDateTime(nextEnd));
           }
           useMockStore.setState((state) => ({
             config: {
               ...state.config,
+              isContestStarted: data.status === 'hacking',
               name: nextName,
               currentPhase: nextPhase || state.config.currentPhase,
               minTeamSize: nextMinTeam,
@@ -95,70 +106,60 @@ export const AdminConfigPage: React.FC = () => {
           }));
         }
       })
-      .catch(() => {});
+      .catch(() => { toast.error('Không thể tải cấu hình. Vui lòng tải lại trang trước khi lưu.'); })
+      .finally(() => { if (mounted) setIsLoading(false); });
     return () => {
       mounted = false;
     };
   }, []);
 
-  const initialName = config.name;
-  const initialPhase = config.currentPhase;
-  const initialMinTeam = config.minTeamMembers || config.minTeamSize || 3;
-  const initialMaxTeam = config.maxTeamMembers || config.maxTeamSize || 5;
-  const initialDeadline = config.finalSubmissionDeadline ? config.finalSubmissionDeadline.slice(0, 16) : '';
-
-  const isDirty =
-    name !== initialName ||
-    currentPhase !== initialPhase ||
-    Number(minTeamMembers) !== Number(initialMinTeam) ||
-    Number(maxTeamMembers) !== Number(initialMaxTeam) ||
-    finalDeadline !== initialDeadline;
+  const isDirty = name !== baseline.name || currentPhase !== baseline.currentPhase ||
+    Number(minTeamMembers) !== baseline.minTeamMembers || Number(maxTeamMembers) !== baseline.maxTeamMembers ||
+    finalDeadline !== baseline.finalDeadline;
 
   const blocker = useUnsavedChangesWarning(isDirty);
 
-  const handleSaveAndLeave = async () => {
-    if (Number(minTeamMembers) > Number(maxTeamMembers)) {
-      toast.error('Số lượng thành viên tối thiểu không được lớn hơn số lượng tối đa.');
-      return;
+  const saveConfig = async (): Promise<boolean> => {
+    if (savingRef.current || isLoading || !hasLoaded) return false;
+    if (!Number.isInteger(minTeamMembers) || minTeamMembers < 1 || !Number.isInteger(maxTeamMembers) || minTeamMembers > maxTeamMembers) {
+      toast.error('Số lượng thành viên phải là số nguyên dương và tối thiểu không vượt quá tối đa.');
+      return false;
     }
+    savingRef.current = true;
+    setIsSaving(true);
+    setAlert(null);
     try {
-      await updateConfig({
-        name,
-        currentPhase,
-        minTeamSize: Number(minTeamMembers),
-        minTeamMembers: Number(minTeamMembers),
-        maxTeamSize: Number(maxTeamMembers),
-        maxTeamMembers: Number(maxTeamMembers),
-        finalSubmissionDeadline: new Date(finalDeadline).toISOString(),
-      });
-      if (blocker.proceed) {
-        blocker.proceed();
-      }
-    } catch {
-      toast.error('Không thể lưu cấu hình. Vui lòng thử lại.');
+      await updateConfig({ name, currentPhase, minTeamSize: minTeamMembers, minTeamMembers,
+        maxTeamSize: maxTeamMembers, maxTeamMembers,
+        finalSubmissionDeadline: configDeadlineToISO(finalDeadline, savedDeadlineRef.current) });
+      const saved = useMockStore.getState().config;
+      const next = { name: saved.name, currentPhase: saved.currentPhase,
+        minTeamMembers: saved.minTeamMembers ?? saved.minTeamSize ?? 3,
+        maxTeamMembers: saved.maxTeamMembers ?? saved.maxTeamSize ?? 5,
+        finalDeadline: toLocalDateTime(saved.finalSubmissionDeadline) };
+      savedDeadlineRef.current = saved.finalSubmissionDeadline;
+      setName(next.name); setCurrentPhase(next.currentPhase);
+      setMinTeamMembers(next.minTeamMembers); setMaxTeamMembers(next.maxTeamMembers);
+      setFinalDeadline(next.finalDeadline); setBaseline(next);
+      return true;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Không thể lưu cấu hình. Vui lòng thử lại.');
+      return false;
+    } finally {
+      savingRef.current = false;
+      setIsSaving(false);
     }
+  };
+
+  const handleSaveAndLeave = async () => {
+    if (await saveConfig()) blocker.proceed?.();
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (Number(minTeamMembers) > Number(maxTeamMembers)) {
-      toast.error('Số lượng thành viên tối thiểu không được lớn hơn số lượng tối đa.');
-      return;
-    }
-    try {
-      await updateConfig({
-        name,
-        currentPhase,
-        minTeamSize: Number(minTeamMembers),
-        minTeamMembers: Number(minTeamMembers),
-        maxTeamSize: Number(maxTeamMembers),
-        maxTeamMembers: Number(maxTeamMembers),
-        finalSubmissionDeadline: new Date(finalDeadline).toISOString(),
-      });
+    if (await saveConfig()) {
       setAlert('Đã cập nhật cấu hình hệ thống Hackathon thành công!');
       setTimeout(() => setAlert(null), 3500);
-    } catch {
-      toast.error('Không thể lưu cấu hình. Vui lòng thử lại.');
     }
   };
 
@@ -207,10 +208,6 @@ export const AdminConfigPage: React.FC = () => {
             <span>{config.isContestStarted ? 'Cuộc thi đang diễn ra' : 'Cuộc thi chưa bắt đầu'}</span>
           </Badge>
 
-          <Badge variant={config.blindJudgingMode ? 'indigo' : 'neutral'} className="py-1 px-2.5">
-            Chấm ẩn danh: {config.blindJudgingMode ? 'BẬT' : 'TẮT'}
-          </Badge>
-
           <Badge variant={config.resultsPublished ? 'success' : 'neutral'} className="py-1 px-2.5">
             Bảng điểm: {config.resultsPublished ? 'CÔNG BỐ' : 'ẨN'}
           </Badge>
@@ -247,8 +244,10 @@ export const AdminConfigPage: React.FC = () => {
         </div>
       )}
 
+      {!isLoading && !hasLoaded && <p role="alert" className="text-sm text-rose-600">Không thể tải cấu hình. Vui lòng tải lại trang.</p>}
       {/* Main Form Grid: Left (Primary Config) & Right (Policies & System Ops) */}
-      <form onSubmit={handleSave} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <form onSubmit={handleSave}>
+        <fieldset disabled={isLoading || isSaving || !hasLoaded} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* ========================================================
             LEFT COLUMN (7 cols on lg, 8 cols on xl): Core Settings
            ======================================================== */}
@@ -289,6 +288,7 @@ export const AdminConfigPage: React.FC = () => {
                     onChange={(e) => setCurrentPhase(e.target.value)}
                     className="w-full p-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none transition-colors"
                   >
+                    {!['Đăng ký tài khoản & Lập đội', 'Lựa chọn đề tài & Giới hạn số lượng', 'Thực thi dự án & Nộp bài các chặng', 'Hội đồng chấm thi độc lập', 'Bế mạc & Công bố kết quả'].includes(currentPhase) && <option value={currentPhase}>{currentPhase}</option>}
                     <option value="Đăng ký tài khoản & Lập đội">Giai đoạn 1: Đăng ký & Lập đội</option>
                     <option value="Lựa chọn đề tài & Giới hạn số lượng">Giai đoạn 2: Chọn đề tài & Khóa số lượng</option>
                     <option value="Thực thi dự án & Nộp bài các chặng">Giai đoạn 3: Thực thi & Nộp bài các chặng</option>
@@ -433,6 +433,7 @@ export const AdminConfigPage: React.FC = () => {
               {config.isContestStarted && (
                 <div className="mt-4 pt-4 border-t border-emerald-500/20">
                   <CountdownTimer
+                    compact
                     targetDate={config.finalSubmissionDeadline}
                     title="Đồng hồ đếm ngược trực tiếp (Xem trước giao diện thí sinh)"
                     className="p-3 bg-muted/40 dark:bg-slate-900/60 border-border"
@@ -448,7 +449,7 @@ export const AdminConfigPage: React.FC = () => {
               <CheckCircle2 size={16} className="text-primary" />
               <span>Các thay đổi sẽ được áp dụng ngay trên toàn bộ giao diện sau khi lưu.</span>
             </div>
-            <Button variant="primary" type="submit" size="lg" className="w-full sm:w-auto gap-2 px-8">
+            <Button variant="primary" type="submit" isLoading={isSaving} disabled={isLoading || !hasLoaded} size="lg" className="w-full sm:w-auto gap-2 px-8">
               <Save size={18} />
               <span>Lưu Cấu Hình Hackathon</span>
             </Button>
@@ -472,45 +473,6 @@ export const AdminConfigPage: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              {/* Toggle 1: Chế Độ Chấm Ẩn Danh */}
-              <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <EyeOff size={16} className={config.blindJudgingMode ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'} />
-                    <span className="font-bold text-foreground text-xs">Chế Độ Chấm Ẩn Danh</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => { void toggleBlindJudging().catch(() => toast.error('Không thể lưu cấu hình. Vui lòng thử lại.')); }}
-                    role="switch"
-                    aria-checked={config.blindJudgingMode}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      config.blindJudgingMode ? 'bg-[#6366F1]' : 'bg-muted'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        config.blindJudgingMode ? 'translate-x-5' : 'translate-x-0'
-                      }`}
-                    />
-                  </button>
-                </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Tự động mã hóa tên đội, trường học và danh tính thí sinh khỏi màn hình chấm của Giám khảo để đảm bảo tính khách quan tuyệt đối.
-                </p>
-                <div className="flex items-center justify-between pt-2 border-t border-border text-[11px]">
-                  <span className="text-muted-foreground">Trạng thái hiện tại:</span>
-                  <span
-                    className={`font-semibold ${
-                      config.blindJudgingMode ? 'text-amber-700 dark:text-amber-400' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {config.blindJudgingMode ? '● Đang bật ẩn danh' : '○ Công khai danh tính'}
-                  </span>
-                </div>
-              </div>
-
               {/* Toggle 2: Công Bố Bảng Xếp Hạng */}
               <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -618,6 +580,7 @@ export const AdminConfigPage: React.FC = () => {
             </button>
           </div>
         </div>
+      </fieldset>
       </form>
 
       {/* Unsaved Changes Route Navigation Blocker Modal */}
@@ -653,6 +616,9 @@ export const AdminConfigPage: React.FC = () => {
           setIsContestToggleConfirmOpen(false);
           try {
             await toggleContestStarted();
+            const savedPhase = useMockStore.getState().config.currentPhase;
+            setCurrentPhase(savedPhase);
+            setBaseline((previous) => ({ ...previous, currentPhase: savedPhase }));
           } catch {
             toast.error('Không thể lưu cấu hình. Vui lòng thử lại.');
           }

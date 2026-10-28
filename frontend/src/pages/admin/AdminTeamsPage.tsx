@@ -166,8 +166,8 @@ export const AdminTeamsPage: React.FC = () => {
         onChange: setComplianceFilter,
         options: [
           { label: 'Tất cả quy mô', value: 'all' },
-          { label: 'Đạt chuẩn (3–5 thành viên)', value: 'compliant' },
-          { label: 'Thiếu thành viên (< 3 người)', value: 'under_quota' },
+          { label: 'Đạt chuẩn theo cấu hình', value: 'compliant' },
+          { label: 'Thiếu thành viên theo cấu hình', value: 'under_quota' },
         ],
       },
     ],
@@ -277,14 +277,14 @@ export const AdminTeamsPage: React.FC = () => {
         className: 'whitespace-nowrap',
         cell: (row) => {
           const count = row.memberCount ?? row.members.length;
-          const isCompliant = count >= 3 && count <= 5;
+          const isCompliant = count >= (row.minMembers ?? 3) && count <= (row.maxMembers ?? 5);
           return (
             <div className="inline-flex flex-col items-center gap-1 whitespace-nowrap">
               <Badge
                 variant={isCompliant ? 'neutral' : 'warning'}
                 className="font-mono"
               >
-                {count} / 5 TV
+                {count} / {row.maxMembers ?? 5} TV
               </Badge>
               <span className="font-mono text-[11px] text-muted-foreground">
                 CP: {row.checkpointsCompleted}/{row.totalCheckpoints}
@@ -445,7 +445,7 @@ export const AdminTeamsPage: React.FC = () => {
       {/* Page Header */}
       <PageHeader
         title="Quản lý Danh sách Đội thi & Đề tài"
-        description="Kiểm duyệt tư cách hợp lệ của các đội thi, đối soát định biên thành viên (3–5 người), theo dõi kho mã nguồn GitHub và phân bổ đề tài Hackathon."
+        description="Kiểm duyệt tư cách hợp lệ của các đội thi, đối soát số lượng thành viên theo cấu hình, theo dõi kho mã nguồn GitHub và phân bổ đề tài Hackathon."
         badge={
           <Badge variant="indigo">
             {metrics.totalTeams} đội • {metrics.totalParticipants} thí sinh trong đội
@@ -473,7 +473,7 @@ export const AdminTeamsPage: React.FC = () => {
               isLoading={isAutoMatching}
               loadingText="Đang ghép đội..."
               onClick={() => setIsAutoMatchConfirmOpen(true)}
-              title="Tự động ghép toàn bộ thí sinh đã đăng nhập nhưng chưa có đội thành các đội 3–5 người"
+              title="Tự động ghép toàn bộ thí sinh đã đăng nhập nhưng chưa có đội thành các đội theo cấu hình cuộc thi"
             >
               <Shuffle size={15} />
               <span>
@@ -598,7 +598,7 @@ export const AdminTeamsPage: React.FC = () => {
               <StatCard
                 title="Từ chối / Thiếu thành viên"
                 value={metrics.rejectedOrFlaggedCount}
-                subtitle="Chưa đạt quy chế 3–5 thành viên"
+                subtitle="Bị từ chối hoặc chưa đạt quy định thành viên"
                 icon={<AlertTriangle size={20} />}
                 iconColor="rose"
                 onClick={() => setStatusFilter('rejected')}
@@ -705,6 +705,7 @@ export const AdminTeamsPage: React.FC = () => {
 
       {/* Reject / Disqualify Team Confirmation Dialog (Option B with mandatory reason validation) */}
       <ConfirmDialog
+        key={rejectTarget?.id || 'no-rejection-target'}
         open={Boolean(rejectTarget)}
         onOpenChange={(open) => {
           if (!open) setRejectTarget(null);
@@ -724,7 +725,8 @@ export const AdminTeamsPage: React.FC = () => {
         isLoading={isMutating}
         requireReason
         reasonLabel="Lý do từ chối / đình chỉ đội thi"
-        defaultReason="Đội thi chưa đủ số lượng thành viên tối thiểu theo quy chế Hackathon (yêu cầu từ 3 đến 5 thành viên hợp lệ)."
+        defaultReason=""
+        reasonPlaceholder="Nhập căn cứ từ chối tại thời điểm xét duyệt đội thi này…"
         minReasonLength={10}
         onConfirm={async (reason) => {
           if (!rejectTarget || !reason) return;
@@ -738,7 +740,7 @@ export const AdminTeamsPage: React.FC = () => {
         open={isAutoMatchConfirmOpen}
         onOpenChange={setIsAutoMatchConfirmOpen}
         title={`Xác nhận ghép đội ngẫu nhiên (${unassignedCandidates.length} thí sinh lẻ)?`}
-        description="Hệ thống sẽ tự động gom toàn bộ thí sinh đã được phê duyệt nhưng chưa có đội (cùng các đội chưa đủ 3 thành viên) để ghép ngẫu nhiên thành các đội hợp lệ từ 3–5 thành viên."
+        description="Hệ thống sẽ tự động gom toàn bộ thí sinh đã được phê duyệt nhưng chưa có đội (cùng các đội chưa đủ thành viên tối thiểu) để ghép ngẫu nhiên thành các đội theo giới hạn thành viên trong cấu hình."
         confirmLabel="Xác nhận ghép đội"
         variant="warning"
         isLoading={isAutoMatching}

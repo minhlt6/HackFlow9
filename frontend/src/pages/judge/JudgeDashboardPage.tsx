@@ -6,12 +6,11 @@ import { useNavigate } from 'react-router-dom';
 import { InitialRoleTodoBanner } from '../../components/common/InitialRoleTodoBanner';
 import {
   Columns,
-  EyeOff,
   ArrowRight,
 } from 'lucide-react';
 
 export const JudgeDashboardPage: React.FC = () => {
-  const { currentUser, teams, evaluations, config, majorTopics, rubricCriteria } = useMockStore();
+  const { currentUser, teams, evaluations, majorTopics, rubricCriteria } = useMockStore();
   const navigate = useNavigate();
 
   // Find evaluations by this judge
@@ -63,16 +62,6 @@ export const JudgeDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Blind Judging Banner */}
-      {config.blindJudgingMode && (
-        <div className="rounded-[14px] border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-3">
-          <EyeOff size={20} className="shrink-0 text-amber-700 dark:text-amber-400" />
-          <span>
-            <strong>Chế độ chấm ẩn danh đang được kích hoạt:</strong> Thông tin về trường đại học và tên thật của thí sinh đã được ẩn danh thành các mã định danh đội để đảm bảo tính khách quan tuyệt đối.
-          </span>
-        </div>
-      )}
-
       {/* Checklist nhiệm vụ ban đầu cho Ban Giám Khảo */}
       <InitialRoleTodoBanner role="judge" />
 
@@ -99,7 +88,7 @@ export const JudgeDashboardPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-foreground">
-              {activeTeams.map((team, idx) => {
+              {activeTeams.map((team) => {
                 const evalItem = judgeEvals.find((e) => e.teamId === team.id);
                 const isEvaluated = Boolean(evalItem && !evalItem.isDraft);
                 const isDraft = Boolean(evalItem?.isDraft);
@@ -107,16 +96,14 @@ export const JudgeDashboardPage: React.FC = () => {
                   ? normalizeScoreTo100(evalItem.totalScore, evalItem.scores, rubricCriteria)
                   : 0;
 
-                const displayName = config.blindJudgingMode
-                  ? `Đội thi ẩn danh #${(idx + 1).toString().padStart(2, '0')}`
-                  : team.name;
+                const displayName = team.name;
 
                 return (
                   <tr key={team.id} className="hover:bg-accent transition-colors">
                     <td className="py-3.5 px-4">
                       <span className="font-bold text-foreground block">{displayName}</span>
                       <span className="text-[11px] text-muted-foreground">
-                        {config.blindJudgingMode ? 'Mã dự thi hợp lệ' : `Đội trưởng: ${team.leaderName}`}
+                        {`Đội trưởng: ${team.leaderName}`}
                       </span>
                     </td>
 

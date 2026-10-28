@@ -14,7 +14,6 @@ import {
   Presentation,
   CheckSquare,
   Save,
-  EyeOff,
   GitBranch,
   ExternalLink,
   ChevronLeft,
@@ -565,9 +564,7 @@ export const JudgingWorkspace: React.FC = () => {
     finalSubmissions,
     submissions,
     saveEvaluation,
-    config,
     majorTopics,
-    toggleBlindJudging,
     syncFromBackend,
   } = useMockStore();
 
@@ -663,10 +660,7 @@ export const JudgingWorkspace: React.FC = () => {
     }
   };
 
-  const currentTeamData = teamsWithStatus.find((t) => t.id === selectedTeam?.id);
-  const displayName = config.blindJudgingMode
-    ? currentTeamData?.anonCode || `Team #${(currentTeamIndex + 1).toString().padStart(4, '0')}`
-    : selectedTeam?.name || '';
+  const displayName = selectedTeam?.name || '';
 
   const commitSha = finalSub?.commitSha || 'c8d4e2f89a1b2c3d';
 
@@ -705,9 +699,7 @@ export const JudgingWorkspace: React.FC = () => {
               className="px-3 py-1.5 rounded-lg bg-card border border-border text-xs font-semibold text-foreground focus:outline-none focus:border-[#6366F1]"
             >
               {filteredTeams.map((t, idx) => {
-                const label = config.blindJudgingMode
-                  ? t.anonCode
-                  : `${idx + 1}. ${t.name}`;
+                const label = `${idx + 1}. ${t.name}`;
                 const statusTag =
                   t.judgingStatus === 'locked'
                     ? ' [Đã khóa]'
@@ -769,22 +761,7 @@ export const JudgingWorkspace: React.FC = () => {
           ))}
         </div>
 
-        {/* Right: Blind Judging Toggle */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={toggleBlindJudging}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all ${
-              config.blindJudgingMode
-                ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-400'
-                : 'bg-muted/60 border-border text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            <EyeOff size={14} />
-            <span className="hidden sm:inline">
-              {config.blindJudgingMode ? 'Chấm Thi Ẩn Danh: BẬT' : 'Chấm Thi Ẩn Danh: TẮT'}
-            </span>
-          </button>
-        </div>
+
       </div>
 
       {/* Notification Toast Alert */}
@@ -841,14 +818,7 @@ export const JudgingWorkspace: React.FC = () => {
                   <h2 className="font-semibold tracking-tight text-foreground text-xl text-foreground tracking-wide">
                     {displayName}
                   </h2>
-                  {config.blindJudgingMode ? (
-                    <Badge variant="warning" className="gap-1">
-                      <EyeOff size={12} />
-                      <span>ẨN DANH</span>
-                    </Badge>
-                  ) : (
-                    <Badge variant="primary">CÔNG KHAI</Badge>
-                  )}
+                  <Badge variant="primary">CÔNG KHAI</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
                   <Globe size={13} className="text-primary" />

@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.support import TicketPriority, TicketStatus
 
@@ -93,5 +93,11 @@ class TicketResponse(BaseModel):
     response: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    resolved_at: Optional[datetime] = None
+
+    @field_validator("created_at", "updated_at", "resolved_at")
+    @classmethod
+    def timestamp_with_timezone(cls, value: Optional[datetime]) -> Optional[datetime]:
+        return value.replace(tzinfo=timezone.utc) if value and not value.tzinfo else value
 
     model_config = ConfigDict(from_attributes=True)

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     DEBUG: bool = True
     ENABLE_DEMO_DATA: bool = False
+    ENABLE_STARTUP_SEED: bool = True
 
     @property
     def demo_enabled(self) -> bool:

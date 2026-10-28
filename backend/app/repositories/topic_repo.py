@@ -19,7 +19,7 @@ class TopicRepository:
     ) -> List[Topic]:
         stmt = (
             select(Topic)
-            .options(selectinload(Topic.subtopics))
+            .options(selectinload(Topic.subtopics).selectinload(Subtopic.mentor))
             .order_by(Topic.created_at.asc())
         )
         if only_active:
@@ -36,7 +36,7 @@ class TopicRepository:
         stmt = (
             select(Topic)
             .where(Topic.id == topic_id)
-            .options(selectinload(Topic.subtopics))
+            .options(selectinload(Topic.subtopics).selectinload(Subtopic.mentor))
         )
         if for_update:
             stmt = stmt.with_for_update()
@@ -49,7 +49,7 @@ class TopicRepository:
         subtopic_id: str,
         for_update: bool = False,
     ) -> Optional[Subtopic]:
-        stmt = select(Subtopic).where(Subtopic.id == subtopic_id)
+        stmt = select(Subtopic).options(selectinload(Subtopic.mentor)).where(Subtopic.id == subtopic_id)
         if for_update:
             stmt = stmt.with_for_update()
         result = await db.execute(stmt)
@@ -57,7 +57,7 @@ class TopicRepository:
 
     @staticmethod
     async def get_config(db: AsyncSession) -> Optional[HackathonConfig]:
-        stmt = select(HackathonConfig).limit(1)
+        stmt = select(HackathonConfig).order_by(HackathonConfig.created_at.asc()).limit(1)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -88,9 +88,11 @@ class TopicRepository:
         description: Optional[str] = None,
         max_teams: int = 5,
         is_active: bool = True,
+        mentor_id: Optional[str] = None,
     ) -> Subtopic:
         subtopic = Subtopic(
             topic_id=topic_id,
+            mentor_id=mentor_id,
             title=title.strip(),
             description=description,
             max_teams=max_teams,

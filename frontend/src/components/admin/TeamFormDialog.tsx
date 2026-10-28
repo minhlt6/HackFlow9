@@ -71,6 +71,11 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
   const [pendingMemberEmail, setPendingMemberEmail] = useState('');
   const [memberInputError, setMemberInputError] = useState<string | null>(null);
 
+  const config = useMockStore((s) => s.config);
+  const minTeamSize = Math.max(1, Number(config?.minTeamMembers ?? config?.minTeamSize ?? 3));
+  const maxTeamSize = Math.max(minTeamSize, Number(config?.maxTeamMembers ?? config?.maxTeamSize ?? 5));
+  const maxMemberEmails = Math.max(0, maxTeamSize - 1);
+
   const {
     register,
     handleSubmit,
@@ -79,7 +84,10 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
     setValue,
     formState: { errors },
   } = useForm<AdminTeamFormValues>({
-    resolver: zodResolver(adminTeamFormSchema),
+    resolver: zodResolver(adminTeamFormSchema.extend({
+      memberCount: adminTeamFormSchema.shape.memberCount.min(minTeamSize, `Đội cần tối thiểu ${minTeamSize} người.`).max(maxTeamSize, `Đội không được vượt quá ${maxTeamSize} người.`),
+      memberEmails: adminTeamFormSchema.shape.memberEmails.max(maxMemberEmails, `Tối đa ${maxMemberEmails} thành viên ngoài Đội trưởng.`),
+    })),
     defaultValues: {
       name: '',
       inviteCode: 'HF2026',
@@ -89,16 +97,11 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
       memberEmails: [],
       majorTopicId: defaultMajor,
       subTopicId: defaultSub,
-      memberCount: 3,
+      memberCount: minTeamSize,
       repoUrl: '',
       description: '',
     },
   });
-
-  const config = useMockStore((s) => s.config);
-  const minTeamSize = Math.max(1, Number(config?.minTeamMembers ?? config?.minTeamSize ?? 3));
-  const maxTeamSize = Math.max(minTeamSize, Number(config?.maxTeamMembers ?? config?.maxTeamSize ?? 5));
-  const maxMemberEmails = Math.max(1, maxTeamSize - 1);
 
   const selectedMajorId = useWatch({ control, name: 'majorTopicId' });
   const memberCountValue = Number(useWatch({ control, name: 'memberCount' }) || minTeamSize);
@@ -220,7 +223,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
         memberEmails: [],
         majorTopicId: defaultMajor,
         subTopicId: defaultSub,
-        memberCount: 3,
+        memberCount: minTeamSize,
         repoUrl: '',
         description: '',
       });
@@ -621,7 +624,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
                   variant={isSizeValid ? 'success' : 'warning'}
                   size="sm"
                 >
-                  Quy mô đội: {totalMembersCount}/5 người (1 Đội trưởng +{' '}
+                  Quy mô đội: {totalMembersCount}/{maxTeamSize} người (1 Đội trưởng +{' '}
                   {memberEmailsValue.length} Thành viên)
                 </Badge>
               </div>
@@ -702,7 +705,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
               {memberEmailsValue.length === 0 ? (
                 <div className="rounded-md border border-dashed border-border px-3 py-3 text-center text-xs text-muted-foreground">
                   Chưa có thành viên nào được thêm. Vui lòng chọn hoặc nhập ít nhất{' '}
-                  <strong>2 email thành viên</strong> để đủ điều kiện 3–5 người/đội.
+                  <strong>{Math.max(0, minTeamSize - 1)} email thành viên</strong> để đủ điều kiện {minTeamSize}–{maxTeamSize} người/đội.
                 </div>
               ) : (
                 <div className="space-y-1.5">

@@ -5,6 +5,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class SubtopicResponse(BaseModel):
     id: str
     topic_id: str
+    mentor_id: Optional[str] = None
+    mentor_name: Optional[str] = None
     title: str
     description: Optional[str] = None
     max_teams: int
@@ -37,6 +39,8 @@ class TopicCreateRequest(BaseModel):
 
 
 class SubtopicCreateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mentor_id: Optional[str] = None
     title: str = Field(..., min_length=1, max_length=128)
     description: Optional[str] = None
     max_teams: int = Field(default=5, ge=1)
@@ -45,6 +49,8 @@ class SubtopicCreateRequest(BaseModel):
 
 
 class SubtopicUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    mentor_id: Optional[str] = None
     title: Optional[str] = Field(default=None, min_length=1, max_length=128)
     description: Optional[str] = None
     max_teams: Optional[int] = Field(default=None, ge=1)

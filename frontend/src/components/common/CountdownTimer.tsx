@@ -9,6 +9,7 @@ interface CountdownTimerProps {
   subtitle?: string;
   isStarted?: boolean; // Optional override; defaults to config.isContestStarted
   className?: string;
+  compact?: boolean;
 }
 
 export const CountdownTimer: React.FC<CountdownTimerProps> = ({
@@ -17,6 +18,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   subtitle,
   isStarted,
   className = '',
+  compact = false,
 }) => {
   const { config } = useMockStore();
 
@@ -65,7 +67,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
       >
         <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-amber-500/10 blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className={`flex flex-col justify-between gap-4 ${compact ? '' : 'sm:flex-row sm:items-center'}`}>
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
               <Clock size={24} className="animate-pulse" />
@@ -117,7 +119,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     >
       <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className={`flex flex-col justify-between gap-4 ${compact ? '' : 'sm:flex-row sm:items-center'}`}>
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
             <Clock size={24} className="animate-pulse" />

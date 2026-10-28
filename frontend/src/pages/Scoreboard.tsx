@@ -162,7 +162,7 @@ export const Scoreboard: React.FC = () => {
               Bảng xếp hạng đang được tổng hợp
             </h3>
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-              Hội đồng Giám khảo đang trong giai đoạn chấm thi độc lập theo Chế độ chấm ẩn danh (Blind Judging). Điểm số đang trong giai đoạn bảo mật và đối soát. Kết quả chung cuộc sẽ được công bố chính thức tại Lễ bế mạc cuộc thi.
+              Hội đồng Giám khảo đang trong giai đoạn chấm thi độc lập. Điểm số đang trong giai đoạn bảo mật và đối soát. Kết quả chung cuộc sẽ được công bố chính thức tại Lễ bế mạc cuộc thi.
             </p>
           </div>
 

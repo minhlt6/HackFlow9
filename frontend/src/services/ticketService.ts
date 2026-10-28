@@ -56,6 +56,7 @@ export interface TicketItem {
   response?: string | null;
   created_at?: string;
   createdAt?: string;
+  resolved_at?: string | null;
   updated_at?: string;
   updatedAt?: string;
 }

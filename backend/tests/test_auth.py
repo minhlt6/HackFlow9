@@ -144,17 +144,8 @@ async def test_github_oauth_whitelisted_gets_approved(client: AsyncClient):
     BTC thêm email vào Whitelist → Thí sinh đăng nhập GitHub với email đó
     → tài khoản được tạo với approval_status='approved'.
     """
-    # 1. Register an admin to manage whitelist
-    admin_res = await client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": "btc_whitelist_admin@example.com",
-            "password": "adminpass123",
-            "full_name": "BTC Quản Trị",
-            "role": "admin",
-        },
-    )
-    admin_token = admin_res.json()["data"]["access_token"]
+    # 1. Use admin token to manage whitelist (public register cannot create admin)
+    admin_token = "mock-jwt-token-admin" 
 
     # 2. BTC adds email to whitelist
     # The mock code "whitelist_code_999" produces dev_whitelist_code_999@example.com
@@ -206,8 +197,8 @@ async def test_rbac_admin_protection(client: AsyncClient):
     assert cand_admin_res.json()["success"] is False
     assert "Truy cập trái phép" in cand_admin_res.json()["message"]
 
-    # 3. Register admin user
-    admin_res = await client.post(
+    # 3. Attempt to self-register as admin -> 403 Forbidden
+    admin_reg_res = await client.post(
         "/api/v1/auth/register",
         json={
             "email": "admin_user@example.com",
@@ -216,7 +207,9 @@ async def test_rbac_admin_protection(client: AsyncClient):
             "role": "admin",
         },
     )
-    admin_token = admin_res.json()["data"]["access_token"]
+    assert admin_reg_res.status_code == 403
+    assert admin_reg_res.json()["error_code"] == "FORBIDDEN_ROLE"
+    admin_token = "mock-jwt-token-admin" 
 
     # 4. Admin accesses admin endpoint -> 200 OK
     admin_access_res = await client.get(
@@ -253,8 +246,8 @@ async def test_require_approved_protection(client: AsyncClient):
     assert res_pending.json()["success"] is False
     assert "chưa được kích hoạt" in res_pending.json()["message"]
 
-    # 2. Administrative user (approved by default)
-    admin_res = await client.post(
+    # 2. Judge user created via Admin Personnel API (public register rejects judge)
+    judge_reg_res = await client.post(
         "/api/v1/auth/register",
         json={
             "email": "judge_approved@example.com",
@@ -263,7 +256,8 @@ async def test_require_approved_protection(client: AsyncClient):
             "role": "judge",
         },
     )
-    approved_token = admin_res.json()["data"]["access_token"]
+    assert judge_reg_res.status_code == 403
+    approved_token = "mock-jwt-token-judge" 
 
     res_approved = await client.get(
         "/api/v1/auth/test-approved",

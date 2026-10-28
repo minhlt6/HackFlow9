@@ -72,6 +72,9 @@ async def _seed_default_accounts() -> None:
 
         await conn.run_sync(_ensure_schema_columns)
 
+    if not settings.ENABLE_STARTUP_SEED:
+        return
+
     is_test_env = settings.ENVIRONMENT in {"test", "testing"}
     if is_test_env and not settings.demo_enabled:
         return
@@ -88,6 +91,12 @@ async def _seed_default_accounts() -> None:
     default_pw_hash = hash_password("123456")
 
     async with db_module.AsyncSessionLocal() as session:
+        rehearsal_admin = (
+            await session.execute(select(User).where(User.email == "admin@demo.example.com"))
+        ).scalar_one_or_none()
+        if rehearsal_admin is not None:
+            return
+
         for email, full_name, role, approval_status, gh_user in default_users:
             res = await session.execute(select(User).where(User.email == email))
             existing = res.scalar_one_or_none()
@@ -324,28 +333,6 @@ async def _seed_default_accounts() -> None:
             teams_res = await session.execute(select(Team).order_by(Team.created_at.asc()))
             existing_teams = list(teams_res.scalars().all())
             teams_by_name = {t.team_name.lower(): t for t in existing_teams}
-
-            # Ensure Team 1 (ChanBoMayDI or CyberSamurai) has 3 members and a topic/subtopic
-            if existing_teams:
-                t1 = existing_teams[0]
-                if not t1.subtopic_id and all_subtopics:
-                    t1.subtopic_id = str(all_subtopics[0].id)
-                    t1.topic_id = str(all_subtopics[0].topic_id)
-                t1_mems_res = await session.execute(select(TeamMember).where(TeamMember.team_id == str(t1.id)))
-                t1_mem_uids = {str(m.user_id) for m in t1_mems_res.scalars().all()}
-                m2_user = user_by_email.get("member2@cybersamurai.team")
-                if m2_user and str(m2_user.id) not in t1_mem_uids:
-                    # Only add if m2_user has no team yet
-                    m2_check = await session.execute(select(TeamMember).where(TeamMember.user_id == str(m2_user.id)))
-                    if not m2_check.scalar_one_or_none():
-                        session.add(
-                            TeamMember(
-                                team_id=str(t1.id),
-                                user_id=str(m2_user.id),
-                                role=TeamMemberRole.MEMBER.value,
-                            )
-                        )
-                        await session.flush()
 
             sample_teams_spec = []
             if not existing_teams:

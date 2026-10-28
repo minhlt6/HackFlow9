@@ -153,6 +153,7 @@ export const topicsApi = {
       description?: string;
       max_teams?: number;
       is_active?: boolean;
+      mentor_id?: string | null;
     }
   ): Promise<Topic> => {
     const response = await axiosClient.post<ApiResponse<Topic>>(
@@ -173,6 +174,7 @@ export const topicsApi = {
       description?: string;
       max_teams?: number;
       is_active?: boolean;
+      mentor_id?: string | null;
     }
   ): Promise<unknown> => {
     const response = await axiosClient.patch<ApiResponse<unknown>>(

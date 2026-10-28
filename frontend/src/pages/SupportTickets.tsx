@@ -243,10 +243,9 @@ export const SupportTickets: React.FC = () => {
     (t: SupportTicket) =>
       Boolean(
         (effectiveMentorId && t.assignedMentorId === effectiveMentorId) ||
-          (currentUser.id && t.assignedMentorId === currentUser.id) ||
-          (isMentor && Boolean(t.assignedMentorId)),
+          (currentUser.id && t.assignedMentorId === currentUser.id),
       ),
-    [effectiveMentorId, currentUser.id, isMentor],
+    [effectiveMentorId, currentUser.id],
   );
 
   const mentorAllowedTickets = useMemo(() => {

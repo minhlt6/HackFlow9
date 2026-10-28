@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.response import ApiResponse, success_response
 from app.schemas.team import TeamCreateRequest, TeamJoinRequest, TeamResponse
 from app.services.team_service import team_service
+from app.core.exceptions import ForbiddenException
 
 router = APIRouter()
 
@@ -24,8 +25,16 @@ class TransferLeaderRequest(BaseModel):
 )
 async def list_teams(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ApiResponse[List[TeamResponse]]:
-    teams = await team_service.list_all_teams(db)
+    if current_user.role == "candidate":
+        own_team = await team_service.get_my_team(db, current_user)
+        teams = [own_team] if own_team else []
+    elif current_user.role in ("admin", "mentor"):
+        teams = await team_service.list_all_teams(db)
+    else:
+        raise ForbiddenException(message="Vui lòng sử dụng danh sách bài chấm ẩn danh.", error_code="FORBIDDEN_ROLE")
+    teams = [team_service.visible_team(t, current_user) for t in teams]
     return success_response(
         data=teams,
         message=f"Tải danh sách đội thi thành công ({len(teams)} đội).",
@@ -158,12 +167,18 @@ async def get_my_team(
 async def get_team_by_id(
     team_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> ApiResponse[TeamResponse]:
     """
     Xem chi tiết thông tin một đội thi theo ID.
     """
-    team = await team_service.get_team_by_id(db, team_id)
+    if current_user.role == "judge":
+        raise ForbiddenException(message="Vui lòng sử dụng danh sách bài chấm ẩn danh.", error_code="FORBIDDEN_ROLE")
+    if current_user.role == "candidate":
+        own = await team_service.get_my_team(db, current_user)
+        if not own or own.id != team_id:
+            raise ForbiddenException(message="Bạn không có quyền xem đội thi khác.", error_code="TEAM_ACCESS_DENIED")
+    team = team_service.visible_team(await team_service.get_team_by_id(db, team_id), current_user)
     return success_response(
         data=team,
         message="Lấy chi tiết đội thi thành công.",

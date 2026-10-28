@@ -3,8 +3,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, Depends, Query
-from pydantic import BaseModel, Field
-from sqlalchemy import select
+from pydantic import BaseModel, Field, EmailStr
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -32,17 +32,13 @@ from app.schemas.admin import (
 from app.schemas.auth import UserResponse
 from app.schemas.response import ApiResponse, success_response
 from app.services.team_service import team_service
+from app.services.team_policy import config_team_limits, get_team_limits
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 public_router = APIRouter()
 
-# In-memory cache synchronized with SQL columns (Team.admin_meta and User.profile_meta)
-_TEAM_ADMIN_META: Dict[str, Dict[str, Any]] = {}
-_PERSONNEL_EXTRA_META: Dict[str, Dict[str, Any]] = {}
-
-
 def _get_team_meta(team: Team) -> Dict[str, Any]:
-    base = dict(_TEAM_ADMIN_META.get(str(team.id), {}))
+    base = {}
     if isinstance(getattr(team, "admin_meta", None), dict):
         base.update(team.admin_meta)
     return base
@@ -52,7 +48,6 @@ def _update_team_meta(team: Team, updates: Dict[str, Any]) -> Dict[str, Any]:
     merged = _get_team_meta(team)
     merged.update(updates)
     team.admin_meta = dict(merged)
-    _TEAM_ADMIN_META[str(team.id)] = dict(merged)
     return merged
 
 
@@ -63,7 +58,7 @@ def _get_user_profile_extra(user_obj: Optional[User]) -> Dict[str, Any]:
 
 
 def _get_personnel_meta(user_obj: User) -> Dict[str, Any]:
-    base = dict(_PERSONNEL_EXTRA_META.get(str(user_obj.id), {}))
+    base = {}
     if isinstance(getattr(user_obj, "profile_meta", None), dict):
         base.update(user_obj.profile_meta)
     return base
@@ -73,7 +68,6 @@ def _update_personnel_meta(user_obj: User, updates: Dict[str, Any]) -> Dict[str,
     merged = _get_personnel_meta(user_obj)
     merged.update(updates)
     user_obj.profile_meta = dict(merged)
-    _PERSONNEL_EXTRA_META[str(user_obj.id)] = dict(merged)
     return merged
 
 
@@ -142,19 +136,20 @@ class AdminBulkApproveRequest(BaseModel):
 
 
 class AdminAutoMatchRequest(BaseModel):
-    target_team_size: int = Field(default=4, ge=3, le=5)
+    target_team_size: int = Field(default=4, ge=1)
     fill_incomplete_teams: bool = Field(default=True)
     auto_assign_topics: bool = Field(default=True)
     auto_approve: bool = Field(default=True)
 
 
 class AdminRejectTeamRequest(BaseModel):
-    reason: str = Field(default="Không đáp ứng điều kiện quy định của BTC")
+    reason: str = Field(default="Không đáp ứng điều kiện quy định của BTC", min_length=1, max_length=2000)
+    reason_code: str = Field(default="manual", pattern="^(manual|under_min)$")
 
 
 class AdminPersonnelCreateRequest(BaseModel):
-    full_name: Optional[str] = ""
-    email: str
+    full_name: str = Field(min_length=1, max_length=255)
+    email: EmailStr
     role: str
     organization: Optional[str] = ""
     specialty: Optional[str] = ""
@@ -170,7 +165,7 @@ def _compute_eligibility(member_count: int, min_size: int = 3, max_size: int = 5
     return "valid"
 
 
-def _serialize_admin_team(team: Team) -> Dict[str, Any]:
+def _serialize_admin_team(team: Team, min_size: int = 3, max_size: int = 5) -> Dict[str, Any]:
     team_id = str(team.id)
     meta = _get_team_meta(team)
     university = meta.get("university") or ""
@@ -241,8 +236,8 @@ def _serialize_admin_team(team: Team) -> Dict[str, Any]:
     if not university:
         university = "ĐH Bách Khoa Hà Nội (HUST)"
 
-    member_count = len(members_list) if len(members_list) > 0 else (meta.get("member_count") or 0)
-    eligibility = _compute_eligibility(member_count)
+    member_count = len(members_list)
+    eligibility = _compute_eligibility(member_count, min_size, max_size)
 
     # Determine approval_status
     default_approval = "approved" if team.is_locked else ("pending" if eligibility == "valid" else "pending")
@@ -297,13 +292,15 @@ def _serialize_admin_team(team: Team) -> Dict[str, Any]:
         "members": members_list,
         "member_count": member_count,
         "memberCount": member_count,
-        "min_members": 3,
-        "max_members": 5,
+        "min_members": min_size,
+        "max_members": max_size,
         "eligibility_status": eligibility,
         "approval_status": approval_status,
         "status": approval_status,
         "rejection_reason": meta.get("rejection_reason"),
         "rejectionReason": meta.get("rejection_reason"),
+        "last_review": meta.get("last_review"),
+        "review_history": meta.get("review_history", []),
         "selected_topic_id": sub_topic_id or None,
         "selected_topic_name": topic_name,
         "selected_track": track_name,
@@ -316,6 +313,27 @@ def _serialize_admin_team(team: Team) -> Dict[str, Any]:
         "updated_at": updated_iso,
         "approved_at": meta.get("approved_at"),
     }
+
+
+async def _serialize_admin_teams(db: AsyncSession, teams: List[Team]) -> List[Dict[str, Any]]:
+    minimum, maximum = await get_team_limits(db)
+    return [_serialize_admin_team(t, minimum, maximum) for t in teams]
+
+
+async def _serialize_configured_team(db: AsyncSession, team: Team) -> Dict[str, Any]:
+    return (await _serialize_admin_teams(db, [team]))[0]
+
+
+def _review_metadata(team: Team, actor: User, decision: str, reason: str | None,
+                     minimum: int, maximum: int, reason_code: str = "manual") -> Dict[str, Any]:
+    review = {
+        "decision": decision, "reason": reason, "reason_code": reason_code,
+        "reviewed_at": datetime.now(timezone.utc).isoformat(), "reviewed_by": str(actor.id),
+        "member_count": len(team.members), "min_members": minimum, "max_members": maximum,
+    }
+    history = list(_get_team_meta(team).get("review_history") or [])
+    history.append(review)
+    return {"last_review": review, "review_history": history}
 
 
 async def _ensure_candidate_user(
@@ -365,7 +383,7 @@ async def _ensure_candidate_user(
     return user
 
 
-async def _load_team_full(db: AsyncSession, team_id: str) -> Optional[Team]:
+async def _load_team_full(db: AsyncSession, team_id: str, for_update: bool = False) -> Optional[Team]:
     stmt = (
         select(Team)
         .where(Team.id == team_id)
@@ -375,6 +393,8 @@ async def _load_team_full(db: AsyncSession, team_id: str) -> Optional[Team]:
             selectinload(Team.subtopic),
         )
     )
+    if for_update:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
     res = await db.execute(stmt)
     return res.scalar_one_or_none()
 
@@ -503,44 +523,19 @@ async def list_unassigned_candidates(
     )
 
 
-def _partition_team_sizes(total_candidates: int, preferred_size: int = 4) -> List[int]:
-    """Chia N thí sinh lẻ thành các đội hợp lệ từ 3 đến 5 thành viên."""
-    if total_candidates < 3:
-        return [total_candidates] if total_candidates > 0 else []
-    sizes: List[int] = []
-    remaining = total_candidates
-    pref = max(3, min(5, preferred_size))
-    while remaining > 0:
-        if 3 <= remaining <= 5:
-            sizes.append(remaining)
-            remaining = 0
-        elif remaining == 6:
-            sizes.extend([3, 3])
-            remaining = 0
-        elif remaining == 7:
-            sizes.extend([4, 3])
-            remaining = 0
-        elif remaining == 8:
-            sizes.extend([4, 4])
-            remaining = 0
-        elif remaining == 9:
-            if pref == 3:
-                sizes.extend([3, 3, 3])
-            else:
-                sizes.extend([5, 4])
-            remaining = 0
-        elif remaining == 10:
-            sizes.extend([5, 5] if pref == 5 else [4, 3, 3])
-            remaining = 0
-        else:
-            # Ensure taking `pref` doesn't leave 1 or 2
-            if remaining - pref in (1, 2):
-                step = 3 if remaining - 3 >= 3 else 4
-            else:
-                step = pref
-            sizes.append(step)
-            remaining -= step
-    return sizes
+def _partition_team_sizes(total_candidates: int, preferred_size: int = 4,
+                          min_size: int = 3, max_size: int = 5) -> List[int]:
+    """Distribute candidates within SQL-configured limits; retain a pending remainder if necessary."""
+    if total_candidates <= 0:
+        return []
+    import math
+    low, high = math.ceil(total_candidates / max_size), total_candidates // min_size
+    if low <= high:
+        groups = min(range(low, high + 1), key=lambda n: abs(total_candidates / n - preferred_size))
+        size, extra = divmod(total_candidates, groups)
+        return [size + (1 if i < extra else 0) for i in range(groups)]
+    full, remainder = divmod(total_candidates, max_size)
+    return [max_size] * full + ([remainder] if remainder else [])
 
 
 @router.post(
@@ -554,6 +549,8 @@ async def auto_match_unassigned_candidates(
     _: User = Depends(require_role("admin")),
 ):
     import random
+
+    minimum, maximum = await get_team_limits(db)
 
     stmt_users = select(User).where(
         User.role == UserRole.CANDIDATE.value,
@@ -595,8 +592,8 @@ async def auto_match_unassigned_candidates(
     if body.fill_incomplete_teams:
         for t in existing_teams:
             curr_len = len(t.members or [])
-            if curr_len < 3 and unassigned:
-                needed = 3 - curr_len
+            if not t.is_locked and curr_len < minimum and unassigned:
+                needed = minimum - curr_len
                 while needed > 0 and unassigned:
                     cand = unassigned.pop(0)
                     db.add(
@@ -610,7 +607,7 @@ async def auto_match_unassigned_candidates(
                     needed -= 1
                     matched_candidates_count += 1
                 meta_updates: Dict[str, Any] = {"member_count": curr_len}
-                if curr_len >= 3 and body.auto_approve:
+                if curr_len >= minimum and body.auto_approve:
                     meta_updates["approval_status"] = "approved"
                 _update_team_meta(t, meta_updates)
                 filled_existing_team_ids.append(str(t.id))
@@ -621,14 +618,15 @@ async def auto_match_unassigned_candidates(
     subtopics = list(res_subs.scalars().all())
 
     created_team_ids: List[str] = []
-    sizes = _partition_team_sizes(len(unassigned), body.target_team_size)
+    sizes = _partition_team_sizes(len(unassigned), body.target_team_size, minimum, maximum)
 
-    # If remaining is 1 or 2 and there are existing teams with < 5 members, absorb them into existing teams
-    if len(sizes) == 1 and sizes[0] < 3:
-        absorbable_teams = [t for t in existing_teams if len(t.members or []) < 5]
+    # Absorb a small remainder only into unlocked teams with available configured capacity.
+    await db.flush()
+    if len(sizes) == 1 and sizes[0] < minimum:
+        absorbable_teams = [t for t in existing_teams if not t.is_locked]
         for t in absorbable_teams:
-            curr_len = len(t.members or [])
-            while curr_len < 5 and unassigned:
+            curr_len = await team_repo.count_members(db, str(t.id))
+            while curr_len < maximum and unassigned:
                 cand = unassigned.pop(0)
                 db.add(
                     TeamMember(
@@ -642,7 +640,7 @@ async def auto_match_unassigned_candidates(
                 _update_team_meta(t, {"member_count": curr_len})
                 if str(t.id) not in filled_existing_team_ids:
                     filled_existing_team_ids.append(str(t.id))
-        sizes = _partition_team_sizes(len(unassigned), body.target_team_size)
+        sizes = _partition_team_sizes(len(unassigned), body.target_team_size, minimum, maximum)
 
     team_prefixes = [
         "NovaBuilders",
@@ -681,7 +679,7 @@ async def auto_match_unassigned_candidates(
         existing_names.add(candidate_name.lower())
 
         invite_code = await team_service.generate_invite_code(db)
-        chosen_sub = subtopics[idx % len(subtopics)] if (body.auto_assign_topics and subtopics) else None
+        chosen_sub = subtopics[idx % len(subtopics)] if (body.auto_assign_topics and subtopics and len(group) >= minimum) else None
 
         new_team = Team(
             team_name=candidate_name,
@@ -710,7 +708,7 @@ async def auto_match_unassigned_candidates(
             new_team,
             {
                 "description": new_team.description,
-                "approval_status": "approved" if (body.auto_approve and len(group) >= 3) else "pending",
+                "approval_status": "approved" if (body.auto_approve and len(group) >= minimum) else "pending",
                 "university": leader_school,
                 "major_topic_id": str(chosen_sub.topic_id) if chosen_sub else None,
                 "sub_topic_id": str(chosen_sub.id) if chosen_sub else None,
@@ -729,7 +727,7 @@ async def auto_match_unassigned_candidates(
     for tid in affected_ids:
         loaded_t = await _load_team_full(db, tid)
         if loaded_t:
-            serialized_teams.append(_serialize_admin_team(loaded_t))
+            serialized_teams.append(await _serialize_configured_team(db, loaded_t))
 
     return success_response(
         data={
@@ -772,7 +770,7 @@ async def list_admin_teams(
     )
     res = await db.execute(stmt)
     teams = list(res.scalars().all())
-    items = [_serialize_admin_team(t) for t in teams]
+    items = await _serialize_admin_teams(db, teams)
 
     if search and search.strip():
         q = search.strip().lower()
@@ -825,10 +823,7 @@ async def create_admin_team(
 
     raw_leader_name = (body.leader_name or body.leaderName or "").strip()
     cfg = await _get_or_create_hackathon_config(db)
-    min_team_size = max(1, int((cfg.settings_data or {}).get("minTeamSize", 3)))
-    if (cfg.settings_data or {}).get("minTeamSize") == 2:
-        min_team_size = 3
-    max_team_size = max(min_team_size, int((cfg.settings_data or {}).get("maxTeamSize", 5)))
+    min_team_size, max_team_size = config_team_limits(cfg.settings_data)
 
     explicit_members = _extract_member_inputs(
         body.members, body.member_emails, body.memberEmails, raw_leader_email
@@ -869,7 +864,9 @@ async def create_admin_team(
     requested_code = (body.invite_code or body.inviteCode or "").strip().upper()
     if requested_code:
         existing_code = await team_repo.get_by_invite_code(db, requested_code)
-        invite_code = requested_code if not existing_code else await team_service.generate_invite_code(db)
+        if existing_code:
+            raise ConflictException(message="Mã mời đã tồn tại trong hệ thống.", error_code="INVITE_CODE_TAKEN")
+        invite_code = requested_code
     else:
         invite_code = await team_service.generate_invite_code(db)
 
@@ -949,7 +946,7 @@ async def create_admin_team(
         team,
         {
             "description": (body.description or "").strip(),
-            "approval_status": "approved" if 3 <= final_member_count <= 5 else "pending",
+            "approval_status": "approved" if min_team_size <= final_member_count <= max_team_size else "pending",
             "university": resolved_university,
             "major_topic_id": resolved_major_id,
             "sub_topic_id": resolved_sub_id,
@@ -964,7 +961,7 @@ async def create_admin_team(
 
     loaded = await _load_team_full(db, team_id_str)
     return success_response(
-        data=_serialize_admin_team(loaded),
+        data=await _serialize_configured_team(db, loaded),
         message=f"Đã tạo đội thi '{cleaned_name}' ({final_member_count} thành viên) thành công.",
         status_code=201,
     )
@@ -981,7 +978,7 @@ async def update_admin_team(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
-    team = await _load_team_full(db, team_id)
+    team = await _load_team_full(db, team_id, for_update=True)
     if not team:
         raise NotFoundException(message="Không tìm thấy đội thi cần cập nhật.")
     team_id_str = str(team.id)
@@ -1046,10 +1043,7 @@ async def update_admin_team(
     )
 
     cfg = await _get_or_create_hackathon_config(db)
-    min_team_size = max(1, int((cfg.settings_data or {}).get("minTeamSize", 3)))
-    if (cfg.settings_data or {}).get("minTeamSize") == 2:
-        min_team_size = 3
-    max_team_size = max(min_team_size, int((cfg.settings_data or {}).get("maxTeamSize", 5)))
+    min_team_size, max_team_size = config_team_limits(cfg.settings_data)
     requested_member_count = body.member_count if body.member_count is not None else body.memberCount
 
     if has_member_list_update:
@@ -1141,7 +1135,7 @@ async def update_admin_team(
         if leader_mem and leader_mem.user and leader_name:
             leader_mem.user.full_name = leader_name
         desired_member_count = body.member_count if body.member_count is not None else body.memberCount
-        if desired_member_count is not None and 1 <= desired_member_count <= 5:
+        if desired_member_count is not None and 1 <= desired_member_count <= max_team_size:
             meta["member_count"] = desired_member_count
             current_members = list(team.members or [])
             if len(current_members) < desired_member_count:
@@ -1187,7 +1181,7 @@ async def update_admin_team(
     db.expire_all()
     loaded = await _load_team_full(db, team_id_str)
     return success_response(
-        data=_serialize_admin_team(loaded),
+        data=await _serialize_configured_team(db, loaded),
         message="Cập nhật đội thi thành công.",
     )
 
@@ -1200,12 +1194,16 @@ async def update_admin_team(
 async def approve_admin_team(
     team_id: str,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    current_admin: User = Depends(require_role("admin")),
 ):
-    team = await _load_team_full(db, team_id)
+    team = await _load_team_full(db, team_id, for_update=True)
     if not team:
         raise NotFoundException(message="Không tìm thấy đội thi.")
 
+    minimum, maximum = await get_team_limits(db)
+    if not minimum <= len(team.members) <= maximum:
+        raise ConflictException(message="Đội chưa đáp ứng giới hạn thành viên để được phê duyệt.", error_code="TEAM_SIZE_INVALID")
+    review = _review_metadata(team, current_admin, "approved", None, minimum, maximum)
     team_id_str = str(team.id)
     team_name_str = team.team_name
     team.is_locked = True
@@ -1213,6 +1211,7 @@ async def approve_admin_team(
         team,
         {
             "approval_status": "approved",
+            **review,
             "rejection_reason": None,
             "approved_at": datetime.now(timezone.utc).isoformat(),
         },
@@ -1222,7 +1221,7 @@ async def approve_admin_team(
     loaded = await _load_team_full(db, team_id_str)
 
     return success_response(
-        data=_serialize_admin_team(loaded),
+        data=await _serialize_configured_team(db, loaded),
         message=f"Đã phê duyệt đội thi '{team_name_str}'.",
     )
 
@@ -1235,7 +1234,7 @@ async def approve_admin_team(
 async def bulk_approve_admin_teams(
     body: AdminBulkApproveRequest,
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    current_admin: User = Depends(require_role("admin")),
 ):
     stmt = (
         select(Team)
@@ -1253,15 +1252,21 @@ async def bulk_approve_admin_teams(
     skipped_ids: List[str] = []
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    minimum, maximum = await get_team_limits(db)
     for t in teams:
         tid = str(t.id)
         if tid not in id_set:
             continue
+        if not minimum <= len(t.members) <= maximum:
+            skipped_ids.append(tid)
+            continue
+        review = _review_metadata(t, current_admin, "approved", None, minimum, maximum)
         t.is_locked = True
         _update_team_meta(
             t,
             {
                 "approval_status": "approved",
+                **review,
                 "rejection_reason": None,
                 "approved_at": now_iso,
             },
@@ -1269,7 +1274,7 @@ async def bulk_approve_admin_teams(
         approved_count += 1
 
     await db.commit()
-    all_serialized = [_serialize_admin_team(t) for t in teams]
+    all_serialized = await _serialize_admin_teams(db, teams)
     return success_response(
         data={
             "approved_count": approved_count,
@@ -1289,12 +1294,18 @@ async def reject_admin_team(
     team_id: str,
     body: AdminRejectTeamRequest = Body(default=AdminRejectTeamRequest()),
     db: AsyncSession = Depends(get_db),
-    _: User = Depends(require_role("admin")),
+    current_admin: User = Depends(require_role("admin")),
 ):
-    team = await _load_team_full(db, team_id)
+    team = await _load_team_full(db, team_id, for_update=True)
     if not team:
         raise NotFoundException(message="Không tìm thấy đội thi.")
 
+    minimum, maximum = await get_team_limits(db)
+    if not body.reason.strip():
+        raise BadRequestException(message="Vui lòng nhập lý do từ chối.")
+    if body.reason_code == "under_min" and len(team.members) >= minimum:
+        raise ConflictException(message="Đội đã đủ thành viên tối thiểu; không thể từ chối vì thiếu thành viên.", error_code="REJECTION_REASON_INVALID")
+    review = _review_metadata(team, current_admin, "rejected", body.reason.strip(), minimum, maximum, body.reason_code)
     team_id_str = str(team.id)
     team_name_str = team.team_name
     team.is_locked = False
@@ -1302,6 +1313,7 @@ async def reject_admin_team(
         team,
         {
             "approval_status": "rejected",
+            **review,
             "rejection_reason": body.reason.strip() if body.reason else "Bị từ chối bởi BTC",
         },
     )
@@ -1310,7 +1322,7 @@ async def reject_admin_team(
     loaded = await _load_team_full(db, team_id_str)
 
     return success_response(
-        data=_serialize_admin_team(loaded),
+        data=await _serialize_configured_team(db, loaded),
         message=f"Đã từ chối đội thi '{team_name_str}'.",
     )
 
@@ -1325,7 +1337,7 @@ async def delete_admin_team(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
-    team = await _load_team_full(db, team_id)
+    team = await _load_team_full(db, team_id, for_update=True)
     if not team:
         raise NotFoundException(message="Không tìm thấy đội thi cần xóa.")
 
@@ -1336,7 +1348,6 @@ async def delete_admin_team(
 
     await db.delete(team)
     await db.commit()
-    _TEAM_ADMIN_META.pop(team_id, None)
 
     return success_response(
         data={"deleted_id": team_id},
@@ -1416,21 +1427,18 @@ async def create_personnel(
     clean_email = body.email.strip().lower()
     existing = await user_repo.get_by_email(db, clean_email)
     if existing:
-        existing.full_name = body.full_name.strip()
-        existing.role = role_val
-        existing.approval_status = ApprovalStatus.APPROVED.value
-        existing.is_active = True
-        user_obj = existing
-    else:
-        user_obj = User(
-            email=clean_email,
-            full_name=body.full_name.strip(),
-            hashed_password=hash_password("123456"),
-            role=role_val,
-            approval_status=ApprovalStatus.APPROVED.value,
-            is_active=True,
-        )
-        db.add(user_obj)
+        raise ConflictException(message="Email này đã tồn tại trong hệ thống.", error_code="EMAIL_ALREADY_EXISTS")
+    if not body.full_name.strip():
+        raise BadRequestException(message="Vui lòng nhập họ tên.")
+    user_obj = User(
+        email=clean_email,
+        full_name=body.full_name.strip(),
+        hashed_password=hash_password("123456"),
+        role=role_val,
+        approval_status=ApprovalStatus.APPROVED.value,
+        is_active=True,
+    )
+    db.add(user_obj)
 
     await db.flush()
     uid = str(user_obj.id)
@@ -1468,7 +1476,7 @@ async def create_personnel(
             "assigned_team_ids": pers_meta["assigned_team_ids"],
             "is_active": user_obj.is_active,
         },
-        message=f"Đã thêm nhân sự '{user_obj.full_name}' thành công.",
+        message=f"Đã tạo tài khoản '{user_obj.full_name}' thành công.",
         status_code=201,
     )
 
@@ -1512,13 +1520,13 @@ async def delete_personnel(
     assign_res = await db.execute(assign_stmt)
     for a in assign_res.scalars().all():
         await db.delete(a)
+    await db.execute(update(Subtopic).where(Subtopic.mentor_id == uid_str).values(mentor_id=None))
     if u.email.lower() in _DEFAULT_SEEDED_PERSONNEL_EMAILS:
         u.is_active = False
         db.add(u)
     else:
         await db.delete(u)
     await db.commit()
-    _PERSONNEL_EXTRA_META.pop(uid_str, None)
     return success_response(data={"id": uid_str}, message="Đã xóa nhân sự thành công.")
 
 
@@ -1903,15 +1911,15 @@ _PHASE_LABELS: Dict[str, str] = {
 
 
 def _serialize_hackathon_config(cfg: Any) -> Dict[str, Any]:
-    start_iso = cfg.start_time.isoformat() if cfg.start_time else "2026-10-15T01:00:00+00:00"
-    end_iso = cfg.end_time.isoformat() if cfg.end_time else "2026-12-31T11:00:00+00:00"
+    def utc_iso(value: datetime) -> str:
+        # SQLite returns naive datetimes; SQL timestamps in this application represent UTC.
+        aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return aware.astimezone(timezone.utc).isoformat()
+
+    start_iso = utc_iso(cfg.start_time) if cfg.start_time else "2026-10-15T01:00:00+00:00"
+    end_iso = utc_iso(cfg.end_time) if cfg.end_time else "2026-12-31T11:00:00+00:00"
     sdata = cfg.settings_data or {}
-    raw_min = int(sdata.get("minTeamSize") or sdata.get("minTeamMembers") or 3)
-    if raw_min == 2 and "minTeamMembers" not in sdata:
-        raw_min = 3
-    raw_max = int(sdata.get("maxTeamSize") or sdata.get("maxTeamMembers") or 5)
-    if raw_max < raw_min:
-        raw_max = max(5, raw_min)
+    raw_min, raw_max = config_team_limits(sdata)
     raw_status = str(sdata.get("status") or "hacking")
     current_phase = str(
         sdata.get("currentPhase")
@@ -1988,7 +1996,10 @@ async def update_hackathon_config(
             return val if val.tzinfo else val.replace(tzinfo=timezone.utc)
         if isinstance(val, str) and val.strip():
             cleaned = val.strip().replace("Z", "+00:00")
-            dt = datetime.fromisoformat(cleaned)
+            try:
+                dt = datetime.fromisoformat(cleaned)
+            except ValueError:
+                raise BadRequestException(message="Thời gian cấu hình không hợp lệ.")
             return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
         return None
 
@@ -2019,6 +2030,14 @@ async def update_hackathon_config(
     elif "leaderboardPublished" in body and body["leaderboardPublished"] is not None:
         cfg.is_result_published = bool(body["leaderboardPublished"])
 
+    for field in ("minTeamSize", "minTeamMembers", "maxTeamSize", "maxTeamMembers"):
+        value = body.get(field)
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
+            raise BadRequestException(message="Giới hạn thành viên phải là số nguyên dương.")
+    for first, second in (("minTeamSize", "minTeamMembers"), ("maxTeamSize", "maxTeamMembers")):
+        if body.get(first) is not None and body.get(second) is not None and body[first] != body[second]:
+            raise BadRequestException(message="Các trường giới hạn thành viên không thống nhất.")
+
     # 4. Persist UI metadata with the competition record.
     metadata = dict(cfg.settings_data or {})
     for k in (
@@ -2045,12 +2064,25 @@ async def update_hackathon_config(
     if "maxTeamSize" in body and body["maxTeamSize"] is not None:
         metadata["maxTeamMembers"] = int(body["maxTeamSize"])
 
-    min_v = int(metadata.get("minTeamSize", 3))
-    max_v = int(metadata.get("maxTeamSize", 5))
+    min_v, max_v = config_team_limits(metadata)
     if min_v < 1 or max_v < min_v:
         raise BadRequestException(
             message=f"Số lượng thành viên tối thiểu ({min_v}) phải lớn hơn 0 và không vượt quá số lượng tối đa ({max_v})."
         )
+    if body.get("status") is not None and body.get("currentPhase") is None:
+        metadata["currentPhase"] = _PHASE_LABELS.get(str(body["status"]), str(body["status"]))
+    if body.get("currentPhase") is not None and body.get("status") is None:
+        phase_statuses = {label: status for status, label in _PHASE_LABELS.items()}
+        phase_statuses.update({
+            "Đăng ký tài khoản & Lập đội": "registration",
+            "Lựa chọn đề tài & Giới hạn số lượng": "team_formation",
+            "Thực thi dự án & Nộp bài các chặng": "hacking",
+            "Hội đồng chấm thi độc lập": "judging",
+            "Bế mạc & Công bố kết quả": "completed",
+        })
+        phase = str(body["currentPhase"])
+        if phase in phase_statuses:
+            metadata["status"] = phase_statuses[phase]
     cfg.settings_data = metadata
 
     db.add(cfg)

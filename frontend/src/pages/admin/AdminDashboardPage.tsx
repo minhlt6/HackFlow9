@@ -20,8 +20,6 @@ import {
   ShieldCheck,
   CheckSquare,
   HelpCircle,
-  EyeOff,
-  Eye,
   Trophy,
   Settings,
   Play,
@@ -37,7 +35,6 @@ export const AdminDashboardPage: React.FC = () => {
     submissions,
     tickets,
     config,
-    toggleBlindJudging,
     toggleResultsPublished,
     toggleContestStarted,
   } = useMockStore();
@@ -88,7 +85,7 @@ export const AdminDashboardPage: React.FC = () => {
     <div className="space-y-6">
       <PageHeader
         title={`Tổng quan Cuộc thi: ${config.name}`}
-        description="Theo dõi tình trạng xác thực tài khoản OAuth, tiến độ nộp bài các chặng Checkpoint, xử lý hỗ trợ kỹ thuật và điều phối chế độ chấm ẩn danh."
+        description="Theo dõi tình trạng xác thực tài khoản OAuth, tiến độ nộp bài các chặng Checkpoint, xử lý hỗ trợ kỹ thuật và công bố kết quả cuộc thi."
         badge={<Badge variant="indigo">HackFlow Core v2.4</Badge>}
         actions={
           <>
@@ -106,23 +103,6 @@ export const AdminDashboardPage: React.FC = () => {
                 {config.isContestStarted
                   ? 'Đang chạy đếm ngược (Tạm dừng)'
                   : 'Bắt đầu cuộc thi'}
-              </span>
-            </Button>
-
-            <Button
-              type="button"
-              variant={config.blindJudgingMode ? 'secondary' : 'outline'}
-              size="sm"
-              onClick={() => {
-                void toggleBlindJudging().catch(() => toast.error('Không thể lưu thay đổi. Vui lòng thử lại.'));
-
-              }}
-            >
-              {config.blindJudgingMode ? <EyeOff size={15} /> : <Eye size={15} />}
-              <span>
-                {config.blindJudgingMode
-                  ? 'Chấm ẩn danh: ĐANG BẬT'
-                  : 'Bật chấm ẩn danh'}
               </span>
             </Button>
 
@@ -301,12 +281,6 @@ export const AdminDashboardPage: React.FC = () => {
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Hạn nộp chung cuộc:</span>
                   <span className="font-mono font-medium text-foreground">15/11/2026 23:59</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Chế độ chấm ẩn danh:</span>
-                  <Badge variant={config.blindJudgingMode ? 'warning' : 'neutral'}>
-                    {config.blindJudgingMode ? 'ĐANG KÍCH HOẠT' : 'TẮT'}
-                  </Badge>
                 </div>
               </div>
 

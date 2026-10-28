@@ -35,10 +35,11 @@ axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     const data = error.response?.data;
-    if (data?.error?.message) {
-      data.message = data.error.message;
-      data.error_code = data.error.code;
-      error.message = data.error.message;
+    const message = data?.error?.message ?? data?.message;
+    if (typeof message === 'string' && message) {
+      data.message = message;
+      data.error_code = data.error?.code ?? data.error_code;
+      error.message = message;
     }
     if (error.response?.status === 401) {
       const token = localStorage.getItem('token');

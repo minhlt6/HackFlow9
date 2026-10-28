@@ -116,7 +116,8 @@ class EvaluationService:
                 error_code="FORBIDDEN",
             )
 
-        if not getattr(payload, "allow_override", False) and await self.repo.has_submitted_evaluations():
+        await self.repo.lock_rubric()
+        if await self.repo.has_submitted_evaluations():
             raise AppException(
                 status_code=status.HTTP_409_CONFLICT,
                 message="Cannot modify rubric criteria because evaluations have already been submitted and locked.",
@@ -443,6 +444,7 @@ class EvaluationService:
                     error_code="FORBIDDEN_NOT_ASSIGNED_JUDGE",
                 )
 
+        await self.repo.lock_rubric()
         existing_evals = await self.repo.list_judge_evaluations_for_submission(
             submission.id, current_user.id
         )

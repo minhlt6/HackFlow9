@@ -2,7 +2,6 @@ import React from 'react';
 import { useLocation } from 'react-router-dom';
 import {
   Menu,
-  EyeOff,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -46,7 +45,6 @@ const SEGMENT_LABELS: Record<string, string> = {
 export interface TopNavProps {
   contestName: string;
   currentPhase: string;
-  blindJudgingMode?: boolean;
   announcements: Announcement[];
   displayName: string;
   displayEmail: string;
@@ -57,7 +55,6 @@ export interface TopNavProps {
 export const TopNav: React.FC<TopNavProps> = ({
   contestName,
   currentPhase,
-  blindJudgingMode,
   displayName,
   displayEmail,
   avatarUrl,
@@ -140,13 +137,6 @@ export const TopNav: React.FC<TopNavProps> = ({
 
       {/* Right: Status Pills, Role Switcher, Theme Toggle, Notifications, User */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-        {blindJudgingMode && (
-          <div className="hidden md:flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-            <EyeOff size={13} />
-            <span>Chấm ẩn danh</span>
-          </div>
-        )}
-
         <div className="hidden md:flex items-center gap-1.5 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 font-mono text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
           <span>Live Sync</span>

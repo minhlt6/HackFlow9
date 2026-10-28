@@ -17,6 +17,9 @@ class EvaluationRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def lock_rubric(self) -> None:
+        await self.db.execute(select(RubricCriteria.id).order_by(RubricCriteria.id).with_for_update())
+
     async def list_active_criteria(self) -> List[RubricCriteria]:
         stmt = (
             select(RubricCriteria)
@@ -41,12 +44,6 @@ class EvaluationRepository:
         existing_res = await self.db.execute(select(RubricCriteria))
         existing_criteria = {str(c.id): c for c in existing_res.scalars().all()}
 
-        eval_res = await self.db.execute(select(Evaluation))
-        all_evals = list(eval_res.scalars().all())
-        eval_groups: Dict[tuple[str, str], List[Evaluation]] = {}
-        for ev in all_evals:
-            eval_groups.setdefault((str(ev.submission_id), str(ev.judge_id)), []).append(ev)
-
         incoming_ids = {
             str(item["id"])
             for item in criteria_items
@@ -61,7 +58,6 @@ class EvaluationRepository:
         await self.db.flush()
 
         result_criteria: List[RubricCriteria] = []
-        newly_created: List[RubricCriteria] = []
         for idx, item in enumerate(criteria_items, start=1):
             raw_id = str(item["id"]) if item.get("id") else None
             if raw_id and raw_id in existing_criteria:
@@ -91,34 +87,10 @@ class EvaluationRepository:
                 criterion = RubricCriteria(**kwargs)
                 self.db.add(criterion)
                 result_criteria.append(criterion)
-                newly_created.append(criterion)
 
         await self.db.flush()
         for c in result_criteria:
             await self.db.refresh(c)
-
-        # Backfill evaluation rows for newly added criteria on existing evaluations so leaderboard stays consistent
-        if newly_created and eval_groups:
-            for (sub_id, j_id), ev_list in eval_groups.items():
-                if not ev_list:
-                    continue
-                sample_ev = ev_list[0]
-                for new_c in newly_created:
-                    default_sc = round(float(new_c.max_score) * 0.85, 1)
-                    self.db.add(
-                        Evaluation(
-                            submission_id=sub_id,
-                            judge_id=j_id,
-                            criteria_id=str(new_c.id),
-                            score=default_sc,
-                            comment=f"Đánh giá tiêu chí '{new_c.title}'",
-                            general_comment=sample_ev.general_comment,
-                            status=sample_ev.status,
-                            evaluated_at=sample_ev.evaluated_at,
-                            submitted_at=sample_ev.submitted_at,
-                        )
-                    )
-            await self.db.flush()
 
         result_criteria.sort(key=lambda c: c.display_order)
         return result_criteria

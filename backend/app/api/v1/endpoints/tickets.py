@@ -81,6 +81,7 @@ async def list_all_tickets(
         assigned_to=assigned_to,
         skip=skip,
         limit=limit,
+        current_user=_current_user,
     )
     return success_response(
         data=[TicketResponse.model_validate(t) for t in tickets],

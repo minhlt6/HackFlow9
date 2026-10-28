@@ -276,13 +276,15 @@ async def test_get_my_team(client: AsyncClient):
     assert res2.status_code == 200
     assert res2.json()["data"]["team_name"] == "SoloSquad"
 
-    # Detail by ID
+    # A different candidate cannot read the team's private details/invitation code.
     res3 = await client.get(
         f"/api/v1/teams/{team_id}",
         headers={"Authorization": f"Bearer {lonely_token}"},
     )
-    assert res3.status_code == 200
-    assert res3.json()["data"]["id"] == team_id
+    assert res3.status_code == 403
+    owner_detail = await client.get(f"/api/v1/teams/{team_id}", headers={"Authorization": f"Bearer {leader_token}"})
+    assert owner_detail.status_code == 200
+    assert owner_detail.json()["data"]["id"] == team_id
 
 
 @pytest.mark.asyncio

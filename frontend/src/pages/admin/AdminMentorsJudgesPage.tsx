@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
@@ -34,67 +34,66 @@ interface MentorRosterItem {
 
 export const AdminMentorsJudgesPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'judges' | 'mentors'>('judges');
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [specialization, setSpecialization] = useState('Computer Vision & LLMs');
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const mutationRef = useRef(false);
   const [alert, setAlert] = useState<string | null>(null);
   const [deletePersonnelTarget, setDeletePersonnelTarget] = useState<{ role: 'judge' | 'mentor'; id: string; name: string; email?: string } | null>(null);
 
   const [judges, setJudges] = useState<JudgeRosterItem[]>([]);
   const [mentors, setMentors] = useState<MentorRosterItem[]>([]);
 
+  const applyRoster = useCallback((rawList: unknown) => {
+    if (!Array.isArray(rawList)) throw new Error('Danh sách tài khoản không hợp lệ.');
+    const nextJudges: JudgeRosterItem[] = [];
+    const nextMentors: MentorRosterItem[] = [];
+    for (const item of rawList as Array<Record<string, unknown>>) {
+      const role = String(item.role ?? '').toLowerCase();
+      const fullName = String(item.full_name ?? item.name ?? 'Chuyên gia');
+      const itemEmail = String(item.email ?? '');
+      const spec = String(item.specialty ?? 'AI Architecture & System Evaluation');
+      const assignedTeams = Array.isArray(item.assigned_team_ids)
+        ? item.assigned_team_ids.length
+        : 0;
+      const avatarChar = fullName.trim().charAt(0).toUpperCase() || 'U';
+      if (role === 'judge') {
+        nextJudges.push({
+          id: String(item.id),
+          name: fullName,
+          email: itemEmail,
+          specialization: spec,
+          assignedCount: assignedTeams,
+          avatar: avatarChar,
+        });
+      } else if (role === 'mentor') {
+        nextMentors.push({
+          id: String(item.id),
+          name: fullName,
+          email: itemEmail,
+          topic: spec,
+          openTickets: 0,
+          avatar: avatarChar,
+        });
+      }
+    }
+    setJudges(nextJudges);
+    setMentors(nextMentors);
+
+  }, []);
+
   useEffect(() => {
     let active = true;
-    apiClient
-      .get('/admin/personnel')
-      .then((res) => {
-        if (!active) return;
-        const rawList = res.data?.data ?? res.data;
-        if (Array.isArray(rawList)) {
-          const nextJudges: JudgeRosterItem[] = [];
-          const nextMentors: MentorRosterItem[] = [];
-          for (const item of rawList as Array<Record<string, unknown>>) {
-            const role = String(item.role ?? '').toLowerCase();
-            const fullName = String(item.full_name ?? item.name ?? 'Chuyên gia');
-            const itemEmail = String(item.email ?? '');
-            const spec = String(item.specialty ?? 'AI Architecture & System Evaluation');
-            const assignedTeams = Array.isArray(item.assigned_team_ids)
-              ? item.assigned_team_ids.length
-              : 0;
-            const avatarChar = fullName.trim().charAt(0).toUpperCase() || 'U';
-            if (role === 'judge') {
-              nextJudges.push({
-                id: String(item.id),
-                name: fullName,
-                email: itemEmail,
-                specialization: spec,
-                assignedCount: assignedTeams,
-                avatar: avatarChar,
-              });
-            } else if (role === 'mentor') {
-              nextMentors.push({
-                id: String(item.id),
-                name: fullName,
-                email: itemEmail,
-                topic: spec,
-                openTickets: 0,
-                avatar: avatarChar,
-              });
-            }
-          }
-          setJudges(nextJudges);
-          setMentors(nextMentors);
-
-        }
-      })
-      .catch(() => {
-        // Keep cached state when offline
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+    apiClient.get('/admin/personnel')
+      .then((res) => { if (active) applyRoster(res.data.data); })
+      .catch((err) => { if (active) setError(err instanceof Error ? err.message : 'Không thể tải danh sách tài khoản.'); })
+      .finally(() => { if (active) setIsLoading(false); });
+    return () => { active = false; };
+  }, [applyRoster]);
 
   const handleDeleteJudge = (id: string, judgeName: string, judgeEmail?: string) => {
     setDeletePersonnelTarget({ role: 'judge', id, name: judgeName, email: judgeEmail });
@@ -105,109 +104,52 @@ export const AdminMentorsJudgesPage: React.FC = () => {
   };
 
   const executeDeletePersonnel = async () => {
-    if (!deletePersonnelTarget) return;
-    const { role, id, name: personName, email: personEmail } = deletePersonnelTarget;
-    setDeletePersonnelTarget(null);
-
-    if (role === 'judge') {
-      const prevJudges = [...judges];
-      const nextJudges = judges.filter(
-        (j) => j.id !== id && (!personEmail || j.email.toLowerCase() !== personEmail.toLowerCase()),
-      );
-      setJudges(nextJudges);
-      try {
-        await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
-          params: personEmail ? { email: personEmail } : undefined,
-        });
-      } catch {
-        setJudges(prevJudges);
-        setAlert('Không thể xóa nhân sự. Vui lòng thử lại.');
-        return;
-      }
-      setAlert(`Đã xóa giám khảo ${personName}`);
-      setTimeout(() => setAlert(null), 3000);
-    } else {
-      const prevMentors = [...mentors];
-      const nextMentors = mentors.filter(
-        (m) => m.id !== id && (!personEmail || m.email.toLowerCase() !== personEmail.toLowerCase()),
-      );
-      setMentors(nextMentors);
-      try {
-        await apiClient.delete(`/admin/personnel/${encodeURIComponent(id)}`, {
-          params: personEmail ? { email: personEmail } : undefined,
-        });
-      } catch {
-        setMentors(prevMentors);
-        setAlert('Không thể xóa nhân sự. Vui lòng thử lại.');
-        return;
-      }
-      setAlert(`Đã xóa cố vấn ${personName}`);
-      setTimeout(() => setAlert(null), 3000);
+    if (!deletePersonnelTarget || mutationRef.current) return;
+    const target = deletePersonnelTarget;
+    mutationRef.current = true;
+    setIsSaving(true); setError(null); setAlert(null);
+    try {
+      await apiClient.delete(`/admin/personnel/${encodeURIComponent(target.id)}`);
+      setJudges((list) => list.filter((item) => item.id !== target.id));
+      setMentors((list) => list.filter((item) => item.id !== target.id));
+      setDeletePersonnelTarget(null);
+      setAlert(`Đã xóa tài khoản ${target.name}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể xóa tài khoản. Vui lòng thử lại.');
+    } finally {
+      mutationRef.current = false; setIsSaving(false);
     }
   };
 
-  const handleInvite = async (e: React.FormEvent) => {
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim()) return;
-
-    const cleanName = name.trim();
-    const cleanEmail = email.trim();
-    const cleanSpec = specialization.trim();
-    const roleToCreate = activeTab === 'judges' ? 'judge' : 'mentor';
-    let createdId = `${roleToCreate}-${Date.now()}`;
-
-    try {
-      const res = await apiClient.post('/admin/personnel', {
-        full_name: cleanName,
-        email: cleanEmail,
-        role: roleToCreate,
-        specialty: cleanSpec,
-      });
-      const payload = res.data?.data ?? res.data;
-      if (payload?.id) {
-        createdId = String(payload.id);
-      }
-    } catch {
-      setAlert('Không thể tạo nhân sự. Vui lòng thử lại.');
+    if (!name.trim() || !email.trim() || mutationRef.current) return;
+    const cleanEmail = email.trim().toLowerCase();
+    setError(null); setAlert(null);
+    if ([...judges, ...mentors].some((item) => item.email.trim().toLowerCase() === cleanEmail)) {
+      setError('Email này đã tồn tại trong danh sách chuyên gia.');
       return;
     }
-
-    if (activeTab === 'judges') {
-      const nextJudges = [
-        ...judges.filter((j) => j.email.toLowerCase() !== cleanEmail.toLowerCase()),
-        {
-          id: createdId,
-          name: cleanName,
-          email: cleanEmail,
-          specialization: cleanSpec,
-          assignedCount: 0,
-          avatar: cleanName.charAt(0).toUpperCase(),
-        },
-      ];
-      setJudges(nextJudges);
-
-      setAlert(`Đã thêm Ban Giám Khảo ${cleanEmail}!`);
-    } else {
-      const nextMentors = [
-        ...mentors.filter((m) => m.email.toLowerCase() !== cleanEmail.toLowerCase()),
-        {
-          id: createdId,
-          name: cleanName,
-          email: cleanEmail,
-          topic: cleanSpec,
-          openTickets: 0,
-          avatar: cleanName.charAt(0).toUpperCase(),
-        },
-      ];
-      setMentors(nextMentors);
-
-      setAlert(`Đã gửi thư mời Cố vấn chuyên môn tới ${cleanEmail}!`);
+    const role = activeTab === 'judges' ? 'judge' : 'mentor';
+    mutationRef.current = true; setIsSaving(true);
+    try {
+      const response = await apiClient.post('/admin/personnel', {
+        full_name: name.trim(), email: cleanEmail, role, specialty: specialization.trim(),
+      });
+      const created = response.data?.data;
+      if (!created?.id || created.role !== role) throw new Error('Phản hồi tạo tài khoản không hợp lệ. Vui lòng tải lại danh sách.');
+      const item = { id: String(created.id), name: String(created.full_name), email: String(created.email),
+        avatar: String(created.full_name).charAt(0).toUpperCase() };
+      if (role === 'judge') setJudges((list) => [...list, { ...item, specialization: String(created.specialty || ''),
+        assignedCount: Array.isArray(created.assigned_team_ids) ? created.assigned_team_ids.length : 0 }]);
+      else setMentors((list) => [...list, { ...item, topic: String(created.specialty || ''), openTickets: 0 }]);
+      setIsCreateOpen(false); setName(''); setEmail('');
+      setAlert(`Đã tạo tài khoản ${role === 'judge' ? 'giám khảo' : 'cố vấn'} ${created.email}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Không thể tạo tài khoản. Vui lòng thử lại.');
+    } finally {
+      mutationRef.current = false; setIsSaving(false);
     }
-
-    setIsInviteOpen(false);
-    setName('');
-    setEmail('');
-    setTimeout(() => setAlert(null), 3000);
   };
 
   return (
@@ -225,9 +167,9 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           </p>
         </div>
 
-        <Button variant="primary" onClick={() => setIsInviteOpen(true)} className="gap-2">
+        <Button variant="primary" onClick={() => setIsCreateOpen(true)} className="gap-2">
           <Plus size={16} />
-          <span>Mời Chuyên Gia Mới</span>
+          <span>Tạo Tài Khoản Chuyên Gia</span>
         </Button>
       </div>
 
@@ -238,6 +180,8 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         </div>
       )}
 
+      {error && !isCreateOpen && <p role="alert" className="text-sm text-rose-600">{error}</p>}
+      {isLoading && <p role="status" className="text-sm text-muted-foreground">Đang tải danh sách tài khoản…</p>}
       {/* Tabs */}
       <div className="flex border-b border-border gap-4">
         <button
@@ -266,30 +210,30 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       </div>
 
       {/* Empty States */}
-      {activeTab === 'judges' && judges.length === 0 && (
+      {!isLoading && !error && activeTab === 'judges' && judges.length === 0 && (
         <div className="rounded-[16px] border border-dashed border-border p-12 text-center bg-card">
           <Scale size={40} className="mx-auto text-muted-foreground mb-3" />
           <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground mb-1">Chưa Có Giám Khảo</h3>
           <p className="text-muted-foreground text-xs max-w-sm mx-auto mb-4">
-            Hội đồng giám khảo hiện chưa có thành viên. Hãy mời các chuyên gia chấm thi để bắt đầu đánh giá bài nộp.
+            Hội đồng giám khảo hiện chưa có thành viên. Hãy tạo tài khoản giám khảo để bắt đầu đánh giá bài nộp.
           </p>
-          <Button variant="primary" size="sm" onClick={() => setIsInviteOpen(true)} className="gap-1.5">
+          <Button variant="primary" size="sm" onClick={() => setIsCreateOpen(true)} className="gap-1.5">
             <Plus size={14} />
-            <span>Mời Giám Khảo Mới</span>
+            <span>Tạo Tài Khoản Giám Khảo</span>
           </Button>
         </div>
       )}
 
-      {activeTab === 'mentors' && mentors.length === 0 && (
+      {!isLoading && !error && activeTab === 'mentors' && mentors.length === 0 && (
         <div className="rounded-[16px] border border-dashed border-border p-12 text-center bg-card">
           <GraduationCap size={40} className="mx-auto text-muted-foreground mb-3" />
           <h3 className="font-semibold tracking-tight text-foreground text-lg text-foreground mb-1">Chưa Có Cố Vấn Chuyên Môn</h3>
           <p className="text-muted-foreground text-xs max-w-sm mx-auto mb-4">
-            Chưa có cố vấn nào trong danh sách. Hãy mời các cố vấn theo từng chuyên môn để hỗ trợ thí sinh.
+            Chưa có cố vấn nào trong danh sách. Hãy tạo tài khoản cố vấn theo từng chuyên môn để hỗ trợ thí sinh.
           </p>
-          <Button variant="primary" size="sm" onClick={() => setIsInviteOpen(true)} className="gap-1.5">
+          <Button variant="primary" size="sm" onClick={() => setIsCreateOpen(true)} className="gap-1.5">
             <Plus size={14} />
-            <span>Mời Cố Vấn Mới</span>
+            <span>Tạo Tài Khoản Cố Vấn</span>
           </Button>
         </div>
       )}
@@ -381,11 +325,13 @@ export const AdminMentorsJudgesPage: React.FC = () => {
 
       {/* Invite Modal */}
       <Modal
-        isOpen={isInviteOpen}
-        onClose={() => setIsInviteOpen(false)}
-        title={activeTab === 'judges' ? 'Mời Giám Khảo Mới' : 'Mời Cố Vấn Chuyên Môn Mới'}
+        isOpen={isCreateOpen}
+        onClose={() => { if (!isSaving) { setIsCreateOpen(false); setError(null); } }}
+        title={activeTab === 'judges' ? 'Tạo Tài Khoản Giám Khảo' : 'Tạo Tài Khoản Cố Vấn'}
       >
-        <form onSubmit={handleInvite} className="space-y-4">
+        <form onSubmit={handleCreateAccount}>
+          {error && <p role="alert" className="text-sm text-rose-600 mb-4">{error}</p>}
+          <fieldset disabled={isSaving} className="space-y-4">
           <Input
             label="Họ và tên chuyên gia *"
             placeholder="Ví dụ: GS. TS. Nguyễn Văn A..."
@@ -411,13 +357,14 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           />
 
           <div className="flex justify-end gap-3 pt-3">
-            <Button variant="ghost" type="button" onClick={() => setIsInviteOpen(false)}>
+            <Button variant="ghost" type="button" onClick={() => setIsCreateOpen(false)}>
               Hủy
             </Button>
-            <Button variant="primary" type="submit">
-              Gửi thư mời
+            <Button variant="primary" type="submit" isLoading={isSaving}>
+              Tạo tài khoản
             </Button>
           </div>
+        </fieldset>
         </form>
       </Modal>
 
@@ -430,6 +377,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         description="Nhân sự này sẽ bị thu hồi quyền truy cập Hội đồng Giám khảo / Cố vấn chuyên môn trên hệ thống."
         confirmLabel="Xác nhận xóa"
         variant="destructive"
+        isLoading={isSaving}
         onConfirm={executeDeletePersonnel}
       />
     </div>

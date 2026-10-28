@@ -1,6 +1,8 @@
-from datetime import datetime, timezone
+import asyncio
+from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from typing import List, Optional
+from app.core.exceptions import BadRequestException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -17,6 +19,7 @@ from app.schemas.support import TicketCreate, TicketUpdate
 
 
 class SupportService:
+    _locks: dict[str, asyncio.Lock] = {}
     """
     Business service layer managing support tickets.
     """
@@ -85,6 +88,11 @@ class SupportService:
                     message="Bạn không có quyền xem ticket của đội khác.",
                     error_code="FORBIDDEN_ROLE",
                 )
+        if user_role == UserRole.MENTOR.value and not (
+            str(ticket.assigned_to) == str(current_user.id) or
+            (ticket.assigned_to is None and ticket.status == "open")
+        ):
+            raise ForbiddenException(message="Ticket không thuộc phạm vi phụ trách của bạn.", error_code="FORBIDDEN_TICKET_ACCESS")
         return ticket
 
     async def list_all_tickets(
@@ -96,6 +104,7 @@ class SupportService:
         assigned_to: Optional[str] = None,
         skip: int = 0,
         limit: int = 100,
+        current_user: Optional[User] = None,
     ) -> List[SupportTicket]:
         """
         Retrieve all tickets with optional filtering (for Mentor and Admin).
@@ -108,9 +117,15 @@ class SupportService:
             assigned_to=assigned_to,
             skip=skip,
             limit=limit,
+            viewer_mentor_id=str(current_user.id) if current_user and current_user.role == "mentor" else None,
         )
 
-    async def update_ticket(
+    async def update_ticket(self, db: AsyncSession, ticket_id: str, payload: TicketUpdate, current_user: User) -> SupportTicket:
+        lock = self._locks.setdefault(ticket_id, asyncio.Lock())
+        async with lock:
+            return await self._update_ticket(db, ticket_id, payload, current_user)
+
+    async def _update_ticket(
         self,
         db: AsyncSession,
         ticket_id: str,
@@ -132,13 +147,38 @@ class SupportService:
                     error_code="FORBIDDEN_ROLE",
                 )
 
-        ticket = await support_repo.get_by_id(db, ticket_id)
+        ticket = await support_repo.get_by_id(db, ticket_id, for_update=True)
         if not ticket:
             raise NotFoundException(
                 message="Không tìm thấy ticket",
                 error_code="TICKET_NOT_FOUND",
             )
 
+        allowed_actions = {"accept", "update_response", "resolve", "close", "reopen", "escalate"}
+        if action and action not in allowed_actions:
+            raise BadRequestException(message="Hành động ticket không hợp lệ.", error_code="INVALID_TICKET_ACTION")
+        if user_role == UserRole.MENTOR.value:
+            if ticket.assigned_to and str(ticket.assigned_to) != str(current_user.id):
+                if action == "accept":
+                    raise ConflictException(message="Ticket đã được người khác tiếp nhận.", error_code="TICKET_ALREADY_ASSIGNED")
+                raise ForbiddenException(message="Chỉ Mentor được phân công hoặc Admin mới được xử lý ticket.", error_code="FORBIDDEN_TICKET_ACCESS")
+            if not ticket.assigned_to and action != "accept":
+                # Legacy status=in_progress is the same operation as accept.
+                if not (action is None and payload.status == TicketStatus.IN_PROGRESS):
+                    raise ForbiddenException(message="Vui lòng tiếp nhận ticket trước khi xử lý.", error_code="TICKET_NOT_ASSIGNED")
+            if payload.assigned_to is not None and str(payload.assigned_to) != str(current_user.id):
+                raise ForbiddenException(message="Chỉ Admin mới được phân công cho người khác.", error_code="FORBIDDEN_TICKET_ACCESS")
+        if action == "accept" and ticket.status not in ("open", "in_progress"):
+            raise ConflictException(message="Ticket không ở trạng thái tiếp nhận.", error_code="INVALID_TICKET_TRANSITION")
+        if action == "reopen":
+            if ticket.status not in ("resolved", "closed"):
+                raise ConflictException(message="Chỉ có thể mở lại ticket đã giải quyết hoặc đóng.", error_code="INVALID_TICKET_TRANSITION")
+            resolved_at = ticket.resolved_at or ticket.updated_at
+            resolved_at = resolved_at if resolved_at.tzinfo else resolved_at.replace(tzinfo=timezone.utc)
+            if user_role == UserRole.CANDIDATE.value and datetime.now(timezone.utc) - resolved_at > timedelta(hours=48):
+                raise ConflictException(message="Đã quá thời hạn 48 giờ để mở lại ticket. Vui lòng tạo ticket mới.", error_code="REOPEN_WINDOW_EXPIRED")
+        if action == "close" and ticket.status not in ("resolved", "closed"):
+            raise ConflictException(message="Chỉ có thể đóng ticket đã được giải quyết.", error_code="INVALID_TICKET_TRANSITION")
         if user_role == UserRole.CANDIDATE.value:
             membership = await team_repo.get_user_membership(db, str(current_user.id))
             team_id = str(membership.team_id) if membership and membership.team_id else None
@@ -222,6 +262,16 @@ class SupportService:
                         error_code="MISSING_TICKET_RESPONSE",
                     )
 
+        next_status = update_data.get("status")
+        next_status = next_status.value if hasattr(next_status, "value") else next_status
+        if next_status == "resolved" and ticket.status != "resolved":
+            update_data["resolved_at"] = datetime.now(timezone.utc)
+        elif next_status == "closed" and ticket.resolved_at is None and ticket.status == "resolved":
+            # Preserve the legacy reference before closing updates updated_at.
+            reference = ticket.updated_at
+            update_data["resolved_at"] = reference if reference.tzinfo else reference.replace(tzinfo=timezone.utc)
+        elif next_status == "in_progress" and ticket.status in ("resolved", "closed"):
+            update_data["resolved_at"] = None
         return await support_repo.update_ticket(db, ticket, update_data)
 
 

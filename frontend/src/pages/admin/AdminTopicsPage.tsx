@@ -18,11 +18,12 @@ import {
   AlertCircle,
   Sparkles,
 } from 'lucide-react';
+import { apiClient } from '../../api/axiosClient';
 import { topicsApi } from '../../api/topicsApi';
 import type { MajorTopic, SubTopic } from '../../types';
 
 export const AdminTopicsPage: React.FC = () => {
-  const { majorTopics, addMajorTopic, deleteMajorTopic, addSubTopic, updateSubTopicQuota } =
+  const { majorTopics, addMajorTopic, deleteMajorTopic, updateSubTopicQuota } =
     useMockStore();
 
   const [loading, setLoading] = useState(false);
@@ -46,6 +47,8 @@ export const AdminTopicsPage: React.FC = () => {
       max_teams: number;
       current_teams: number;
       is_active: boolean;
+      mentor_id?: string | null;
+      mentor_name?: string | null;
     }>;
   }>): MajorTopic[] => {
     return data.map((t) => {
@@ -59,6 +62,8 @@ export const AdminTopicsPage: React.FC = () => {
         registeredTeamsCount: s.current_teams,
         currentTeams: s.current_teams,
         status: s.is_active ? 'OPEN' : 'CLOSED',
+        mentorId: s.mentor_id || undefined,
+        mentorName: s.mentor_name || undefined,
       }));
 
       return {
@@ -121,7 +126,17 @@ export const AdminTopicsPage: React.FC = () => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [quota, setQuota] = useState(3);
-  const [mentorName, setMentorName] = useState('Dr. Lê Quang');
+  const [mentorId, setMentorId] = useState('');
+  const [editMentorId, setEditMentorId] = useState('');
+  const [mentors, setMentors] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [mentorError, setMentorError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    apiClient.get('/admin/personnel', { params: { role: 'mentor' } })
+      .then((res) => { if (active) setMentors(res.data.data.filter((m: { role: string; is_active: boolean }) => m.role === 'mentor' && m.is_active)); })
+      .catch(() => { if (active) setMentorError('Không thể tải danh sách cố vấn. Vui lòng tải lại trang để phân công.'); });
+    return () => { active = false; };
+  }, []);
 
   // Edit Subtopic / Quota Modal
   const [editingSubTopic, setEditingSubTopic] = useState<{
@@ -198,6 +213,7 @@ export const AdminTopicsPage: React.FC = () => {
         title: title.trim(),
         description: description.trim() || undefined,
         max_teams: quota,
+        mentor_id: mentorId || null,
       });
       await fetchTopics();
       showAlert(`Đã thêm đề tài nhánh mới "${title}" thành công lên máy chủ!`, 'success');
@@ -207,12 +223,8 @@ export const AdminTopicsPage: React.FC = () => {
         setIsSubmitting(false);
         return;
       } else {
-        addSubTopic(selectedMajorId, {
-          title: title.trim(),
-          description: description.trim(),
-          quota,
-          mentorName: mentorName.trim(),
-        });
+        showAlert('Không thể lưu đề tài nhánh. Vui lòng thử lại.', 'error');
+        return;
       }
     } finally {
       setIsSubmitting(false);
@@ -221,6 +233,7 @@ export const AdminTopicsPage: React.FC = () => {
     setIsAddOpen(false);
     setTitle('');
     setDescription('');
+    setMentorId('');
   };
 
   const handleSaveQuota = async (e: React.FormEvent) => {
@@ -233,6 +246,7 @@ export const AdminTopicsPage: React.FC = () => {
         title: editSubTitle.trim() || editingSubTopic.title,
         description: editSubDesc.trim() || undefined,
         max_teams: newQuotaValue,
+        mentor_id: editMentorId || null,
       });
       await fetchTopics();
       showAlert('Đã cập nhật đề tài nhánh và chỉ tiêu Quota thành công lên máy chủ!', 'success');
@@ -446,6 +460,7 @@ export const AdminTopicsPage: React.FC = () => {
                           </p>
                         </div>
 
+                        {sub.mentorName && <p className="text-xs text-muted-foreground">Cố vấn phụ trách: {sub.mentorName}</p>}
                         <div className="pt-2 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
                           <div className="flex items-center gap-1.5">
                             <Users size={13} className="text-primary" />
@@ -467,6 +482,7 @@ export const AdminTopicsPage: React.FC = () => {
                                 });
                                 setEditSubTitle(sub.title);
                                 setEditSubDesc(sub.description || '');
+                                setEditMentorId(sub.mentorId || '');
                                 setNewQuotaValue(maxQuota);
                               }}
                               className="!py-1 !px-2.5 text-xs gap-1"
@@ -586,11 +602,14 @@ export const AdminTopicsPage: React.FC = () => {
               required
             />
 
-            <Input
-              label="Cố vấn phụ trách"
-              value={mentorName}
-              onChange={(e) => setMentorName(e.target.value)}
-            />
+            <div className="space-y-1.5">
+              <label htmlFor="subtopic-mentor" className="text-xs font-medium">Cố vấn phụ trách</label>
+              <select id="subtopic-mentor" value={mentorId} onChange={(e) => setMentorId(e.target.value)} className="w-full rounded-md border border-border bg-card p-2 text-sm">
+                <option value="">Chưa phân công</option>
+                {mentors.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+              </select>
+              {mentorError && <p role="alert" className="text-xs text-destructive">{mentorError}</p>}
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-3">
@@ -639,6 +658,16 @@ export const AdminTopicsPage: React.FC = () => {
             onChange={(e) => setNewQuotaValue(Number(e.target.value))}
             required
           />
+
+          <div className="space-y-1.5">
+            <label htmlFor="edit-subtopic-mentor" className="text-xs font-medium">Cố vấn phụ trách</label>
+            <select id="edit-subtopic-mentor" value={editMentorId} onChange={(e) => setEditMentorId(e.target.value)} className="w-full rounded-md border border-border bg-card p-2 text-sm">
+              <option value="">Chưa phân công</option>
+              {editMentorId && !mentors.some((m) => m.id === editMentorId) && <option value={editMentorId}>Cố vấn hiện tại không còn hoạt động</option>}
+              {mentors.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}
+            </select>
+            {mentorError && <p role="alert" className="text-xs text-destructive">{mentorError}</p>}
+          </div>
 
           <div className="flex justify-end gap-3 pt-2">
             <Button variant="ghost" type="button" onClick={() => setEditingSubTopic(null)} disabled={isSubmitting}>

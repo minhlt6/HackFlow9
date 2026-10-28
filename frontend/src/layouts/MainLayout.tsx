@@ -209,7 +209,6 @@ export const MainLayout: React.FC = () => {
               ? 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng'
               : config.currentPhase
           }
-          blindJudgingMode={config?.blindJudgingMode}
           announcements={announcements}
           displayName={displayName}
           displayEmail={displayEmail}

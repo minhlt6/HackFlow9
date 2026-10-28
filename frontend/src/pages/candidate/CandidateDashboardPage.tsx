@@ -128,7 +128,7 @@ export const CandidateDashboardPage: React.FC = () => {
           value={myTeam ? myTeam.name : 'Chưa có'}
           subtitle={
             myTeam
-              ? `${myTeam.members.length}/4 thành viên • Mã: ${myTeam.inviteCode}`
+              ? `${myTeam.members.length}/${myTeam.maxMembers ?? config.maxTeamMembers ?? config.maxTeamSize} thành viên • Mã: ${myTeam.inviteCode}`
               : 'Hãy tạo hoặc tham gia đội'
           }
           icon={<Users size={24} />}

@@ -19,7 +19,6 @@ import {
   Sparkles,
   Scale,
   Settings,
-  EyeOff,
   Check,
   GraduationCap,
   HelpCircle,
@@ -44,7 +43,6 @@ const MandatoryOnboardingWizardContent: React.FC = () => {
     rubricCriteria,
     config,
     updateConfig,
-    toggleBlindJudging,
     setWizardOpen,
     wizardStep,
     openWizardAtStep,
@@ -104,7 +102,7 @@ const MandatoryOnboardingWizardContent: React.FC = () => {
   const adminSteps = [
     { num: 1, title: 'Cấu hình cuộc thi', isDone: true, icon: Settings },
     { num: 2, title: 'Cân bằng tiêu chí', isDone: isWeightBalanced, icon: Scale },
-    { num: 3, title: 'Bảo mật & Ẩn danh', isDone: true, icon: EyeOff },
+    { num: 3, title: 'Bảo mật & Công bố', isDone: true, icon: ShieldAlert },
   ];
 
   const judgeSteps = [
@@ -652,7 +650,7 @@ const MandatoryOnboardingWizardContent: React.FC = () => {
                       Bước 3: Quy Chế & Ký Cam Kết Liêm Chính Học Thuật
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      Đọc thể lệ cuộc thi, cam kết bản quyền mã nguồn và chấp thuận quy trình chấm ẩn danh.
+                      Đọc thể lệ cuộc thi, cam kết bản quyền mã nguồn và quy trình chấm điểm độc lập.
                     </p>
                   </div>
 
@@ -664,7 +662,7 @@ const MandatoryOnboardingWizardContent: React.FC = () => {
                       <strong className="text-foreground">2. Đóng băng commit SHA:</strong> Hệ thống tự động ghi nhận commit SHA tại thời điểm hạn chót của từng chặng.
                     </p>
                     <p>
-                      <strong className="text-foreground">3. Chế độ chấm ẩn danh:</strong> Ban Giám khảo chấm thi hoàn toàn độc lập mà không nhìn thấy thông tin trường học hay danh tính cá nhân của thí sinh.
+                      <strong className="text-foreground">3. Chấm điểm độc lập:</strong> Ban Giám khảo chấm thi hoàn toàn độc lập theo khung tiêu chí Rubric chuẩn hóa của cuộc thi.
                     </p>
                     <p>
                       <strong className="text-foreground">4. An toàn dữ liệu:</strong> Mọi tập dữ liệu mẫu chỉ được sử dụng cho mục đích nghiên cứu tại cuộc thi.
@@ -866,10 +864,10 @@ const MandatoryOnboardingWizardContent: React.FC = () => {
                   <div className="flex items-start justify-between gap-3">
                     <div className="space-y-1">
                       <h3 className="font-semibold text-base text-foreground">
-                        Bước 3: Chính Sách Bảo Mật & Chế Độ Chấm Ẩn Danh
+                        Bước 3: Chính Sách Bảo Mật & Công Bố Kết Quả
                       </h3>
                       <p className="text-xs text-muted-foreground">
-                        Kích hoạt chế độ ẩn danh tính và tên trường của thí sinh khi Ban Giám khảo chấm bài.
+                        Kiểm tra cấu hình công bố kết quả và bảo mật điểm số trong thời gian diễn ra cuộc thi.
                       </p>
                     </div>
                     <Button
@@ -881,31 +879,6 @@ const MandatoryOnboardingWizardContent: React.FC = () => {
                     >
                       <span>Mở trang Cấu hình</span>
                       <ExternalLink size={13} />
-                    </Button>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-muted/30 border border-border flex items-center justify-between gap-4">
-                    <div>
-                      <div className="font-semibold text-sm text-foreground">
-                        Chế độ Chấm ẩn danh (Blind Judging)
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        Ẩn thông tin trường đại học và danh tính thí sinh trên giao diện chấm điểm của Giám khảo.
-                      </div>
-                    </div>
-                    <Button
-                      type="button"
-                      variant={config.blindJudgingMode ? 'primary' : 'secondary'}
-                      size="sm"
-                      onClick={() => {
-                        void toggleBlindJudging().catch(() => setFeedbackMsg({ text: 'Không thể lưu chế độ chấm thi.', type: 'error' }));
-                        setFeedbackMsg({
-                          text: `Đã ${!config.blindJudgingMode ? 'bật' : 'tắt'} chế độ chấm ẩn danh trên máy chủ!`,
-                          type: 'success',
-                        });
-                      }}
-                    >
-                      {config.blindJudgingMode ? 'ĐANG BẬT' : 'BẬT NGAY'}
                     </Button>
                   </div>
 

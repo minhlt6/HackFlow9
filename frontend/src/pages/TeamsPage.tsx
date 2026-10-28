@@ -40,12 +40,12 @@ const loadInitialTeam = (): TeamDetails | null => null;
 
 export const TeamsPage: React.FC = () => {
   const navigate = useNavigate();
+  const mutationRef = React.useRef(false);
+  const [isMutating, setIsMutating] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const currentUser = useAuthStore((state) => state.user);
   const config = useMockStore((state) => state.config);
-  const transferTeamLeaderInStore = useMockStore((state) => state.transferTeamLeader);
-  const removeTeamMemberInStore = useMockStore((state) => state.removeTeamMember);
   const minTeamSize = Math.max(
     1,
     Number(config?.minTeamMembers ?? config?.minTeamSize ?? 3),
@@ -334,11 +334,8 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
     try {
       const response = await apiClient.patch('/teams/me', { description: editDesc.trim() });
       const updated = response.data?.data ?? response.data;
-      if (updated && typeof updated === 'object' && 'id' in updated) {
-        setTeam(updated as TeamDetails);
-      } else {
-        setTeam({ ...team, description: editDesc.trim() });
-      }
+      if (!updated?.id) throw new Error('Phản hồi đội thi không hợp lệ. Vui lòng tải lại.');
+      setTeam(updated as TeamDetails);
       void useMockStore.getState().syncFromBackend?.();
     } catch {
       showToast('Không thể cập nhật mô tả đội thi.', 'error');
@@ -372,24 +369,12 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
         { skills: parsedSkills },
       );
       const updated = response.data?.data ?? response.data;
-      if (updated && typeof updated === 'object' && 'id' in updated) {
-        setTeam(updated as TeamDetails);
-      } else {
-        setTeam({
-          ...team,
-          members: team.members.map((m) =>
-            m.user_id === skillEditTarget.user_id ? { ...m, skills: parsedSkills } : m,
-          ),
-        });
-      }
+      if (!updated?.id || !Array.isArray(updated.members)) throw new Error('Phản hồi đội thi không hợp lệ. Vui lòng tải lại.');
+      setTeam(updated as TeamDetails);
       void useMockStore.getState().syncFromBackend?.();
-    } catch {
-      setTeam({
-        ...team,
-        members: team.members.map((m) =>
-          m.user_id === skillEditTarget.user_id ? { ...m, skills: parsedSkills } : m,
-        ),
-      });
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể lưu chuyên môn thành viên.', 'error');
+      return;
     }
     setSkillEditTarget(null);
     showToast(`Đã cập nhật chuyên môn cho ${skillEditTarget.full_name}!`, 'success');
@@ -409,19 +394,19 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   const handleConfirmTransfer = async () => {
     if (!team || !isLeader || !transferTarget) return;
 
+    if (mutationRef.current) return;
+    mutationRef.current = true; setIsMutating(true);
     try {
       const res = await apiClient.patch('/teams/leader', {
         new_leader_id: transferTarget.user_id,
       });
-      if (res.data?.data) {
-        setTeam(res.data.data);
-      }
-    } catch {
-      showToast('Không thể cập nhật đội thi. Vui lòng thử lại.', 'error');
+      if (!res.data?.data?.id) throw new Error('Phản hồi đội thi không hợp lệ. Vui lòng tải lại.');
+      setTeam(res.data.data);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể cập nhật đội thi. Vui lòng thử lại.', 'error');
       return;
-    }
+    } finally { mutationRef.current = false; setIsMutating(false); }
 
-    transferTeamLeaderInStore(team.id, transferTarget.user_id);
     useMockStore.getState().syncFromBackend?.();
 
     const newLeaderName = transferTarget.full_name;
@@ -446,17 +431,17 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   const handleConfirmRemove = async () => {
     if (!team || !isLeader || !removeTarget) return;
 
+    if (mutationRef.current) return;
+    mutationRef.current = true; setIsMutating(true);
     try {
       const res = await apiClient.delete(`/teams/members/${removeTarget.user_id}`);
-      if (res.data?.data) {
-        setTeam(res.data.data);
-      }
-    } catch {
-      showToast('Không thể cập nhật đội thi. Vui lòng thử lại.', 'error');
+      if (!res.data?.data?.id) throw new Error('Phản hồi đội thi không hợp lệ. Vui lòng tải lại.');
+      setTeam(res.data.data);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể cập nhật đội thi. Vui lòng thử lại.', 'error');
       return;
-    }
+    } finally { mutationRef.current = false; setIsMutating(false); }
 
-    removeTeamMemberInStore(team.id, removeTarget.user_id);
     useMockStore.getState().syncFromBackend?.();
 
     const removedName = removeTarget.full_name;
@@ -475,12 +460,14 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
       setIsLeaveOpen(false);
       return;
     }
+    if (mutationRef.current) return;
+    mutationRef.current = true; setIsMutating(true);
     try {
       await apiClient.post('/teams/leave');
-    } catch {
-      showToast('Không thể rời đội thi. Vui lòng thử lại.', 'error');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Không thể rời đội thi. Vui lòng thử lại.', 'error');
       return;
-    }
+    } finally { mutationRef.current = false; setIsMutating(false); }
     setTeam(null);
     setPreviewMode('no_team');
     setIsLeaveOpen(false);
@@ -1328,7 +1315,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
               <Button
                 variant="primary"
                 type="button"
-                onClick={handleConfirmTransfer}
+                disabled={isMutating} isLoading={isMutating} onClick={handleConfirmTransfer}
                 className="gap-1.5 cursor-pointer"
               >
                 <Crown size={15} />
@@ -1374,7 +1361,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
               <Button
                 variant="danger"
                 type="button"
-                onClick={handleConfirmRemove}
+                disabled={isMutating} isLoading={isMutating} onClick={handleConfirmRemove}
                 className="gap-1.5 cursor-pointer"
               >
                 <UserX size={15} />
@@ -1419,7 +1406,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
               <Button
                 variant="danger"
                 type="button"
-                onClick={handleConfirmLeave}
+                disabled={isMutating} isLoading={isMutating} onClick={handleConfirmLeave}
                 className="gap-1.5 cursor-pointer"
               >
                 <LogOut size={15} />

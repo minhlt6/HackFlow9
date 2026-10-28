@@ -23,10 +23,11 @@ class TeamRepository:
             .options(
                 selectinload(Team.members).selectinload(TeamMember.user),
                 selectinload(Team.topic),
+                selectinload(Team.subtopic),
             )
         )
         if for_update:
-            stmt = stmt.with_for_update()
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -51,10 +52,11 @@ class TeamRepository:
             .options(
                 selectinload(Team.members).selectinload(TeamMember.user),
                 selectinload(Team.topic),
+                selectinload(Team.subtopic),
             )
         )
         if for_update:
-            stmt = stmt.with_for_update()
+            stmt = stmt.with_for_update().execution_options(populate_existing=True)
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -70,6 +72,7 @@ class TeamRepository:
             .options(
                 selectinload(Team.members).selectinload(TeamMember.user),
                 selectinload(Team.topic),
+                selectinload(Team.subtopic),
             )
         )
         result = await db.execute(stmt)

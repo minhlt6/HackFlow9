@@ -3,6 +3,7 @@ import { useMockStore } from '../../store/useMockStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
 import {
   notificationsApi,
+  normalizeAnnouncement,
   type AnnouncementItem,
 } from '../../api/notificationsApi';
 import { Button } from '../../components/Button';
@@ -117,7 +118,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
     setTitle(item.title);
     setContent(item.content);
     setPriority(item.priority || 'info');
-    setTargetRole(item.targetRole || 'all');
+    setTargetRole(normalizeAnnouncement(item).targetRole || 'all');
     setIsAddOpen(true);
   };
 

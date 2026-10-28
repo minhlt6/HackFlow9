@@ -55,6 +55,7 @@ export interface Team {
   approvalStatus?: ApprovalStatus;
   topicName?: string;
   maxMembers?: number;
+  minMembers?: number;
   members: TeamMember[];
   memberCount?: number;
   rejectionReason?: string;
@@ -237,6 +238,7 @@ export interface WhitelistEntry {
 }
 
 export interface Announcement {
+  priority?: 'info' | 'warning' | 'urgent';
   id: string;
   title: string;
   content: string;

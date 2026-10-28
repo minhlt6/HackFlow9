@@ -112,3 +112,6 @@ notion-module/
 *.db-wal
 *.db-shm
 !backend/hackflow.db
+
+# Generated demo databases and credentials
+demo/generated/

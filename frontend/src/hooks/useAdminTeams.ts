@@ -49,10 +49,7 @@ export const adminTeamFormSchema = z.object({
           'Địa chỉ email thành viên không hợp lệ.',
         ),
     )
-    .max(
-      4,
-      'Theo quy chế Hackathon, tối đa 4 thành viên cùng Đội trưởng (= 5 người/đội).',
-    ),
+,
   majorTopicId: z
     .string()
     .trim()
@@ -64,8 +61,7 @@ export const adminTeamFormSchema = z.object({
   memberCount: z
     .number()
     .int('Số lượng thành viên phải là số nguyên.')
-    .min(3, 'Đội thi cần tối thiểu 3 thành viên (1 Đội trưởng + 2 Thành viên).')
-    .max(5, 'Theo quy chế Hackathon, mỗi đội không được vượt quá 5 thành viên.'),
+    .min(1, 'Đội thi cần ít nhất một thành viên.'),
   repoUrl: z
     .string()
     .trim()
@@ -238,10 +234,10 @@ export function useAdminTeams() {
       }
 
       const count = team.memberCount ?? team.members.length;
-      if (complianceFilter === 'compliant' && (count < 3 || count > 5)) {
+      if (complianceFilter === 'compliant' && (count < (team.minMembers ?? 3) || count > (team.maxMembers ?? 5))) {
         return false;
       }
-      if (complianceFilter === 'under_quota' && count >= 3) {
+      if (complianceFilter === 'under_quota' && count >= (team.minMembers ?? 3)) {
         return false;
       }
 
@@ -261,7 +257,7 @@ export function useAdminTeams() {
     const rejectedOrFlaggedCount = teams.filter(
       (t) =>
         (t.status || 'pending').toLowerCase() === 'rejected' ||
-        (t.memberCount ?? t.members.length) < 3,
+        (t.memberCount ?? t.members.length) < (t.minMembers ?? 3),
     ).length;
     const totalParticipants = teams.reduce(
       (sum, t) => sum + (t.memberCount ?? t.members.length),
@@ -287,7 +283,7 @@ export function useAdminTeams() {
       const payload: AdminTeamUpsertPayload = {
         ...values,
         inviteCode: values.inviteCode.toUpperCase(),
-        memberCount: Math.max(Number(values.memberCount) || 3, 1 + values.memberEmails.length),
+        memberCount: Math.max(Number(values.memberCount), 1 + values.memberEmails.length),
         memberEmails: values.memberEmails,
         member_emails: values.memberEmails,
       };
@@ -319,7 +315,7 @@ export function useAdminTeams() {
       const payload: AdminTeamUpsertPayload = {
         ...values,
         inviteCode: values.inviteCode.toUpperCase(),
-        memberCount: Math.max(Number(values.memberCount) || 3, 1 + values.memberEmails.length),
+        memberCount: Math.max(Number(values.memberCount), 1 + values.memberEmails.length),
         memberEmails: values.memberEmails,
         member_emails: values.memberEmails,
       };
@@ -329,7 +325,7 @@ export function useAdminTeams() {
       void syncFromBackend?.();
       toast.success(
         `Đã cập nhật hồ sơ đội "${updated.name}"`,
-        `Quy mô hiện tại: ${updated.memberCount}/5 thành viên • Đề tài đã lưu.`,
+        `Quy mô hiện tại: ${updated.memberCount}/${updated.maxMembers} thành viên • Đề tài đã lưu.`,
       );
       return true;
     } catch (err) {
@@ -394,12 +390,11 @@ export function useAdminTeams() {
     try {
       const ids = selectedTeams.map((t) => t.id);
       const updatedList = await adminTeamsApi.bulkApproveTeams(ids);
-      ids.forEach((id) => approveTeamRegistration(id));
       setTeams(updatedList);
       void syncFromBackend?.();
       toast.success(
-        `Đã phê duyệt hàng loạt ${ids.length} đội thi`,
-        'Trạng thái các đội đã chọn được chuyển sang Đã duyệt.',
+        `Đã phê duyệt ${updatedList.filter((t) => ids.includes(t.id) && t.status === 'approved').length}/${ids.length} đội thi`,
+        'Đội chưa đáp ứng quy định thành viên được giữ nguyên trạng thái.',
       );
     } catch (err) {
       const msg =

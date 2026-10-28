@@ -39,6 +39,12 @@ export interface AnnouncementPaginationData {
   page_size: number;
 }
 
+export function normalizeAnnouncement(item: AnnouncementItem): AnnouncementItem {
+  const audience = item.target_audience;
+  const targetRole = audience === 'candidate' ? 'candidates' : audience === 'judge' ? 'judges' : audience === 'mentor' ? 'mentors' : audience === 'all' ? 'all' : item.targetRole ?? 'all';
+  return { ...item, targetRole };
+}
+
 export const notificationsApi = {
   getMyNotifications: async (): Promise<AppNotification[]> => {
     const response = await axiosClient.get<ApiResponse<AppNotification[]>>('/notifications/me');
@@ -60,7 +66,19 @@ export const notificationsApi = {
       params: { page, page_size: pageSize },
     });
     const data = response.data.data;
-    return { ...data, items: data.items.map(item => ({ ...item, targetRole: item.target_audience === "candidate" ? "candidates" : item.target_audience === "judge" ? "judges" : item.target_audience === "mentor" ? "mentors" : "all" })) };
+    if (!data || !Array.isArray(data.items)) throw new Error('Phản hồi danh sách thông báo không hợp lệ.');
+    return { ...data, items: data.items.map(normalizeAnnouncement) };
+  },
+
+  listAllAnnouncements: async (): Promise<AnnouncementItem[]> => {
+    const all = new Map<string, AnnouncementItem>();
+    for (let page = 1; ; page++) {
+      const batch = await notificationsApi.listAnnouncements(page, 100);
+      const previousCount = all.size;
+      batch.items.forEach((item) => all.set(item.id, item));
+      if (all.size >= batch.total) return [...all.values()];
+      if (all.size === previousCount) throw new Error('Không thể tải đủ danh sách thông báo. Vui lòng thử lại.');
+    }
   },
 
   /**
@@ -68,7 +86,7 @@ export const notificationsApi = {
    */
   createAnnouncement: async (payload: AnnouncementCreatePayload): Promise<AnnouncementItem> => {
     const response = await axiosClient.post<ApiResponse<AnnouncementItem>>('/announcements', payload);
-    return response.data.data;
+    return normalizeAnnouncement(response.data.data);
   },
 
   /**
@@ -76,7 +94,7 @@ export const notificationsApi = {
    */
   updateAnnouncement: async (id: string, payload: AnnouncementUpdatePayload): Promise<AnnouncementItem> => {
     const response = await axiosClient.put<ApiResponse<AnnouncementItem>>(`/announcements/${id}`, payload);
-    return response.data.data;
+    return normalizeAnnouncement(response.data.data);
   },
 
   /**

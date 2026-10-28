@@ -3,6 +3,7 @@ from typing import Any, Optional
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.config import settings
@@ -172,6 +173,19 @@ def register_exception_handlers(app: FastAPI) -> None:
             status_code=exc.status_code,
             content=content,
         )
+
+    @app.exception_handler(IntegrityError)
+    async def integrity_exception_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+        detail = str(exc.orig).lower()
+        for keys, code, message in (
+            (("ix_users_email", "users.email"), "EMAIL_ALREADY_EXISTS", "Email này đã tồn tại trong hệ thống."),
+            (("ix_teams_team_name", "teams.team_name"), "TEAM_NAME_TAKEN", "Tên đội thi đã tồn tại."),
+            (("ix_teams_invite_code", "teams.invite_code"), "INVITE_CODE_TAKEN", "Mã mời đã tồn tại."),
+        ):
+            if ("unique" in detail or "duplicate" in detail) and any(key in detail for key in keys):
+                return JSONResponse(status_code=409, content={"success": False, "data": None, "message": message, "error_code": code})
+        logger.error("Database integrity error on %s", request.url.path, exc_info=exc)
+        return JSONResponse(status_code=500, content={"success": False, "data": None, "message": "Không thể lưu dữ liệu. Vui lòng thử lại.", "error_code": "DATABASE_ERROR"})
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:

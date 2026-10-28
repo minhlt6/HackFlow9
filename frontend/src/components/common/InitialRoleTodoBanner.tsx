@@ -93,7 +93,7 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
         id: 'cand-pledge',
         stepNum: 3,
         title: 'Bước 3: Quy chế & Ký cam kết liêm chính',
-        description: 'Đọc thể lệ cuộc thi, cam kết bản quyền mã nguồn và chấp thuận chấm ẩn danh.',
+        description: 'Đọc thể lệ cuộc thi, cam kết bản quyền mã nguồn và quy trình chấm điểm.',
         isCompleted: isStep3Done,
         actionLabel: isStep3Done ? 'Đã ký cam kết' : 'Ký cam kết ngay',
         icon: <FileCheck size={15} className="text-emerald-600 dark:text-emerald-400" />,
@@ -130,10 +130,10 @@ export const InitialRoleTodoBanner: React.FC<InitialRoleTodoBannerProps> = ({ ro
       {
         id: 'adm-security',
         stepNum: 3,
-        title: 'Bước 3: Thiết lập Chính sách Bảo mật & Chấm ẩn danh',
-        description: 'Kích hoạt chế độ mã hóa danh tính thí sinh khi Ban Giám khảo chấm thi.',
+        title: 'Bước 3: Thiết lập Chính sách Bảo mật & Công bố kết quả',
+        description: 'Kiểm tra quyền truy cập và cấu hình công bố bảng xếp hạng cuộc thi.',
         isCompleted: true,
-        actionLabel: 'Kiểm tra bảo mật',
+        actionLabel: 'Kiểm tra cấu hình',
         icon: <ShieldCheck size={15} className="text-primary" />,
       },
     ];

@@ -12,7 +12,9 @@ from app.core.exceptions import (
 from app.models.team import TeamMemberRole
 from app.models.user import User
 from app.repositories.team_repo import team_repo
+from app.repositories.user_repo import user_repo
 from app.repositories.topic_repo import topic_repo
+from app.services.team_policy import config_team_limits
 from app.schemas.topic import (
     SubtopicCreateRequest,
     SubtopicResponse,
@@ -45,6 +47,8 @@ class TopicService:
                 SubtopicResponse(
                     id=str(s.id),
                     topic_id=str(s.topic_id),
+                    mentor_id=s.mentor_id,
+                    mentor_name=s.mentor_name,
                     title=s.title,
                     description=s.description,
                     max_teams=s.max_teams,
@@ -166,6 +170,14 @@ class TopicService:
         await db.commit()
         return {"id": topic_id, "deleted": "true"}
 
+    @staticmethod
+    async def validate_mentor(db: AsyncSession, mentor_id: Optional[str]) -> None:
+        if mentor_id is None:
+            return
+        mentor = await user_repo.get_by_id(db, mentor_id)
+        if not mentor or mentor.role != "mentor" or not mentor.is_active:
+            raise BadRequestException(message="Vui lòng chọn tài khoản cố vấn đang hoạt động.", error_code="INVALID_MENTOR")
+
     async def create_subtopic(
         self,
         db: AsyncSession,
@@ -178,11 +190,13 @@ class TopicService:
                 message="Không tìm thấy mảng đề tài chính.",
                 error_code="TOPIC_NOT_FOUND",
             )
+        await self.validate_mentor(db, req.mentor_id)
         effective_quota = req.quota_max if req.quota_max is not None else req.max_teams
         tid = str(topic.id)
         await topic_repo.create_subtopic(
             db,
             topic_id=tid,
+            mentor_id=req.mentor_id,
             title=req.title,
             description=req.description,
             max_teams=effective_quota,
@@ -207,6 +221,9 @@ class TopicService:
                 message="Không tìm thấy đề tài chi tiết.",
                 error_code="TOPIC_NOT_FOUND",
             )
+        if "mentor_id" in req.model_fields_set:
+            await self.validate_mentor(db, req.mentor_id)
+            subtopic.mentor_id = req.mentor_id
         effective_quota = req.quota_max if req.quota_max is not None else req.max_teams
         if effective_quota is not None:
             if effective_quota < subtopic.current_teams:
@@ -231,11 +248,14 @@ class TopicService:
             subtopic.is_active = req.is_active
 
         await db.commit()
-        await db.refresh(subtopic)
+        db.expire_all()
+        subtopic = await topic_repo.get_subtopic_by_id(db, subtopic_id)
         rem_sub = max(0, subtopic.max_teams - subtopic.current_teams)
         return SubtopicResponse(
             id=str(subtopic.id),
             topic_id=str(subtopic.topic_id),
+            mentor_id=subtopic.mentor_id,
+            mentor_name=subtopic.mentor_name,
             title=subtopic.title,
             description=subtopic.description,
             max_teams=subtopic.max_teams,
@@ -305,14 +325,6 @@ class TopicService:
                     error_code="TEAM_ACCESS_DENIED",
                 )
 
-            team_meta = team.admin_meta if isinstance(getattr(team, "admin_meta", None), dict) else {}
-            if str(team_meta.get("approval_status", "")).lower() == "rejected":
-                reason_str = team_meta.get("rejection_reason") or "Không đạt điều kiện xét duyệt của Ban Tổ Chức."
-                raise ForbiddenException(
-                    message=f"Đội thi của bạn đã bị Ban Tổ Chức từ chối / đình chỉ tư cách thi đấu (Lý do: {reason_str}), không thể đăng ký đề tài.",
-                    error_code="TEAM_REJECTED",
-                )
-
             team_meta = team.admin_meta if isinstance(getattr(team, "admin_meta", None), dict) else {}
             if str(team_meta.get("approval_status", "")).lower() == "rejected":
                 reason_str = team_meta.get("rejection_reason") or "Không đạt điều kiện xét duyệt của Ban Tổ Chức."
@@ -328,8 +340,7 @@ class TopicService:
                 )
 
             # Verify team meets configurable minTeamSize and maxTeamSize before selecting a topic
-            min_team_size = int((config.settings_data or {}).get("minTeamSize", 3)) if (config and getattr(config, "settings_data", None)) else 3
-            max_team_size = int((config.settings_data or {}).get("maxTeamSize", 5)) if (config and getattr(config, "settings_data", None)) else 5
+            min_team_size, max_team_size = config_team_limits(config.settings_data if config else None)
             if min_team_size < 1:
                 min_team_size = 3
             if max_team_size < min_team_size:
