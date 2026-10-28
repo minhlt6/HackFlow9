@@ -149,17 +149,26 @@ export const SupportTickets: React.FC = () => {
           const assignedTo = item.assigned_to ? String(item.assigned_to) : null;
           const assignedMentorId = assignedTo || (item.assignedMentorId ? String(item.assignedMentorId) : null);
 
+          const matchedTeam = teams.find((t) => t.id === teamId);
+          const matchedMember = matchedTeam?.members.find(
+            (m) => m.userId === creatorId || m.id === creatorId
+          );
+
           return {
             id,
             ticketCode: (item.ticket_code as string) || (item.ticketCode as string) || `#TCK-${id.slice(0, 6).toUpperCase()}`,
             teamId,
             teamName:
+              (item.team_name as string) ||
               (item.teamName as string) ||
-              teams.find((t) => t.id === teamId)?.name ||
+              matchedTeam?.name ||
               'Đội thi',
             creatorId,
             creatorName:
+              (item.creator_name as string) ||
               (item.creatorName as string) ||
+              matchedMember?.fullName ||
+              matchedTeam?.leaderName ||
               (creatorId === currentUser.id ? currentUser.fullName : 'Thí sinh'),
             title: (item.title as string) || '',
             description: (item.content as string) || (item.description as string) || '',
@@ -169,6 +178,7 @@ export const SupportTickets: React.FC = () => {
             status: (item.status as TicketStatus) || 'open',
             assignedMentorId: assignedMentorId || undefined,
             assignedMentorName:
+              (item.assignee_name as string) ||
               (item.assignedMentorName as string) ||
               (assignedMentorId
                 ? assignedMentorId === currentUser.id
@@ -305,33 +315,38 @@ export const SupportTickets: React.FC = () => {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(() => ticketIdParam || null);
 
   useEffect(() => {
-    if (tabParam === 'my_assigned' || tabParam === 'unassigned') {
-      setMentorScopeTab(tabParam);
-    } else if (tabParam === 'all' && isAdmin) {
-      setMentorScopeTab('all');
-    }
+    void Promise.resolve().then(() => {
+      if (tabParam === 'my_assigned' || tabParam === 'unassigned') {
+        setMentorScopeTab(tabParam);
+      } else if (tabParam === 'all' && isAdmin) {
+        setMentorScopeTab('all');
+      }
+    });
   }, [tabParam, isAdmin]);
 
   useEffect(() => {
     if (!ticketIdParam) return;
-    const matched = currentTickets.find((t) => t.id === ticketIdParam || t.ticketCode === ticketIdParam);
-    if (matched) {
-      setSelectedTicketId(matched.id);
-      if (isMentor) {
-        if (isTicketAssignedToCurrentMentor(matched) || matched.status !== 'open') {
-          setMentorScopeTab('my_assigned');
-        } else if (tabParam !== 'my_assigned') {
-          setMentorScopeTab('unassigned');
+    void Promise.resolve().then(() => {
+      const matched = currentTickets.find((t) => t.id === ticketIdParam || t.ticketCode === ticketIdParam);
+      if (matched) {
+        setSelectedTicketId(matched.id);
+        if (isMentor) {
+          if (isTicketAssignedToCurrentMentor(matched) || matched.status !== 'open') {
+            setMentorScopeTab('my_assigned');
+          } else if (tabParam !== 'my_assigned') {
+            setMentorScopeTab('unassigned');
+          }
         }
+        setMentorStatusFilter((prev) => (prev !== 'all' && prev !== matched.status ? 'all' : prev));
+      } else {
+        setSelectedTicketId(ticketIdParam);
       }
-      setMentorStatusFilter((prev) => (prev !== 'all' && prev !== matched.status ? 'all' : prev));
-    } else {
-      setSelectedTicketId(ticketIdParam);
-    }
+    });
   }, [ticketIdParam, tabParam, currentTickets, isMentor, isTicketAssignedToCurrentMentor]);
 
   const handleSelectMentorTab = (tab: 'unassigned' | 'my_assigned' | 'all') => {
     setMentorScopeTab(tab);
+    setMentorStatusFilter('all');
     setSelectedTicketId(null);
     if (searchParams.has('ticketId') || searchParams.has('tab')) {
       setSearchParams({}, { replace: true });
@@ -725,7 +740,7 @@ export const SupportTickets: React.FC = () => {
                 ) : (
                   filteredCandidateTickets.map((t) => {
                     const isSelected = t.id === activeTicket?.id;
-                    const cat = CATEGORY_LABELS[t.category || 'technical'] || CATEGORY_LABELS.technical;
+                    const cat = CATEGORY_LABELS[t.category || 'technical'] || { label: String(t.category || 'Lỗi Kỹ thuật / CI/CD'), variant: 'purple' as BadgeVariant };
                     const prio = PRIORITY_LABELS[t.priority] || PRIORITY_LABELS.normal;
                     const stat = STATUS_LABELS[t.status] || STATUS_LABELS.open;
 
@@ -798,7 +813,7 @@ export const SupportTickets: React.FC = () => {
 
                     <div className="flex flex-wrap items-center gap-2 text-xs">
                       <Badge variant={CATEGORY_LABELS[activeTicket.category || 'technical']?.variant || 'neutral'}>
-                        {CATEGORY_LABELS[activeTicket.category || 'technical']?.label || 'Chung'}
+                        {CATEGORY_LABELS[activeTicket.category || 'technical']?.label || activeTicket.category || 'Chung'}
                       </Badge>
                       <Badge variant={PRIORITY_LABELS[activeTicket.priority]?.variant || 'neutral'}>
                         Mức độ: {PRIORITY_LABELS[activeTicket.priority]?.label || activeTicket.priority}
@@ -1019,33 +1034,47 @@ export const SupportTickets: React.FC = () => {
 
             {/* Quick Filters: Status, Priority & Search */}
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-lg border border-border">
-                <span className="text-muted-foreground text-[11px]">Trạng thái:</span>
-                <select
-                  value={mentorStatusFilter}
-                  onChange={(e) => setMentorStatusFilter(e.target.value as typeof mentorStatusFilter)}
-                  className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer"
+              {mentorScopeTab === 'unassigned' ? (
+                <div
+                  className="flex items-center gap-1.5 bg-card/60 px-2.5 py-1 rounded-lg border border-border text-muted-foreground text-xs opacity-75 cursor-not-allowed select-none"
+                  title="Tab này chỉ hiển thị các yêu cầu đang Chờ tiếp nhận"
                 >
-                  <option value="all">Tất cả</option>
-                  <option value="open">Chờ nhận</option>
-                  <option value="in_progress">Đang xử lý</option>
-                  <option value="resolved">Đã giải quyết</option>
-                  <option value="closed">Đã đóng</option>
-                </select>
-              </div>
+                  <span className="text-muted-foreground text-[11px]">Trạng thái:</span>
+                  <span className="text-xs font-medium text-amber-500 flex items-center gap-1">
+                    🟡 Chờ tiếp nhận
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-lg border border-border">
+                  <span className="text-muted-foreground text-[11px]">Trạng thái:</span>
+                  <select
+                    value={mentorStatusFilter}
+                    onChange={(e) => setMentorStatusFilter(e.target.value as typeof mentorStatusFilter)}
+                    className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer [color-scheme:dark]"
+                  >
+                    <option value="all" className="bg-[#111827] text-slate-100">Tất cả</option>
+                    <option value="in_progress" className="bg-[#111827] text-slate-100">🟣 Đang xử lý (Chưa hoàn thành)</option>
+                    <option value="resolved" className="bg-[#111827] text-slate-100">🟢 Đã giải quyết (Đã phản hồi)</option>
+                    <option value="closed" className="bg-[#111827] text-slate-100">⚪ Đã đóng (Hoàn tất)</option>
+                    {isAdmin && mentorScopeTab === 'all' && (
+                      <option value="open" className="bg-[#111827] text-slate-100">🟡 Chờ nhận (Open)</option>
+                    )}
+                  </select>
+                </div>
+              )}
 
               <div className="flex items-center gap-1 bg-card px-2.5 py-1 rounded-lg border border-border">
                 <span className="text-muted-foreground text-[11px]">Ưu tiên:</span>
                 <select
                   value={mentorPriorityFilter}
                   onChange={(e) => setMentorPriorityFilter(e.target.value as typeof mentorPriorityFilter)}
-                  className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer"
+                  className="bg-transparent text-xs text-foreground focus:outline-none cursor-pointer [color-scheme:dark]"
                 >
-                  <option value="all">Tất cả mức độ</option>
-                  <option value="urgent">🔴 Khẩn cấp (Urgent)</option>
-                  <option value="high">🟠 Cao (High)</option>
-                  <option value="normal">🔵 Bình thường (Normal)</option>
-                  <option value="low">⚪ Thấp (Low)</option>
+                  <option value="all" className="bg-[#111827] text-slate-100">Tất cả mức độ</option>
+                  <option value="urgent" className="bg-[#111827] text-slate-100">🔴 Khẩn cấp (Urgent)</option>
+                  <option value="high" className="bg-[#111827] text-slate-100">🟠 Cao (High)</option>
+                  <option value="normal" className="bg-[#111827] text-slate-100">🔵 Bình thường (Normal)</option>
+                  <option value="low" className="bg-[#111827] text-slate-100">⚪ Thấp (Low)</option>
                 </select>
               </div>
 
@@ -1084,7 +1113,7 @@ export const SupportTickets: React.FC = () => {
                 ) : (
                   filteredMentorTickets.map((t) => {
                     const isSelected = t.id === activeTicket?.id;
-                    const cat = CATEGORY_LABELS[t.category || 'technical'] || CATEGORY_LABELS.technical;
+                    const cat = CATEGORY_LABELS[t.category || 'technical'] || { label: String(t.category || 'Lỗi Kỹ thuật / CI/CD'), variant: 'purple' as BadgeVariant };
                     const prio = PRIORITY_LABELS[t.priority] || PRIORITY_LABELS.normal;
                     const stat = STATUS_LABELS[t.status] || STATUS_LABELS.open;
 
@@ -1195,7 +1224,7 @@ export const SupportTickets: React.FC = () => {
                         <span>Người gửi: <strong>{activeTicket.creatorName || 'Thí sinh'}</strong></span>
                       </span>
                       <Badge variant={CATEGORY_LABELS[activeTicket.category || 'technical']?.variant || 'neutral'}>
-                        {CATEGORY_LABELS[activeTicket.category || 'technical']?.label || 'Chung'}
+                        {CATEGORY_LABELS[activeTicket.category || 'technical']?.label || activeTicket.category || 'Chung'}
                       </Badge>
                       <Badge variant={PRIORITY_LABELS[activeTicket.priority]?.variant || 'neutral'}>
                         {PRIORITY_LABELS[activeTicket.priority]?.label || activeTicket.priority}
@@ -1384,13 +1413,13 @@ export const SupportTickets: React.FC = () => {
               <select
                 value={newCategory}
                 onChange={(e) => setNewCategory(e.target.value as TicketCategory)}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground focus:outline-none focus:border-[#6366F1] cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground focus:outline-none focus:border-[#6366F1] cursor-pointer [color-scheme:dark]"
               >
-                <option value="technical">Kỹ thuật (Lỗi hệ thống / CI/CD)</option>
-                <option value="topic_clarification">Đề tài (Giải đáp yêu cầu)</option>
-                <option value="submission_issue">Nộp bài (Sự cố nộp bài)</option>
-                <option value="account_team">Đội thi (Tài khoản và Ghép đội)</option>
-                <option value="other">Khác (Vấn đề phát sinh khác)</option>
+                <option value="technical" className="bg-[#111827] text-slate-100">Kỹ thuật (Lỗi hệ thống / CI/CD)</option>
+                <option value="topic_clarification" className="bg-[#111827] text-slate-100">Đề tài (Giải đáp yêu cầu)</option>
+                <option value="submission_issue" className="bg-[#111827] text-slate-100">Nộp bài (Sự cố nộp bài)</option>
+                <option value="account_team" className="bg-[#111827] text-slate-100">Đội thi (Tài khoản và Ghép đội)</option>
+                <option value="other" className="bg-[#111827] text-slate-100">Khác (Vấn đề phát sinh khác)</option>
               </select>
             </div>
 
@@ -1401,12 +1430,12 @@ export const SupportTickets: React.FC = () => {
               <select
                 value={newPriority}
                 onChange={(e) => setNewPriority(e.target.value as TicketPriority)}
-                className="w-full px-3 py-2 text-xs rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground focus:outline-none focus:border-[#6366F1] cursor-pointer"
+                className="w-full px-3 py-2 text-xs rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground focus:outline-none focus:border-[#6366F1] cursor-pointer [color-scheme:dark]"
               >
-                <option value="urgent">🔴 Urgent (Khẩn cấp - Sự cố sát giờ nộp)</option>
-                <option value="high">🟠 High (Cao - Chặn tiến độ làm bài)</option>
-                <option value="normal">🔵 Normal (Bình thường - Cần giải đáp)</option>
-                <option value="low">⚪ Low (Thấp - Tham khảo thêm)</option>
+                <option value="urgent" className="bg-[#111827] text-slate-100">🔴 Urgent (Khẩn cấp - Sự cố sát giờ nộp)</option>
+                <option value="high" className="bg-[#111827] text-slate-100">🟠 High (Cao - Chặn tiến độ làm bài)</option>
+                <option value="normal" className="bg-[#111827] text-slate-100">🔵 Normal (Bình thường - Cần giải đáp)</option>
+                <option value="low" className="bg-[#111827] text-slate-100">⚪ Low (Thấp - Tham khảo thêm)</option>
               </select>
             </div>
           </div>

@@ -196,7 +196,11 @@ export const AdminCriteriaPage: React.FC = () => {
   const saveToBackend = async (newCriteria: RubricCriteria[], successMsg?: string) => {
     const sum = newCriteria.reduce((acc, c) => acc + c.weight, 0);
     if (sum !== 100) {
-      showAlert(`Tổng trọng số hiện tại là ${sum}%. Hệ thống yêu cầu chính xác 100% để lưu.`, 'error');
+      showAlert(
+        `Tổng trọng số hiện tại là ${sum}% (chưa đạt 100%). Vui lòng sửa lại trọng số chấm điểm cho tới khi đạt đủ 100% trước khi lưu!`,
+        'error',
+        6000
+      );
       return false;
     }
 
@@ -204,6 +208,7 @@ export const AdminCriteriaPage: React.FC = () => {
     try {
       const payload: RubricConfigurePayload = {
         name: 'HackFlow Final Rubric',
+        allow_override: true,
         criteria: newCriteria.map((c, idx) => ({
           id: c.id,
           title: c.name.trim(),
@@ -417,9 +422,9 @@ export const AdminCriteriaPage: React.FC = () => {
       setCriteriaList(updatedList);
       useMockStore.setState({ rubricCriteria: updatedList });
       showAlert(
-        `Đã thêm tiêu chí mới. Tổng trọng số hiện là ${newTotal}%. Vui lòng bấm 'Cân Bằng Tỷ Lệ' để đưa về 100% trước khi áp dụng.`,
-        'info',
-        5000
+        `Tổng trọng số hiện tại là ${newTotal}% (chưa đạt 100%). Vui lòng điều chỉnh lại trọng số các tiêu chí hoặc bấm "Cân Bằng Tỷ Lệ (100%)" cho tới khi đạt đủ 100% để lưu!`,
+        'error',
+        6000
       );
     }
   };
@@ -438,9 +443,9 @@ export const AdminCriteriaPage: React.FC = () => {
       setCriteriaList(updatedList);
       useMockStore.setState({ rubricCriteria: updatedList });
       showAlert(
-        `Đã cập nhật tiêu chí. Tổng trọng số hiện là ${newTotal}%. Vui lòng điều chỉnh về 100% để lưu lên hệ thống.`,
-        'info',
-        5000
+        `Tổng trọng số hiện tại là ${newTotal}% (chưa đạt 100%). Vui lòng sửa lại trọng số chấm điểm cho tới khi đạt đủ 100% để lưu lên hệ thống!`,
+        'error',
+        6000
       );
     }
   };

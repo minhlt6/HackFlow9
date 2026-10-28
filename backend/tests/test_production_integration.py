@@ -158,3 +158,32 @@ async def test_production_lifespan_falls_back_to_sqlite_on_gaierror(monkeypatch)
         assert calls["switched"] is True
         assert calls["count"] == 2
 
+
+@pytest.mark.asyncio
+async def test_locked_team_leader_can_update_description_and_member_skills(client):
+    async with TestSessionLocal() as session:
+        team, tokens = await setup_team_and_users(session)
+        team.is_locked = True
+        await session.commit()
+
+    leader_headers = {"Authorization": f"Bearer {tokens['leader']}"}
+    res_desc = await client.patch(
+        "/api/v1/teams/me",
+        headers=leader_headers,
+        json={"description": "Mô tả giải pháp AI mới sau khi duyệt"},
+    )
+    assert res_desc.status_code == 200
+    team_data = res_desc.json()["data"]
+    assert team_data["description"] == "Mô tả giải pháp AI mới sau khi duyệt"
+    assert len(team_data["members"]) >= 1
+    assert len(team_data["members"][0]["skills"]) >= 1
+
+    member_uid = team_data["members"][0]["user_id"]
+    res_skills = await client.patch(
+        f"/api/v1/teams/members/{member_uid}/skills",
+        headers=leader_headers,
+        json={"skills": ["AI Security", "PyTorch", "FastAPI"]},
+    )
+    assert res_skills.status_code == 200
+    updated_member = next(m for m in res_skills.json()["data"]["members"] if m["user_id"] == member_uid)
+    assert updated_member["skills"] == ["AI Security", "PyTorch", "FastAPI"]

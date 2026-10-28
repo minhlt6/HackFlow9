@@ -95,7 +95,21 @@ export const CandidateCheckpointsPage: React.FC = () => {
     fetchSubmissions(cpId);
   };
 
-  const selectedCheckpoint = checkpoints.find((cp) => cp.id === selectedCheckpointId);
+  const selectedCheckpointIndex = checkpoints.findIndex((cp) => cp.id === selectedCheckpointId);
+  const selectedCheckpoint = selectedCheckpointIndex >= 0 ? checkpoints[selectedCheckpointIndex] : undefined;
+
+  const getCheckpointStageLabel = (cp: CheckpointWithSubmission, index: number): string => {
+    const stageNumber =
+      index >= 0
+        ? index + 1
+        : cp.order ??
+          cp.checkpoint_number ??
+          (typeof cp.display_order === 'number' ? cp.display_order + 1 : 1);
+    if (cp.is_final_checkpoint) {
+      return `Chặng ${stageNumber} (Chung cuộc)`;
+    }
+    return `Chặng ${stageNumber}`;
+  };
 
   // Callback khi nộp bài thành công từ CheckpointSubmissionForm
   const handleSubmissionSuccess = (newSub: Submission) => {
@@ -174,7 +188,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
             </div>
 
             <div className="space-y-3">
-              {checkpoints.map((cp) => {
+              {checkpoints.map((cp, idx) => {
                 const isSelected = cp.id === selectedCheckpointId;
                 const hasSubmitted = !!cp.latest_submission;
                 const isFinal = Boolean(cp.is_final_checkpoint);
@@ -200,7 +214,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                       <div className="space-y-1 min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-mono font-bold text-primary">
-                            Chặng {cp.order || 1}
+                            {getCheckpointStageLabel(cp, idx)}
                           </span>
                           {getStatusBadge(cp.status)}
                           {isFinal ? (
@@ -301,7 +315,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                     <div>
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-mono uppercase tracking-wider text-primary font-bold">
-                          Chặng {selectedCheckpoint.order || 1}
+                          {getCheckpointStageLabel(selectedCheckpoint, selectedCheckpointIndex)}
                         </span>
                         {getStatusBadge(selectedCheckpoint.status)}
                         {selectedCheckpoint.is_final_checkpoint ? (

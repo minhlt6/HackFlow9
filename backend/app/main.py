@@ -381,6 +381,8 @@ async def _seed_default_accounts() -> None:
             for t_name, t_desc, inv_code, sub_idx, mem_emails, uni_name in sample_teams_spec:
                 if t_name.lower() in teams_by_name:
                     existing_t = teams_by_name[t_name.lower()]
+                    if not existing_t.description:
+                        existing_t.description = t_desc
                     if not getattr(existing_t, "admin_meta", None):
                         existing_t.admin_meta = {
                             "description": t_desc,

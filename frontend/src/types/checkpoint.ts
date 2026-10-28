@@ -47,6 +47,8 @@ export interface Checkpoint {
   is_final_checkpoint?: boolean; // HF-23: true nếu là chặng chốt sản phẩm cuối cùng (bắt buộc repo & freeze SHA), false nếu là chặng tiến độ trung gian
   grace_period_seconds?: number;
   submission_fields?: SubmissionFieldConfig[] | null;
+  display_order?: number;
+  checkpoint_number?: number;
   order?: number;
   status?: CheckpointStatus;
   is_open?: boolean;

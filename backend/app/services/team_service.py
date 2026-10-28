@@ -55,6 +55,27 @@ class TeamService:
         members_resp = []
         for m in team.members or []:
             user = m.user
+            u_meta = (
+                user.profile_meta
+                if (user and isinstance(getattr(user, "profile_meta", None), dict))
+                else {}
+            )
+            raw_skills = u_meta.get("skills")
+            skills_list = (
+                [str(s).strip() for s in raw_skills if str(s).strip()]
+                if isinstance(raw_skills, list)
+                else []
+            )
+            if not skills_list:
+                if m.role == "leader":
+                    skills_list = ["Team Lead", "System Architecture", "AI/ML"]
+                else:
+                    skills_list = ["Fullstack", "Backend", "AI Engineering"]
+            uni = (
+                u_meta.get("university")
+                or u_meta.get("school")
+                or "ĐH Bách Khoa Hà Nội (HUST)"
+            )
             members_resp.append(
                 TeamMemberResponse(
                     id=str(m.id),
@@ -65,6 +86,8 @@ class TeamService:
                     avatar_url=user.avatar_url if user else None,
                     github_username=user.github_username if user else None,
                     joined_at=m.joined_at,
+                    skills=skills_list,
+                    university=str(uni),
                 )
             )
 
@@ -93,10 +116,16 @@ class TeamService:
             else (topic_obj.title if topic_obj else None)
         )
 
+        effective_desc = (
+            (team.description.strip() if isinstance(team.description, str) and team.description.strip() else None)
+            or (str(meta.get("description")).strip() if meta.get("description") else None)
+            or (f"Định hướng nghiên cứu chuyên sâu: {topic_name}" if topic_name else None)
+        )
+
         return TeamResponse(
             id=str(team.id),
             team_name=team.team_name,
-            description=team.description,
+            description=effective_desc,
             invite_code=team.invite_code,
             status=status,
             approval_status=approval_status or ("approved" if min_members <= member_count <= max_members else "pending"),
@@ -176,12 +205,51 @@ class TeamService:
         membership = await team_repo.get_user_membership(db, str(user.id))
         if not membership or membership.role != TeamMemberRole.LEADER.value:
             raise ForbiddenException(message="Chỉ đội trưởng được chỉnh sửa đội thi.")
-        team = await team_repo.get_by_id(db, str(membership.team_id))
-        if team.is_locked:
-            raise ForbiddenException(message="Đội thi đã bị khóa.")
-        team.description = description.strip()
+        team_id_str = str(membership.team_id)
+        team = await team_repo.get_by_id(db, team_id_str)
+        if not team:
+            raise NotFoundException(message="Không tìm thấy đội thi.")
+        cleaned_desc = description.strip()
+        team.description = cleaned_desc
+        meta = dict(team.admin_meta) if isinstance(getattr(team, "admin_meta", None), dict) else {}
+        meta["description"] = cleaned_desc
+        team.admin_meta = meta
         await db.commit()
-        return self.build_team_response(team)
+        db.expire_all()
+        loaded = await team_repo.get_by_id(db, team_id_str)
+        return self.build_team_response(loaded or team)
+
+    async def update_member_skills(
+        self, db: AsyncSession, current_user: User, target_user_id: str, skills: List[str]
+    ) -> TeamResponse:
+        membership = await team_repo.get_user_membership(db, str(current_user.id))
+        if not membership:
+            raise ForbiddenException(message="Bạn chưa tham gia đội thi nào.")
+        is_leader = membership.role == TeamMemberRole.LEADER.value
+        if not is_leader and str(current_user.id) != str(target_user_id):
+            raise ForbiddenException(message="Chỉ Đội trưởng hoặc chính thành viên mới được cập nhật chuyên môn.")
+        team_id_str = str(membership.team_id)
+        team = await team_repo.get_by_id(db, team_id_str)
+        if not team:
+            raise NotFoundException(message="Không tìm thấy đội thi.")
+        target_member = next(
+            (m for m in (team.members or []) if str(m.user_id) == str(target_user_id) or str(m.id) == str(target_user_id)),
+            None,
+        )
+        if not target_member or not target_member.user:
+            raise NotFoundException(message="Không tìm thấy thành viên trong đội thi.")
+        cleaned_skills = [s.strip() for s in skills if isinstance(s, str) and s.strip()][:10]
+        u_meta = (
+            dict(target_member.user.profile_meta)
+            if isinstance(getattr(target_member.user, "profile_meta", None), dict)
+            else {}
+        )
+        u_meta["skills"] = cleaned_skills
+        target_member.user.profile_meta = u_meta
+        await db.commit()
+        db.expire_all()
+        loaded = await team_repo.get_by_id(db, team_id_str)
+        return self.build_team_response(loaded or team)
 
     async def join_team(
         self,

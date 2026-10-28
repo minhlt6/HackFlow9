@@ -40,7 +40,18 @@ export const checkpointApi = {
    */
   getCheckpoints: async (onlyActive = false): Promise<CheckpointWithSubmission[]> => {
     const response = await axiosClient.get<ApiResponse<CheckpointWithSubmission[]>>('/checkpoints', { params: { only_active: onlyActive } });
-    return response.data.data;
+    const rawList = Array.isArray(response.data.data) ? response.data.data : [];
+    return rawList.map((cp, idx) => ({
+      ...cp,
+      order:
+        typeof cp.order === 'number' && cp.order > 0
+          ? cp.order
+          : typeof cp.checkpoint_number === 'number' && cp.checkpoint_number > 0
+            ? cp.checkpoint_number
+            : typeof cp.display_order === 'number'
+              ? cp.display_order + 1
+              : idx + 1,
+    }));
   },
 
   /**

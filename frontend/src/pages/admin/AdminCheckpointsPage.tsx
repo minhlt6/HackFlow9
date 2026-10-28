@@ -922,7 +922,7 @@ export const AdminCheckpointsPage: React.FC = () => {
         ) : (
           checkpoints.map((cp, idx) => {
             const cpSubmissions = submissions.filter((s) => s.checkpointId === cp.id);
-            const approvedTeamsCount = teams.filter((t) => t.status === 'approved').length;
+            const approvedTeamsCount = teams.filter((t) => String(t.status || '').toLowerCase() === 'approved' || t.approvalStatus === 'approved').length;
             const duration = cp.durationMinutes || 180;
 
             return (

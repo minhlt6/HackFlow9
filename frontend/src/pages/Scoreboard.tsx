@@ -31,15 +31,24 @@ export const Scoreboard: React.FC = () => {
     evaluationService.getLeaderboard().then((response) => {
       if (!active) return;
       const data = response.data;
+      setError(null);
       setRows(data.leaderboard || []);
       useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: Boolean(data.is_result_published) } }));
     }).catch((err: unknown) => {
       if (!active) return;
       setRows([]);
-      setError(err instanceof Error ? err.message : 'Không thể tải bảng xếp hạng.');
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403 || !isAdmin) {
+        setError(null);
+        if (status === 403) {
+          useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: false } }));
+        }
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Error');
     });
     return () => { active = false; };
-  }, [config.resultsPublished]);
+  }, [config.resultsPublished, isAdmin]);
   const teamsWithScores = rows.map((row) => ({
     id: row.team_id, name: row.team_name, subTopicTitle: row.topic_title,
     avgScore: row.final_score, evalCount: row.eval_count, hasDiscrepancy: Boolean(row.has_discrepancy),

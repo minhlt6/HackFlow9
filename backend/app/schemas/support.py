@@ -80,8 +80,11 @@ class TicketResponse(BaseModel):
     """Schema for returning support ticket information."""
     id: str
     team_id: Optional[str] = None
+    team_name: Optional[str] = None
     user_id: str
+    creator_name: Optional[str] = None
     assigned_to: Optional[str] = None
+    assignee_name: Optional[str] = None
     title: str
     content: str
     category: Optional[str] = None

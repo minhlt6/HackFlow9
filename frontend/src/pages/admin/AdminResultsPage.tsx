@@ -191,6 +191,15 @@ export const AdminResultsPage: React.FC = () => {
       return;
     }
     useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: nextPublished } }));
+    setApiRows((prev) =>
+      prev
+        ? prev.map((r) => ({
+            ...r,
+            hasLockedEvaluations: !nextPublished ? true : r.hasLockedEvaluations,
+            hasDraftEvaluations: nextPublished ? true : false,
+          }))
+        : prev
+    );
     setAlert(
       nextPublished
         ? 'Đã công bố bảng xếp hạng chính thức cho toàn bộ thí sinh!'
@@ -448,7 +457,9 @@ export const AdminResultsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      {row.hasLockedEvaluations ? (
+                      {config.resultsPublished ? (
+                        <Badge variant="success">Đã mở khóa</Badge>
+                      ) : row.hasLockedEvaluations || (!row.hasDraftEvaluations && row.evalCount >= 0) ? (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -458,10 +469,8 @@ export const AdminResultsPage: React.FC = () => {
                           <Unlock size={13} />
                           <span>Mở khóa phiếu</span>
                         </Button>
-                      ) : row.hasDraftEvaluations ? (
-                        <Badge variant="cyan">Đã mở khóa (Nháp)</Badge>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Chưa có phiếu</span>
+                        <Badge variant="cyan">Đã mở khóa</Badge>
                       )}
                     </td>
                   </tr>

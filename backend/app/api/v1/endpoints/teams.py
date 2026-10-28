@@ -174,7 +174,22 @@ class TeamDescriptionRequest(BaseModel):
     description: str = Field(default="", max_length=2000)
 
 
+class TeamMemberSkillsRequest(BaseModel):
+    skills: list[str] = Field(default_factory=list)
+
+
 @router.patch("/me", response_model=ApiResponse[TeamResponse])
 async def update_my_team(body: TeamDescriptionRequest, db: AsyncSession = Depends(get_db), current_user: User = Depends(require_approved())):
     team = await team_service.update_description(db, current_user, body.description)
     return success_response(data=team, message="Đã cập nhật mô tả đội thi.")
+
+
+@router.patch("/members/{user_id}/skills", response_model=ApiResponse[TeamResponse])
+async def update_team_member_skills(
+    user_id: str,
+    body: TeamMemberSkillsRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_approved()),
+):
+    team = await team_service.update_member_skills(db, current_user, user_id, body.skills)
+    return success_response(data=team, message="Đã cập nhật chuyên môn thành viên.")

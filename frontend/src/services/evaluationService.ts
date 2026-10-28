@@ -14,6 +14,7 @@ export interface RubricCriterionInput {
 export interface RubricConfigurePayload {
   name?: string;
   criteria: RubricCriterionInput[];
+  allow_override?: boolean;
 }
 
 export interface EvaluationCriteriaScore {

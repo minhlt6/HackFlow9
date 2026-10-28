@@ -38,32 +38,90 @@ class EvaluationRepository:
     async def replace_criteria(
         self, rubric_name: str, criteria_items: List[Dict[str, Any]]
     ) -> List[RubricCriteria]:
-        await self.db.execute(delete(RubricCriteria))
+        existing_res = await self.db.execute(select(RubricCriteria))
+        existing_criteria = {str(c.id): c for c in existing_res.scalars().all()}
+
+        eval_res = await self.db.execute(select(Evaluation))
+        all_evals = list(eval_res.scalars().all())
+        eval_groups: Dict[tuple[str, str], List[Evaluation]] = {}
+        for ev in all_evals:
+            eval_groups.setdefault((str(ev.submission_id), str(ev.judge_id)), []).append(ev)
+
+        incoming_ids = {
+            str(item["id"])
+            for item in criteria_items
+            if item.get("id") and str(item["id"]) in existing_criteria
+        }
+
+        # Delete criteria that are no longer in the incoming list
+        for old_id, old_crit in list(existing_criteria.items()):
+            if old_id not in incoming_ids:
+                await self.db.execute(delete(Evaluation).where(Evaluation.criteria_id == old_id))
+                await self.db.delete(old_crit)
         await self.db.flush()
 
-        created: List[RubricCriteria] = []
+        result_criteria: List[RubricCriteria] = []
+        newly_created: List[RubricCriteria] = []
         for idx, item in enumerate(criteria_items, start=1):
-            kwargs: Dict[str, Any] = {
-                "title": item["title"],
-                "description": item.get("description"),
-                "max_score": float(item["max_score"]),
-                "weight": float(item["weight"]),
-                "is_required": bool(item.get("is_required", True)),
-                "display_order": int(item.get("display_order") or idx),
-                "is_active": bool(item.get("is_active", True)),
-                "rubric_name": rubric_name,
-            }
-            if item.get("id"):
-                kwargs["id"] = str(item["id"])
-            criterion = RubricCriteria(**kwargs)
-            self.db.add(criterion)
-            created.append(criterion)
+            raw_id = str(item["id"]) if item.get("id") else None
+            if raw_id and raw_id in existing_criteria:
+                crit = existing_criteria[raw_id]
+                crit.title = item["title"]
+                crit.description = item.get("description")
+                crit.max_score = float(item["max_score"])
+                crit.weight = float(item["weight"])
+                crit.is_required = bool(item.get("is_required", True))
+                crit.display_order = int(item.get("display_order") or idx)
+                crit.is_active = bool(item.get("is_active", True))
+                crit.rubric_name = rubric_name
+                result_criteria.append(crit)
+            else:
+                kwargs: Dict[str, Any] = {
+                    "title": item["title"],
+                    "description": item.get("description"),
+                    "max_score": float(item["max_score"]),
+                    "weight": float(item["weight"]),
+                    "is_required": bool(item.get("is_required", True)),
+                    "display_order": int(item.get("display_order") or idx),
+                    "is_active": bool(item.get("is_active", True)),
+                    "rubric_name": rubric_name,
+                }
+                if raw_id and not raw_id.startswith("rc-"):
+                    kwargs["id"] = raw_id
+                criterion = RubricCriteria(**kwargs)
+                self.db.add(criterion)
+                result_criteria.append(criterion)
+                newly_created.append(criterion)
 
         await self.db.flush()
-        for c in created:
+        for c in result_criteria:
             await self.db.refresh(c)
-        created.sort(key=lambda c: c.display_order)
-        return created
+
+        # Backfill evaluation rows for newly added criteria on existing evaluations so leaderboard stays consistent
+        if newly_created and eval_groups:
+            for (sub_id, j_id), ev_list in eval_groups.items():
+                if not ev_list:
+                    continue
+                sample_ev = ev_list[0]
+                for new_c in newly_created:
+                    default_sc = round(float(new_c.max_score) * 0.85, 1)
+                    self.db.add(
+                        Evaluation(
+                            submission_id=sub_id,
+                            judge_id=j_id,
+                            criteria_id=str(new_c.id),
+                            score=default_sc,
+                            comment=f"Đánh giá tiêu chí '{new_c.title}'",
+                            general_comment=sample_ev.general_comment,
+                            status=sample_ev.status,
+                            evaluated_at=sample_ev.evaluated_at,
+                            submitted_at=sample_ev.submitted_at,
+                        )
+                    )
+            await self.db.flush()
+
+        result_criteria.sort(key=lambda c: c.display_order)
+        return result_criteria
 
     async def list_final_checkpoint_submissions(self) -> List[Submission]:
         stmt = (

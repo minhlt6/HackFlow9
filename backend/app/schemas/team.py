@@ -59,6 +59,8 @@ class TeamMemberResponse(BaseModel):
     avatar_url: Optional[str] = None
     github_username: Optional[str] = None
     joined_at: datetime
+    skills: List[str] = Field(default_factory=list)
+    university: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

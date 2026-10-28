@@ -179,12 +179,16 @@ class CheckpointService:
         checkpoint: Checkpoint,
         now: Optional[datetime] = None,
         latest_submission: Optional[dict] = None,
+        order: Optional[int] = None,
     ) -> CheckpointResponse:
         info = cls.calculate_time_gate_info(checkpoint, now)
+        resolved_order = order if order is not None else (int(checkpoint.display_order or 0) + 1)
         return CheckpointResponse(
             id=str(checkpoint.id),
             weight=checkpoint.weight,
             display_order=checkpoint.display_order,
+            order=resolved_order,
+            checkpoint_number=resolved_order,
             title=checkpoint.title,
             description=checkpoint.description,
             start_time=info["start_time"],
@@ -256,9 +260,12 @@ class CheckpointService:
 
         return [
             self.build_checkpoint_response(
-                cp, now, latest_submission=submissions_by_cp.get(str(cp.id))
+                cp,
+                now,
+                latest_submission=submissions_by_cp.get(str(cp.id)),
+                order=idx + 1,
             )
-            for cp in checkpoints
+            for idx, cp in enumerate(checkpoints)
         ]
 
     async def get_checkpoint_by_id(

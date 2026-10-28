@@ -1,9 +1,20 @@
 from typing import List, Optional, Union
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.support import SupportTicket, TicketPriority, TicketStatus
+from app.models.team import TeamMember
+from app.models.user import User
 from app.schemas.support import TicketCreate, TicketUpdate
+
+TICKET_LOAD_OPTIONS = (
+    selectinload(SupportTicket.team),
+    selectinload(SupportTicket.user)
+    .selectinload(User.team_memberships)
+    .selectinload(TeamMember.team),
+    selectinload(SupportTicket.assignee),
+)
 
 
 class SupportRepository:
@@ -38,8 +49,8 @@ class SupportRepository:
         )
         db.add(ticket)
         await db.commit()
-        await db.refresh(ticket)
-        return ticket
+        reloaded = await SupportRepository.get_by_id(db, str(ticket.id))
+        return reloaded or ticket
 
     @staticmethod
     async def get_tickets_by_user_or_team(
@@ -58,6 +69,7 @@ class SupportRepository:
 
         stmt = (
             select(SupportTicket)
+            .options(*TICKET_LOAD_OPTIONS)
             .where(or_(*conditions))
             .order_by(SupportTicket.created_at.desc())
         )
@@ -77,7 +89,7 @@ class SupportRepository:
         """
         Filter tickets by status, priority, category, assigned_to with pagination.
         """
-        stmt = select(SupportTicket)
+        stmt = select(SupportTicket).options(*TICKET_LOAD_OPTIONS)
         if status is not None:
             status_val = status.value if hasattr(status, "value") else str(status)
             stmt = stmt.where(SupportTicket.status == status_val)
@@ -101,7 +113,11 @@ class SupportRepository:
         """
         Get a support ticket by its UUID primary key.
         """
-        stmt = select(SupportTicket).where(SupportTicket.id == ticket_id)
+        stmt = (
+            select(SupportTicket)
+            .options(*TICKET_LOAD_OPTIONS)
+            .where(SupportTicket.id == ticket_id)
+        )
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
@@ -127,8 +143,8 @@ class SupportRepository:
 
         db.add(db_obj)
         await db.commit()
-        await db.refresh(db_obj)
-        return db_obj
+        reloaded = await SupportRepository.get_by_id(db, str(db_obj.id))
+        return reloaded or db_obj
 
 
 support_repo = SupportRepository()

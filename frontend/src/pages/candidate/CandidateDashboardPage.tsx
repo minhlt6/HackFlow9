@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { CountdownTimer } from '../../components/common/CountdownTimer';
 import { StatCard } from '../../components/common/StatCard';
@@ -22,8 +22,20 @@ export const CandidateDashboardPage: React.FC = () => {
     useMockStore();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    void useMockStore.getState().syncFromBackend?.();
+  }, []);
+
   // Find candidate's team
   const myTeam = teams.find((t) => t.id === currentUser.teamId);
+  const isTeamApproved = Boolean(
+    myTeam &&
+      (myTeam.approvalStatus === 'approved' ||
+        String(myTeam.status || '').toLowerCase() === 'approved' ||
+        String(myTeam.status || '').toLowerCase() === 'valid' ||
+        String(myTeam.status || '').toLowerCase() === 'locked' ||
+        Boolean(myTeam.subTopicId)),
+  );
 
   // Find selected topic details
   let selectedTopicTitle = 'Chưa đăng ký đề tài';
@@ -144,8 +156,12 @@ export const CandidateDashboardPage: React.FC = () => {
 
         <StatCard
           title="Trạng thái Đội thi"
-          value={myTeam?.status === 'approved' ? 'Hợp lệ' : 'Đang duyệt'}
-          subtitle="Được phép dự thi và nộp mã nguồn"
+          value={isTeamApproved ? 'Hợp lệ' : 'Đang duyệt'}
+          subtitle={
+            isTeamApproved
+              ? 'Được phép dự thi và nộp mã nguồn'
+              : 'Đang chờ Ban Tổ Chức xét duyệt'
+          }
           icon={<ShieldCheck size={24} />}
           iconColor="purple"
           onClick={() => navigate('/teams')}
@@ -171,7 +187,8 @@ export const CandidateDashboardPage: React.FC = () => {
             <div className="space-y-2">
               <h4 className="text-base font-bold text-foreground">{selectedTopicTitle}</h4>
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Đề tài áp dụng các thuật toán Trí tuệ nhân tạo để giải quyết bài toán thực tế. Đội thi cần nộp mã nguồn và tài liệu qua từng chặng thi.
+                {myTeam?.description?.trim() ||
+                  'Đề tài áp dụng các thuật toán Trí tuệ nhân tạo để giải quyết bài toán thực tế. Đội thi cần nộp mã nguồn và tài liệu qua từng chặng thi.'}
               </p>
             </div>
 

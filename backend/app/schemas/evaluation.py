@@ -27,6 +27,7 @@ class RubricConfigureRequest(BaseModel):
     """Request schema for POST /api/v1/rubrics (Admin only)."""
     name: str = Field(default="HackFlow Final Rubric", min_length=1, max_length=128)
     criteria: List[RubricCriterionInput] = Field(default_factory=list)
+    allow_override: bool = Field(default=False)
 
 
 class RubricCriteriaResponse(BaseModel):

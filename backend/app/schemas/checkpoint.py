@@ -86,6 +86,8 @@ class CheckpointValidateWindowRequest(BaseModel):
 class CheckpointResponse(BaseModel):
     weight: float = 0
     display_order: int = 0
+    order: int = 1
+    checkpoint_number: int = 1
     id: str
     title: str
     description: Optional[str] = None

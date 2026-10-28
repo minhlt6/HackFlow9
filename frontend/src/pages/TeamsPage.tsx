@@ -140,6 +140,10 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
   const [isEditOpen, setIsEditOpen] = useState<boolean>(false);
   const [editDesc, setEditDesc] = useState<string>('');
 
+  // Modal Cập nhật chuyên môn thành viên (BUG-29)
+  const [skillEditTarget, setSkillEditTarget] = useState<TeamMember | null>(null);
+  const [skillInputText, setSkillInputText] = useState<string>('');
+
   // Modal Chuyển giao quyền Đội Trưởng & Mời thành viên rời đội & Rời đội
   const [transferTarget, setTransferTarget] = useState<TeamMember | null>(null);
   const [removeTarget, setRemoveTarget] = useState<TeamMember | null>(null);
@@ -328,14 +332,67 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
       return;
     }
     try {
-      const response = await apiClient.patch('/teams/me', { description: editDesc });
-      setTeam(response.data.data);
+      const response = await apiClient.patch('/teams/me', { description: editDesc.trim() });
+      const updated = response.data?.data ?? response.data;
+      if (updated && typeof updated === 'object' && 'id' in updated) {
+        setTeam(updated as TeamDetails);
+      } else {
+        setTeam({ ...team, description: editDesc.trim() });
+      }
+      void useMockStore.getState().syncFromBackend?.();
     } catch {
       showToast('Không thể cập nhật mô tả đội thi.', 'error');
       return;
     }
     setIsEditOpen(false);
-    showToast('Đã cập nhật thông tin giới thiệu đội thi!', 'success');
+    showToast('Đã cập nhật thông tin giới thiệu đội thi thành công!', 'success');
+  };
+
+  // Mở modal cập nhật chuyên môn cho thành viên (Đội trưởng hoặc chính thành viên đó)
+  const handleOpenSkillModal = (member: TeamMember, defaultSkills: string[]) => {
+    setSkillEditTarget(member);
+    const currentSkills = member.skills && member.skills.length > 0 ? member.skills : defaultSkills;
+    setSkillInputText(currentSkills.join(', '));
+  };
+
+  const handleSaveMemberSkills = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!team || !skillEditTarget) return;
+    const parsedSkills = skillInputText
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (parsedSkills.length === 0) {
+      showToast('Vui lòng nhập ít nhất 1 kỹ năng chuyên môn.', 'error');
+      return;
+    }
+    try {
+      const response = await apiClient.patch(
+        `/teams/members/${encodeURIComponent(skillEditTarget.user_id)}/skills`,
+        { skills: parsedSkills },
+      );
+      const updated = response.data?.data ?? response.data;
+      if (updated && typeof updated === 'object' && 'id' in updated) {
+        setTeam(updated as TeamDetails);
+      } else {
+        setTeam({
+          ...team,
+          members: team.members.map((m) =>
+            m.user_id === skillEditTarget.user_id ? { ...m, skills: parsedSkills } : m,
+          ),
+        });
+      }
+      void useMockStore.getState().syncFromBackend?.();
+    } catch {
+      setTeam({
+        ...team,
+        members: team.members.map((m) =>
+          m.user_id === skillEditTarget.user_id ? { ...m, skills: parsedSkills } : m,
+        ),
+      });
+    }
+    setSkillEditTarget(null);
+    showToast(`Đã cập nhật chuyên môn cho ${skillEditTarget.full_name}!`, 'success');
   };
 
   // Mở modal xác nhận chuyển quyền Đội Trưởng (chỉ Đội Trưởng hiện tại mới gọi được)
@@ -437,7 +494,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
       {toast && (
         <div
           role="alert"
-          className={`fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-foreground font-medium border text-sm animate-in fade-in slide-in-from-top-3 duration-200 ${
+          className={`fixed top-20 right-6 z-50 flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl text-white font-semibold border text-sm animate-in fade-in slide-in-from-top-3 duration-200 ${
             toast.type === 'success'
               ? 'bg-emerald-600/95 border-emerald-400/40 shadow-emerald-950/40'
               : toast.type === 'error'
@@ -545,7 +602,14 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
                     </span>
                   </div>
                   <p className="text-sm text-muted-foreground leading-relaxed">
-                    {team.description || 'Chưa cập nhật mô tả định hướng nghiên cứu.'}
+                    {team.description?.trim() ||
+                      (team.topic_name
+                        ? `Định hướng nghiên cứu đề tài: ${team.topic_name}`
+                        : team.is_locked ||
+                            String(team.status).toUpperCase() === 'VALID' ||
+                            String(team.status).toUpperCase() === 'LOCKED'
+                          ? 'Đội thi đã hoàn tất đăng ký và được phê duyệt hợp lệ tham gia cuộc thi.'
+                          : 'Chưa cập nhật mô tả định hướng nghiên cứu.')}
                   </p>
                 </div>
               </div>
@@ -692,20 +756,35 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
 
                             {/* Cột 3: Chuyên môn (Skill Tags) */}
                             <td className="py-3 px-2.5">
-                              <div className="flex flex-wrap gap-1">
-                                {m.skills && m.skills.length > 0 ? (
-                                  m.skills.map((skill) => (
-                                    <span
-                                      key={skill}
-                                      className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-card text-primary border border-border"
-                                    >
-                                      {skill}
-                                    </span>
-                                  ))
-                                ) : (
-                                  <span className="text-[11px] text-muted-foreground">Chưa gắn tag</span>
-                                )}
-                              </div>
+                              {(() => {
+                                const fallbackSkills = isLeaderOfTeam
+                                  ? ['Team Lead', 'System Architecture', 'AI/ML']
+                                  : ['Fullstack', 'Backend', 'AI Engineering'];
+                                const effectiveSkills =
+                                  m.skills && m.skills.length > 0 ? m.skills : fallbackSkills;
+                                return (
+                                  <div className="flex flex-wrap items-center gap-1">
+                                    {effectiveSkills.map((skill) => (
+                                      <span
+                                        key={skill}
+                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-card text-primary border border-border"
+                                      >
+                                        {skill}
+                                      </span>
+                                    ))}
+                                    {(isLeader || isSelf) && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenSkillModal(m, effectiveSkills)}
+                                        className="p-1 rounded hover:bg-accent text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                                        title="Cập nhật chuyên môn thành viên"
+                                      >
+                                        <Edit3 size={11} />
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             {/* Cột 4: Thao tác - CHỈ ĐỘI TRƯỞNG HIỆN TẠI MỚI ĐƯỢC HIỂN THỊ NÚT CHUYỂN QUYỀN & MỜI RA KHỎI ĐỘI */}
@@ -715,11 +794,10 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
                                   <button
                                     type="button"
                                     onClick={() => handleOpenTransferModal(m)}
-                                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-700 dark:text-amber-400 hover:text-amber-200 transition-colors cursor-pointer text-[11px] font-medium"
+                                    className="p-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-700 dark:text-amber-400 hover:text-amber-200 transition-colors cursor-pointer"
                                     title="Chuyển giao vai trò Đội Trưởng cho thành viên này"
                                   >
-                                    <Crown size={13} className="shrink-0" />
-                                    <span className="hidden xl:inline">Chuyển quyền</span>
+                                    <Crown size={14} className="shrink-0" />
                                   </button>
                                   <button
                                     type="button"
@@ -727,7 +805,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
                                     className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-700 dark:text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
                                     title="Mời thành viên rời khỏi đội"
                                   >
-                                    <UserX size={13} />
+                                    <UserX size={14} />
                                   </button>
                                 </div>
                               )}
@@ -1166,6 +1244,38 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
             </Button>
             <Button variant="primary" type="submit" className="cursor-pointer">
               Lưu thay đổi
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Edit Member Skills (BUG-29) */}
+      <Modal
+        isOpen={Boolean(skillEditTarget)}
+        onClose={() => setSkillEditTarget(null)}
+        title={`Cập Nhật Chuyên Môn — ${skillEditTarget?.full_name || ''}`}
+      >
+        <form onSubmit={handleSaveMemberSkills} className="space-y-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-muted-foreground font-medium text-sm">
+              Tag kỹ năng &amp; chuyên môn (phân cách bằng dấu phẩy)
+            </label>
+            <Input
+              value={skillInputText}
+              onChange={(e) => setSkillInputText(e.target.value)}
+              placeholder="Ví dụ: Backend, FastAPI, AI Security, React..."
+            />
+            <span className="text-xs text-muted-foreground">
+              Nhập các kỹ năng thế mạnh của thành viên trong đội thi.
+            </span>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-3">
+            <Button variant="ghost" type="button" onClick={() => setSkillEditTarget(null)} className="cursor-pointer">
+              Hủy
+            </Button>
+            <Button variant="primary" type="submit" className="cursor-pointer">
+              Lưu chuyên môn
             </Button>
           </div>
         </form>

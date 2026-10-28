@@ -776,7 +776,7 @@ export const useMockStore = create<MockStoreState>()(
 
       approveTeamRegistration: (teamId) => {
         set((state) => ({
-          teams: state.teams.map((t) => (t.id === teamId ? { ...t, status: 'APPROVED' } : t)),
+          teams: state.teams.map((t) => (t.id === teamId ? { ...t, status: 'approved', approvalStatus: 'approved' } : t)),
         }));
       },
 
@@ -1692,7 +1692,7 @@ export const useMockStore = create<MockStoreState>()(
           const cpArr = unwrap(checkpointsRes.value.data);
           if (Array.isArray(cpArr)) {
             const now = Date.now();
-            updates.checkpoints = (cpArr as Array<Record<string, unknown>>).map((cp) => {
+            updates.checkpoints = (cpArr as Array<Record<string, unknown>>).map((cp, idx) => {
               const deadlineStr = String(cp.deadline ?? new Date().toISOString());
               const startStr = String(cp.start_time ?? deadlineStr);
               const deadlineMs = new Date(deadlineStr).getTime();
@@ -1703,7 +1703,11 @@ export const useMockStore = create<MockStoreState>()(
 
               return {
                 id: String(cp.id),
-                checkpointNumber: Number(cp.checkpoint_number ?? 1),
+                checkpointNumber: Number(
+                  cp.checkpoint_number ??
+                    cp.order ??
+                    (typeof cp.display_order === 'number' ? Number(cp.display_order) + 1 : idx + 1)
+                ),
                 isFinalCheckpoint: Boolean(cp.is_final_checkpoint),
                 title: String(cp.title ?? ''),
                 description: String(cp.description ?? ''),
@@ -1780,14 +1784,14 @@ export const useMockStore = create<MockStoreState>()(
               const rawStatus = String(rawApproval || t.status || 'approved').toLowerCase();
               const status: Team['status'] =
                 rawStatus === 'rejected'
-                  ? 'REJECTED'
-                  : rawStatus === 'approved' || rawStatus === 'valid'
-                    ? 'APPROVED'
+                  ? 'rejected'
+                  : rawStatus === 'approved' || rawStatus === 'valid' || rawStatus === 'locked'
+                    ? 'approved'
                     : 'pending';
               const approvalStatus: Team['approvalStatus'] =
                 rawStatus === 'rejected'
                   ? 'rejected'
-                  : rawStatus === 'approved' || rawStatus === 'valid'
+                  : rawStatus === 'approved' || rawStatus === 'valid' || rawStatus === 'locked'
                     ? 'approved'
                     : 'pending';
               const resolvedSubOrTopicId =
@@ -1850,15 +1854,34 @@ export const useMockStore = create<MockStoreState>()(
               ? (tkRaw as { items: unknown[] }).items
               : null;
           if (Array.isArray(tkArr)) {
-            updates.tickets = (tkArr as Array<Record<string, unknown>>).map((tk, idx) => ({
+            const knownTeams = updates.teams || get().teams;
+            updates.tickets = (tkArr as Array<Record<string, unknown>>).map((tk, idx) => {
+              const teamId = String(tk.team_id ?? tk.teamId ?? '');
+              const creatorId = String(tk.created_by ?? tk.user_id ?? tk.creatorId ?? '');
+              const matchedTeam = knownTeams.find((t) => t.id === teamId);
+              const matchedMember = matchedTeam?.members.find(
+                (m) => m.userId === creatorId || m.id === creatorId
+              );
+              const resolvedTeamName = String(
+                tk.team_name ?? tk.teamName ?? matchedTeam?.name ?? 'Đội thi'
+              );
+              const resolvedCreatorName = String(
+                tk.creator_name ??
+                  tk.creatorName ??
+                  tk.sender_name ??
+                  matchedMember?.fullName ??
+                  matchedTeam?.leaderName ??
+                  'Thí sinh'
+              );
+              return {
               id: String(tk.id),
               ticketCode: String(tk.ticket_code ?? `TK-${String(idx + 1).padStart(2, '0')}`),
-              teamId: String(tk.team_id ?? ''),
-              teamName: String(tk.team_name ?? 'Đội thi'),
-              creatorId: String(tk.created_by ?? tk.user_id ?? ''),
-              creatorName: String(tk.creator_name ?? tk.sender_name ?? 'Thí sinh'),
-              senderId: String(tk.created_by ?? tk.user_id ?? ''),
-              senderName: String(tk.creator_name ?? tk.sender_name ?? 'Thí sinh'),
+              teamId,
+              teamName: resolvedTeamName,
+              creatorId,
+              creatorName: resolvedCreatorName,
+              senderId: creatorId,
+              senderName: resolvedCreatorName,
               title: String(tk.title ?? ''),
               description: String(tk.description ?? tk.content ?? ''),
               content: String(tk.description ?? tk.content ?? ''),
@@ -1891,7 +1914,8 @@ export const useMockStore = create<MockStoreState>()(
                     sentAt: String(m.sentAt ?? m.created_at ?? new Date().toISOString()),
                   }))
                 : [],
-            }));
+              };
+            });
           }
         }
 

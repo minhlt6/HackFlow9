@@ -57,3 +57,31 @@ class SupportTicket(BaseModel):
     assignee: Mapped[Optional["User"]] = relationship(
         foreign_keys=[assigned_to], back_populates="assigned_tickets"
     )
+
+    @property
+    def team_name(self) -> Optional[str]:
+        team_obj = self.__dict__.get("team")
+        if team_obj and getattr(team_obj, "team_name", None):
+            return team_obj.team_name
+        user_obj = self.__dict__.get("user")
+        if user_obj:
+            memberships = user_obj.__dict__.get("team_memberships") or []
+            for tm in memberships:
+                tm_team = tm.__dict__.get("team")
+                if tm_team and getattr(tm_team, "team_name", None):
+                    return tm_team.team_name
+        return None
+
+    @property
+    def creator_name(self) -> Optional[str]:
+        user_obj = self.__dict__.get("user")
+        if user_obj:
+            return user_obj.full_name or user_obj.github_username or user_obj.email
+        return None
+
+    @property
+    def assignee_name(self) -> Optional[str]:
+        assignee_obj = self.__dict__.get("assignee")
+        if assignee_obj:
+            return assignee_obj.full_name or assignee_obj.github_username or assignee_obj.email
+        return None

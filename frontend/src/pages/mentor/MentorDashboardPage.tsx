@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { StatCard } from '../../components/common/StatCard';
 import { Button } from '../../components/Button';
-import { Badge } from '../../components/Badge';
+import { Badge, type BadgeVariant } from '../../components/Badge';
 import { useNavigate } from 'react-router-dom';
 import { InitialRoleTodoBanner } from '../../components/common/InitialRoleTodoBanner';
 import { ticketService } from '../../services/ticketService';
@@ -12,6 +12,19 @@ import {
   ArrowRight,
   MessageSquare,
 } from 'lucide-react';
+
+const CATEGORY_META: Record<string, { label: string; variant: BadgeVariant }> = {
+  technical: { label: 'Lỗi Kỹ thuật / CI/CD', variant: 'purple' },
+  topic_clarification: { label: 'Giải đáp Đề tài', variant: 'cyan' },
+  submission_issue: { label: 'Vấn đề Nộp bài', variant: 'warning' },
+  account_team: { label: 'Tài khoản và Đội thi', variant: 'indigo' },
+  other: { label: 'Vấn đề khác', variant: 'neutral' },
+};
+
+const getTicketCategoryBadge = (category?: string): { label: string; variant: BadgeVariant } => {
+  if (!category) return CATEGORY_META.technical;
+  return CATEGORY_META[category] || { label: category, variant: 'purple' };
+};
 
 export const MentorDashboardPage: React.FC = () => {
   const { currentUser, tickets, teams, syncFromBackend } = useMockStore();
@@ -137,35 +150,56 @@ export const MentorDashboardPage: React.FC = () => {
         </div>
 
         <div className="space-y-3">
-          {openTickets.map((t) => (
-            <div
-              key={t.id}
-              className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-foreground text-sm">{t.title}</span>
-                  <Badge variant={t.priority === 'high' ? 'danger' : 'warning'}>
-                    {t.priority.toUpperCase()}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{t.description}</p>
-                <div className="text-[11px] text-primary mt-1">
-                  Đội thi: {t.teamName} • Người tạo: {t.creatorName}
-                </div>
-              </div>
+          {openTickets.map((t) => {
+            const catBadge = getTicketCategoryBadge(t.category);
+            const matchedTeam = t.teamId ? teams.find((team) => team.id === t.teamId) : undefined;
+            const matchedMember =
+              t.creatorId && matchedTeam
+                ? matchedTeam.members.find((m) => m.userId === t.creatorId || m.id === t.creatorId)
+                : undefined;
+            const resolvedTeamName =
+              t.teamName && t.teamName !== 'Đội thi'
+                ? t.teamName
+                : matchedTeam?.name || t.teamName || 'Đội thi';
+            const resolvedCreatorName =
+              t.creatorName && t.creatorName !== 'Thí sinh'
+                ? t.creatorName
+                : matchedMember?.fullName || matchedTeam?.leaderName || t.creatorName || 'Thí sinh';
 
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => void handleProcessTicket(t)}
-                className="gap-1.5 shrink-0"
+            return (
+              <div
+                key={t.id}
+                className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
               >
-                <span>Vào xử lý</span>
-                <ArrowRight size={13} />
-              </Button>
-            </div>
-          ))}
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-foreground text-sm">{t.title}</span>
+                    <Badge variant={catBadge.variant} size="sm">
+                      {catBadge.label}
+                    </Badge>
+                    <Badge variant={t.priority === 'high' || t.priority === 'urgent' ? 'danger' : 'warning'} size="sm">
+                      {t.priority.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{t.description}</p>
+                  <div className="text-[11px] text-primary mt-1 font-medium">
+                    Đội thi: <span className="font-semibold text-foreground">{resolvedTeamName}</span> • Người tạo:{' '}
+                    <span className="font-semibold text-foreground">{resolvedCreatorName}</span>
+                  </div>
+                </div>
+
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={() => void handleProcessTicket(t)}
+                  className="gap-1.5 shrink-0"
+                >
+                  <span>Vào xử lý</span>
+                  <ArrowRight size={13} />
+                </Button>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
