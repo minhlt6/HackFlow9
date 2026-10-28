@@ -95,6 +95,13 @@ async def _seed_default_accounts() -> None:
             await session.execute(select(User).where(User.email == "admin@demo.example.com"))
         ).scalar_one_or_none()
         if rehearsal_admin is not None:
+            if rehearsal_admin.hashed_password != default_pw_hash:
+                demo_users = (
+                    await session.execute(select(User).where(User.email.like("%@demo.example.com")))
+                ).scalars().all()
+                for u_demo in demo_users:
+                    u_demo.hashed_password = default_pw_hash
+                await session.commit()
             return
 
         for email, full_name, role, approval_status, gh_user in default_users:
