@@ -123,7 +123,7 @@ export interface CheckpointSubmission {
   isAfterDeadline?: boolean;
   score?: number;
   penaltyApplied?: number;
-  status?: 'submitted' | 'late' | 'reviewed';
+  status?: import('./checkpoint').SubmissionStatus | 'reviewed';
 }
 
 export interface Checkpoint {

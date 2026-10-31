@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import apiClient from '../api/axiosClient';
 import { notificationsApi } from '../api/notificationsApi';
+import { ticketService } from '../services/ticketService';
 import { useAuthStore } from './useAuthStore';
 import type {
   User,
@@ -1444,7 +1445,7 @@ export const useMockStore = create<MockStoreState>()(
           notificationsApi.listAllAnnouncements().then((items) => ({ data: { data: items } })),
           roleNow === 'judge' ? Promise.resolve({ data: null }) : apiClient.get('/teams'),
           roleNow === 'admin' || roleNow === 'mentor'
-            ? apiClient.get('/tickets')
+            ? ticketService.getAllTickets().then((data) => ({ data }))
             : (roleNow === 'candidate' || roleNow === 'leader' || roleNow === 'member') &&
                 approvalNow === 'approved'
               ? apiClient.get('/tickets/me')
@@ -1753,7 +1754,7 @@ export const useMockStore = create<MockStoreState>()(
                 commitSha,
                 submittedAt,
                 isAfterDeadline: Boolean(raw.grace_period_applied),
-                status: 'submitted',
+                status: String(raw.status || 'invalid').toLowerCase() as CheckpointSubmission['status'],
               });
 
               if ((updates.checkpoints || get().checkpoints).some((cp) => cp.id === cpId && cp.isFinalCheckpoint) && raw.status === 'submitted') {

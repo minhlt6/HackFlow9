@@ -47,7 +47,7 @@ export const extractApiErrorMessage = (error: unknown, defaultMsg: string): stri
         return 'Bạn chưa tham gia đội thi nào hoặc không có quyền thao tác trên đội thi này.';
       }
       if (resData.error_code === 'TOPIC_SELECTION_CLOSED') {
-        return 'Thời gian đăng ký chọn đề tài đã đóng hoặc chưa bắt đầu.';
+        return resData.message || 'Thời gian đăng ký chọn đề tài đã đóng hoặc chưa bắt đầu.';
       }
       if (resData.message) {
         return resData.message;

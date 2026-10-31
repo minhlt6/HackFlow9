@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import React, { useEffect, useState, useRef } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { toast } from '../../store/useToastStore';
@@ -32,6 +33,7 @@ import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDial
 import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
 
 export const AdminConfigPage: React.FC = () => {
+  const { confirm, confirmationDialog } = useActionConfirmation();
   const {
     config,
     updateConfig,
@@ -119,12 +121,14 @@ export const AdminConfigPage: React.FC = () => {
 
   const blocker = useUnsavedChangesWarning(isDirty);
 
-  const saveConfig = async (): Promise<boolean> => {
+  const saveConfig = async (alreadyConfirmed = false): Promise<boolean> => {
     if (savingRef.current || isLoading || !hasLoaded) return false;
     if (!Number.isInteger(minTeamMembers) || minTeamMembers < 1 || !Number.isInteger(maxTeamMembers) || minTeamMembers > maxTeamMembers) {
       toast.error('Số lượng thành viên phải là số nguyên dương và tối thiểu không vượt quá tối đa.');
       return false;
     }
+    if (isDirty && !alreadyConfirmed && !await confirm({title: 'Áp dụng thay đổi cấu hình cuộc thi?',
+      description: `Tên: ${baseline.name} → ${name}. Giai đoạn: ${baseline.currentPhase} → ${currentPhase}. Số thành viên: ${baseline.minTeamMembers}–${baseline.maxTeamMembers} → ${minTeamMembers}–${maxTeamMembers}. Hạn cuối: ${baseline.finalDeadline} → ${finalDeadline}. Thay đổi có hiệu lực ngay sau khi lưu.`, confirmLabel: 'Xác nhận lưu cấu hình'})) return false;
     savingRef.current = true;
     setIsSaving(true);
     setAlert(null);
@@ -152,7 +156,7 @@ export const AdminConfigPage: React.FC = () => {
   };
 
   const handleSaveAndLeave = async () => {
-    if (await saveConfig()) blocker.proceed?.();
+    if (await saveConfig(true)) blocker.proceed?.();
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -179,6 +183,7 @@ export const AdminConfigPage: React.FC = () => {
 
   return (
     <div className="space-y-6  w-full pb-10">
+      {confirmationDialog}
       {/* Top Header & Overview Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>

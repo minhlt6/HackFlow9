@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import axios from 'axios';
 import {
   Lightbulb,
   CheckCircle2,
@@ -23,6 +24,7 @@ import { teamsApi } from '../api/teamsApi';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMockStore } from '../store/useMockStore';
 import type { Topic, Subtopic } from '../types/topic';
+import { topicUnavailableReason } from '../utils/topicAvailability';
 import type { TeamDetails } from '../types/team';
 
 type FilterTab = 'all' | 'available' | 'full' | 'selected';
@@ -213,7 +215,7 @@ export const TopicsPage: React.FC = () => {
         return t.id === currentSelectedTopicId;
       }
       if (filterTab === 'available') {
-        return t.remaining_slots > 0;
+        return !topicUnavailableReason(t);
       }
       if (filterTab === 'full') {
         return t.remaining_slots === 0;
@@ -230,11 +232,12 @@ export const TopicsPage: React.FC = () => {
 
   // Action: Open Select Modal
   const handleOpenSelectModal = (topic: Topic) => {
+    if (topicUnavailableReason(topic)) return;
     setSelectError(null);
     setSelectedTopicToRegister(topic);
     // Default to first subtopic if available
     if (topic.subtopics && topic.subtopics.length > 0) {
-      setSelectedSubtopicId(topic.subtopics[0].id);
+      setSelectedSubtopicId(topic.subtopics.find((sub) => !topicUnavailableReason(topic, sub))?.id || '');
     } else {
       setSelectedSubtopicId('');
     }
@@ -243,6 +246,12 @@ export const TopicsPage: React.FC = () => {
   // Action: Confirm Select Topic
   const handleConfirmSelect = async () => {
     if (!selectedTopicToRegister) return;
+    const chosenSubtopic = selectedTopicToRegister.subtopics.find((sub) => sub.id === selectedSubtopicId);
+    const unavailable = topicUnavailableReason(selectedTopicToRegister, chosenSubtopic);
+    if (unavailable || (selectedTopicToRegister.subtopics.length > 0 && !chosenSubtopic)) {
+      setSelectError(unavailable || 'Vui lòng chọn đề tài nhánh còn mở đăng ký.');
+      return;
+    }
     if (!isLeader) {
       setSelectError('Chỉ Đội trưởng (Team Leader) mới có quyền đăng ký hoặc hủy chọn đề tài.');
       return;
@@ -303,7 +312,13 @@ export const TopicsPage: React.FC = () => {
         err,
         'Không thể đăng ký đề tài. Vui lòng kiểm tra lại điều kiện đội thi hoặc quota!'
       );
-      setSelectError(errorMsg);
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        setSelectedTopicToRegister(null);
+        await loadData();
+        showToast(errorMsg, 'error');
+      } else {
+        setSelectError(errorMsg);
+      }
     } finally {
       setIsSubmittingSelect(false);
     }
@@ -541,7 +556,7 @@ export const TopicsPage: React.FC = () => {
                 : 'text-muted-foreground hover:text-foreground hover:bg-accent'
             }`}
           >
-            Còn Slot ({topics.filter((t) => t.remaining_slots > 0).length})
+            Có thể đăng ký ({topics.filter((t) => !topicUnavailableReason(t)).length})
           </button>
           <button
             type="button"
@@ -632,6 +647,7 @@ export const TopicsPage: React.FC = () => {
           {filteredTopics.map((topic) => {
             const isSelected = topic.id === currentSelectedTopicId;
             const isFull = topic.remaining_slots <= 0;
+            const unavailableReason = topicUnavailableReason(topic);
             const quotaPercent = Math.min(
               100,
               Math.round((topic.current_teams / topic.max_teams) * 100)
@@ -654,8 +670,8 @@ export const TopicsPage: React.FC = () => {
                 className={`flex flex-col justify-between rounded-2xl transition-all duration-200 relative overflow-hidden ${
                   isSelected
                     ? 'border-[#6366F1] bg-primary/5 dark:bg-indigo-950/30 shadow-lg shadow-[#6366F1]/10'
-                    : isFull
-                    ? 'border-border bg-muted/40 dark:bg-slate-900/60 opacity-90'
+                    : unavailableReason
+                    ? 'border-border bg-muted/40 dark:bg-slate-900/60 opacity-60'
                     : 'border-border bg-muted/40 dark:bg-slate-900/60 hover:border-[#6366F1]/40'
                 }`}
               >
@@ -740,7 +756,8 @@ export const TopicsPage: React.FC = () => {
                           {topic.subtopics.map((sub: Subtopic) => (
                             <div
                               key={sub.id}
-                              className="p-2.5 rounded-lg bg-card border border-border text-xs space-y-1"
+                              aria-disabled={Boolean(topicUnavailableReason(topic, sub))}
+                              className={`p-2.5 rounded-lg bg-card border border-border text-xs space-y-1 ${topicUnavailableReason(topic, sub) ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
                               <div className="flex items-center justify-between gap-1">
                                 <span className="font-medium text-foreground truncate">
@@ -750,6 +767,7 @@ export const TopicsPage: React.FC = () => {
                                   {sub.current_teams}/{sub.max_teams}
                                 </span>
                               </div>
+                              {topicUnavailableReason(topic, sub) && <p>{topicUnavailableReason(topic, sub)}</p>}
                               {sub.description && (
                                 <p className="text-[11px] text-muted-foreground line-clamp-2">
                                   {sub.description}
@@ -781,14 +799,14 @@ export const TopicsPage: React.FC = () => {
                         Đội của bạn đã chọn đề tài này
                       </div>
                     )
-                  ) : isFull ? (
+                  ) : unavailableReason ? (
                     <Button
                       variant="secondary"
                       size="sm"
                       disabled
                       className="w-full py-2 opacity-50 cursor-not-allowed"
                     >
-                      <span>Hết suất đăng ký (Full)</span>
+                      <span>{unavailableReason}</span>
                     </Button>
                   ) : currentSelectedTopicId ? (
                     <Button
@@ -899,7 +917,8 @@ export const TopicsPage: React.FC = () => {
                   </label>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {selectedTopicToRegister.subtopics.map((sub: Subtopic) => {
-                      const isSubFull = sub.remaining_slots <= 0;
+                      const unavailable = topicUnavailableReason(selectedTopicToRegister, sub);
+                      const isSubFull = Boolean(unavailable);
                       const isSubChecked = selectedSubtopicId === sub.id;
 
                       return (
@@ -923,6 +942,7 @@ export const TopicsPage: React.FC = () => {
                             className="mt-1 text-[#6366F1] focus:ring-[#6366F1]"
                           />
                           <div className="flex-1 min-w-0">
+                            {unavailable && <p className="text-xs text-muted-foreground">{unavailable}</p>}
                             <div className="flex items-center justify-between gap-1">
                               <p className="text-xs font-semibold text-foreground">
                                 {sub.title}
@@ -972,6 +992,7 @@ export const TopicsPage: React.FC = () => {
                 variant="primary"
                 size="md"
                 isLoading={isSubmittingSelect}
+                disabled={Boolean(topicUnavailableReason(selectedTopicToRegister)) || (selectedTopicToRegister.subtopics.length > 0 && !selectedSubtopicId)}
                 onClick={handleConfirmSelect}
                 className="px-6 font-semibold"
               >

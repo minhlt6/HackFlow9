@@ -39,12 +39,17 @@ class TopicService:
         return self._topic_locks[topic_id]
 
     @staticmethod
-    def build_topic_response(topic) -> TopicResponse:
+    def build_topic_response(topic, selection_reason: Optional[str] = None) -> TopicResponse:
+        reason = selection_reason or ("Đề tài đã đóng đăng ký." if not topic.is_active else
+                                     "Đề tài đã hết chỗ." if topic.current_teams >= topic.max_teams else None)
         subtopics_resp = []
         for s in topic.subtopics or []:
             rem_sub = max(0, s.max_teams - s.current_teams)
             subtopics_resp.append(
                 SubtopicResponse(
+                    can_select=not bool(reason or not s.is_active or rem_sub <= 0),
+                    unavailable_reason=reason or ("Đề tài nhánh đã đóng đăng ký." if not s.is_active else
+                                                 "Đề tài nhánh đã hết chỗ." if rem_sub <= 0 else None),
                     id=str(s.id),
                     topic_id=str(s.topic_id),
                     mentor_id=s.mentor_id,
@@ -67,6 +72,8 @@ class TopicService:
             status = "AVAILABLE"
 
         return TopicResponse(
+            can_select=not bool(reason),
+            unavailable_reason=reason,
             id=str(topic.id),
             title=topic.title,
             description=topic.description,
@@ -83,7 +90,21 @@ class TopicService:
         List all active topics with their quota, remaining slots, and subtopics.
         """
         topics = await topic_repo.get_all(db, only_active=True)
-        return [self.build_topic_response(t) for t in topics]
+        config = await topic_repo.get_config(db)
+        reason = None
+        if config:
+            now = datetime.now(timezone.utc)
+            start = config.start_time
+            end = config.end_time
+            start = start.replace(tzinfo=timezone.utc) if start.tzinfo is None else start
+            end = end.replace(tzinfo=timezone.utc) if end.tzinfo is None else end
+            if not config.is_topic_published:
+                reason = "Đề tài chưa được công bố."
+            elif now < start:
+                reason = "Chưa đến thời gian đăng ký đề tài."
+            elif now > end:
+                reason = "Thời gian đăng ký đề tài đã kết thúc."
+        return [self.build_topic_response(t, reason) for t in topics]
 
     async def create_topic(
         self,

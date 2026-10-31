@@ -60,6 +60,7 @@ export interface AdminTeamUpsertPayload {
 }
 
 export interface AdminAutoMatchResult {
+  remaining_candidates_count: number;
   matched_candidates_count: number;
   created_teams_count: number;
   filled_teams_count: number;
@@ -254,6 +255,7 @@ export const adminTeamsApi = {
         matched_candidates_count: number;
         created_teams_count: number;
         filled_teams_count: number;
+        remaining_candidates_count: number;
         teams: unknown[];
       }>
     >('/admin/teams/auto-match', {
@@ -266,6 +268,7 @@ export const adminTeamsApi = {
     return {
       message: res.data.message || 'Đã ghép đội ngẫu nhiên thành công.',
       result: {
+        remaining_candidates_count: rawData?.remaining_candidates_count ?? 0,
         matched_candidates_count: rawData?.matched_candidates_count ?? 0,
         created_teams_count: rawData?.created_teams_count ?? 0,
         filled_teams_count: rawData?.filled_teams_count ?? 0,

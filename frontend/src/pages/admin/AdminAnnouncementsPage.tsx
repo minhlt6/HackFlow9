@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { useNotificationStore } from '../../store/useNotificationStore';
@@ -32,6 +33,7 @@ const PRIORITY_BADGES: Record<string, { label: string; variant: BadgeVariant }> 
 };
 
 export const AdminAnnouncementsPage: React.FC = () => {
+  const { confirm, confirmationDialog } = useActionConfirmation();
   const {
     broadcastAnnouncement,
   } = useMockStore();
@@ -126,6 +128,8 @@ export const AdminAnnouncementsPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) return;
+    const audience = ({all:'Tất cả người dùng', candidates:'Thí sinh', judges:'Giám khảo', mentors:'Cố vấn'} as Record<string,string>)[targetRole] || targetRole;
+    if (!await confirm({title: editingItem ? 'Cập nhật thông báo?' : 'Đăng thông báo?', description: `Thông báo "${title.trim()}" sẽ hiển thị cho: ${audience}. Nội dung được áp dụng ngay sau khi lưu.`, confirmLabel: editingItem ? 'Xác nhận cập nhật' : 'Xác nhận đăng'})) return;
 
     try {
       setIsSubmitting(true);
@@ -221,6 +225,7 @@ export const AdminAnnouncementsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {confirmationDialog}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

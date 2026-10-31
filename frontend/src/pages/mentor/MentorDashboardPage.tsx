@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { isUnassignedTicket } from '../../utils/progress';
 import { useMockStore } from '../../store/useMockStore';
 import { StatCard } from '../../components/common/StatCard';
 import { Button } from '../../components/Button';
@@ -6,6 +7,7 @@ import { Badge, type BadgeVariant } from '../../components/Badge';
 import { useNavigate } from 'react-router-dom';
 import { InitialRoleTodoBanner } from '../../components/common/InitialRoleTodoBanner';
 import { ticketService } from '../../services/ticketService';
+import type { SupportTicket } from '../../types';
 import {
   HelpCircle,
   Users,
@@ -27,16 +29,36 @@ const getTicketCategoryBadge = (category?: string): { label: string; variant: Ba
 };
 
 export const MentorDashboardPage: React.FC = () => {
-  const { currentUser, tickets, teams, syncFromBackend } = useMockStore();
+  const { currentUser, teams, syncFromBackend } = useMockStore();
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const navigate = useNavigate();
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
     void syncFromBackend?.();
+    void ticketService.getAllTickets().then((result) => {
+      if (active) {
+        setTickets(result.data.map((item) => ({
+          id: item.id, title: item.title, status: item.status, priority: item.priority,
+          description: item.content || '', category: item.category,
+          teamId: item.team_id || '', teamName: item.teamName || 'Đội thi',
+          creatorId: item.user_id, creatorName: item.creatorName,
+          assignedMentorId: item.assigned_to || undefined,
+          createdAt: item.created_at || '',
+        })));
+        setError('');
+      }
+    }).catch(() => {
+      if (active) setError('Không thể tải yêu cầu hỗ trợ. Vui lòng kiểm tra phiên đăng nhập và thử lại.');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, [syncFromBackend]);
 
-  const openTickets = tickets.filter((t) => t.status !== 'resolved' && t.status !== 'closed');
+  const openTickets = loading || error ? [] : tickets.filter(isUnassignedTicket);
   const claimedByMe = tickets.filter(
-    (t) => t.assignedMentorId === currentUser.id || Boolean(t.assignedMentorId),
+    (t) => t.assignedMentorId === currentUser.id,
   );
 
   const handleProcessTicket = async (ticket: (typeof tickets)[number]) => {
@@ -56,7 +78,8 @@ export const MentorDashboardPage: React.FC = () => {
           ),
         }));
       } catch {
-        // Ignore if already claimed or offline; SupportTickets page will sync
+        setError('Không thể tiếp nhận ticket. Vui lòng tải lại để kiểm tra trạng thái mới nhất.');
+        return;
       }
     }
     navigate(`/mentor/tickets?ticketId=${encodeURIComponent(ticket.id)}&tab=my_assigned`);
@@ -64,6 +87,7 @@ export const MentorDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6 ">
+      {error && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-destructive">{error}</p>}
       {/* Top Banner */}
       <div className="relative overflow-hidden rounded-[16px] border border-border bg-card p-6 lg:p-8">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#6366F1]/10 blur-3xl pointer-events-none" />
@@ -84,7 +108,7 @@ export const MentorDashboardPage: React.FC = () => {
             </h1>
             <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
               Bạn đang phụ trách cố vấn kỹ thuật cho lĩnh vực{' '}
-              <strong className="text-foreground">Trí Tuệ Nhân Tạo & Y Tế Số</strong>. Tiếp nhận các yêu cầu hỗ trợ và đồng hành cùng các đội thi.
+              <strong className="text-foreground">được Ban tổ chức phân công</strong>. Tiếp nhận các yêu cầu hỗ trợ và đồng hành cùng các đội thi.
             </p>
           </div>
 
@@ -106,7 +130,7 @@ export const MentorDashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           title="Tickets Chờ Tiếp Nhận"
-          value={openTickets.length}
+          value={loading || error ? '—' : openTickets.length}
           subtitle="Yêu cầu từ các đội thi cần giải đáp"
           icon={<HelpCircle size={24} />}
           iconColor="rose"
@@ -114,16 +138,16 @@ export const MentorDashboardPage: React.FC = () => {
         />
 
         <StatCard
-          title="Tickets Đang Trực Tiếp Hỗ Trợ"
-          value={claimedByMe.length}
-          subtitle="Đang trao đổi qua tin nhắn"
+          title="Tickets Tôi Phụ Trách"
+          value={loading || error ? '—' : claimedByMe.length}
+          subtitle="Tất cả yêu cầu do bạn phụ trách"
           icon={<MessageSquare size={24} />}
           iconColor="purple"
           onClick={() => navigate('/mentor/tickets?tab=my_assigned')}
         />
 
         <StatCard
-          title="Đội Thi Thuộc Lĩnh Vực"
+          title="Đội Thi Có Thể Theo Dõi"
           value={teams.length}
           subtitle="Đang trong giai đoạn thực thi dự án"
           icon={<Users size={24} />}

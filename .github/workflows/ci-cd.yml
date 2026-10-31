@@ -74,6 +74,9 @@ jobs:
       - name: 3. Cài đặt thư viện Frontend
         run: npm ci
 
+      - name: Kiểm thử hợp đồng API và quy tắc giao diện
+        run: node --test tests/*.test.mjs
+
       - name: 4. Kiểm tra kiểu dữ liệu TypeScript & Đóng gói Production
         env:
           VITE_API_BASE_URL: https://hackflow9-production.up.railway.app

@@ -14,6 +14,7 @@ import { CountdownTimer } from '../../components/CountdownTimer';
 import { CheckpointSubmissionForm } from '../../components/CheckpointSubmissionForm';
 import { SubmissionHistoryTable } from '../../components/SubmissionHistoryTable';
 import { checkpointApi } from '../../api/checkpointApi';
+import { isCompletedSubmission } from '../../utils/progress';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useMockStore } from '../../store/useMockStore';
 import {
@@ -26,6 +27,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
   const [checkpoints, setCheckpoints] = useState<CheckpointWithSubmission[]>([]);
   const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [loadError, setLoadError] = useState('');
 
   // Danh sách lịch sử nộp bài của checkpoint được chọn (HF-31)
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -77,6 +79,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
         }
       } catch (err) {
         console.error('Lỗi khi tải danh sách checkpoints:', err);
+        if (isMounted) setLoadError('Không thể tải đầy đủ dữ liệu các chặng. Vui lòng tải lại trang.');
       } finally {
         if (isMounted) {
           setIsLoading(false);
@@ -149,6 +152,8 @@ export const CandidateCheckpointsPage: React.FC = () => {
   return (
     <div className="space-y-6 text-foreground max-w-7xl mx-auto ">
       {/* Tiêu đề trang */}
+      {loadError && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-destructive">{loadError}</p>}
+      {!isLoading && !loadError && <p className="text-sm text-muted-foreground">Đã hoàn thành {checkpoints.filter((cp) => isCompletedSubmission(cp.latest_submission?.status)).length}/{checkpoints.length} chặng. Bài chờ xác minh SHA chưa được tính hoàn thành.</p>}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-2">
           <span className="p-2 rounded-xl bg-[#6366F1]/15 text-primary border border-[#6366F1]/30">

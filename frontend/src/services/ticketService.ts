@@ -33,6 +33,8 @@ export interface TicketFilterParams {
   category?: string;
   page?: number;
   page_size?: number;
+  skip?: number;
+  limit?: number;
 }
 
 export interface TicketItem {
@@ -85,8 +87,23 @@ export const ticketService = {
    * GET /api/v1/tickets
    */
   getAllTickets: async (params?: TicketFilterParams) => {
-    const response = await axiosClient.get('/tickets', { params });
-    return response.data;
+    const items: TicketItem[] = [];
+    const seen = new Set<string>();
+    const limit = Math.min(100, Math.max(1, params?.limit ?? params?.page_size ?? 100));
+    let skip = params?.skip ?? ((params?.page ?? 1) - 1) * limit;
+    for (;;) {
+      const response = await axiosClient.get('/tickets', { params: { ...params, skip, limit } });
+      const page: unknown = response.data?.data;
+      if (!Array.isArray(page)) throw new Error('Dữ liệu yêu cầu hỗ trợ không hợp lệ.');
+      for (const item of page as TicketItem[]) {
+        if (!item.id || seen.has(item.id)) throw new Error('Danh sách yêu cầu hỗ trợ không đồng bộ.');
+        seen.add(item.id);
+        items.push(item);
+      }
+      if (params?.page || params?.skip !== undefined || page.length < limit) break;
+      skip += page.length;
+    }
+    return { data: items };
   },
 
   /**

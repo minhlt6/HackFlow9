@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useMockStore } from '../../store/useMockStore';
@@ -440,6 +441,7 @@ interface RawCheckpoint {
 }
 
 export const AdminCheckpointsPage: React.FC = () => {
+  const { confirm, confirmationDialog } = useActionConfirmation();
   const {
     config,
     checkpoints,
@@ -664,6 +666,7 @@ export const AdminCheckpointsPage: React.FC = () => {
   };
 
   const persistOrder = async (ordered: typeof checkpoints) => {
+    if (!await confirm({title: 'Thay đổi thứ tự các chặng?', description: ordered.map((cp, index) => `${index + 1}. ${cp.title || cp.name}`).join(' → '), confirmLabel: 'Xác nhận thứ tự'})) return;
     setSubmitting(true);
     try {
       await Promise.all(ordered.map((cp, index) => checkpointApi.updateCheckpoint(cp.id, { display_order: index })));
@@ -687,6 +690,7 @@ export const AdminCheckpointsPage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCp) return;
+    if (!await confirm({title: 'Lưu thay đổi chặng nộp bài?', description: `Chặng: ${editingCp.title} → ${editTitle.trim()}. Trọng số: ${editingCp.weight ?? 0}% → ${editWeight}%. Hạn hiện tại: ${new Date(editingCp.deadline).toLocaleString('vi-VN')}; hạn mới tính sau ${editDurationMinutes} phút từ lúc xác nhận. Nội dung và yêu cầu nộp sẽ áp dụng cho các đội.`, confirmLabel: 'Xác nhận lưu chặng'})) return;
 
     setSubmitting(true);
     try {
@@ -805,6 +809,7 @@ export const AdminCheckpointsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 w-full">
+      {confirmationDialog}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>

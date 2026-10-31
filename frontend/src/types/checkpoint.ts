@@ -48,6 +48,7 @@ export interface Checkpoint {
   grace_period_seconds?: number;
   submission_fields?: SubmissionFieldConfig[] | null;
   display_order?: number;
+  weight?: number;
   checkpoint_number?: number;
   order?: number;
   status?: CheckpointStatus;
@@ -165,7 +166,7 @@ export function getSubmissionStatusMeta(status: SubmissionStatus, isFinal: boole
   title: string;
   statusNote?: string;
 } {
-  const normalizedStatus = String(status || 'submitted').toLowerCase();
+  const normalizedStatus = String(status || '').toLowerCase();
 
   switch (normalizedStatus) {
     case 'evaluated':
@@ -222,7 +223,6 @@ export function getSubmissionStatusMeta(status: SubmissionStatus, isFinal: boole
           'Bản nộp này không hợp lệ (Repository không truy cập được hoặc sai định dạng yêu cầu).',
       };
     case 'submitted':
-    default:
       return {
         normalizedStatus: 'submitted',
         badgeVariant: 'success',
@@ -232,6 +232,12 @@ export function getSubmissionStatusMeta(status: SubmissionStatus, isFinal: boole
         title: isFinal
           ? 'Đã ghi nhận bài nộp sản phẩm thành công!'
           : 'Đã ghi nhận báo cáo tiến độ thành công!',
+      };
+    default:
+      return {
+        normalizedStatus, badgeVariant: 'neutral', badgeLabel: 'Trạng thái chưa xác định',
+        containerClass: 'bg-muted/40 border-border', iconBgClass: 'bg-muted text-muted-foreground',
+        title: 'Chưa xác định được trạng thái bài nộp',
       };
   }
 }

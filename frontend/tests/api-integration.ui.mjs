@@ -148,6 +148,7 @@ try {
     assert.equal(await scope.inputValue(),'judges');
     await page.getByLabel('Tiêu đề thông báo *',{exact:true}).fill('Edited judge notice');
     await page.getByRole('button',{name:'Cập nhật thông báo',exact:true}).click();
+    await page.getByRole('button',{name:'Xác nhận cập nhật',exact:true}).click();
     await eventually(()=>Promise.resolve(state.calls.some((c)=>c.path==='/announcements/notice-audit'&&c.method==='PUT')),'No announcement update');
     assert.equal(state.announcements[0].target_audience,'judge');
     await page.reload();
@@ -174,6 +175,7 @@ try {
     assert.equal(await page.getByLabel('Cố vấn phụ trách',{exact:true}).inputValue(),'mentor-audit');
     await page.getByLabel('Cố vấn phụ trách',{exact:true}).selectOption('');
     await page.getByRole('button',{name:'Lưu cập nhật',exact:true}).click();
+    await page.getByRole('button',{name:'Xác nhận lưu đề tài',exact:true}).click();
     await eventually(()=>Promise.resolve(state.topics[0].subtopics[0].mentor_id===null),'Mentor clear failed');
     await screenshot(page,'api-mentor-assignment.png');
     assert.deepEqual(pageErrors,[]);
@@ -199,6 +201,7 @@ try {
     await page.goto(`${base}/admin/criteria`);
     await page.getByText('Locked criterion',{exact:true}).first().waitFor();
     await page.getByRole('button',{name:'Lưu Lên Hệ Thống',exact:true}).click();
+    await page.getByRole('button',{name:'Xác nhận lưu',exact:true}).click();
     await page.getByText('Không thể sửa đổi tiêu chí vì Giám khảo đã nộp bảng điểm chấm thi. Hệ thống đã khóa Rubric.',{exact:true}).waitFor();
     const write=state.calls.find((c)=>c.path==='/rubrics'&&c.method==='POST');
     assert.equal(write.payload.allow_override,false);

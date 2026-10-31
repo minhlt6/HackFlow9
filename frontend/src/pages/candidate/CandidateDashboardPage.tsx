@@ -1,4 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import { checkpointApi } from '../../api/checkpointApi';
+import { getSubmissionStatusMeta, type CheckpointWithSubmission } from '../../types/checkpoint';
+import { isCompletedSubmission } from '../../utils/progress';
 import { useMockStore } from '../../store/useMockStore';
 import { CountdownTimer } from '../../components/common/CountdownTimer';
 import { StatCard } from '../../components/common/StatCard';
@@ -18,12 +21,22 @@ import {
 } from 'lucide-react';
 
 export const CandidateDashboardPage: React.FC = () => {
-  const { currentUser, teams, majorTopics, checkpoints, submissions, config, announcements } =
+  const { currentUser, teams, majorTopics, config, announcements } =
     useMockStore();
   const navigate = useNavigate();
+  const [checkpoints, setCheckpoints] = useState<CheckpointWithSubmission[]>([]);
+  const [progressError, setProgressError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void useMockStore.getState().syncFromBackend?.();
+    let active = true;
+    void checkpointApi.getCheckpoints().then((data) => {
+      if (active) setCheckpoints(data);
+    }).catch(() => {
+      if (active) setProgressError('Không thể tải tiến độ các chặng. Vui lòng tải lại trang.');
+    }).finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
   }, []);
 
   // Find candidate's team
@@ -52,16 +65,17 @@ export const CandidateDashboardPage: React.FC = () => {
   }
 
   // Count submissions
-  const teamSubmissions = submissions.filter((s) => s.teamId === myTeam?.id);
+  const completedCount = checkpoints.filter((cp) => isCompletedSubmission(cp.latest_submission?.status)).length;
 
   // Next active checkpoint
   const nextCheckpoint = checkpoints.find((cp) => {
-    const isSubmitted = teamSubmissions.some((s) => s.checkpointId === cp.id);
+    const isSubmitted = isCompletedSubmission(cp.latest_submission?.status);
     return !isSubmitted;
-  }) || checkpoints[checkpoints.length - 1];
+  });
 
   return (
     <div className="space-y-6 ">
+      {progressError && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-destructive">{progressError}</p>}
       {/* Welcome Banner */}
       <div className="relative overflow-hidden rounded-[16px] border border-border bg-card p-6 lg:p-8">
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#6366F1]/10 blur-3xl pointer-events-none" />
@@ -147,8 +161,8 @@ export const CandidateDashboardPage: React.FC = () => {
 
         <StatCard
           title="Tiến độ các chặng nộp"
-          value={`${teamSubmissions.length}/${checkpoints.length}`}
-          subtitle={`Kế tiếp: ${(nextCheckpoint?.title || nextCheckpoint?.name || 'Checkpoint').slice(0, 24)}...`}
+          value={loading || progressError ? '—' : `${completedCount}/${checkpoints.length}`}
+          subtitle={nextCheckpoint ? `Kế tiếp: ${nextCheckpoint.title}` : checkpoints.length ? 'Đã hoàn thành tất cả các chặng' : 'Chưa có chặng nộp bài'}
           icon={<CheckSquare size={24} />}
           iconColor="amber"
           onClick={() => navigate('/checkpoints')}
@@ -217,14 +231,15 @@ export const CandidateDashboardPage: React.FC = () => {
                 </h3>
               </div>
               <span className="text-xs text-muted-foreground">
-                Đã hoàn thành {teamSubmissions.length} trên {checkpoints.length}
+                Đã hoàn thành {completedCount} trên {checkpoints.length}
               </span>
             </div>
 
             <div className="space-y-3">
               {checkpoints.map((cp, idx) => {
-                const isSubmitted = teamSubmissions.some((s) => s.checkpointId === cp.id);
-                const sub = teamSubmissions.find((s) => s.checkpointId === cp.id);
+                const sub = cp.latest_submission;
+                const isSubmitted = isCompletedSubmission(sub?.status);
+                const meta = sub ? getSubmissionStatusMeta(sub.status, Boolean(cp.is_final_checkpoint)) : null;
 
                 return (
                   <div
@@ -244,19 +259,19 @@ export const CandidateDashboardPage: React.FC = () => {
                       <div>
                         <p className="text-sm font-semibold text-foreground">{cp.title}</p>
                         <p className="text-xs text-muted-foreground">
-                          Thời lượng: {cp.durationMinutes || 180} phút • Trọng số: {cp.weight || 20}%
+                          Hạn nộp: {new Date(cp.deadline).toLocaleString('vi-VN')} • Trọng số: {cp.weight ?? 0}%
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      {isSubmitted ? (
+                      {sub ? (
                         <div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 font-mono">
-                          <GitBranch size={13} />
-                          <span>SHA: {sub?.commitSha.slice(0, 7)}</span>
+                          <Badge variant={meta?.badgeVariant || 'neutral'}>{meta?.badgeLabel}</Badge>
+                          {sub.commit_sha && <><GitBranch size={13} /><span>SHA: {sub.commit_sha.slice(0, 7)}</span></>}
                         </div>
                       ) : (
-                        <Badge variant="warning">Chưa nộp</Badge>
+                        <Badge variant="warning">{cp.status === 'upcoming' ? 'Chưa mở' : 'Chưa nộp'}</Badge>
                       )}
                     </div>
                   </div>

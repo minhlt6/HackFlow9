@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 import hashlib
+import math
 from typing import Any, Dict, List, Optional, Tuple
 from fastapi import status
 from sqlalchemy import select
@@ -80,6 +81,7 @@ class EvaluationService:
             RubricCriteriaResponse.model_validate(c).model_dump() for c in criteria
         ]
         total_weight = round(sum(float(c.weight) for c in criteria), 4)
+        is_locked = await self.repo.has_submitted_evaluations()
         rubric_name = (
             criteria[0].rubric_name if criteria else "HackFlow Final Rubric"
         )
@@ -91,6 +93,9 @@ class EvaluationService:
             "total_weight": total_weight,
         }
         return {
+            "is_locked": is_locked,
+            "can_edit": not is_locked,
+            "lock_reason": "Đã có điểm chấm chính thức, không thể sửa tiêu chí." if is_locked else None,
             "id": "rubric-default",
             "name": rubric_name,
             "is_active": True,
@@ -456,6 +461,16 @@ class EvaluationService:
             )
 
         active_criteria = await self.repo.list_active_criteria()
+        if target_status == EvaluationStatus.SUBMITTED.value:
+            weights = [float(c.weight) for c in active_criteria]
+            total = sum(weights)
+            if (not active_criteria or any(not math.isfinite(w) or w <= 0 for w in weights)
+                    or not (abs(total - 1.0) <= 1e-6 or abs(total - 100.0) <= 1e-4)):
+                raise AppException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    message="Tổng trọng số tiêu chí phải đạt 100% trước khi khóa điểm chính thức.",
+                    error_code="CRITERIA_WEIGHT_INVALID",
+                )
         criteria_by_id = {c.id: c for c in active_criteria}
 
         # Validate each incoming criterion score range (0 <= score <= max_score)

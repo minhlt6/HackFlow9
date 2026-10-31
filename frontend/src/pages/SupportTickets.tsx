@@ -196,12 +196,13 @@ export const SupportTickets: React.FC = () => {
         setApiTickets(mapped);
         useMockStore.setState({ tickets: mapped });
       }
-    } catch {
-      // Local dev / network offline fallback
+    } catch (err) {
+      setApiTickets([]);
+      handleApiError(err, 'Không thể tải yêu cầu hỗ trợ.');
     } finally {
       setIsFetchingApi(false);
     }
-  }, [isCandidate, currentUser.id, currentUser.fullName, teams]);
+  }, [isCandidate, currentUser.id, currentUser.fullName, teams, handleApiError]);
 
   useEffect(() => {
     // Defer to a microtask so setState inside fetchTicketsFromApi is not called synchronously in the effect body

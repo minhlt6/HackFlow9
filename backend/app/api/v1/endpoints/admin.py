@@ -135,6 +135,10 @@ class AdminBulkApproveRequest(BaseModel):
     team_ids: List[str] = Field(default_factory=list)
 
 
+class CandidateBulkApproveRequest(BaseModel):
+    candidate_ids: List[str] = Field(min_length=1, max_length=10000)
+
+
 class AdminAutoMatchRequest(BaseModel):
     target_team_size: int = Field(default=4, ge=1)
     fill_incomplete_teams: bool = Field(default=True)
@@ -525,17 +529,17 @@ async def list_unassigned_candidates(
 
 def _partition_team_sizes(total_candidates: int, preferred_size: int = 4,
                           min_size: int = 3, max_size: int = 5) -> List[int]:
-    """Distribute candidates within SQL-configured limits; retain a pending remainder if necessary."""
+    """Maximize valid teams; never create an under-minimum team."""
     if total_candidates <= 0:
         return []
-    import math
-    low, high = math.ceil(total_candidates / max_size), total_candidates // min_size
-    if low <= high:
-        groups = min(range(low, high + 1), key=lambda n: abs(total_candidates / n - preferred_size))
-        size, extra = divmod(total_candidates, groups)
-        return [size + (1 if i < extra else 0) for i in range(groups)]
-    full, remainder = divmod(total_candidates, max_size)
-    return [max_size] * full + ([remainder] if remainder else [])
+    if not 1 <= min_size <= max_size:
+        raise ValueError("Invalid team size limits")
+    groups = total_candidates // min_size
+    if not groups:
+        return []
+    usable = min(total_candidates, groups * max_size)
+    size, extra = divmod(usable, groups)
+    return [size + (1 if i < extra else 0) for i in range(groups)]
 
 
 @router.post(
@@ -556,7 +560,7 @@ async def auto_match_unassigned_candidates(
         User.role == UserRole.CANDIDATE.value,
         User.approval_status == ApprovalStatus.APPROVED.value,
         User.is_active.is_(True),
-    )
+    ).with_for_update()
     res_users = await db.execute(stmt_users)
     all_candidates = list(res_users.scalars().all())
 
@@ -592,7 +596,8 @@ async def auto_match_unassigned_candidates(
     if body.fill_incomplete_teams:
         for t in existing_teams:
             curr_len = len(t.members or [])
-            if not t.is_locked and curr_len < minimum and unassigned:
+            if (not t.is_locked and _get_team_meta(t).get("approval_status") != "rejected"
+                    and curr_len < minimum and len(unassigned) >= minimum - curr_len):
                 needed = minimum - curr_len
                 while needed > 0 and unassigned:
                     cand = unassigned.pop(0)
@@ -613,7 +618,8 @@ async def auto_match_unassigned_candidates(
                 filled_existing_team_ids.append(str(t.id))
 
     # Load topics/subtopics for automatic assignment
-    stmt_subs = select(Subtopic).options(selectinload(Subtopic.topic)).where(Subtopic.is_active.is_(True))
+    await db.execute(select(Topic).order_by(Topic.id).with_for_update())
+    stmt_subs = select(Subtopic).options(selectinload(Subtopic.topic)).where(Subtopic.is_active.is_(True)).with_for_update()
     res_subs = await db.execute(stmt_subs)
     subtopics = list(res_subs.scalars().all())
 
@@ -622,8 +628,9 @@ async def auto_match_unassigned_candidates(
 
     # Absorb a small remainder only into unlocked teams with available configured capacity.
     await db.flush()
-    if len(sizes) == 1 and sizes[0] < minimum:
-        absorbable_teams = [t for t in existing_teams if not t.is_locked]
+    if not sizes and unassigned and body.fill_incomplete_teams:
+        absorbable_teams = [t for t in existing_teams if not t.is_locked
+                            and _get_team_meta(t).get("approval_status") != "rejected"]
         for t in absorbable_teams:
             curr_len = await team_repo.count_members(db, str(t.id))
             while curr_len < maximum and unassigned:
@@ -679,7 +686,15 @@ async def auto_match_unassigned_candidates(
         existing_names.add(candidate_name.lower())
 
         invite_code = await team_service.generate_invite_code(db)
-        chosen_sub = subtopics[idx % len(subtopics)] if (body.auto_assign_topics and subtopics and len(group) >= minimum) else None
+        chosen_sub = None
+        if body.auto_assign_topics:
+            for sub in subtopics:
+                if (sub.current_teams < sub.max_teams and sub.topic and sub.topic.is_active
+                        and sub.topic.current_teams < sub.topic.max_teams):
+                    chosen_sub = sub
+                    sub.current_teams += 1
+                    sub.topic.current_teams += 1
+                    break
 
         new_team = Team(
             team_name=candidate_name,
@@ -734,12 +749,15 @@ async def auto_match_unassigned_candidates(
             "matched_candidates_count": matched_candidates_count,
             "created_teams_count": len(created_team_ids),
             "filled_teams_count": len(filled_existing_team_ids),
+            "remaining_candidates_count": len(unassigned),
             "teams": serialized_teams,
         },
         message=(
-            f"Đã ghép thành công {matched_candidates_count} thí sinh vào "
+            (f"Đã ghép thành công {matched_candidates_count} thí sinh vào "
             f"{len(created_team_ids)} đội mới"
-            + (f" và bổ sung vào {len(filled_existing_team_ids)} đội thiếu người." if filled_existing_team_ids else ".")
+            + (f" và bổ sung vào {len(filled_existing_team_ids)} đội." if filled_existing_team_ids else ".")
+            if matched_candidates_count else "Chưa đủ điều kiện tạo hoặc bổ sung đội hợp lệ.")
+            + (f" Còn {len(unassigned)} thí sinh chờ đủ điều kiện ghép đội." if unassigned else "")
         ),
     )
 
@@ -1716,6 +1734,7 @@ async def list_pending_candidates(
         .where(
             UserModel.role == UserRole.CANDIDATE.value,
             UserModel.approval_status == ApprovalStatus.PENDING.value,
+            UserModel.is_active.is_(True),
         )
         .order_by(UserModel.created_at.desc())
     )
@@ -1745,6 +1764,34 @@ async def list_pending_candidates(
     )
 
 
+@router.post("/candidates/approve-all", response_model=ApiResponse[Dict[str, Any]])
+async def approve_all_pending_candidates(
+    body: CandidateBulkApproveRequest,
+    db: AsyncSession = Depends(get_db),
+    current_admin: User = Depends(require_role("admin")),
+):
+    # Explicit snapshot: new arrivals after confirmation are never silently approved.
+    requested = set(body.candidate_ids)
+    result = await db.execute(select(User).where(
+        User.id.in_(requested), User.role == UserRole.CANDIDATE.value,
+        User.is_active.is_(True), User.approval_status == ApprovalStatus.PENDING.value,
+    ).order_by(User.id).with_for_update())
+    candidates = result.scalars().all()
+    approved = []
+    for candidate in candidates:
+        candidate.approval_status = ApprovalStatus.APPROVED.value
+        await whitelist_repo.add_email(db, candidate.email, added_by=str(current_admin.id),
+                                       note="Phê duyệt tài khoản hàng loạt bởi BTC")
+        approved.append(str(candidate.id))
+    from app.models.checkpoint import AuditLog
+    db.add(AuditLog(user_id=str(current_admin.id), action="CANDIDATES_BULK_APPROVED", status="success",
+                    details={"approved_ids": approved, "skipped_count": len(requested)-len(approved)}))
+    await db.commit()
+    return success_response(data={"approved_ids": approved, "approved_count": len(approved),
+                                  "skipped_count": len(requested)-len(approved)},
+                            message=f"Đã duyệt {len(approved)} tài khoản; bỏ qua {len(requested)-len(approved)} tài khoản không còn đủ điều kiện.")
+
+
 @router.post(
     "/candidates/{user_id}/approval",
     response_model=ApiResponse[UserResponse],
@@ -1756,9 +1803,12 @@ async def approve_or_reject_candidate(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(require_role("admin")),
 ) -> ApiResponse[UserResponse]:
-    candidate = await user_repo.get_by_id(db, user_id)
+    candidate = (await db.execute(select(User).where(User.id == user_id).with_for_update())).scalar_one_or_none()
     if not candidate:
         raise NotFoundException(message="Không tìm thấy người dùng.")
+
+    if candidate.role != UserRole.CANDIDATE.value or not candidate.is_active:
+        raise BadRequestException(message="Chỉ xử lý tài khoản thí sinh đang hoạt động.")
 
     if candidate.approval_status != ApprovalStatus.PENDING.value:
         raise BadRequestException(

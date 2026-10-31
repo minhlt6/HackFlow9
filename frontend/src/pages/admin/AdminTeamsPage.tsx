@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   Users,
   CheckCircle2,
@@ -50,6 +51,7 @@ import type { EnrichedAdminTeam } from '../../api/adminTeamsApi';
 import { toast } from '../../store/useToastStore';
 
 export const AdminTeamsPage: React.FC = () => {
+  const { confirm, confirmationDialog } = useActionConfirmation();
   const {
     teams,
     filteredTeams,
@@ -76,13 +78,18 @@ export const AdminTeamsPage: React.FC = () => {
     handleCreateTeam,
     handleUpdateTeam,
     handleAutoMatchTeams,
-    handleApproveTeam,
+    handleApproveTeam: executeApproveTeam,
     handleBulkApprove,
     handleRejectTeam,
     handleDeleteTeam,
     handleResetDemoDataset,
     handleExportCsv,
   } = useAdminTeams();
+
+  const handleApproveTeam = useCallback(async (team: EnrichedAdminTeam) => {
+    if (!await confirm({title: 'Duyệt đội thi?', description: `Duyệt đội "${team.name}" để tham gia cuộc thi và nộp bài?`, confirmLabel: 'Xác nhận duyệt đội', variant: 'primary'})) return;
+    await executeApproveTeam(team);
+  }, [confirm, executeApproveTeam]);
 
   // Dialog states
   const [selectedRowIds, setSelectedRowIds] = useState<string[]>([]);
@@ -442,6 +449,7 @@ export const AdminTeamsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {confirmationDialog}
       {/* Page Header */}
       <PageHeader
         title="Quản lý Danh sách Đội thi & Đề tài"
@@ -740,7 +748,7 @@ export const AdminTeamsPage: React.FC = () => {
         open={isAutoMatchConfirmOpen}
         onOpenChange={setIsAutoMatchConfirmOpen}
         title={`Xác nhận ghép đội ngẫu nhiên (${unassignedCandidates.length} thí sinh lẻ)?`}
-        description="Hệ thống sẽ tự động gom toàn bộ thí sinh đã được phê duyệt nhưng chưa có đội (cùng các đội chưa đủ thành viên tối thiểu) để ghép ngẫu nhiên thành các đội theo giới hạn thành viên trong cấu hình."
+        description="Hệ thống bổ sung các đội thiếu người đủ điều kiện, sau đó chia thí sinh đã duyệt chưa có đội thành số đội hợp lệ nhiều nhất theo cấu hình. Người chưa thể ghép sẽ tiếp tục chờ; không tạo đội dưới mức tối thiểu."
         confirmLabel="Xác nhận ghép đội"
         variant="warning"
         isLoading={isAutoMatching}

@@ -3,6 +3,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class SubtopicResponse(BaseModel):
+    can_select: bool = True
+    unavailable_reason: Optional[str] = None
     id: str
     topic_id: str
     mentor_id: Optional[str] = None
@@ -18,6 +20,8 @@ class SubtopicResponse(BaseModel):
 
 
 class TopicResponse(BaseModel):
+    can_select: bool = True
+    unavailable_reason: Optional[str] = None
     id: str
     title: str
     description: Optional[str] = None

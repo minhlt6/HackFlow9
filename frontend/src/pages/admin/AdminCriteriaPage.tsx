@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useMockStore } from '../../store/useMockStore';
@@ -78,11 +79,16 @@ interface RawCriterion {
 }
 
 export const AdminCriteriaPage: React.FC = () => {
+  const { confirm, confirmationDialog } = useActionConfirmation();
   const mockCriteria = useMockStore((s) => s.rubricCriteria);
 
   const [criteriaList, setCriteriaList] = useState<RubricCriteria[]>(mockCriteria);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [locked, setLocked] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savedCriteria, setSavedCriteria] = useState<RubricCriteria[]>([]);
+  const [hasPreview, setHasPreview] = useState(false);
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [name, setName] = useState('');
@@ -102,6 +108,8 @@ export const AdminCriteriaPage: React.FC = () => {
     }, duration);
   };
 
+  const readOnly = locked || loading || saving || loadFailed;
+
   const totalWeight = criteriaList.reduce((sum, c) => sum + c.weight, 0);
   const isWeightValid = totalWeight === 100;
   const availableRemaining = Math.max(0, 100 - totalWeight);
@@ -110,6 +118,8 @@ export const AdminCriteriaPage: React.FC = () => {
   const fetchCriteria = useCallback(async () => {
     try {
       const res = await evaluationService.getRubrics();
+      setLocked(Boolean(res?.data?.is_locked ?? res?.is_locked));
+      setLoadFailed(false);
       const rawCriteria =
         res?.data?.criteria ||
         res?.criteria ||
@@ -126,11 +136,14 @@ export const AdminCriteriaPage: React.FC = () => {
           displayOrder: c.display_order ?? c.displayOrder ?? index + 1,
         }));
         setCriteriaList(mapped);
+        setSavedCriteria(mapped);
+        setHasPreview(false);
         useMockStore.setState({ rubricCriteria: mapped });
       } else {
-        setCriteriaList(useMockStore.getState().rubricCriteria);
+        setCriteriaList([]); setSavedCriteria([]); setHasPreview(false);
       }
     } catch (err: unknown) {
+      setLoadFailed(true);
       if (axios.isAxiosError(err)) {
         const msg =
           err.response?.data?.message ||
@@ -152,6 +165,8 @@ export const AdminCriteriaPage: React.FC = () => {
       .getRubrics()
       .then((res) => {
         if (ignore) return;
+        setLocked(Boolean(res?.data?.is_locked ?? res?.is_locked));
+        setLoadFailed(false);
         const rawCriteria =
           res?.data?.criteria ||
           res?.criteria ||
@@ -168,13 +183,16 @@ export const AdminCriteriaPage: React.FC = () => {
             displayOrder: c.display_order ?? c.displayOrder ?? index + 1,
           }));
           setCriteriaList(mapped);
+        setSavedCriteria(mapped);
+        setHasPreview(false);
           useMockStore.setState({ rubricCriteria: mapped });
         } else {
-          setCriteriaList(useMockStore.getState().rubricCriteria);
+          setCriteriaList([]); setSavedCriteria([]); setHasPreview(false);
         }
       })
       .catch((err: unknown) => {
         if (ignore) return;
+        setLoadFailed(true);
         if (axios.isAxiosError(err)) {
           const msg =
             err.response?.data?.message ||
@@ -185,7 +203,7 @@ export const AdminCriteriaPage: React.FC = () => {
         } else {
           setCriteriaList(useMockStore.getState().rubricCriteria);
         }
-      });
+      }).finally(() => { if (!ignore) setLoading(false); });
 
     return () => {
       ignore = true;
@@ -193,7 +211,8 @@ export const AdminCriteriaPage: React.FC = () => {
   }, []);
 
   // Persist rubric configuration to Backend API
-  const saveToBackend = async (newCriteria: RubricCriteria[], successMsg?: string) => {
+  const saveToBackend = async (newCriteria: RubricCriteria[], successMsg?: string, alreadyConfirmed = false) => {
+    if (readOnly) return false;
     const sum = newCriteria.reduce((acc, c) => acc + c.weight, 0);
     if (sum !== 100) {
       showAlert(
@@ -204,6 +223,7 @@ export const AdminCriteriaPage: React.FC = () => {
       return false;
     }
 
+    if (!alreadyConfirmed && !await confirm({title: "Lưu thay đổi tiêu chí chấm điểm?", description: `Tổng trọng số ${sum}%. ${newCriteria.map((criterion) => `${criterion.name}: ${savedCriteria.find((old) => old.id === criterion.id)?.weight ?? "mới"} → ${criterion.weight}%`).join("; ")}. Thay đổi áp dụng cho các lượt chấm tiếp theo.`, confirmLabel: "Xác nhận lưu", variant: "warning"})) return false;
     setSaving(true);
     try {
       const payload: RubricConfigurePayload = {
@@ -241,6 +261,8 @@ export const AdminCriteriaPage: React.FC = () => {
       }
 
       setCriteriaList(savedList);
+      setSavedCriteria(savedList);
+      setHasPreview(false);
       useMockStore.setState({ rubricCriteria: savedList });
       showAlert(successMsg || 'Đã cấu hình và lưu ma trận tiêu chí Rubric thành công lên hệ thống!', 'success');
       return true;
@@ -251,6 +273,10 @@ export const AdminCriteriaPage: React.FC = () => {
         const serverMsg = err.response?.data?.message;
 
         if (status === 409 || errCode === 'RUBRIC_LOCKED_BY_EVALUATIONS') {
+          setLocked(true);
+          setIsAddOpen(false);
+          setEditingItem(null);
+          setDeleteCriterionTarget(null);
           showAlert(
             'Không thể sửa đổi tiêu chí vì Giám khảo đã nộp bảng điểm chấm thi. Hệ thống đã khóa Rubric.',
             'error',
@@ -362,6 +388,7 @@ export const AdminCriteriaPage: React.FC = () => {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     if (!name.trim()) return;
 
     let updatedList: RubricCriteria[];
@@ -411,16 +438,15 @@ export const AdminCriteriaPage: React.FC = () => {
       updatedList = [...criteriaList, newCriterion];
     }
 
-    setIsAddOpen(false);
-    setName('');
-    setDescription('');
-
     const newTotal = updatedList.reduce((sum, c) => sum + c.weight, 0);
     if (newTotal === 100) {
-      await saveToBackend(updatedList, 'Đã thêm tiêu chí mới và lưu thành công lên máy chủ!');
+      if (await saveToBackend(updatedList, 'Đã thêm tiêu chí mới và lưu thành công lên máy chủ!')) {
+        setIsAddOpen(false); setName(''); setDescription('');
+      }
     } else {
       setCriteriaList(updatedList);
-      useMockStore.setState({ rubricCriteria: updatedList });
+      setHasPreview(true);
+      setIsAddOpen(false); setEditingItem(null);
       showAlert(
         `Tổng trọng số hiện tại là ${newTotal}% (chưa đạt 100%). Vui lòng điều chỉnh lại trọng số các tiêu chí hoặc bấm "Cân Bằng Tỷ Lệ (100%)" cho tới khi đạt đủ 100% để lưu!`,
         'error',
@@ -431,17 +457,17 @@ export const AdminCriteriaPage: React.FC = () => {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (readOnly) return;
     if (!editingItem) return;
 
     const updatedList = criteriaList.map((c) => (c.id === editingItem.id ? editingItem : c));
-    setEditingItem(null);
-
     const newTotal = updatedList.reduce((sum, c) => sum + c.weight, 0);
     if (newTotal === 100) {
-      await saveToBackend(updatedList, 'Đã cập nhật tiêu chí và lưu thành công lên máy chủ!');
+      if (await saveToBackend(updatedList, 'Đã cập nhật tiêu chí và lưu thành công lên máy chủ!')) setEditingItem(null);
     } else {
       setCriteriaList(updatedList);
-      useMockStore.setState({ rubricCriteria: updatedList });
+      setHasPreview(true);
+      setIsAddOpen(false); setEditingItem(null);
       showAlert(
         `Tổng trọng số hiện tại là ${newTotal}% (chưa đạt 100%). Vui lòng sửa lại trọng số chấm điểm cho tới khi đạt đủ 100% để lưu lên hệ thống!`,
         'error',
@@ -451,6 +477,7 @@ export const AdminCriteriaPage: React.FC = () => {
   };
 
   const handleDelete = (id: string, criterionName: string) => {
+    if (readOnly) return;
     if (criteriaList.length <= 1) {
       showAlert('Ma trận đánh giá phải có ít nhất 1 tiêu chí!', 'error');
       return;
@@ -459,6 +486,7 @@ export const AdminCriteriaPage: React.FC = () => {
   };
 
   const executeDeleteCriterion = async () => {
+    if (readOnly) return;
     if (!deleteCriterionTarget) return;
     const { id, name: criterionName } = deleteCriterionTarget;
     setDeleteCriterionTarget(null);
@@ -468,22 +496,24 @@ export const AdminCriteriaPage: React.FC = () => {
       return;
     }
     const balanced = rebalanceProportional(remaining);
-    await saveToBackend(balanced, `Đã xóa tiêu chí "${criterionName}" và tự động cân đối lại 100%!`);
+    await saveToBackend(balanced, `Đã xóa tiêu chí "${criterionName}" và tự động cân đối lại 100%!`, true);
   };
 
   const handleQuickRebalance = async (mode: 'proportional' | 'equal') => {
+    if (readOnly) return;
     if (criteriaList.length === 0) return;
     const balanced = mode === 'proportional' ? rebalanceProportional(criteriaList) : rebalanceEqual(criteriaList);
-    await saveToBackend(
-      balanced,
-      mode === 'proportional'
-        ? 'Đã chuẩn hóa tỷ lệ tất cả tiêu chí về đúng 100% và lưu lên hệ thống!'
-        : 'Đã chia đều trọng số cho toàn bộ tiêu chí về 100% và lưu lên hệ thống!'
-    );
+    setCriteriaList(balanced);
+    setHasPreview(true);
+    showAlert('Đã xem trước trọng số mới. Chưa lưu lên hệ thống; bấm Lưu Lên Hệ Thống để áp dụng.', 'info', 6000);
   };
 
   return (
     <div className="space-y-6">
+      {confirmationDialog}
+      {hasPreview && <p role="status" className="rounded-xl border border-primary/30 p-4 text-sm">Bạn đang xem trước trọng số mới, chưa lưu vào hệ thống. Bấm Lưu Lên Hệ Thống để áp dụng.</p>}
+      {locked && <p role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">Tiêu chí đã khóa vì có điểm chấm chính thức. Bạn chỉ có thể xem; các thao tác thay đổi đã được vô hiệu hóa.</p>}
+      {loadFailed && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-sm text-destructive">Không thể xác định trạng thái tiêu chí. Vui lòng tải lại trước khi chỉnh sửa.</p>}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -499,11 +529,12 @@ export const AdminCriteriaPage: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
+            onClick={async () => {
+              if (hasPreview && !await confirm({title: 'Bỏ bản xem trước tiêu chí?', description: 'Các trọng số chưa lưu sẽ bị bỏ và thay bằng dữ liệu từ máy chủ.', confirmLabel: 'Tải lại và bỏ bản xem trước'})) return;
               setLoading(true);
               void fetchCriteria();
             }}
-            disabled={loading}
+            disabled={loading || saving}
             className="gap-1.5 text-xs text-muted-foreground hover:text-foreground"
             title="Tải lại ma trận tiêu chí từ Backend"
           >
@@ -515,9 +546,9 @@ export const AdminCriteriaPage: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={() => handleQuickRebalance('proportional')}
-            disabled={saving || criteriaList.length === 0}
+            disabled={readOnly || criteriaList.length === 0}
             className="gap-1.5 text-xs text-primary border-[#6366F1]/30 hover:bg-[#6366F1]/10"
-            title="Tự động chuẩn hóa co dãn các tiêu chí hiện có để đạt đúng 100%"
+            title="Xem trước trọng số chuẩn hóa về 100%; cần bấm Lưu để áp dụng"
           >
             <Scale size={14} />
             <span>Cân Bằng Tỷ Lệ (100%)</span>
@@ -527,9 +558,9 @@ export const AdminCriteriaPage: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={() => handleQuickRebalance('equal')}
-            disabled={saving || criteriaList.length === 0}
+            disabled={readOnly || criteriaList.length === 0}
             className="gap-1.5 text-xs text-sky-700 dark:text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/10"
-            title="Chia đều 100% cho toàn bộ tiêu chí"
+            title="Xem trước chia đều 100%; cần bấm Lưu để áp dụng"
           >
             <Sliders size={14} />
             <span>Chia Đều</span>
@@ -539,7 +570,7 @@ export const AdminCriteriaPage: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={() => saveToBackend(criteriaList)}
-            disabled={saving || !isWeightValid || criteriaList.length === 0}
+            disabled={readOnly || !isWeightValid || criteriaList.length === 0}
             className={`gap-1.5 text-xs font-semibold ${
               isWeightValid
                 ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10'
@@ -553,7 +584,9 @@ export const AdminCriteriaPage: React.FC = () => {
 
           <Button
             variant="primary"
+            disabled={readOnly}
             onClick={() => {
+              if (readOnly) return;
               if (availableRemaining > 0) {
                 setWeight(availableRemaining);
               } else {
@@ -679,7 +712,7 @@ export const AdminCriteriaPage: React.FC = () => {
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => handleQuickRebalance('proportional')}
-              disabled={saving}
+              disabled={readOnly}
               className="px-3 py-1.5 rounded-full bg-[#6366F1] hover:bg-[#5558d9] text-white font-medium text-xs flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
             >
               <Sparkles size={13} />
@@ -687,7 +720,7 @@ export const AdminCriteriaPage: React.FC = () => {
             </button>
             <button
               onClick={() => handleQuickRebalance('equal')}
-              disabled={saving}
+              disabled={readOnly}
               className="px-3 py-1.5 rounded-full bg-muted/60 hover:bg-accent border border-border text-foreground font-medium text-xs flex items-center gap-1.5 transition-colors disabled:opacity-50"
             >
               <Sliders size={13} />
@@ -777,7 +810,7 @@ export const AdminCriteriaPage: React.FC = () => {
                         <div className="flex items-center justify-end gap-2">
                           <button
                             onClick={() => setEditingItem({ ...c })}
-                            disabled={saving}
+                            disabled={readOnly}
                             className="p-1.5 rounded-md hover:bg-accent text-primary hover:text-foreground transition-colors disabled:opacity-40"
                             title="Chỉnh sửa tiêu chí"
                           >
@@ -785,7 +818,7 @@ export const AdminCriteriaPage: React.FC = () => {
                           </button>
                           <button
                             onClick={() => handleDelete(c.id, c.name)}
-                            disabled={saving}
+                            disabled={readOnly}
                             className="p-1.5 rounded-md hover:bg-accent text-rose-700 dark:text-rose-400 hover:text-rose-300 transition-colors disabled:opacity-40"
                             title="Xóa tiêu chí"
                           >
@@ -958,7 +991,7 @@ export const AdminCriteriaPage: React.FC = () => {
             <Button variant="ghost" type="button" onClick={() => setIsAddOpen(false)}>
               Hủy
             </Button>
-            <Button variant="primary" type="submit" className="gap-2">
+            <Button variant="primary" type="submit" disabled={readOnly} className="gap-2">
               <CheckCircle2 size={16} />
               <span>Xác Nhận & Lưu Tiêu Chí</span>
             </Button>
@@ -1014,7 +1047,7 @@ export const AdminCriteriaPage: React.FC = () => {
               <Button variant="ghost" type="button" onClick={() => setEditingItem(null)}>
                 Hủy
               </Button>
-              <Button variant="primary" type="submit">
+              <Button variant="primary" type="submit" disabled={readOnly}>
                 Cập nhật
               </Button>
             </div>

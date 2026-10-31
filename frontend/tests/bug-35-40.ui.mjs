@@ -126,6 +126,7 @@ try {
     state.failConfig = true;
     await nameInput.fill('Unsaved edit');
     await save.click();
+    await page.getByRole('button',{name:'Xác nhận lưu cấu hình',exact:true}).click();
     await eventually(() => save.isEnabled(), 'Failed save did not release button');
     assert.equal(state.config.name, 'Saved and leave');
     assert.equal(await page.evaluate(() => !window.dispatchEvent(new Event('beforeunload', { cancelable: true }))), true);

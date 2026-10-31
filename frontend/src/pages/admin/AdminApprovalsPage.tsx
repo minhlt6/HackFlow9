@@ -1,4 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
+import { candidateApprovalsApi } from '../../api/candidateApprovalsApi';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { axiosClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
@@ -26,6 +28,11 @@ interface BackendPendingCandidate {
 }
 
 export const AdminApprovalsPage: React.FC = () => {
+  const { confirm, confirmationDialog } = useActionConfirmation();
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [alertIsError, setAlertIsError] = useState(false);
   const { approveCandidate, rejectCandidate } = useMockStore();
   const [backendPending, setBackendPending] = useState<User[]>([]);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -42,6 +49,8 @@ export const AdminApprovalsPage: React.FC = () => {
     try {
       const res = await axiosClient.get<{ data?: BackendPendingCandidate[] }>('/admin/candidates/pending');
       const list = res.data?.data;
+      if (!Array.isArray(list)) throw new Error("Danh sách chờ duyệt không hợp lệ");
+      setLoadFailed(false);
       if (Array.isArray(list)) {
         useMockStore.setState({
           pendingCandidates: list.map((c) => ({
@@ -76,8 +85,12 @@ export const AdminApprovalsPage: React.FC = () => {
           })),
         );
       }
+      return true;
     } catch {
-      // Fallback to mock pendingCandidates
+      setLoadFailed(true);
+      setAlertIsError(true);
+      setAlertMsg("Không thể tải danh sách chờ duyệt. Vui lòng làm mới trước khi duyệt.");
+      return false;
     } finally {
       setIsRefreshing(false);
     }
@@ -101,24 +114,43 @@ export const AdminApprovalsPage: React.FC = () => {
   );
 
   const handleApprove = async (id: string, name: string) => {
+    if (busyRef.current || loadFailed) return;
+    busyRef.current = true; setBusy(true);
     try {
-      await axiosClient.post(`/admin/candidates/${id}/approval`, {
-        action: 'approve',
-        note: 'Phê duyệt bởi BTC trên giao diện Admin',
-      });
+      if (!await confirm({title: 'Duyệt tài khoản thí sinh?', description: `Duyệt ${name} và thêm email vào Whitelist để được tham gia hệ thống?`, confirmLabel: 'Xác nhận duyệt', variant: 'primary'})) return;
+      await candidateApprovalsApi.approve(id);
+      approveCandidate(id);
+      setBackendPending((previous) => previous.filter((candidate) => candidate.id !== id));
+      setAlertIsError(false);
+      setAlertMsg(`Đã phê duyệt tài khoản của thí sinh ${name}!`);
     } catch {
-      setAlertMsg('Không thể lưu phê duyệt. Vui lòng thử lại.');
-      return;
-    }
-    approveCandidate(id);
-    setBackendPending((prev) => prev.filter((c) => c.id !== id));
-    setAlertMsg(`Đã phê duyệt tài khoản của thí sinh ${name}!`);
-    setTimeout(() => setAlertMsg(null), 3000);
+      setAlertIsError(true); setAlertMsg('Không thể lưu phê duyệt. Vui lòng làm mới và thử lại.');
+    } finally {busyRef.current = false; setBusy(false);}
+  };
+
+  const handleApproveAll = async () => {
+    if (busyRef.current || loadFailed || isRefreshing || !backendPending.length) return;
+    const ids = backendPending.map((candidate) => candidate.id);
+    busyRef.current = true; setBusy(true);
+    try {
+      if (!await confirm({title: `Duyệt tất cả ${ids.length} tài khoản đang chờ?`,
+        description: `Duyệt toàn bộ ${ids.length} thí sinh trong danh sách đã tải, không phụ thuộc ô tìm kiếm, và thêm email vào Whitelist. Tài khoản mới xuất hiện sau đó không nằm trong lần duyệt này; tài khoản đã đổi trạng thái sẽ được bỏ qua.`,
+        confirmLabel: `Xác nhận duyệt ${ids.length} tài khoản`, variant: 'warning'})) return;
+      const result = await candidateApprovalsApi.approveAll(ids);
+      const approved = new Set(result.data.approved_ids);
+      setBackendPending((previous) => previous.filter((candidate) => !approved.has(candidate.id)));
+      useMockStore.setState((state) => ({pendingCandidates: state.pendingCandidates.filter((candidate) => !approved.has(candidate.id))}));
+      const refreshed = await fetchBackendPending();
+      setAlertIsError(!refreshed); setAlertMsg(result.message + (refreshed ? "" : " Không tải lại được danh sách; vui lòng làm mới."));
+    } catch {
+      setAlertIsError(true); setAlertMsg('Không thể duyệt tất cả tài khoản. Dữ liệu chưa được xác nhận lưu; vui lòng làm mới và thử lại.');
+    } finally {busyRef.current = false; setBusy(false);}
   };
 
   const handleConfirmReject = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!rejectingCandidateId) return;
+    if (!rejectingCandidateId || busyRef.current) return;
+    busyRef.current = true; setBusy(true);
 
     const targetId = rejectingCandidateId;
 
@@ -128,10 +160,13 @@ export const AdminApprovalsPage: React.FC = () => {
         note: rejectReason,
       });
     } catch {
-      setAlertMsg('Không thể lưu phê duyệt. Vui lòng thử lại.');
+      setAlertIsError(true); setAlertMsg('Không thể lưu phê duyệt. Vui lòng thử lại.');
+      busyRef.current = false; setBusy(false);
       return;
     }
 
+    busyRef.current = false; setBusy(false);
+    setAlertIsError(false);
     rejectCandidate(targetId, rejectReason);
     setBackendPending((prev) => prev.filter((c) => c.id !== targetId));
     setRejectingCandidateId(null);
@@ -141,6 +176,7 @@ export const AdminApprovalsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 ">
+      {confirmationDialog}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -154,10 +190,12 @@ export const AdminApprovalsPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button variant="primary" disabled={busy || isRefreshing || loadFailed || !backendPending.length} onClick={() => void handleApproveAll()}>Duyệt tất cả ({backendPending.length})</Button>
           <Button
             variant="secondary"
             size="sm"
+            disabled={busy || isRefreshing}
             onClick={() => void fetchBackendPending()}
             className="gap-1.5"
           >
@@ -169,7 +207,7 @@ export const AdminApprovalsPage: React.FC = () => {
       </div>
 
       {alertMsg && (
-        <div className="p-3.5 rounded-[10px] bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
+        <div role="alert" className={`p-3.5 rounded-[10px] border text-xs flex items-center gap-2 ${alertIsError ? "bg-rose-500/10 border-rose-500/30 text-rose-700 dark:text-rose-400" : "bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400"}`}>
           <CheckCircle size={15} />
           <span>{alertMsg}</span>
         </div>
@@ -254,7 +292,8 @@ export const AdminApprovalsPage: React.FC = () => {
                         <Button
                           variant="success"
                           size="sm"
-                          onClick={() => handleApprove(cand.id, cand.fullName)}
+                          disabled={busy || isRefreshing || loadFailed}
+                          onClick={() => void handleApprove(cand.id, cand.fullName)}
                           className="gap-1 px-3 cursor-pointer"
                         >
                           <CheckCircle size={14} />
@@ -263,6 +302,7 @@ export const AdminApprovalsPage: React.FC = () => {
                         <Button
                           variant="danger"
                           size="sm"
+                          disabled={busy}
                           onClick={() => setRejectingCandidateId(cand.id)}
                           className="gap-1 px-3 cursor-pointer"
                         >
@@ -305,7 +345,7 @@ export const AdminApprovalsPage: React.FC = () => {
             <Button variant="ghost" type="button" onClick={() => setRejectingCandidateId(null)}>
               Hủy
             </Button>
-            <Button variant="danger" type="submit">
+            <Button variant="danger" type="submit" disabled={busy}>
               Xác nhận từ chối
             </Button>
           </div>

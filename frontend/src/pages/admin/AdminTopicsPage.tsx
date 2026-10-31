@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import { useMockStore } from '../../store/useMockStore';
@@ -23,7 +24,8 @@ import { topicsApi } from '../../api/topicsApi';
 import type { MajorTopic, SubTopic } from '../../types';
 
 export const AdminTopicsPage: React.FC = () => {
-  const { majorTopics, addMajorTopic, deleteMajorTopic, updateSubTopicQuota } =
+  const { confirm, confirmationDialog } = useActionConfirmation();
+  const { majorTopics, addMajorTopic, deleteMajorTopic } =
     useMockStore();
 
   const [loading, setLoading] = useState(false);
@@ -144,6 +146,7 @@ export const AdminTopicsPage: React.FC = () => {
     title: string;
     description: string;
     quota: number;
+    mentorName?: string;
   } | null>(null);
   const [editSubTitle, setEditSubTitle] = useState('');
   const [editSubDesc, setEditSubDesc] = useState('');
@@ -239,6 +242,8 @@ export const AdminTopicsPage: React.FC = () => {
   const handleSaveQuota = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSubTopic) return;
+    const mentorName = mentors.find((mentor) => mentor.id === editMentorId)?.full_name || 'Chưa phân công';
+    if (!await confirm({title: 'Lưu thay đổi đề tài nhánh?', description: `Đề tài: ${editingSubTopic.title} → ${editSubTitle.trim() || editingSubTopic.title}. Số chỗ: ${editingSubTopic.quota} → ${newQuotaValue}. Cố vấn: ${editingSubTopic.mentorName || 'Chưa phân công'} → ${mentorName}. Thay đổi áp dụng ngay cho các đội thi.`, confirmLabel: 'Xác nhận lưu đề tài'})) return;
 
     setIsSubmitting(true);
     try {
@@ -256,7 +261,8 @@ export const AdminTopicsPage: React.FC = () => {
         setIsSubmitting(false);
         return;
       } else {
-        updateSubTopicQuota(editingSubTopic.id, newQuotaValue);
+        showAlert('Không thể lưu thay đổi đề tài. Vui lòng thử lại.', 'error');
+        return;
       }
     } finally {
       setIsSubmitting(false);
@@ -289,6 +295,7 @@ export const AdminTopicsPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {confirmationDialog}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
         <div>
@@ -479,6 +486,7 @@ export const AdminTopicsPage: React.FC = () => {
                                   title: sub.title,
                                   description: sub.description || '',
                                   quota: maxQuota,
+                                  mentorName: sub.mentorName,
                                 });
                                 setEditSubTitle(sub.title);
                                 setEditSubDesc(sub.description || '');

@@ -248,9 +248,10 @@ async def test_auto_match_obeys_custom_limits_and_persists(client):
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["matched_candidates_count"] == 11
-    assert sorted(t["member_count"] for t in data["teams"]) == [5, 6]
+    # BUG-41: maximize valid teams rather than preferring the requested size.
+    assert sorted(t["member_count"] for t in data["teams"]) == [2, 2, 2, 2, 3]
     teams = (await client.get("/api/v1/admin/teams", headers=ADMIN)).json()["data"]
-    assert sorted(t["member_count"] for t in teams) == [5, 6]
+    assert sorted(t["member_count"] for t in teams) == [2, 2, 2, 2, 3]
     assert all(t["min_members"] == 2 and t["max_members"] == 6 for t in teams)
 
 

@@ -1,6 +1,8 @@
 export type TopicStatus = 'AVAILABLE' | 'FULL' | 'CLOSED';
 
 export interface Subtopic {
+  can_select?: boolean;
+  unavailable_reason?: string | null;
   id: string;
   topic_id: string;
   mentor_id?: string | null;
@@ -14,6 +16,8 @@ export interface Subtopic {
 }
 
 export interface Topic {
+  can_select?: boolean;
+  unavailable_reason?: string | null;
   id: string;
   title: string;
   description?: string | null;

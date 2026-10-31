@@ -1,3 +1,4 @@
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { axiosClient } from '../../api/axiosClient';
@@ -23,6 +24,7 @@ interface BackendWhitelistItem {
 }
 
 export const AdminWhitelistPage: React.FC = () => {
+  const { confirm, confirmationDialog } = useActionConfirmation();
   const {
     addWhitelistEntry,
     bulkImportWhitelist,
@@ -121,6 +123,7 @@ export const AdminWhitelistPage: React.FC = () => {
       .filter((e) => e.length > 0 && e.includes('@'));
 
     if (emails.length === 0) return;
+    if (!await confirm({title: 'Nhập Whitelist hàng loạt?', description: `Thêm hoặc kích hoạt lại ${new Set(emails.map((email) => email.toLowerCase())).size} email vào danh sách cho phép tham gia.`, confirmLabel: 'Xác nhận nhập danh sách'})) return;
 
 
     setIsBulkOpen(false);
@@ -173,6 +176,7 @@ export const AdminWhitelistPage: React.FC = () => {
       setDeactivateWlTarget(item);
       return;
     }
+    if (!await confirm({title: "Kích hoạt lại Whitelist?", description: `Cho phép email ${item.email} tham gia trở lại?`, confirmLabel: "Xác nhận kích hoạt"})) return;
     await executeToggleActive(item);
   };
 
@@ -204,6 +208,7 @@ export const AdminWhitelistPage: React.FC = () => {
 
   return (
     <div className="space-y-6 ">
+      {confirmationDialog}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>

@@ -342,7 +342,7 @@ export function useAdminTeams() {
     setIsAutoMatching(true);
     setIsMutating(true);
     try {
-      const { message } = await adminTeamsApi.autoMatchTeams({
+      const { message, result } = await adminTeamsApi.autoMatchTeams({
         target_team_size: 4,
         fill_incomplete_teams: true,
         auto_assign_topics: true,
@@ -350,7 +350,8 @@ export function useAdminTeams() {
       });
       await loadTeams();
       void syncFromBackend?.();
-      toast.success('Ghép đội ngẫu nhiên thành công!', message);
+      if (result.matched_candidates_count) toast.success('Ghép đội ngẫu nhiên thành công!', message);
+      else toast.info('Chưa có đội mới được ghép', message);
     } catch (err) {
       const msg =
         err instanceof Error
