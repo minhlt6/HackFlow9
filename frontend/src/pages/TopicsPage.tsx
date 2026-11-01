@@ -32,6 +32,16 @@ type FilterTab = 'all' | 'available' | 'full' | 'selected';
 export const TopicsPage: React.FC = () => {
   const currentUser = useAuthStore((state) => state.user);
 
+  const [cancelPolicy, setCancelPolicy] = useState({can_cancel_topic:false, reason:'Đang kiểm tra quyền hủy đề tài.' as string | null});
+  const refreshCancellationPolicy = useCallback(async () => {
+    try { setCancelPolicy(await topicsApi.getCancellationPolicy()); }
+    catch { setCancelPolicy({can_cancel_topic:false, reason:'Không thể kiểm tra quyền hủy. Vui lòng làm mới.'}); }
+  }, []);
+  useEffect(() => {
+    void Promise.resolve().then(refreshCancellationPolicy);
+    window.addEventListener('focus', refreshCancellationPolicy);
+    return () => window.removeEventListener('focus', refreshCancellationPolicy);
+  }, [refreshCancellationPolicy]);
   // Topics & Team Data
   const [topics, setTopics] = useState<Topic[]>([]);
   const [team, setTeam] = useState<TeamDetails | null>(null);
@@ -120,6 +130,7 @@ export const TopicsPage: React.FC = () => {
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setFetchError(null);
+    await refreshCancellationPolicy();
 
     let loadedTopics: Topic[];
     let loadedTeam: TeamDetails | null;
@@ -149,7 +160,7 @@ export const TopicsPage: React.FC = () => {
     setTopics(loadedTopics);
     setTeam(loadedTeam);
     setIsLoading(false);
-  }, []);
+  }, [refreshCancellationPolicy]);
 
   useEffect(() => {
     let isMounted = true;
@@ -326,13 +337,14 @@ export const TopicsPage: React.FC = () => {
 
   // Action: Open Cancel Modal
   const handleOpenCancelModal = (topic: Topic) => {
+    if (!cancelPolicy.can_cancel_topic) return;
     setCancelError(null);
     setTopicToCancel(topic);
   };
 
   // Action: Confirm Cancel Topic
   const handleConfirmCancel = async () => {
-    if (!topicToCancel) return;
+    if (!topicToCancel || !cancelPolicy.can_cancel_topic) return;
     if (!isLeader) {
       setCancelError('Chỉ Đội trưởng (Team Leader) mới có quyền đăng ký hoặc hủy chọn đề tài.');
       return;
@@ -346,6 +358,7 @@ export const TopicsPage: React.FC = () => {
         });
 
 
+      void refreshCancellationPolicy();
       showToast(`Đã hủy đăng ký đề tài "${topicToCancel.title}" thành công.`, 'success');
 
       // Update local team state
@@ -386,6 +399,7 @@ export const TopicsPage: React.FC = () => {
         'Không thể hủy đề tài. Có thể thời hạn hủy đã kết thúc!'
       );
       setCancelError(errorMsg);
+      void refreshCancellationPolicy();
     } finally {
       setIsSubmittingCancel(false);
     }
@@ -393,6 +407,7 @@ export const TopicsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 text-foreground ">
+      {team?.topic_id && !cancelPolicy.can_cancel_topic && <p role="status" className="rounded-xl border border-border p-4 text-sm text-muted-foreground">{cancelPolicy.reason}</p>}
       {/* Toast Feedback */}
       {feedbackToast && (
         <div
@@ -464,7 +479,9 @@ export const TopicsPage: React.FC = () => {
                 <Button
                   variant="danger"
                   size="sm"
-                  onClick={() => handleOpenCancelModal(currentSelectedTopic)}
+                  disabled={!cancelPolicy.can_cancel_topic}
+                        title={cancelPolicy.reason || undefined}
+                        onClick={() => handleOpenCancelModal(currentSelectedTopic)}
                   className="px-4 py-2 font-semibold shadow-md"
                 >
                   <XCircle size={15} />
@@ -788,6 +805,8 @@ export const TopicsPage: React.FC = () => {
                       <Button
                         variant="danger"
                         size="sm"
+                        disabled={!cancelPolicy.can_cancel_topic}
+                        title={cancelPolicy.reason || undefined}
                         onClick={() => handleOpenCancelModal(topic)}
                         className="w-full py-2 font-medium"
                       >
@@ -1057,7 +1076,8 @@ export const TopicsPage: React.FC = () => {
                 variant="danger"
                 size="md"
                 isLoading={isSubmittingCancel}
-                onClick={handleConfirmCancel}
+                disabled={!cancelPolicy.can_cancel_topic}
+              onClick={handleConfirmCancel}
                 className="px-6 font-semibold"
               >
                 <XCircle size={16} />

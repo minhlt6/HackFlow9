@@ -1,3 +1,4 @@
+import { useLiveCheckpoints } from '../../hooks/useLiveCheckpoints';
 import React, { useEffect, useState } from 'react';
 import { checkpointApi } from '../../api/checkpointApi';
 import { getSubmissionStatusMeta, type CheckpointWithSubmission } from '../../types/checkpoint';
@@ -24,7 +25,8 @@ export const CandidateDashboardPage: React.FC = () => {
   const { currentUser, teams, majorTopics, config, announcements } =
     useMockStore();
   const navigate = useNavigate();
-  const [checkpoints, setCheckpoints] = useState<CheckpointWithSubmission[]>([]);
+  const [rawCheckpoints, setCheckpoints] = useState<CheckpointWithSubmission[]>([]);
+  const checkpoints = useLiveCheckpoints(rawCheckpoints, setCheckpoints);
   const [progressError, setProgressError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -75,6 +77,7 @@ export const CandidateDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6 ">
+      {checkpoints.some((cp) => cp.availability_error) && <p role="alert" className="rounded-xl border border-amber-500/30 p-4 text-sm">Không thể xác minh trạng thái các chặng. Form nộp tạm khóa cho đến khi kết nối lại.</p>}
       {progressError && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-destructive">{progressError}</p>}
       {/* Welcome Banner */}
       <div className="relative overflow-hidden rounded-[16px] border border-border bg-card p-6 lg:p-8">

@@ -78,6 +78,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
 
   const {
     register,
+    setError,
     handleSubmit,
     reset,
     control,
@@ -129,7 +130,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
   const unassignedPool = useMemo(
     () =>
       candidatesDirectory.filter(
-        (c) => !c.hasTeam && c.approval_status === 'approved',
+        (c) => !c.hasTeam && c.approval_status === 'approved' && c.is_active === true,
       ),
     [candidatesDirectory],
   );
@@ -342,6 +343,10 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
     totalMembersCount >= minTeamSize && totalMembersCount <= maxTeamSize;
 
   const onFormValid = async (values: AdminTeamFormValues) => {
+    if (values.inviteCode.trim().length < 6 && values.inviteCode.trim().toUpperCase() !== editingTeam?.inviteCode?.toUpperCase()) {
+      setError('inviteCode', {type:'validate', message:'Mã mời mới phải gồm 6–16 ký tự.'}); return;
+    }
+
     const resolvedLeader = candidateByEmail.get(
       values.leaderEmail.trim().toLowerCase(),
     );
@@ -385,7 +390,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
         </DialogHeader>
 
         <datalist id="candidate-email-datalist">
-          {candidatesDirectory.map((c) => (
+          {candidatesDirectory.filter((c) => c.is_active).map((c) => (
             <option
               key={c.id}
               value={c.email}
@@ -461,7 +466,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
               <div className="sm:col-span-3 space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="team-form-code" requiredIndicator>
-                    Mã mời (6 ký tự)
+                    Mã mời (6–16 ký tự; tự sinh 6)
                   </Label>
                   <button
                     type="button"
@@ -479,7 +484,7 @@ export const TeamFormDialog: React.FC<TeamFormDialogProps> = ({
                 <Input
                   id="team-form-code"
                   placeholder="HF2026"
-                  maxLength={6}
+                  maxLength={16}
                   className="font-mono uppercase"
                   hasError={Boolean(errors.inviteCode)}
                   disabled={isSubmitting}

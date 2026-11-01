@@ -2,6 +2,8 @@ import asyncio
 from typing import Dict, List, Optional
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from app.models.checkpoint import Submission
 
 from app.core.exceptions import (
     BadRequestException,
@@ -32,6 +34,26 @@ class TopicService:
     and cancellation within the allowed competition timeframe.
     """
     _topic_locks: Dict[str, asyncio.Lock] = {}
+
+    async def cancellation_policy(self, db, user, team=None):
+        membership = await team_repo.get_user_membership(db, str(user.id))
+        reason = None
+        if user.role != "candidate" or user.approval_status != "approved" or not membership or membership.role != TeamMemberRole.LEADER.value:
+            reason = "Chỉ đội trưởng mới có quyền hủy đề tài."
+        else:
+            team = team or await team_repo.get_by_id(db, membership.team_id)
+            config = await topic_repo.get_config(db)
+            if not team or not team.topic_id:
+                reason = "Đội chưa chọn đề tài."
+            elif team.is_locked:
+                reason = "Đội thi đã khóa đề tài, không thể hủy."
+            elif config and str((config.settings_data or {}).get("status", "")).lower() not in {"", "registration", "team_formation"}:
+                reason = "Đã qua giai đoạn chọn đề tài; vui lòng liên hệ Ban tổ chức."
+            elif config and (not config.is_topic_published or datetime.now(timezone.utc) > (config.end_time.replace(tzinfo=timezone.utc) if config.end_time.tzinfo is None else config.end_time)):
+                reason = "Thời gian thay đổi đề tài đã đóng."
+            elif (await db.execute(select(Submission.id).where(Submission.team_id == team.id).limit(1))).first():
+                reason = "Đội đã có bài nộp, không thể hủy đề tài."
+        return {"can_cancel_topic": reason is None, "reason": reason}
 
     def _get_topic_lock(self, topic_id: str) -> asyncio.Lock:
         if topic_id not in self._topic_locks:
@@ -515,6 +537,9 @@ class TopicService:
                 )
 
             # 4. Lock and decrement Topic & Subtopic
+            policy = await self.cancellation_policy(db, current_user, team)
+            if not policy["can_cancel_topic"]:
+                raise ConflictException(message=policy["reason"], error_code="TOPIC_CANCELLATION_LOCKED")
             topic = await topic_repo.get_by_id(db, team.topic_id, for_update=True)
             if topic and topic.current_teams > 0:
                 topic.current_teams -= 1

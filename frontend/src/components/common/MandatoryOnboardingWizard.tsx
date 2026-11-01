@@ -578,7 +578,7 @@ const MandatoryOnboardingWizardContent: React.FC = () => {
                         <form onSubmit={handleJoinTeam} className="space-y-3 text-xs">
                           <div className="space-y-1.5">
                             <label className="text-foreground font-medium">
-                              Nhập mã mời 6 ký tự do Đội trưởng cung cấp *
+                              Nhập mã mời do Đội trưởng cung cấp (6–16 ký tự; hỗ trợ mã cũ) *
                             </label>
                             <div className="flex gap-2">
                               <input

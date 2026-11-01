@@ -1,6 +1,12 @@
 from datetime import datetime, timezone
 import hashlib
 import math
+from types import SimpleNamespace
+from sqlalchemy.orm import selectinload
+from app.models.team import Team
+from app.models.checkpoint import Submission
+from app.services.judging_policy import judging_block_reason
+from app.services.checkpoint_service import ensure_utc
 from typing import Any, Dict, List, Optional, Tuple
 from fastapi import status
 from sqlalchemy import select
@@ -246,6 +252,22 @@ class EvaluationService:
                     filtered.append(sub)
             submissions = filtered
 
+        if current_user.role == UserRole.JUDGE.value and has_assignments:
+            assigned = await self.repo.list_judge_assignments(current_user.id)
+            missing_ids = {row.team_id for row in assigned if row.team_id} - {s.team_id for s in submissions}
+            if missing_ids:
+                missing = (await self.db.execute(select(Team).where(Team.id.in_(missing_ids)).options(
+                    selectinload(Team.topic), selectinload(Team.subtopic)))).scalars().all()
+                for team in missing:
+                    if (team.admin_meta or {}).get("approval_status") == "rejected":
+                        continue
+                    submissions.append(SimpleNamespace(id=team.id, team_id=team.id, team=team, checkpoint=None,
+                        status="missing", repo_url=None, demo_url=None, commit_sha=None, submission_data={}, note=None, submitted_at=None))
+
+        scoped_ids = {s.team_id for s in submissions}
+        progress = (await self.db.execute(select(Submission).where(Submission.team_id.in_(scoped_ids)).options(
+            selectinload(Submission.checkpoint)))).scalars().all() if scoped_ids else []
+
         active_criteria = await self.repo.list_active_criteria()
         criteria_map = {c.id: c for c in active_criteria}
 
@@ -269,7 +291,7 @@ class EvaluationService:
             slide_url = sub_data.get("slide_url") or sub_data.get("presentation_url")
             note = sub.note or sub_data.get("note") or sub_data.get("description")
 
-            sub_evals = evals_by_submission.get(sub.id, [])
+            sub_evals = evals_by_submission.get(sub.id, []) if sub.checkpoint else []
             if not sub_evals:
                 eval_status = "not_started"
                 my_total_score: Optional[float] = None
@@ -310,7 +332,19 @@ class EvaluationService:
 
             items.append(
                 {
-                    "submission_id": sub.id,
+                    "review_id": sub.id,
+                    "submission_id": sub.id if sub.checkpoint else None,
+                    "can_evaluate": judging_block_reason(sub) is None,
+                    "evaluation_block_reason": judging_block_reason(sub),
+                    "submission_status": sub.status,
+                    "checkpoint_submissions": [
+                        {"id": p.id, "checkpoint_id": p.checkpoint_id, "checkpoint_title": p.checkpoint.title,
+                         "status": p.status, "submitted_at": ensure_utc(p.submitted_at).isoformat(),
+                         "repo_url": p.repo_url, "demo_url": p.demo_url, "note": p.note,
+                         "commit_sha": p.commit_sha}
+                        for p in sorted(progress, key=lambda p: (p.checkpoint.display_order, p.checkpoint_id))
+                        if p.team_id == sub.team_id and not p.checkpoint.is_final_checkpoint
+                    ],
                     "anonymous_team_code": generate_anonymous_team_code(sub.team_id),
                     "topic_title": topic_title,
                     "repo_url": repo_url,
@@ -410,10 +444,6 @@ class EvaluationService:
             )
 
         submission = await self.repo.get_submission_by_id_or_team(payload.submission_id)
-        if settings.demo_enabled and submission is None and payload.team_id:
-            submission = await self.repo.ensure_final_submission_for_team(
-                payload.team_id, str(current_user.id)
-            )
         if submission is None:
             raise AppException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -450,6 +480,9 @@ class EvaluationService:
                 )
 
         await self.repo.lock_rubric()
+        reason = judging_block_reason(submission)
+        if reason:
+            raise AppException(status_code=status.HTTP_409_CONFLICT, message=reason, error_code="FINAL_SUBMISSION_NOT_ELIGIBLE")
         existing_evals = await self.repo.list_judge_evaluations_for_submission(
             submission.id, current_user.id
         )

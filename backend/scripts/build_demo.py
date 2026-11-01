@@ -75,7 +75,7 @@ def build_dataset(stage, now, password):
 
     results = stage == "results"
     add(HackathonConfig, "config", name="HackFlow — Cuộc thi Demo", start_time=now-timedelta(days=1),
-        end_time=now+timedelta(days=3), is_topic_published=True, is_result_published=False,
+        end_time=now+timedelta(days=5), is_topic_published=True, is_result_published=False,
         settings_data={"status": "judging" if results else "hacking", "season": "Demo",
                        "minTeamMembers": 3, "maxTeamMembers": 5, "minTeamSize": 3, "maxTeamSize": 5,
                        "registrationDeadline": (now+timedelta(days=1)).isoformat(),
@@ -121,10 +121,10 @@ def build_dataset(stage, now, password):
                        "invite_code": f"DEMO{slug.upper()}", "size": size, "approval": approval}
 
     # Two open stages allow real writes; closed/upcoming stages demonstrate server-side time gates.
-    cp_specs = [("closed", "Chặng 1 — Đã đóng", -48, -24, False, 15),
+    cp_specs = [("closed", "Chặng 1 — Khởi động", -48, -24, False, 15),
                 ("open", "Chặng 2 — Nộp tiến độ trực tiếp", -12, 24, False, 20),
-                ("future", "Chặng 3 — Chưa mở", 48, 72, False, 25),
-                ("final", "Chung kết — Nộp bài và chấm điểm", -6, 36, True, 40)]
+                ("future", "Chặng 3 — Tích hợp và kiểm thử", 48, 72, False, 25),
+                ("final", "Chung kết — Nộp bài và chấm điểm", -6, 96, True, 40)]
     for order, (slug, title, start, end, final, weight) in enumerate(cp_specs, 1):
         checkpoints[slug] = add(Checkpoint, f"checkpoint/{slug}", title=title,
             description="Mốc tương đối theo giờ tạo bộ demo; giờ UTC được giao diện đổi sang giờ địa phương.",

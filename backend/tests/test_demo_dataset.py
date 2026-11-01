@@ -52,7 +52,11 @@ async def test_demo_database_real_api_lifecycle(stage, db_session, client):
         selected = await client.post("/api/v1/topics/select", headers=explorer, json={"topic_id": demo_id("topic/0"), "subtopic_id": demo_id("subtopic/0/1")})
         assert selected.status_code == 200, selected.text
         cancelled = await client.post("/api/v1/topics/cancel", headers=explorer, json={})
-        assert cancelled.status_code == 200, cancelled.text
+        assert cancelled.status_code == 409, cancelled.text
+        # Cancelling is only legal before hacking and before the team submits.
+        phase = await client.patch('/api/v1/admin/config', headers=admin, json={'status':'team_formation'})
+        assert phase.status_code == 200
+        assert (await client.post('/api/v1/topics/cancel', headers=explorer, json={})).status_code == 200
         expired = await client.patch("/api/v1/tickets/" + manifest["tickets"]["expired"], headers=leader, json={"action": "reopen"})
         assert expired.status_code == 409, expired.text
         recent = await client.patch("/api/v1/tickets/" + manifest["tickets"]["recent"], headers=leader, json={"action": "reopen"})
@@ -61,6 +65,12 @@ async def test_demo_database_real_api_lifecycle(stage, db_session, client):
         assert foreign.status_code == 403, foreign.text
         payload = {"submission_id": manifest["final_submissions"]["cyber"], "status": "draft",
                    "evaluations": [{"criteria_id": c["id"], "score": 8, "comment": "Demo"} for c in criteria]}
+        blocked = await client.post("/api/v1/evaluations", headers=judge, json=payload)
+        assert blocked.status_code == 409  # Unverified fixtures are intentionally not gradeable.
+        from app.models.checkpoint import Submission
+        sub = await db_session.get(Submission, manifest['final_submissions']['cyber'])
+        sub.status = 'submitted'; sub.commit_sha = 'a' * 40
+        await db_session.commit()
         draft = await client.post("/api/v1/evaluations", headers=judge, json=payload)
         assert draft.status_code in (200, 201), draft.text
         payload["status"] = "submitted"

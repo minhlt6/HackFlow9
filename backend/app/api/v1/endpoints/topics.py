@@ -21,6 +21,11 @@ from app.services.topic_service import topic_service
 router = APIRouter()
 
 
+@router.get("/cancellation-policy")
+async def cancellation_policy(db: AsyncSession = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return ApiResponse.ok(data=await topic_service.cancellation_policy(db, current_user))
+
+
 @router.get(
     "",
     response_model=ApiResponse[List[TopicResponse]],

@@ -1,4 +1,5 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
+import {evaluationService} from '../../services/evaluationService';
 import { useMockStore, normalizeScoreTo100 } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
 import { Badge } from '../../components/Badge';
@@ -12,10 +13,16 @@ import {
 export const JudgeDashboardPage: React.FC = () => {
   const { currentUser, teams, evaluations, majorTopics, rubricCriteria } = useMockStore();
   const navigate = useNavigate();
+  const [loadError, setLoadError] = useState('');
+  useEffect(() => {
+    let active = true;
+    void evaluationService.getAnonymousSubmissions().then(() => useMockStore.getState().syncFromBackend?.()).catch(() => {if (active) setLoadError('Không thể tải bài chấm. Vui lòng kiểm tra phiên đăng nhập và tải lại.');});
+    return () => {active = false;};
+  }, []);
 
   // Find evaluations by this judge
   const activeTeams = teams.filter((t) => t.status !== 'REJECTED' && t.approvalStatus !== 'rejected');
-  const judgeEvals = evaluations.filter((e) => e.judgeId === currentUser.id);
+  const judgeEvals = evaluations.filter((e) => e.judgeId === currentUser.id && teams.some((team) => team.id === e.teamId && team.canEvaluate === true));
 
   const getTopicTitle = (subTopicId?: string) => {
     if (!subTopicId) return 'Chưa phân công';
@@ -28,6 +35,7 @@ export const JudgeDashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6 ">
+      {loadError && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-sm text-destructive">{loadError}</p>}
       {/* Top Banner */}
       <div className="relative overflow-hidden rounded-[16px] border border-border bg-card p-6 lg:p-8">
         <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-[#6366F1]/10 blur-3xl pointer-events-none" />
@@ -113,7 +121,7 @@ export const JudgeDashboardPage: React.FC = () => {
 
                     <td className="py-3.5 px-4 text-center">
                       <Badge variant={isEvaluated ? 'success' : isDraft ? 'cyan' : 'warning'}>
-                        {isEvaluated
+                        {team.canEvaluate !== true ? 'Chưa đủ điều kiện chấm' : isEvaluated
                           ? 'Đã chấm xong'
                           : isDraft
                           ? 'Đang lưu nháp'
@@ -139,7 +147,7 @@ export const JudgeDashboardPage: React.FC = () => {
                         className="gap-1 px-3"
                       >
                         <Columns size={13} />
-                        <span>{isEvaluated ? 'Xem lại' : 'Chấm điểm'}</span>
+                        <span>{team.canEvaluate !== true ? 'Xem tiến độ' : isEvaluated ? 'Xem lại' : 'Chấm điểm'}</span>
                         <ArrowRight size={13} />
                       </Button>
                     </td>

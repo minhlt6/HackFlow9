@@ -79,7 +79,7 @@ Admin duyệt `PendingPioneers`; thử duyệt `NewBuilders` có 2 người và 
 
 ### Cảnh 7 — Chọn/hủy đề tài và kiểm soát chỗ (2 phút)
 
-Đăng nhập `explore.leader`, vào `/topics`: thử lĩnh vực **Web3 — Đã hết chỗ** để thấy bị chặn. Chọn nhánh còn chỗ của **AI & Giáo dục**, F5 và quan sát chỗ đã sử dụng tăng. Hủy trong điều kiện cho phép để thấy trả lại chỗ; nếu UI đang khóa theo giai đoạn thì admin mở chọn đề tài trước cảnh này.
+Đăng nhập `explore.leader`, vào `/topics`: thử lĩnh vực **Web3 — Đã hết chỗ** để thấy bị chặn. Chọn nhánh còn chỗ của **AI & Giáo dục**, F5 và quan sát chỗ đã sử dụng tăng. Muốn hủy để minh họa trả lại chỗ, admin chuyển về giai đoạn thành lập đội trước, dùng đội chưa khóa và chưa có bài nộp; sau đó trở lại giai đoạn thực thi. Trong giai đoạn thực thi nút hủy bị khóa; nếu UI đang khóa theo giai đoạn thì admin mở chọn đề tài trước cảnh này.
 
 Nếu muốn thể hiện tính nhất quán, mở danh mục ở admin sau thao tác và đối chiếu với candidate. Không sửa tay bộ đếm slot trong CSDL.
 
@@ -95,7 +95,7 @@ Thử nộp tại chặng đã đóng/chưa mở nếu giao diện cho thao tác
 
 Vẫn dùng `cyber.leader`, vào `/final-submission`, thay repo/link mẫu bằng repo GitHub công khai hoạt động, nộp lại. Kiểm tra thông báo, thời gian nhận, SHA và lịch sử sau F5. Chuẩn bị trước quyền truy cập/token nếu dùng repo riêng tư.
 
-Bài chung kết được dựng sẵn đang ghi rõ chưa xác minh SHA. Chỉ gọi thao tác nộp lại này là “đóng băng SHA thành công” khi API thực sự trả kết quả thành công và có SHA. Nếu GitHub lỗi, trình bày đúng trạng thái lỗi và tiếp tục bằng bài mẫu; không coi bài mẫu là bằng chứng tích hợp GitHub đã chạy.
+Bài chung kết được dựng sẵn đang ghi rõ chưa xác minh SHA. Chỉ gọi thao tác nộp lại này là “đóng băng SHA thành công” khi API thực sự trả kết quả thành công và có SHA. Nếu GitHub lỗi, trình bày đúng trạng thái lỗi và chỉ xem tiến độ hoặc bộ kết quả chuẩn bị sẵn; không chấm bài final chưa xác minh và không coi bài mẫu là bằng chứng GitHub đã chạy.
 
 ### Cảnh 10 — Ticket candidate → mentor → candidate (4 phút)
 

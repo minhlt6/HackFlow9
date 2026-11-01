@@ -273,7 +273,7 @@ class TeamService:
         invite_code: str,
     ) -> TeamResponse:
         cleaned_code = invite_code.strip().upper()
-        if not cleaned_code or len(cleaned_code) < 6:
+        if not cleaned_code or len(cleaned_code) < 4:
             raise BadRequestException(
                 message="Mã mời không tồn tại hoặc không hợp lệ.",
                 error_code="INVITE_CODE_INVALID",

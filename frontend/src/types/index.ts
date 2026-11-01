@@ -43,6 +43,8 @@ export interface TeamMember {
 }
 
 export interface Team {
+  canEvaluate?: boolean;
+  evaluationBlockReason?: string;
   id: string;
   name: string;
   description: string;
@@ -108,6 +110,7 @@ export interface SubmissionFieldConfig {
 }
 
 export interface CheckpointSubmission {
+  checkpointTitle?: string;
   id: string;
   checkpointId: string;
   teamId: string;

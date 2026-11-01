@@ -286,8 +286,8 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
       setJoinError('Vui lòng nhập mã mời tham gia.');
       return;
     }
-    if (cleaned.length < 6) {
-      setJoinError('Mã mời phải có đúng 6 ký tự.');
+    if (!/^[A-Z0-9-]{4,16}$/.test(cleaned)) {
+      setJoinError('Mã mời phải gồm 6–16 ký tự; có hỗ trợ mã cũ đã phát.');
       return;
     }
 
@@ -1057,7 +1057,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
                 Bạn Chưa Thuộc Đội Thi Nào
               </h3>
               <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
-                Để tham gia chọn đề tài và nộp các bài thi các chặng, bạn cần tạo một đội thi mới hoặc tham gia đội thi có sẵn qua mã mời 6 ký tự.
+                Để tham gia chọn đề tài và nộp các bài thi các chặng, bạn cần tạo một đội thi mới hoặc tham gia đội thi có sẵn qua mã mời do đội trưởng cung cấp.
               </p>
             </div>
 
@@ -1173,7 +1173,7 @@ const [team, setTeamState] = useState<TeamDetails | null>(loadInitialTeam);
         <form onSubmit={handleJoinTeam} className="space-y-4">
           <Input
             label="Mã mời tham gia đội *"
-            placeholder="Nhập 6 ký tự (ví dụ: CS8821)"
+            placeholder="Nhập mã mời (ví dụ: CS8821)"
             value={joinCode}
             onChange={(e) => {
               setJoinCode(e.target.value.toUpperCase());

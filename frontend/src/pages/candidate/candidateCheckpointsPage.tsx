@@ -1,3 +1,5 @@
+import { checkpointScheduleWarning } from '../../utils/progress';
+import { useLiveCheckpoints } from '../../hooks/useLiveCheckpoints';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   CheckSquare,
@@ -24,7 +26,8 @@ import {
 } from '../../types/checkpoint';
 
 export const CandidateCheckpointsPage: React.FC = () => {
-  const [checkpoints, setCheckpoints] = useState<CheckpointWithSubmission[]>([]);
+  const [rawCheckpoints, setCheckpoints] = useState<CheckpointWithSubmission[]>([]);
+  const checkpoints = useLiveCheckpoints(rawCheckpoints, setCheckpoints);
   const [selectedCheckpointId, setSelectedCheckpointId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState('');
@@ -96,6 +99,8 @@ export const CandidateCheckpointsPage: React.FC = () => {
   const handleSelectCheckpoint = (cpId: string) => {
     setSelectedCheckpointId(cpId);
     fetchSubmissions(cpId);
+    setCheckpoints((items) => items.map((cp) => cp.id === cpId ? {...cp, availability_error:'Đang kiểm tra trạng thái chặng.'} : cp));
+    void checkpointApi.getCheckpoints().then(setCheckpoints).catch(() => setLoadError('Không thể kiểm tra trạng thái chặng. Vui lòng tải lại.'));
   };
 
   const selectedCheckpointIndex = checkpoints.findIndex((cp) => cp.id === selectedCheckpointId);
@@ -151,6 +156,8 @@ export const CandidateCheckpointsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 text-foreground max-w-7xl mx-auto ">
+      {checkpointScheduleWarning(checkpoints) && <p role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">{checkpointScheduleWarning(checkpoints)}</p>}
+      {checkpoints.some((cp) => cp.availability_error) && <p role="alert" className="rounded-xl border border-amber-500/30 p-4 text-sm">Không thể xác minh trạng thái các chặng. Form nộp tạm khóa cho đến khi kết nối lại.</p>}
       {/* Tiêu đề trang */}
       {loadError && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-destructive">{loadError}</p>}
       {!isLoading && !loadError && <p className="text-sm text-muted-foreground">Đã hoàn thành {checkpoints.filter((cp) => isCompletedSubmission(cp.latest_submission?.status)).length}/{checkpoints.length} chặng. Bài chờ xác minh SHA chưa được tính hoàn thành.</p>}

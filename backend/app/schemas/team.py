@@ -35,19 +35,17 @@ class TeamCreateRequest(BaseModel):
 class TeamJoinRequest(BaseModel):
     invite_code: str = Field(
         ...,
-        min_length=6,
-        max_length=16,
-        description="Mã mời tham gia đội (6 ký tự)",
+        min_length=4,
+        max_length=64,
+        description="Mã mời 6–16 ký tự; hỗ trợ tra cứu mã cũ 4–5 ký tự đã được phát.",
         examples=["A1B2C3"],
     )
 
     @field_validator("invite_code")
     @classmethod
     def validate_invite_code(cls, v: str) -> str:
-        cleaned = v.strip().upper()
-        if len(cleaned) < 6:
-            raise ValueError("Mã mời không hợp lệ.")
-        return cleaned
+        from app.core.invite_codes import normalize_invite_code
+        return normalize_invite_code(v, legacy=True)
 
 
 class TeamMemberResponse(BaseModel):

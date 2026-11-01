@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, Depends, Query
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, field_validator
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -78,6 +78,12 @@ class AdminTeamMemberInput(BaseModel):
 
 
 class AdminCreateTeamRequest(BaseModel):
+    @field_validator("invite_code", "inviteCode")
+    @classmethod
+    def valid_code(cls, value):
+        from app.core.invite_codes import normalize_invite_code
+        return normalize_invite_code(value) if value else value
+
     name: str
     description: Optional[str] = ""
     invite_code: Optional[str] = None
@@ -105,6 +111,12 @@ class AdminCreateTeamRequest(BaseModel):
 
 
 class AdminUpdateTeamRequest(BaseModel):
+    @field_validator("invite_code", "inviteCode")
+    @classmethod
+    def valid_code(cls, value):
+        from app.core.invite_codes import normalize_invite_code
+        return normalize_invite_code(value, legacy=True) if value else value
+
     name: Optional[str] = None
     description: Optional[str] = None
     invite_code: Optional[str] = None
@@ -467,6 +479,8 @@ async def list_candidates_directory(
         has_team = mem is not None and mem.team is not None
         if unassigned_only and has_team:
             continue
+        if unassigned_only and not u.is_active:
+            continue
 
         extra = _get_user_profile_extra(u)
         school = (
@@ -494,6 +508,7 @@ async def list_candidates_directory(
                 "github_username": u.github_username or "",
                 "skills": skills,
                 "approval_status": u.approval_status,
+                "is_active": u.is_active,
                 "has_team": has_team,
                 "hasTeam": has_team,
                 "team_id": str(mem.team_id) if has_team else None,
@@ -571,7 +586,8 @@ async def auto_match_unassigned_candidates(
     unassigned = [u for u in all_candidates if str(u.id) not in assigned_user_ids]
     if not unassigned:
         raise BadRequestException(
-            message="Hiện không có thí sinh lẻ nào (đã duyệt & chưa có đội) để ghép đội ngẫu nhiên."
+            message="Hiện không có thí sinh đang hoạt động, đã duyệt và chưa có đội để ghép.",
+            error_code="NO_ELIGIBLE_CANDIDATES",
         )
 
     random.shuffle(unassigned)
@@ -1012,6 +1028,11 @@ async def update_admin_team(
 
     requested_code = (body.invite_code or body.inviteCode or "").strip().upper()
     if requested_code and requested_code != team.invite_code:
+        from app.core.invite_codes import normalize_invite_code
+        try:
+            requested_code = normalize_invite_code(requested_code)
+        except ValueError as exc:
+            raise BadRequestException(message=str(exc))
         dup_code = await team_repo.get_by_invite_code(db, requested_code)
         if dup_code and str(dup_code.id) != str(team.id):
             raise ConflictException(

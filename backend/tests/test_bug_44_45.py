@@ -67,7 +67,7 @@ async def test_rubric_read_lock_and_weight_precondition(client, db_session):
     criterion = RubricCriteria(title="Quality", weight=.8, max_score=10)
     db_session.add_all([judge, admin, cp, criterion])
     await db_session.flush()
-    submission = Submission(team_id=team.id, checkpoint_id=cp.id, submitted_by=leader.id, status="submitted")
+    submission = Submission(team_id=team.id, checkpoint_id=cp.id, submitted_by=leader.id, status="submitted", repo_url="https://github.com/test/repo", commit_sha="a"*40)
     db_session.add(submission)
     await db_session.commit()
     loaded = (await client.get("/api/v1/rubrics", headers=auth(admin))).json()["data"]

@@ -1776,30 +1776,45 @@ export const useMockStore = create<MockStoreState>()(
           }
         }
 
+        if (roleNow === 'judge' && judgeSubmRes.status === 'rejected') {
+          updates.teams = []; updates.submissions = []; updates.finalSubmissions = []; updates.evaluations = [];
+        }
         if (judgeSubmRes.status === 'fulfilled' && judgeSubmRes.value.data) {
           const jRaw = unwrap(judgeSubmRes.value.data) as { submissions?: Array<Record<string, unknown>> } | null;
           if (Array.isArray(jRaw?.submissions)) {
             if (roleNow === 'judge') {
               updates.teams = jRaw.submissions.map((sub) => ({
-                id: String(sub.submission_id), name: String(sub.team_name ?? sub.anonymous_team_code),
+                id: String(sub.review_id ?? sub.submission_id), canEvaluate: sub.can_evaluate === true, evaluationBlockReason: String(sub.evaluation_block_reason ?? ''), name: String(sub.team_name ?? sub.anonymous_team_code),
                 description: String(sub.topic_title ?? ''), inviteCode: '', leaderId: '',
                 status: 'approved', members: [], createdAt: String(sub.submitted_at ?? ''),
               }));
-              updates.finalSubmissions = jRaw.submissions.map((sub) => ({
-                teamId: String(sub.submission_id), repoUrl: String(sub.repo_url ?? ''),
+              updates.finalSubmissions = jRaw.submissions.filter((sub) => sub.submission_id).map((sub) => ({
+                teamId: String(sub.review_id ?? sub.submission_id), repoUrl: String(sub.repo_url ?? ''),
                 demoVideoUrl: String(sub.demo_url ?? ''), slideUrl: String(sub.slide_url ?? ''),
                 summary: String(sub.note ?? ''), commitSha: String(sub.commit_sha ?? ''),
                 submittedAt: String(sub.submitted_at ?? ''), status: 'submitted',
               }));
-              updates.submissions = [];
+              updates.submissions = jRaw.submissions.flatMap((sub) =>
+                (Array.isArray(sub.checkpoint_submissions) ? sub.checkpoint_submissions as Array<Record<string, unknown>> : []).map((progress) => ({
+                  id: String(progress.id), teamId: String(sub.review_id ?? sub.submission_id),
+                  checkpointId: String(progress.checkpoint_id), checkpointTitle: String(progress.checkpoint_title ?? ''),
+                  repoUrl: String(progress.repo_url ?? ''), demoUrl: String(progress.demo_url ?? ''),
+                  description: String(progress.note ?? ''), commitSha: String(progress.commit_sha ?? ''),
+                  submittedAt: String(progress.submitted_at ?? ''), status: String(progress.status ?? 'invalid') as CheckpointSubmission['status'],
+                })));
+            } else {
+              updates.teams = (updates.teams || get().teams).map((team) => {
+                const row = jRaw.submissions?.find((sub) => (updates.submissions || get().submissions).some((progress) => progress.teamId === team.id && progress.id === sub.submission_id));
+                return {...team, canEvaluate: row?.can_evaluate === true, evaluationBlockReason: String(row?.evaluation_block_reason ?? 'Đội chưa có bài chung kết hợp lệ.')};
+              });
             }
             const currJudge = get().currentUser;
             const knownSubs = updates.submissions || get().submissions;
             const mappedEvals: TeamEvaluation[] = [];
             for (const js of jRaw.submissions) {
               const evalStatus = String(js.evaluation_status ?? 'not_started');
-              if (evalStatus === 'not_started') continue;
-              const subId = String(js.submission_id ?? '');
+              if (evalStatus === 'not_started' || (roleNow === 'judge' && js.can_evaluate !== true)) continue;
+              const subId = String(js.review_id ?? js.submission_id ?? '');
               const matchedSub = knownSubs.find(
                 (s) => s.id === subId || (js.repo_url && s.repoUrl === String(js.repo_url))
               );

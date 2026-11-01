@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { z } from 'zod';
 import {
@@ -26,8 +27,8 @@ export const adminTeamFormSchema = z.object({
     .string()
     .trim()
     .regex(
-      /^[A-Za-z0-9-]{4,12}$/,
-      'Mã mời phải bao gồm 4–12 ký tự chữ cái hoặc chữ số (VD: HF2026).',
+      /^[A-Za-z0-9-]{4,16}$/,
+      'Mã mời gồm 6–16 ký tự chữ, số hoặc gạch ngang; chỉ giữ mã cũ 4–5 ký tự đã phát.',
     ),
   leaderEmail: z
     .string()
@@ -111,7 +112,8 @@ export function useAdminTeams() {
       const directory = await adminTeamsApi.getCandidateDirectory();
       setCandidatesDirectory(directory);
     } catch {
-      // Non-blocking fallback
+      setCandidatesDirectory([]);
+      setError('Không thể tải danh sách thí sinh hợp lệ. Vui lòng làm mới.');
     }
   }, []);
 
@@ -171,7 +173,7 @@ export function useAdminTeams() {
   const unassignedCandidates = useMemo(
     () =>
       candidatesDirectory.filter(
-        (c) => !c.hasTeam && c.approval_status === 'approved',
+        (c) => !c.hasTeam && c.approval_status === 'approved' && c.is_active === true,
       ),
     [candidatesDirectory],
   );
@@ -353,6 +355,9 @@ export function useAdminTeams() {
       if (result.matched_candidates_count) toast.success('Ghép đội ngẫu nhiên thành công!', message);
       else toast.info('Chưa có đội mới được ghép', message);
     } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.data?.error_code === 'NO_ELIGIBLE_CANDIDATES') {
+        await loadTeams(); toast.info('Danh sách thí sinh đã thay đổi', 'Hiện không còn thí sinh hợp lệ để ghép đội.'); return;
+      }
       const msg =
         err instanceof Error
           ? err.message

@@ -75,7 +75,7 @@ async def join_team(
     current_user: User = Depends(require_approved()),
 ) -> ApiResponse[TeamResponse]:
     """
-    Gia nhập đội thi hiện có bằng mã mời 6 ký tự.
+    Gia nhập đội thi hiện có bằng mã mời 6–16 ký tự (hỗ trợ mã cũ đã phát).
     Chỉ tài khoản APPROVED mới được tham gia.
     """
     team = await team_service.join_team(db, current_user, body.invite_code)

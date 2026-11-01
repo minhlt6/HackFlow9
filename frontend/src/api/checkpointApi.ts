@@ -43,6 +43,7 @@ export const checkpointApi = {
     const rawList = Array.isArray(response.data.data) ? response.data.data : [];
     return rawList.map((cp, idx) => ({
       ...cp,
+      title: ({'Chặng 1 — Đã đóng':'Chặng 1 — Khởi động','Chặng 3 — Chưa mở':'Chặng 3 — Tích hợp và kiểm thử'} as Record<string,string>)[cp.title] || cp.title,
       order:
         typeof cp.order === 'number' && cp.order > 0
           ? cp.order

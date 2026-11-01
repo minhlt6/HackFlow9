@@ -77,6 +77,11 @@ export const extractApiErrorMessage = (error: unknown, defaultMsg: string): stri
 };
 
 export const topicsApi = {
+  getCancellationPolicy: async (): Promise<{ can_cancel_topic: boolean; reason: string | null }> => {
+    const response = await axiosClient.get('/topics/cancellation-policy');
+    if (typeof response.data?.data?.can_cancel_topic !== 'boolean') throw new Error('Không thể xác định quyền hủy đề tài.');
+    return response.data.data;
+  },
   /**
    * Lấy danh sách toàn bộ đề tài kèm quota và subtopics (GET /api/v1/topics)
    */

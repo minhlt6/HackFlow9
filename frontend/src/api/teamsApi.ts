@@ -20,7 +20,7 @@ export const teamsApi = {
   },
 
   /**
-   * Tham gia đội thi bằng mã mời 6 ký tự
+   * Tham gia đội thi bằng mã mời 6–16 ký tự (hỗ trợ mã cũ đã phát)
    */
   joinTeam: async (payload: JoinTeamPayload): Promise<TeamDetails> => {
     const response = await axiosClient.post<ApiResponse<TeamDetails>>('/teams/join', payload);

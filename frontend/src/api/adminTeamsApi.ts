@@ -24,6 +24,7 @@ export interface EnrichedAdminTeam extends Team {
 }
 
 export interface CandidateDirectoryEntry {
+  is_active: boolean;
   id: string;
   email: string;
   fullName: string;

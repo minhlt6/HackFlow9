@@ -1,3 +1,4 @@
+import { checkpointScheduleWarning } from '../../utils/progress';
 import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
@@ -809,6 +810,7 @@ export const AdminCheckpointsPage: React.FC = () => {
 
   return (
     <div className="space-y-6 w-full">
+      {checkpointScheduleWarning(checkpoints) && <p role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">{checkpointScheduleWarning(checkpoints)}</p>}
       {confirmationDialog}
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">

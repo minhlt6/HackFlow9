@@ -239,7 +239,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
 
   // Bước 2: Khi người dùng bấm xác nhận trong Dialog -> gọi API và hiển thị loading
   const handleConfirmSubmit = async () => {
-    if (!pendingData) return;
+    if (!pendingData || isFormLocked || !isTeamLeader || isSubmitting) return;
 
     try {
       setIsSubmitting(true);
@@ -816,7 +816,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
               type="button"
               variant="primary"
               isLoading={isSubmitting}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isFormLocked || !isTeamLeader}
               onClick={handleConfirmSubmit}
               className="min-w-[150px]"
             >

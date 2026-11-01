@@ -57,7 +57,7 @@ Frontend giữ `VITE_API_BASE_URL=http://localhost:8000/api/v1`, rồi chạy `n
 
 ## Tạo lại trước buổi demo
 
-Thời gian chặng tính theo lúc tạo: chặng mở còn 24 giờ, chung kết còn 36 giờ. **Tạo bộ mới trong ngày demo**; đừng chỉ sửa giờ máy. Muốn diễn lại từ đầu, tạo tệp tên mới và chuyển cấu hình sang tệp đó; công cụ không ghi đè DB đã tồn tại.
+Thời gian chặng tính theo lúc tạo: chặng mở còn 24 giờ, chung kết còn 96 giờ. **Tạo bộ mới trong ngày demo**; đừng chỉ sửa giờ máy. Muốn diễn lại từ đầu, tạo tệp tên mới và chuyển cấu hình sang tệp đó; công cụ không ghi đè DB đã tồn tại.
 
 Chạy từ `backend`, sau khi đã cấu hình đúng `SECRET_KEY` giống backend sẽ sử dụng:
 
@@ -90,7 +90,7 @@ Railway cần `DATABASE_URL` đúng PostgreSQL, `ENABLE_STARTUP_SEED=false`, `EN
 
 ## Giới hạn trình diễn cần biết
 
-- Dữ liệu bài nộp là fixture có nhãn, **không giả mạo SHA đã xác minh**: bài chung kết dùng `sha_verification_failed`, `commit_sha=null`. Bộ hiện tại cho phép giám khảo chấm các bài đó và đã được kiểm tra qua API. Để trình diễn đóng băng SHA thật, dùng leader nộp lại bằng repo GitHub công khai hoạt động và kiểm tra kết quả trả về.
+- Dữ liệu bài nộp là fixture có nhãn, **không giả mạo SHA đã xác minh**: bài chung kết dùng `sha_verification_failed`, `commit_sha=null`. Các bản mẫu này chỉ được xem tiến độ, chưa đủ điều kiện chấm. Giám khảo chỉ chấm được sau khi có bài chung kết hợp lệ với SHA và thời gian nộp hợp lệ. Để trình diễn đóng băng SHA thật, dùng leader nộp lại bằng repo GitHub công khai hoạt động và kiểm tra kết quả trả về.
 - Các link `example.com` chỉ minh họa dữ liệu; trước buổi trình diễn thay bằng link demo/video/slide thật của nhóm. Link repo mẫu không thể hiện quyền sở hữu của các đội giả lập.
 - GitHub OAuth cần tài khoản GitHub thật và callback đã cấu hình. Email `@demo.example.com` không phải hộp thư thực, không dùng để nhận mail hay giả vờ xác minh OAuth.
 - Grace period 5 giây, retry GitHub, idempotency và quyền truy cập trực tiếp phù hợp với kịch bản API bổ sung; không dựa vào thao tác chuột sát giây trong buổi thuyết trình.

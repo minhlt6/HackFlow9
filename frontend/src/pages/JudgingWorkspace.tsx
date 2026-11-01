@@ -1,3 +1,4 @@
+import { getSubmissionStatusMeta, type SubmissionStatus } from '../types/checkpoint';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useMockStore } from '../store/useMockStore';
@@ -62,16 +63,17 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
   saveEvaluation,
   onAlert,
 }) => {
-  const isLocked = Boolean(existingEval && !existingEval.isDraft);
+  const isLocked = Boolean(existingEval && !existingEval.isDraft && team.canEvaluate === true);
+  const isIneligible = team.canEvaluate !== true;
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isUnlockConfirmOpen, setIsUnlockConfirmOpen] = useState(false);
 
   // Scores state: Map criterionId -> score (0 to maxScore) or '' during typing
   const [scores, setScores] = useState<Record<string, number | ''>>(() => {
-    if (existingEval?.scores) return existingEval.scores;
+    if (!isIneligible && existingEval?.scores) return existingEval.scores;
     const initial: Record<string, number | ''> = {};
     for (const c of rubricCriteria) {
-      initial[c.id] = Math.round(c.maxScore * 0.85);
+      initial[c.id] = isIneligible ? '' : Math.round(c.maxScore * 0.85);
     }
     return initial;
   });
@@ -142,7 +144,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
 
   // Save Draft (status = 'draft')
   const handleSaveDraft = async () => {
-    if (!team || isLocked) return;
+    if (!team || isLocked || isIneligible) return;
 
     const numericScores: Record<string, number> = {};
     for (const c of rubricCriteria) {
@@ -193,6 +195,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
   // Submit and Lock Evaluation (status = 'submitted')
   const handleLockConfirm = async () => {
     if (!team) return;
+
+    if (isIneligible) { onAlert(team.evaluationBlockReason || 'Chưa có bài chung kết hợp lệ.'); return; }
 
     // Validate empty criteria scores per SRS HF-36 (422 MISSING_RUBRIC_CRITERIA_SCORE)
     const emptyCriterion = rubricCriteria.find(
@@ -302,6 +306,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-[#111827] border border-border rounded-xl overflow-hidden shadow-2xl">
+      {isIneligible && <p role="alert" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">{team.evaluationBlockReason || 'Chưa có bài chung kết hợp lệ; chỉ được xem tiến độ, không được chấm.'}</p>}
       {/* Rubric Header */}
       <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 flex items-center justify-between shrink-0">
         <div>
@@ -367,7 +372,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
                     min={0}
                     max={c.maxScore}
                     step={0.5}
-                    disabled={isLocked}
+                    disabled={isLocked || isIneligible}
                     value={displayScore}
                     onFocus={(e) => {
                       if (!isLocked) e.target.select();
@@ -387,7 +392,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
                   min={0}
                   max={c.maxScore}
                   step={0.5}
-                  disabled={isLocked}
+                  disabled={isLocked || isIneligible}
                   value={typeof currentScore === 'number' ? currentScore : 0}
                   onChange={(e) =>
                     handleScoreSliderChange(c.id, parseFloat(e.target.value), c.maxScore)
@@ -409,7 +414,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
                 </div>
                 <input
                   type="text"
-                  disabled={isLocked}
+                  disabled={isLocked || isIneligible}
                   value={criteriaComments[c.id] || ''}
                   onChange={(e) =>
                     setCriteriaComments((prev) => ({ ...prev, [c.id]: e.target.value }))
@@ -430,7 +435,7 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
           </label>
           <textarea
             rows={3}
-            disabled={isLocked}
+            disabled={isLocked || isIneligible}
             value={generalComment}
             onChange={(e) => setGeneralComment(e.target.value)}
             placeholder="Nhận xét chi tiết về giải pháp, kiến trúc kỹ thuật và tiềm năng phát triển của sản phẩm..."
@@ -464,13 +469,14 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
           </div>
         ) : (
           <>
-            <Button variant="secondary" onClick={handleSaveDraft} className="gap-1.5 text-xs">
+            <Button variant="secondary" disabled={isIneligible} onClick={handleSaveDraft} className="gap-1.5 text-xs">
               <Save size={14} />
               <span>Lưu Bản Nháp</span>
             </Button>
 
             <Button
               variant="primary"
+              disabled={isIneligible}
               onClick={() => setIsConfirmModalOpen(true)}
               className="gap-2 px-6 shadow-md shadow-[#6366F1]/25"
             >
@@ -586,7 +592,7 @@ export const JudgingWorkspace: React.FC = () => {
           syncFromBackend?.(),
         ]);
       } catch {
-        // Fallback to local store silently in demo
+        setAlert('Không thể tải dữ liệu chấm thi. Vui lòng kiểm tra phiên đăng nhập và thử lại.');
       }
     };
     initService();
@@ -599,7 +605,7 @@ export const JudgingWorkspace: React.FC = () => {
         (e) => e.teamId === team.id && e.judgeId === currentUser.id,
       );
       let judgingStatus: 'unscored' | 'draft' | 'locked' = 'unscored';
-      if (existing) {
+      if (existing && team.canEvaluate === true) {
         judgingStatus = existing.isDraft ? 'draft' : 'locked';
       }
       const anonCode = user?.role === 'judge' ? team.name : `Team #${idx + 1}`;
@@ -642,7 +648,7 @@ export const JudgingWorkspace: React.FC = () => {
   const teamTopicTitle = (teamSubTopic?.title || selectedTeam?.description || 'Chưa cập nhật đề tài').replace(/\s*&\s*/g, ' và ');
 
   const finalSub = finalSubmissions.find((f) => f.teamId === selectedTeam?.id);
-  const teamCheckpoints = submissions.filter((s) => s.teamId === selectedTeam?.id);
+  const teamCheckpoints = submissions.filter((s) => s.teamId === selectedTeam?.id && !useMockStore.getState().checkpoints.some((cp) => cp.id === s.checkpointId && cp.isFinalCheckpoint));
 
   const existingEval = evaluations.find(
     (e) => e.teamId === selectedTeam?.id && e.judgeId === currentUser.id,
@@ -1044,10 +1050,8 @@ export const JudgingWorkspace: React.FC = () => {
                       className="p-3 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border text-xs space-y-1.5"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-foreground">Chặng #{idx + 1}</span>
-                        <Badge variant="success" size="sm">
-                          Đã nộp
-                        </Badge>
+                        <span className="font-semibold text-foreground">{chk.checkpointTitle || useMockStore.getState().checkpoints.find((cp) => cp.id === chk.checkpointId)?.title || `Chặng ${idx + 1}`}</span>
+                        <Badge variant={getSubmissionStatusMeta((chk.status || 'invalid') as SubmissionStatus, false).badgeVariant} size="sm">{getSubmissionStatusMeta((chk.status || 'invalid') as SubmissionStatus, false).badgeLabel}</Badge>
                       </div>
                       <p className="text-muted-foreground text-[11px] leading-relaxed">
                         {chk.description || 'Đã nộp báo cáo kiến trúc và mã nguồn giai đoạn MVP.'}

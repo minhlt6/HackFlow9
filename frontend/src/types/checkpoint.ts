@@ -37,6 +37,7 @@ export interface SubmissionFieldConfig {
 }
 
 export interface Checkpoint {
+  availability_error?: string;
   id: string;
   title: string;
   description?: string | null;
