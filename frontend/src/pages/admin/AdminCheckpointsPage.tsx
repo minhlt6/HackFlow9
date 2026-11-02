@@ -668,11 +668,19 @@ export const AdminCheckpointsPage: React.FC = () => {
     setEditReqInput('');
   };
 
+  const isReorderLocked =
+    Boolean(config.isContestStarted) ||
+    checkpoints.some((cp) => cp.status === 'open' || cp.status === 'closed');
+
   const persistOrder = async (ordered: typeof checkpoints) => {
+    if (isReorderLocked) {
+      showAlert('Chỉ được phép điều chỉnh thứ tự các chặng khi cuộc thi chưa bắt đầu.', 'error');
+      return;
+    }
     if (!await confirm({title: 'Thay đổi thứ tự các chặng?', description: ordered.map((cp, index) => `${index + 1}. ${cp.title || cp.name}`).join(' → '), confirmLabel: 'Xác nhận thứ tự'})) return;
     setSubmitting(true);
     try {
-      await Promise.all(ordered.map((cp, index) => checkpointApi.updateCheckpoint(cp.id, { display_order: index })));
+      await Promise.all(ordered.map((cp, index) => checkpointApi.updateCheckpoint(cp.id, { display_order: index + 1 })));
       await loadCheckpoints();
       showAlert('Đã lưu thứ tự các chặng.', 'success');
     } catch {
@@ -681,13 +689,30 @@ export const AdminCheckpointsPage: React.FC = () => {
     } finally { setSubmitting(false); }
   };
   const reorderCheckpoints = (from: number, to: number) => {
+    if (isReorderLocked) {
+      showAlert('Chỉ được phép điều chỉnh thứ tự các chặng khi cuộc thi chưa bắt đầu.', 'error');
+      return;
+    }
+    if (checkpoints[from]?.isFinalCheckpoint || checkpoints[to]?.isFinalCheckpoint) {
+      showAlert('Chặng chung kết luôn cố định ở vị trí cuối cùng.', 'error');
+      return;
+    }
     const ordered = [...checkpoints];
     const [moved] = ordered.splice(from, 1);
     ordered.splice(to, 0, moved);
     void persistOrder(ordered);
   };
   const sortCheckpointsByDeadline = () => {
-    void persistOrder([...checkpoints].sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime()));
+    if (isReorderLocked) {
+      showAlert('Chỉ được phép sắp xếp lại thứ tự các chặng khi cuộc thi chưa bắt đầu.', 'error');
+      return;
+    }
+    const sorted = [...checkpoints].sort((a, b) => {
+      if (a.isFinalCheckpoint && !b.isFinalCheckpoint) return 1;
+      if (!a.isFinalCheckpoint && b.isFinalCheckpoint) return -1;
+      return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+    });
+    void persistOrder(sorted);
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -895,12 +920,16 @@ export const AdminCheckpointsPage: React.FC = () => {
           {checkpoints.length > 1 && (
             <Button
               variant="secondary"
-              disabled={submitting}
+              disabled={submitting || isReorderLocked}
               onClick={() => {
                 sortCheckpointsByDeadline();
               }}
               className="gap-2 text-xs"
-              title="Tự động sắp xếp các chặng theo thời hạn deadline từ sớm đến muộn"
+              title={
+                isReorderLocked
+                  ? 'Chỉ được phép sắp xếp lại thứ tự chặng khi cuộc thi chưa bắt đầu'
+                  : 'Tự động sắp xếp các chặng theo thời hạn deadline từ sớm đến muộn'
+              }
             >
               <ArrowUpDown size={14} />
               <span>Sắp xếp theo Deadline</span>
@@ -985,12 +1014,20 @@ export const AdminCheckpointsPage: React.FC = () => {
                     <div className="flex items-center gap-0.5 bg-muted/40 dark:bg-slate-900/60 border border-border rounded-[8px] p-0.5 shadow-sm">
                       <button
                         type="button"
-                        disabled={submitting || idx === 0}
+                        disabled={submitting || isReorderLocked || Boolean(cp.isFinalCheckpoint) || idx === 0}
                         onClick={() => {
                           reorderCheckpoints(idx, idx - 1);
                         }}
                         className="p-1 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all"
-                        title={idx === 0 ? 'Đã ở vị trí đầu tiên' : `Di chuyển lên vị trí #${idx}`}
+                        title={
+                          isReorderLocked
+                            ? 'Chỉ được phép điều chỉnh thứ tự chặng khi cuộc thi chưa bắt đầu'
+                            : cp.isFinalCheckpoint
+                            ? 'Chặng chung kết luôn cố định ở vị trí cuối cùng'
+                            : idx === 0
+                            ? 'Đã ở vị trí đầu tiên'
+                            : `Di chuyển lên vị trí #${idx}`
+                        }
                       >
                         <ArrowUp size={14} />
                       </button>
@@ -999,12 +1036,28 @@ export const AdminCheckpointsPage: React.FC = () => {
                       </div>
                       <button
                         type="button"
-                        disabled={submitting || idx === checkpoints.length - 1}
+                        disabled={
+                          submitting ||
+                          isReorderLocked ||
+                          Boolean(cp.isFinalCheckpoint) ||
+                          idx === checkpoints.length - 1 ||
+                          Boolean(checkpoints[idx + 1]?.isFinalCheckpoint)
+                        }
                         onClick={() => {
                           reorderCheckpoints(idx, idx + 1);
                         }}
                         className="p-1 rounded-[6px] text-muted-foreground hover:text-foreground hover:bg-accent disabled:opacity-20 disabled:cursor-not-allowed transition-all"
-                        title={idx === checkpoints.length - 1 ? 'Đã ở vị trí cuối cùng' : `Di chuyển xuống vị trí #${idx + 2}`}
+                        title={
+                          isReorderLocked
+                            ? 'Chỉ được phép điều chỉnh thứ tự chặng khi cuộc thi chưa bắt đầu'
+                            : cp.isFinalCheckpoint
+                            ? 'Chặng chung kết luôn cố định ở vị trí cuối cùng'
+                            : checkpoints[idx + 1]?.isFinalCheckpoint
+                            ? 'Không thể di chuyển xuống sau Chặng chung kết'
+                            : idx === checkpoints.length - 1
+                            ? 'Đã ở vị trí cuối cùng'
+                            : `Di chuyển xuống vị trí #${idx + 2}`
+                        }
                       >
                         <ArrowDown size={14} />
                       </button>
