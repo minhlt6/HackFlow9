@@ -224,9 +224,14 @@ class TeamService:
         team = await team_repo.get_by_id(db, team_id_str)
         if not team:
             raise NotFoundException(message="Không tìm thấy đội thi.")
+        meta = dict(team.admin_meta) if isinstance(getattr(team, "admin_meta", None), dict) else {}
+        if str(meta.get("approval_status", "")).lower() == "rejected":
+            raise ForbiddenException(
+                message="Đội thi đã bị từ chối tư cách thi đấu.",
+                error_code="TEAM_REJECTED",
+            )
         cleaned_desc = description.strip()
         team.description = cleaned_desc
-        meta = dict(team.admin_meta) if isinstance(getattr(team, "admin_meta", None), dict) else {}
         meta["description"] = cleaned_desc
         team.admin_meta = meta
         await db.commit()
@@ -314,6 +319,10 @@ class TeamService:
 
             team_id = str(team.id)
             await team_repo.add_member(db, team_id, str(current_user.id))
+            if isinstance(getattr(team, "admin_meta", None), dict):
+                meta = dict(team.admin_meta)
+                meta["member_count"] = member_count + 1
+                team.admin_meta = meta
             await db.commit()
 
             db.expire_all()
@@ -339,7 +348,15 @@ class TeamService:
             await db.delete(membership)
             await db.flush()
             if count == 1:
+                if team.topic and team.topic.current_teams > 0:
+                    team.topic.current_teams -= 1
+                if team.subtopic and team.subtopic.current_teams > 0:
+                    team.subtopic.current_teams -= 1
                 await db.delete(team)
+            elif isinstance(getattr(team, "admin_meta", None), dict):
+                meta = dict(team.admin_meta)
+                meta["member_count"] = max(1, count - 1)
+                team.admin_meta = meta
             await db.commit()
             return {"team_id": team_id, "left": True}
 
@@ -360,8 +377,13 @@ class TeamService:
                 raise NotFoundException(message="Không tìm thấy thành viên trong đội.")
             if str(target_mem.user_id) == str(current_user.id):
                 raise BadRequestException(message="Không thể tự xóa chính mình.")
-            await check_member_removal(db, team, await team_repo.count_members(db, team_id))
+            count = await team_repo.count_members(db, team_id)
+            await check_member_removal(db, team, count)
             await db.delete(target_mem)
+            if isinstance(getattr(team, "admin_meta", None), dict):
+                meta = dict(team.admin_meta)
+                meta["member_count"] = max(1, count - 1)
+                team.admin_meta = meta
             await db.commit()
             db.expire_all()
             loaded = await team_repo.get_by_id(db, team_id)
@@ -377,6 +399,17 @@ class TeamService:
             leader_mem = await team_repo.get_user_membership(db, str(current_user.id))
             if not team or not leader_mem or str(leader_mem.team_id) != team_id or leader_mem.role != TeamMemberRole.LEADER.value:
                 raise ForbiddenException(message="Chỉ đội trưởng mới có quyền nhượng quyền.")
+            if team.is_locked:
+                raise ConflictException(
+                    message="Đội thi đã bị khóa, không thể chuyển nhượng quyền Đội trưởng.",
+                    error_code="TEAM_LOCKED",
+                )
+            meta = dict(team.admin_meta) if isinstance(getattr(team, "admin_meta", None), dict) else {}
+            if str(meta.get("approval_status", "")).lower() == "rejected":
+                raise ForbiddenException(
+                    message="Đội thi đã bị từ chối tư cách thi đấu, không thể nhượng quyền.",
+                    error_code="TEAM_REJECTED",
+                )
             target_mem = await team_repo.get_user_membership(db, new_leader_user_id)
             if not target_mem or str(target_mem.team_id) != team_id:
                 raise NotFoundException(message="Thành viên được chọn không thuộc đội của bạn.")

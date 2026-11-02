@@ -468,7 +468,9 @@ export const useMockStore = create<MockStoreState>()(
             ...newConfig,
             name: String(saved.name), currentPhase: String(saved.currentPhase),
             finalSubmissionDeadline: String(saved.end_time),
-            isContestStarted: saved.status === 'hacking',
+            isContestStarted: ['hacking', 'judging', 'completed'].includes(
+              String(saved.status || '').toLowerCase()
+            ),
             minTeamSize: Number(saved.minTeamSize), minTeamMembers: Number(saved.minTeamMembers),
             maxTeamSize: Number(saved.maxTeamSize), maxTeamMembers: Number(saved.maxTeamMembers),
           },
@@ -1953,7 +1955,13 @@ export const useMockStore = create<MockStoreState>()(
               ...currCfg,
               name: String(cfgObj.name ?? cfgObj.eventName ?? currCfg.name),
               currentPhase: mappedPhase,
-              isContestStarted: cfgObj.status === 'hacking' || mappedPhase.includes('Giai đoạn 3'),
+              isContestStarted:
+                ['hacking', 'judging', 'completed'].includes(
+                  String(cfgObj.status || '').toLowerCase()
+                ) ||
+                mappedPhase.includes('Giai đoạn 3') ||
+                mappedPhase.includes('Giai đoạn 4') ||
+                mappedPhase.includes('Giai đoạn 5'),
               contestStart: String(cfgObj.start_time ?? ''),
               contestEnd: String(cfgObj.end_time ?? ''),
               blindJudging: Boolean(cfgObj.blindJudgingEnabled ?? currCfg.blindJudging),

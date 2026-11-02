@@ -169,6 +169,11 @@ class TopicService:
             topic.description = req.description
         effective_quota = req.quota_max if req.quota_max is not None else req.max_teams
         if effective_quota is not None:
+            if effective_quota < topic.current_teams:
+                raise BadRequestException(
+                    message=f"Quota mới ({effective_quota}) không được nhỏ hơn số đội đã đăng ký ({topic.current_teams}).",
+                    error_code="INVALID_QUOTA",
+                )
             topic.max_teams = effective_quota
         if req.is_active is not None:
             topic.is_active = req.is_active
@@ -189,6 +194,17 @@ class TopicService:
                 message="Không tìm thấy đề tài chi tiết yêu cầu.",
                 error_code="TOPIC_NOT_FOUND",
             )
+        from sqlalchemy import select
+        from app.models.team import Team
+
+        team_using_sub = (
+            await db.execute(select(Team.id).where(Team.subtopic_id == str(subtopic.id)).limit(1))
+        ).first()
+        if subtopic.current_teams > 0 or team_using_sub is not None:
+            raise ConflictException(
+                message="Không thể xóa đề tài nhánh đã có đội thi đăng ký.",
+                error_code="TOPIC_IN_USE",
+            )
         await db.delete(subtopic)
         await db.commit()
         return {"id": subtopic_id, "deleted": "true"}
@@ -204,7 +220,17 @@ class TopicService:
                 message="Không tìm thấy mảng đề tài yêu cầu.",
                 error_code="TOPIC_NOT_FOUND",
             )
-        if topic.current_teams > 0 or any(s.current_teams > 0 for s in (topic.subtopics or [])):
+        from sqlalchemy import select
+        from app.models.team import Team
+
+        team_using_top = (
+            await db.execute(select(Team.id).where(Team.topic_id == str(topic.id)).limit(1))
+        ).first()
+        if (
+            topic.current_teams > 0
+            or any(s.current_teams > 0 for s in (topic.subtopics or []))
+            or team_using_top is not None
+        ):
             raise ConflictException(
                 message="Không thể xóa mảng đề tài đã có đội thi đăng ký.",
                 error_code="TOPIC_IN_USE",

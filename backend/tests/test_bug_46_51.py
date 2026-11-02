@@ -148,3 +148,178 @@ async def test_inactive_users_are_visible_in_directory_but_not_matching_pool(db_
     assert inactive['is_active'] is False
     pool=(await client.get('/api/v1/admin/candidates/unassigned',headers=h)).json()['data']
     assert all(u['is_active'] is True and u['approval_status']=='approved' and not u['has_team'] for u in pool)
+
+
+@pytest.mark.asyncio
+async def test_group1_topic_quota_and_subtopic_deletion_constraints(db_session, client):
+    from app.models.topic import Topic, Subtopic
+
+    data = await seed(db_session)
+    admin = await headers(db_session, 'admin')
+    cyber_team = await db_session.get(Team, data['teams']['cyber']['id'])
+    sub_id = str(cyber_team.subtopic_id)
+    top_id = str(cyber_team.topic_id)
+
+    # LOGIC-01: Cannot delete subtopic that has registered teams
+    del_sub = await client.delete(f'/api/v1/topics/subtopics/{sub_id}', headers=admin)
+    assert del_sub.status_code == 409
+    assert del_sub.json()['error_code'] == 'TOPIC_IN_USE'
+
+    # LOGIC-03: Cannot lower parent topic max_teams below current_teams
+    top_obj = await db_session.get(Topic, top_id)
+    top_obj.current_teams = 2
+    await db_session.commit()
+    bad_quota = await client.put(
+        f'/api/v1/topics/{top_id}',
+        headers=admin,
+        json={'max_teams': 1},
+    )
+    assert bad_quota.status_code == 400
+    assert bad_quota.json()['error_code'] == 'INVALID_QUOTA'
+
+    # LOGIC-02: Admin creating a team with subtopic increments current_teams in DB
+    sub_obj = await db_session.get(Subtopic, sub_id)
+    sub_obj.max_teams = sub_obj.current_teams + 5
+    top_obj.max_teams = top_obj.current_teams + 5
+    await db_session.commit()
+    before_sub = sub_obj.current_teams
+    before_top = top_obj.current_teams
+
+    created = await client.post(
+        '/api/v1/admin/teams',
+        headers=admin,
+        json={
+            'name': 'Quota Sync Team',
+            'leader_email': 'quotasync.leader@example.com',
+            'member_count': 3,
+            'sub_topic_id': sub_id,
+        },
+    )
+    assert created.status_code in (200, 201), created.text
+    await db_session.refresh(sub_obj)
+    await db_session.refresh(top_obj)
+    assert sub_obj.current_teams == before_sub + 1
+    assert top_obj.current_teams == before_top + 1
+
+
+@pytest.mark.asyncio
+async def test_group2_team_leave_decrements_topic_and_locked_or_rejected_guards(db_session, client):
+    from app.models.topic import Topic, Subtopic
+
+    data = await seed(db_session)
+    admin = await headers(db_session, 'admin')
+    cyber_id = data['teams']['cyber']['id']
+    cyber_leader = await headers(db_session, 'cyber.leader')
+
+    # LOGIC-04: Locked team blocks leader transfer; rejected team blocks description update
+    cyber_team = await db_session.get(Team, cyber_id)
+    other_member_id = demo_id('user/cyber.m2')
+    cyber_team.is_locked = True
+    await db_session.commit()
+    transfer_locked = await client.patch(
+        '/api/v1/teams/leader',
+        headers=cyber_leader,
+        json={'new_leader_id': other_member_id},
+    )
+    assert transfer_locked.status_code == 409
+    assert transfer_locked.json()['error_code'] == 'TEAM_LOCKED'
+
+    await client.patch(
+        f'/api/v1/admin/teams/{cyber_id}/reject',
+        headers=admin,
+        json={'reason': 'Vi phạm quy chế'},
+    )
+    desc_rejected = await client.patch(
+        '/api/v1/teams/me',
+        headers=cyber_leader,
+        json={'description': 'Thử sửa khi đã bị từ chối'},
+    )
+    assert desc_rejected.status_code == 403
+    assert desc_rejected.json()['error_code'] == 'TEAM_REJECTED'
+
+    # LOGIC-05: Sole member leaving team decrements topic/subtopic current_teams
+    cfg = await db_session.get(HackathonConfig, demo_id('config'))
+    cfg.settings_data = {**cfg.settings_data, 'status': 'registration', 'minTeamMembers': 1, 'minTeamSize': 1}
+    solo_user = User(
+        email='solo.leave@example.com',
+        full_name='Solo Leader',
+        role='candidate',
+        approval_status='approved',
+        is_active=True,
+    )
+    top = Topic(title='Solo Track', max_teams=5, current_teams=1, is_active=True)
+    db_session.add_all([solo_user, top])
+    await db_session.flush()
+    sub = Subtopic(topic_id=top.id, title='Solo Sub', max_teams=5, current_teams=1, is_active=True)
+    db_session.add(sub)
+    await db_session.flush()
+    solo_team = Team(
+        team_name='Solo Leave Team',
+        invite_code='SOLO99',
+        topic_id=str(top.id),
+        subtopic_id=str(sub.id),
+        is_locked=False,
+    )
+    db_session.add(solo_team)
+    await db_session.flush()
+    from app.models.team import TeamMember
+    db_session.add(TeamMember(team_id=str(solo_team.id), user_id=str(solo_user.id), role='leader'))
+    await db_session.commit()
+
+    solo_headers = {'Authorization': 'Bearer ' + AuthService.create_user_token(solo_user)}
+    leave_res = await client.post('/api/v1/teams/leave', headers=solo_headers)
+    assert leave_res.status_code == 200, leave_res.text
+    await db_session.refresh(top)
+    await db_session.refresh(sub)
+    assert top.current_teams == 0
+    assert sub.current_teams == 0
+
+
+@pytest.mark.asyncio
+async def test_group3_leaderboard_discrepancy_threshold_and_personnel_soft_delete(db_session, client):
+    data = await seed(db_session)
+    admin = await headers(db_session, 'admin')
+    j1 = await headers(db_session, 'judge1')
+    j2 = await headers(db_session, 'judge2')
+    sub_id = data['final_submissions']['cyber']
+    criteria = (await db_session.execute(select(RubricCriteria))).scalars().all()
+
+    # Judge 1 submits 9/10 (90.0), Judge 2 saves draft 8/10 (80.0) -> spread when both submitted = 10.0
+    await client.post(
+        '/api/v1/evaluations',
+        headers=j1,
+        json={'submission_id': sub_id, 'status': 'submitted', 'evaluations': [{'criteria_id': c.id, 'score': 9} for c in criteria]},
+    )
+    await client.post(
+        '/api/v1/evaluations',
+        headers=j2,
+        json={'submission_id': sub_id, 'status': 'draft', 'evaluations': [{'criteria_id': c.id, 'score': 8} for c in criteria]},
+    )
+
+    # LOGIC-08: Leaderboard includes draft judge in all_judge_scores while keeping judge_scores submitted-only
+    lb_res = (await client.get('/api/v1/leaderboard', headers=admin)).json()['data']['leaderboard']
+    cyber_entry = next(e for e in lb_res if e['submission_id'] == sub_id)
+    assert len(cyber_entry['judge_scores']) == 1
+    assert len(cyber_entry['all_judge_scores']) == 2
+
+    # Submit Judge 2 (spread = 10.0) and set discrepancyThreshold = 5 in HackathonConfig
+    await client.post(
+        '/api/v1/evaluations',
+        headers=j2,
+        json={'submission_id': sub_id, 'status': 'submitted', 'evaluations': [{'criteria_id': c.id, 'score': 8} for c in criteria]},
+    )
+    await client.patch('/api/v1/admin/config', headers=admin, json={'discrepancyThreshold': 5})
+    lb_res2 = (await client.get('/api/v1/leaderboard', headers=admin)).json()['data']['leaderboard']
+    cyber_entry2 = next(e for e in lb_res2 if e['submission_id'] == sub_id)
+    assert cyber_entry2['has_discrepancy'] is True
+
+    # LOGIC-10: Deleting judge1 (who has evaluations) soft-deletes (is_active=False) and preserves Evaluations
+    j1_id = demo_id('user/judge1')
+    del_j1 = await client.delete(f'/api/v1/admin/personnel/{j1_id}', headers=admin)
+    assert del_j1.status_code == 200
+    j1_user = await db_session.get(User, j1_id)
+    await db_session.refresh(j1_user)
+    assert j1_user is not None and j1_user.is_active is False
+    eval_cnt = await db_session.scalar(select(func.count()).select_from(Evaluation).where(Evaluation.judge_id == j1_id))
+    assert eval_cnt > 0
+

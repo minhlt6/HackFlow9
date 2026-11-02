@@ -430,8 +430,13 @@ export const AdminTopicsPage: React.FC = () => {
                   <Button
                     variant="danger"
                     size="sm"
+                    disabled={major.subTopics.some((s) => (s.currentTeams ?? s.registeredTeamsCount ?? 0) > 0)}
                     onClick={() => handleDeleteMajor(major.id, major.title)}
-                    title="Xóa lĩnh vực này"
+                    title={
+                      major.subTopics.some((s) => (s.currentTeams ?? s.registeredTeamsCount ?? 0) > 0)
+                        ? 'Không thể xóa lĩnh vực đã có đội thi đăng ký'
+                        : 'Xóa lĩnh vực này'
+                    }
                   >
                     <Trash2 size={14} />
                   </Button>
@@ -501,9 +506,18 @@ export const AdminTopicsPage: React.FC = () => {
                             </Button>
                             <button
                               type="button"
+                              disabled={currentTeams > 0}
                               onClick={() => void handleDeleteSubTopic(sub.id, sub.title)}
-                              className="p-1.5 rounded-md text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                              title="Xóa đề tài nhánh"
+                              className={`p-1.5 rounded-md transition-colors ${
+                                currentTeams > 0
+                                  ? 'text-muted-foreground/40 cursor-not-allowed'
+                                  : 'text-muted-foreground hover:text-rose-600 hover:bg-rose-500/10 cursor-pointer'
+                              }`}
+                              title={
+                                currentTeams > 0
+                                  ? 'Không thể xóa đề tài nhánh đã có đội thi đăng ký'
+                                  : 'Xóa đề tài nhánh'
+                              }
                             >
                               <Trash2 size={14} />
                             </button>

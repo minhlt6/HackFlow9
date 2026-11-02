@@ -122,6 +122,21 @@ class LeaderboardService:
         active_criteria = await self._list_active_criteria()
         criteria_map = {c.id: c for c in active_criteria}
 
+        config = await self._get_or_create_config(create_if_missing=False)
+        raw_threshold = (
+            (config.settings_data or {}).get("discrepancyThreshold")
+            if config and isinstance(config.settings_data, dict)
+            else None
+        )
+        try:
+            max_spread_threshold = (
+                float(raw_threshold)
+                if raw_threshold is not None
+                else DEFAULT_MAX_SPREAD_THRESHOLD
+            )
+        except (TypeError, ValueError):
+            max_spread_threshold = DEFAULT_MAX_SPREAD_THRESHOLD
+
         # Identify the highest-weight criterion for Tie-breaker Level 1
         top_criterion: Optional[RubricCriteria] = None
         if active_criteria:
@@ -161,6 +176,7 @@ class LeaderboardService:
             judge_groups = evals_by_sub_and_judge.get(sub.id, {})
             all_judge_groups = all_evals_by_sub_and_judge.get(sub.id, {})
             judge_scores_list: List[Dict[str, Any]] = []
+            all_judge_scores_list: List[Dict[str, Any]] = []
             judge_totals: List[float] = []
             draft_judge_totals: List[float] = []
             top_criterion_scores: List[float] = []
@@ -188,6 +204,14 @@ class LeaderboardService:
                     j_evals[0].judge.full_name
                     if j_evals and j_evals[0].judge
                     else None
+                )
+                all_judge_scores_list.append(
+                    {
+                        "judge_id": judge_id,
+                        "judge_name": judge_name,
+                        "total_score": s_j,
+                        "status": "submitted" if is_submitted else "draft",
+                    }
                 )
                 if is_submitted:
                     judge_scores_list.append(
@@ -239,7 +263,7 @@ class LeaderboardService:
                     variance = sum((val - mean_score) ** 2 for val in judge_totals) / m_count
                     std_dev = round(math.sqrt(variance), 2)
                     has_discrepancy = bool(
-                        max_spread > DEFAULT_MAX_SPREAD_THRESHOLD
+                        max_spread > max_spread_threshold
                         or std_dev > DEFAULT_STD_DEV_THRESHOLD
                     )
                     warning_code = (
@@ -271,6 +295,7 @@ class LeaderboardService:
                     "has_discrepancy": has_discrepancy,
                     "warning_code": warning_code,
                     "judge_scores": judge_scores_list,
+                    "all_judge_scores": all_judge_scores_list,
                     "submitted_at": (
                         sub.submitted_at.isoformat() if sub.submitted_at else None
                     ),

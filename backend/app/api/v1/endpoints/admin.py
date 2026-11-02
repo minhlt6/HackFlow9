@@ -827,6 +827,39 @@ async def list_admin_teams(
     )
 
 
+async def _detach_member_from_previous_team(
+    db: AsyncSession,
+    old_mem: Optional[TeamMember],
+    target_team_id: Optional[str] = None,
+) -> None:
+    if not old_mem:
+        return
+    prev_team_id = str(old_mem.team_id)
+    if target_team_id and prev_team_id == str(target_team_id):
+        return
+    was_leader = old_mem.role == TeamMemberRole.LEADER.value
+    old_mem_id = str(old_mem.id)
+    await db.delete(old_mem)
+    await db.flush()
+
+    prev_team = await _load_team_full(db, prev_team_id, for_update=True)
+    if not prev_team:
+        return
+    remaining = [m for m in (prev_team.members or []) if str(m.id) != old_mem_id]
+    if not remaining:
+        if prev_team.topic and prev_team.topic.current_teams > 0:
+            prev_team.topic.current_teams -= 1
+        if prev_team.subtopic and prev_team.subtopic.current_teams > 0:
+            prev_team.subtopic.current_teams -= 1
+        await db.delete(prev_team)
+        await db.flush()
+    else:
+        if was_leader and not any(m.role == TeamMemberRole.LEADER.value for m in remaining):
+            remaining[0].role = TeamMemberRole.LEADER.value
+        _update_team_meta(prev_team, {"member_count": len(remaining)})
+        await db.flush()
+
+
 @router.post(
     "/teams",
     response_model=ApiResponse[Dict[str, Any]],
@@ -892,8 +925,7 @@ async def create_admin_team(
 
     old_leader_mem = await team_repo.get_user_membership(db, str(leader_user.id))
     if old_leader_mem:
-        await db.delete(old_leader_mem)
-        await db.flush()
+        await _detach_member_from_previous_team(db, old_leader_mem)
 
     requested_code = (body.invite_code or body.inviteCode or "").strip().upper()
     if requested_code:
@@ -917,6 +949,16 @@ async def create_admin_team(
         sub_res = await db.execute(select(Subtopic).where(Subtopic.id == resolved_sub_id))
         sub_obj = sub_res.scalar_one_or_none()
         if sub_obj:
+            if sub_obj.current_teams >= sub_obj.max_teams:
+                raise ConflictException(
+                    message="Đề tài nhánh đã đủ số lượng đội đăng ký tối đa.",
+                    error_code="TOPIC_FULL",
+                )
+            sub_obj.current_teams += 1
+            top_res = await db.execute(select(Topic).where(Topic.id == sub_obj.topic_id))
+            top_obj = top_res.scalar_one_or_none()
+            if top_obj:
+                top_obj.current_teams += 1
             team.subtopic_id = str(sub_obj.id)
             team.topic_id = str(sub_obj.topic_id)
             resolved_major_id = str(sub_obj.topic_id)
@@ -924,11 +966,23 @@ async def create_admin_team(
             top_res = await db.execute(select(Topic).where(Topic.id == resolved_sub_id))
             top_obj = top_res.scalar_one_or_none()
             if top_obj:
+                if top_obj.current_teams >= top_obj.max_teams:
+                    raise ConflictException(
+                        message="Đề tài đã đủ số lượng đội đăng ký tối đa.",
+                        error_code="TOPIC_FULL",
+                    )
+                top_obj.current_teams += 1
                 team.topic_id = str(top_obj.id)
     elif resolved_major_id:
         top_res = await db.execute(select(Topic).where(Topic.id == resolved_major_id))
         top_obj = top_res.scalar_one_or_none()
         if top_obj:
+            if top_obj.current_teams >= top_obj.max_teams:
+                raise ConflictException(
+                    message="Đề tài đã đủ số lượng đội đăng ký tối đa.",
+                    error_code="TOPIC_FULL",
+                )
+            top_obj.current_teams += 1
             team.topic_id = str(top_obj.id)
 
     db.add(team)
@@ -964,8 +1018,7 @@ async def create_admin_team(
         seen_user_ids.add(str(m_user.id))
         old_mem = await team_repo.get_user_membership(db, str(m_user.id))
         if old_mem:
-            await db.delete(old_mem)
-            await db.flush()
+            await _detach_member_from_previous_team(db, old_mem, str(team.id))
         db.add(
             TeamMember(
                 team_id=str(team.id),
@@ -1016,6 +1069,8 @@ async def update_admin_team(
     if not team:
         raise NotFoundException(message="Không tìm thấy đội thi cần cập nhật.")
     team_id_str = str(team.id)
+    old_topic_id = str(team.topic_id) if team.topic_id else None
+    old_subtopic_id = str(team.subtopic_id) if team.subtopic_id else None
 
     if body.name and body.name.strip() != team.team_name:
         cleaned_name = body.name.strip()
@@ -1050,23 +1105,74 @@ async def update_admin_team(
     if repo_val is not None:
         meta["repo_url"] = repo_val.strip() or None
 
-    resolved_sub_id = body.sub_topic_id or body.subTopicId or body.selected_topic_id
-    resolved_major_id = body.major_topic_id or body.majorTopicId
+    resolved_sub_id = body.sub_topic_id if body.sub_topic_id is not None else (
+        body.subTopicId if body.subTopicId is not None else body.selected_topic_id
+    )
+    resolved_major_id = body.major_topic_id if body.major_topic_id is not None else body.majorTopicId
     if resolved_sub_id is not None:
-        meta["sub_topic_id"] = resolved_sub_id
-        meta["selected_topic_id"] = resolved_sub_id
-        sub_res = await db.execute(select(Subtopic).where(Subtopic.id == resolved_sub_id))
-        sub_obj = sub_res.scalar_one_or_none()
-        if sub_obj:
-            team.subtopic_id = str(sub_obj.id)
-            team.topic_id = str(sub_obj.topic_id)
-            meta["major_topic_id"] = str(sub_obj.topic_id)
+        meta["sub_topic_id"] = resolved_sub_id or None
+        meta["selected_topic_id"] = resolved_sub_id or None
+        if not resolved_sub_id:
+            team.subtopic_id = None
+        else:
+            sub_res = await db.execute(select(Subtopic).where(Subtopic.id == resolved_sub_id))
+            sub_obj = sub_res.scalar_one_or_none()
+            if sub_obj:
+                team.subtopic_id = str(sub_obj.id)
+                team.topic_id = str(sub_obj.topic_id)
+                meta["major_topic_id"] = str(sub_obj.topic_id)
+            else:
+                top_res = await db.execute(select(Topic).where(Topic.id == resolved_sub_id))
+                top_obj = top_res.scalar_one_or_none()
+                if top_obj:
+                    team.subtopic_id = None
+                    team.topic_id = str(top_obj.id)
+                    meta["major_topic_id"] = str(top_obj.id)
     if resolved_major_id is not None:
-        meta["major_topic_id"] = resolved_major_id
-        top_res = await db.execute(select(Topic).where(Topic.id == resolved_major_id))
-        top_obj = top_res.scalar_one_or_none()
-        if top_obj:
-            team.topic_id = str(top_obj.id)
+        meta["major_topic_id"] = resolved_major_id or None
+        if not resolved_major_id and not resolved_sub_id:
+            team.topic_id = None
+        elif resolved_major_id:
+            top_res = await db.execute(select(Topic).where(Topic.id == resolved_major_id))
+            top_obj = top_res.scalar_one_or_none()
+            if top_obj:
+                team.topic_id = str(top_obj.id)
+
+    new_subtopic_id = str(team.subtopic_id) if team.subtopic_id else None
+    new_topic_id = str(team.topic_id) if team.topic_id else None
+    if new_subtopic_id != old_subtopic_id:
+        if old_subtopic_id:
+            old_sub_res = await db.execute(select(Subtopic).where(Subtopic.id == old_subtopic_id))
+            old_sub_obj = old_sub_res.scalar_one_or_none()
+            if old_sub_obj and old_sub_obj.current_teams > 0:
+                old_sub_obj.current_teams -= 1
+        if new_subtopic_id:
+            new_sub_res = await db.execute(select(Subtopic).where(Subtopic.id == new_subtopic_id))
+            new_sub_obj = new_sub_res.scalar_one_or_none()
+            if new_sub_obj:
+                if new_sub_obj.current_teams >= new_sub_obj.max_teams:
+                    raise ConflictException(
+                        message="Đề tài nhánh đã đủ số lượng đội đăng ký tối đa.",
+                        error_code="TOPIC_FULL",
+                    )
+                new_sub_obj.current_teams += 1
+
+    if new_topic_id != old_topic_id:
+        if old_topic_id:
+            old_top_res = await db.execute(select(Topic).where(Topic.id == old_topic_id))
+            old_top_obj = old_top_res.scalar_one_or_none()
+            if old_top_obj and old_top_obj.current_teams > 0:
+                old_top_obj.current_teams -= 1
+        if new_topic_id:
+            new_top_res = await db.execute(select(Topic).where(Topic.id == new_topic_id))
+            new_top_obj = new_top_res.scalar_one_or_none()
+            if new_top_obj:
+                if not new_subtopic_id and new_top_obj.current_teams >= new_top_obj.max_teams:
+                    raise ConflictException(
+                        message="Đề tài đã đủ số lượng đội đăng ký tối đa.",
+                        error_code="TOPIC_FULL",
+                    )
+                new_top_obj.current_teams += 1
 
     if body.selected_topic_name is not None:
         meta["selected_topic_name"] = body.selected_topic_name
@@ -1133,8 +1239,7 @@ async def update_admin_team(
 
         old_leader_mem = await team_repo.get_user_membership(db, str(leader_user.id))
         if old_leader_mem and str(old_leader_mem.team_id) != str(team.id):
-            await db.delete(old_leader_mem)
-            await db.flush()
+            await _detach_member_from_previous_team(db, old_leader_mem, str(team.id))
 
         db.add(
             TeamMember(
@@ -1155,8 +1260,7 @@ async def update_admin_team(
             seen_ids.add(str(m_user.id))
             old_mem = await team_repo.get_user_membership(db, str(m_user.id))
             if old_mem and str(old_mem.team_id) != str(team.id):
-                await db.delete(old_mem)
-                await db.flush()
+                await _detach_member_from_previous_team(db, old_mem, str(team.id))
             db.add(
                 TeamMember(
                     team_id=str(team.id),
@@ -1559,8 +1663,13 @@ async def delete_personnel(
     assign_res = await db.execute(assign_stmt)
     for a in assign_res.scalars().all():
         await db.delete(a)
+    from app.models.evaluation import Evaluation
+
     await db.execute(update(Subtopic).where(Subtopic.mentor_id == uid_str).values(mentor_id=None))
-    if u.email.lower() in _DEFAULT_SEEDED_PERSONNEL_EMAILS:
+    has_evals = (
+        await db.execute(select(Evaluation.id).where(Evaluation.judge_id == uid_str).limit(1))
+    ).first() is not None
+    if u.email.lower() in _DEFAULT_SEEDED_PERSONNEL_EMAILS or has_evals:
         u.is_active = False
         db.add(u)
     else:

@@ -28,7 +28,7 @@ async def check_member_removal(db: AsyncSession, team: Team, count: int) -> None
     meta = team.admin_meta or {}
     # A topic registration or explicit approval enrolls a team in the contest.
     participating = bool(team.topic_id or team.subtopic_id or meta.get("approval_status") == "approved")
-    if participating and count - 1 < minimum:
+    if participating and (count > 1 or meta.get("approval_status") == "approved") and count - 1 < minimum:
         raise ConflictException(
             message=f"Không thể xóa thành viên hoặc rời đội vì đội đang tham gia dự thi và cần duy trì tối thiểu {minimum} thành viên.",
             error_code="TEAM_MIN_MEMBERS",

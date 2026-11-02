@@ -93,7 +93,9 @@ export const AdminConfigPage: React.FC = () => {
           useMockStore.setState((state) => ({
             config: {
               ...state.config,
-              isContestStarted: data.status === 'hacking',
+              isContestStarted: ['hacking', 'judging', 'completed'].includes(
+                String(data.status || '').toLowerCase()
+              ),
               name: nextName,
               currentPhase: nextPhase || state.config.currentPhase,
               minTeamSize: nextMinTeam,

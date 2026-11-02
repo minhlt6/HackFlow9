@@ -89,11 +89,13 @@ export const AdminResultsPage: React.FC = () => {
           const tId = String(entry.team_id ?? entry.teamId ?? '');
           const tName = String(entry.team_name ?? entry.teamName ?? '');
           const matchedTeam = teams.find((t) => t.id === tId || t.name === tName);
-          const rawJudges = Array.isArray(entry.judge_scores)
-            ? (entry.judge_scores as Array<Record<string, unknown>>)
-            : Array.isArray(entry.judgeBreakdown)
-              ? (entry.judgeBreakdown as Array<Record<string, unknown>>)
-              : [];
+          const rawJudges = Array.isArray(entry.all_judge_scores)
+            ? (entry.all_judge_scores as Array<Record<string, unknown>>)
+            : Array.isArray(entry.judge_scores)
+              ? (entry.judge_scores as Array<Record<string, unknown>>)
+              : Array.isArray(entry.judgeBreakdown)
+                ? (entry.judgeBreakdown as Array<Record<string, unknown>>)
+                : [];
           const judgeList = rawJudges.map((jb: Record<string, unknown>, idx: number) => ({
             judgeId: String(jb.judge_id ?? jb.judgeName ?? `judge-${idx + 1}`),
             judgeName: String(jb.judge_name ?? jb.judgeName ?? `Giám khảo #${idx + 1}`),

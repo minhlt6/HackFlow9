@@ -209,6 +209,17 @@ async def unlock_evaluation_by_id(
             message="Evaluation unlocked successfully",
         )
 
+    if resolved_sub is not None:
+        return ApiResponse(
+            success=True,
+            data={
+                "submission_id": str(resolved_sub.id),
+                "status": "draft",
+                "unlocked_by": str(current_user.id),
+            },
+            message="Evaluation unlocked successfully",
+        )
+
     raise NotFoundException(message="Evaluation not found.")
 
 

@@ -90,6 +90,60 @@ async def _seed_default_accounts() -> None:
     ]
     default_pw_hash = hash_password("123456")
 
+    async def _reconcile_database_counters(session) -> None:
+        from app.models.team import Team, TeamMember
+        from app.models.topic import Topic, Subtopic
+
+        all_teams = list((await session.execute(select(Team))).scalars().all())
+        all_members = list((await session.execute(select(TeamMember))).scalars().all())
+        all_topics = list((await session.execute(select(Topic))).scalars().all())
+        all_subtopics = list((await session.execute(select(Subtopic))).scalars().all())
+
+        mem_counts: dict[str, int] = {}
+        for m in all_members:
+            tid = str(m.team_id)
+            mem_counts[tid] = mem_counts.get(tid, 0) + 1
+
+        topic_counts: dict[str, int] = {}
+        subtopic_counts: dict[str, int] = {}
+        changed = False
+        for t in all_teams:
+            tid = str(t.id)
+            if t.topic_id:
+                top_id = str(t.topic_id)
+                topic_counts[top_id] = topic_counts.get(top_id, 0) + 1
+            if t.subtopic_id:
+                sub_id = str(t.subtopic_id)
+                subtopic_counts[sub_id] = subtopic_counts.get(sub_id, 0) + 1
+            actual_mc = mem_counts.get(tid, 0)
+            if isinstance(getattr(t, "admin_meta", None), dict):
+                if t.admin_meta.get("member_count") != actual_mc:
+                    meta = dict(t.admin_meta)
+                    meta["member_count"] = actual_mc
+                    t.admin_meta = meta
+                    changed = True
+
+        for sub in all_subtopics:
+            actual_sc = subtopic_counts.get(str(sub.id), 0)
+            if sub.current_teams != actual_sc:
+                sub.current_teams = actual_sc
+                changed = True
+            if sub.max_teams < actual_sc:
+                sub.max_teams = actual_sc
+                changed = True
+
+        for top in all_topics:
+            actual_tc = topic_counts.get(str(top.id), 0)
+            if top.current_teams != actual_tc:
+                top.current_teams = actual_tc
+                changed = True
+            if top.max_teams < actual_tc:
+                top.max_teams = actual_tc
+                changed = True
+
+        if changed:
+            await session.commit()
+
     async with db_module.AsyncSessionLocal() as session:
         rehearsal_admin = (
             await session.execute(select(User).where(User.email == "admin@demo.example.com"))
@@ -102,6 +156,7 @@ async def _seed_default_accounts() -> None:
                 for u_demo in demo_users:
                     u_demo.hashed_password = default_pw_hash
                 await session.commit()
+            await _reconcile_database_counters(session)
             return
 
         for email, full_name, role, approval_status, gh_user in default_users:
