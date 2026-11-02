@@ -715,29 +715,74 @@ export const AdminCheckpointsPage: React.FC = () => {
     void persistOrder(sorted);
   };
 
+  const totalWeight = checkpoints.reduce((sum, cp) => sum + Number(cp.weight ?? 0), 0);
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCp) return;
-    if (!await confirm({title: 'Lưu thay đổi chặng nộp bài?', description: `Chặng: ${editingCp.title} → ${editTitle.trim()}. Trọng số: ${editingCp.weight ?? 0}% → ${editWeight}%. Hạn hiện tại: ${new Date(editingCp.deadline).toLocaleString('vi-VN')}; hạn mới tính sau ${editDurationMinutes} phút từ lúc xác nhận. Nội dung và yêu cầu nộp sẽ áp dụng cho các đội.`, confirmLabel: 'Xác nhận lưu chặng'})) return;
+    if (editingCp.status === 'closed') {
+      showAlert('Chặng nộp bài đã đóng, không thể chỉnh sửa cấu hình.', 'error');
+      return;
+    }
+
+    const baseStartMs = editingCp.startTime ? new Date(editingCp.startTime).getTime() : Date.now();
+    const startMs = Number.isFinite(baseStartMs) ? baseStartMs : Date.now();
+    const deadlineDate = new Date(startMs + Number(editDurationMinutes) * 60 * 1000);
+
+    const otherFinalCp = checkpoints.find((c) => Boolean(c.isFinalCheckpoint) && c.id !== editingCp.id);
+    const effectiveIsFinal = Boolean(editingCp.isFinalCheckpoint) || (!otherFinalCp && editSubmissionFields.some((f) => f.type === 'repoUrl' && f.required));
+
+    if (!effectiveIsFinal && otherFinalCp) {
+      const finalDeadlineMs = new Date(otherFinalCp.deadline).getTime();
+      if (Number.isFinite(finalDeadlineMs) && deadlineDate.getTime() > finalDeadlineMs) {
+        showAlert(
+          `Hạn chót mới (${deadlineDate.toLocaleString('vi-VN')}) vượt quá hạn Chặng Chung kết (${new Date(finalDeadlineMs).toLocaleString('vi-VN')}). Vui lòng giảm thời lượng hoặc gia hạn Chặng Chung kết trước.`,
+          'error'
+        );
+        return;
+      }
+    }
+
+    if (effectiveIsFinal) {
+      const maxProgressDeadline = Math.max(
+        0,
+        ...checkpoints
+          .filter((c) => !c.isFinalCheckpoint && c.id !== editingCp.id)
+          .map((c) => new Date(c.deadline).getTime())
+          .filter(Number.isFinite)
+      );
+      if (maxProgressDeadline > 0 && deadlineDate.getTime() < maxProgressDeadline) {
+        showAlert(
+          `Hạn chót Chặng Chung kết (${deadlineDate.toLocaleString('vi-VN')}) không được sớm hơn hạn chót của các chặng tiến độ (${new Date(maxProgressDeadline).toLocaleString('vi-VN')}).`,
+          'error'
+        );
+        return;
+      }
+    }
+
+    if (!await confirm({title: 'Lưu thay đổi chặng nộp bài?', description: `Chặng: ${editingCp.title} → ${editTitle.trim()}. Trọng số: ${editingCp.weight ?? 0}% → ${editWeight}%. Mở cổng: ${new Date(startMs).toLocaleString('vi-VN')} → Hạn mới: ${deadlineDate.toLocaleString('vi-VN')} (thời lượng ${editDurationMinutes} phút). Nội dung và yêu cầu nộp sẽ áp dụng cho các đội.`, confirmLabel: 'Xác nhận lưu chặng'})) return;
 
     setSubmitting(true);
     try {
-      const now = new Date();
-      const deadlineDate = new Date(now.getTime() + Number(editDurationMinutes) * 60 * 1000);
-
+      let freezeAssigned = false;
       const payload: CheckpointUpdatePayload = {
         title: editTitle.trim(),
         weight: Number(editWeight),
         description: editDescription.trim() || undefined,
+        start_time: new Date(startMs).toISOString(),
         deadline: deadlineDate.toISOString(),
         requirements: editRequirements.join('\n'),
-        is_final_checkpoint: editSubmissionFields.some((f) => f.type === 'repoUrl' && f.required),
-        submission_fields: editSubmissionFields.map((f) => ({
-          field_key: f.type === 'repoUrl' ? 'repo_url' : f.type === 'demoUrl' ? 'demo_url' : f.id,
-          field_label: f.label,
-          required: f.required,
-          apply_sha_freeze: f.type === 'repoUrl',
-        })),
+        is_final_checkpoint: effectiveIsFinal,
+        submission_fields: editSubmissionFields.map((f) => {
+          const shouldFreeze = effectiveIsFinal && f.type === 'repoUrl' && !freezeAssigned;
+          if (shouldFreeze) freezeAssigned = true;
+          return {
+            field_key: f.type === 'repoUrl' ? 'repo_url' : f.type === 'demoUrl' ? 'demo_url' : f.id,
+            field_label: f.label,
+            required: f.required,
+            apply_sha_freeze: shouldFreeze,
+          };
+        }),
       };
 
       await checkpointApi.updateCheckpoint(editingCp.id, payload);
@@ -773,32 +818,49 @@ export const AdminCheckpointsPage: React.FC = () => {
       return;
     }
 
+    const hasExistingFinal = finalCheckpointIndex >= 0;
+    const isFinal =
+      !hasExistingFinal &&
+      newSubmissionFields.some((f) => f.type === 'repoUrl' && f.required);
+
+    const targetIndex =
+      insertPosition === 'end'
+        ? hasExistingFinal
+          ? finalCheckpointIndex
+          : checkpoints.length
+        : Math.min(
+            Number(insertPosition),
+            hasExistingFinal ? finalCheckpointIndex : checkpoints.length
+          );
+
+    const prevCp = targetIndex > 0 ? checkpoints[targetIndex - 1] : undefined;
+    const prevDeadlineMs = prevCp?.deadline ? new Date(prevCp.deadline).getTime() : NaN;
+    const startMs = Number.isFinite(prevDeadlineMs) ? Math.max(Date.now(), prevDeadlineMs) : Date.now();
+    const startDate = new Date(startMs);
+    const deadlineDate = new Date(startMs + Number(newDurationMinutes) * 60 * 1000);
+
+    const existingFinalCp = finalCheckpointIndex >= 0 ? checkpoints[finalCheckpointIndex] : undefined;
+    if (!isFinal && existingFinalCp) {
+      const finalDeadlineMs = new Date(existingFinalCp.deadline).getTime();
+      if (Number.isFinite(finalDeadlineMs) && deadlineDate.getTime() > finalDeadlineMs) {
+        showAlert(
+          `Hạn chót dự kiến của chặng mới (${deadlineDate.toLocaleString('vi-VN')}) vượt quá hạn Chặng Chung kết (${new Date(finalDeadlineMs).toLocaleString('vi-VN')}). Vui lòng giảm thời lượng hoặc gia hạn Chặng Chung kết trước.`,
+          'error'
+        );
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
-      const now = new Date();
-      const deadlineDate = new Date(now.getTime() + Number(newDurationMinutes) * 60 * 1000);
-      const hasExistingFinal = finalCheckpointIndex >= 0;
-      const isFinal =
-        !hasExistingFinal &&
-        newSubmissionFields.some((f) => f.type === 'repoUrl' && f.required);
       let freezeAssigned = false;
-
-      const targetIndex =
-        insertPosition === 'end'
-          ? hasExistingFinal
-            ? finalCheckpointIndex
-            : checkpoints.length
-          : Math.min(
-              Number(insertPosition),
-              hasExistingFinal ? finalCheckpointIndex : checkpoints.length
-            );
 
       const payload: CheckpointCreatePayload = {
         title: newTitle.trim(),
         weight: Number(newWeight),
-        display_order: targetIndex,
+        display_order: targetIndex + 1,
         description: newDescription.trim() || undefined,
-        start_time: now.toISOString(),
+        start_time: startDate.toISOString(),
         deadline: deadlineDate.toISOString(),
         requirements: newRequirements.join('\n'),
         is_active: true,
@@ -822,7 +884,7 @@ export const AdminCheckpointsPage: React.FC = () => {
         orderedIds.splice(targetIndex, 0, created.id);
         await Promise.all(
           orderedIds.map((id, index) =>
-            checkpointApi.updateCheckpoint(id, { display_order: index })
+            checkpointApi.updateCheckpoint(id, { display_order: index + 1 })
           )
         );
       }
@@ -916,6 +978,11 @@ export const AdminCheckpointsPage: React.FC = () => {
           </Badge>
 
           <Badge variant="indigo">{checkpoints.length} Chặng nộp</Badge>
+          {checkpoints.length > 0 && (
+            <Badge variant={totalWeight === 100 ? 'success' : 'warning'}>
+              Tổng trọng số: {totalWeight}%
+            </Badge>
+          )}
 
           {checkpoints.length > 1 && (
             <Button
@@ -1064,6 +1131,16 @@ export const AdminCheckpointsPage: React.FC = () => {
                     </div>
 
                     <h3 className="font-semibold tracking-tight text-foreground text-lg sm:text-xl">{cp.title}</h3>
+                    {cp.status === 'open' ? (
+                      <Badge variant="success">Đang mở nộp bài</Badge>
+                    ) : cp.status === 'upcoming' ? (
+                      <Badge variant="indigo">Chưa mở</Badge>
+                    ) : (
+                      <Badge variant="neutral">Đã đóng</Badge>
+                    )}
+                    {cp.isFinalCheckpoint && (
+                      <Badge variant="danger">Chặng chung kết</Badge>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
@@ -1076,8 +1153,13 @@ export const AdminCheckpointsPage: React.FC = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => handleEdit(cp)}
-                      disabled={submitting}
+                      disabled={submitting || cp.status === 'closed'}
                       className="gap-1.5"
+                      title={
+                        cp.status === 'closed'
+                          ? 'Chặng đã đóng, không thể chỉnh sửa cấu hình'
+                          : 'Cấu hình chặng nộp bài'
+                      }
                     >
                       <Edit2 size={13} />
                       <span>Cấu hình</span>
@@ -1086,9 +1168,25 @@ export const AdminCheckpointsPage: React.FC = () => {
                       variant="danger"
                       size="sm"
                       onClick={() => handleDelete(cp.id, cp.title)}
-                      disabled={submitting}
+                      disabled={
+                        submitting ||
+                        Boolean(cp.isFinalCheckpoint) ||
+                        cp.status === 'closed' ||
+                        cp.status === 'open' ||
+                        cpSubmissions.length > 0
+                      }
                       className="gap-1.5"
-                      title="Xóa chặng này"
+                      title={
+                        cp.isFinalCheckpoint
+                          ? 'Không thể xóa Chặng chung kết'
+                          : cp.status === 'closed'
+                          ? 'Không thể xóa chặng đã đóng'
+                          : cp.status === 'open'
+                          ? 'Không thể xóa chặng đang mở nộp bài'
+                          : cpSubmissions.length > 0
+                          ? 'Không thể xóa chặng đã có bài nộp của đội thi'
+                          : 'Xóa chặng này'
+                      }
                     >
                       <Trash2 size={13} />
                     </Button>
@@ -1161,16 +1259,24 @@ export const AdminCheckpointsPage: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       <span>•</span>
-                      {config.isContestStarted ? (
+                      {cp.status === 'open' ? (
                         <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                           <span>
-                            Đang đếm ngược • Hạn chót: {new Date(cp.deadline).toLocaleTimeString('vi-VN')} {new Date(cp.deadline).toLocaleDateString('vi-VN')}
+                            Đang mở nộp bài • Hạn chót: {new Date(cp.deadline).toLocaleTimeString('vi-VN')} {new Date(cp.deadline).toLocaleDateString('vi-VN')}
+                          </span>
+                        </div>
+                      ) : cp.status === 'upcoming' ? (
+                        <div className="flex items-center gap-1.5 text-primary font-medium">
+                          <span>
+                            Chưa mở • Mở cổng: {cp.startTime ? `${new Date(cp.startTime).toLocaleTimeString('vi-VN')} ${new Date(cp.startTime).toLocaleDateString('vi-VN')}` : 'Sắp tới'} → Hạn chót: {new Date(cp.deadline).toLocaleTimeString('vi-VN')} {new Date(cp.deadline).toLocaleDateString('vi-VN')}
                           </span>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400">
-                          <span>Chưa kích hoạt • Tự động tính sau khi phát lệnh bắt đầu</span>
+                        <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
+                          <span>
+                            Đã đóng cổng nộp • Kết thúc: {new Date(cp.deadline).toLocaleTimeString('vi-VN')} {new Date(cp.deadline).toLocaleDateString('vi-VN')}
+                          </span>
                         </div>
                       )}
                     </div>

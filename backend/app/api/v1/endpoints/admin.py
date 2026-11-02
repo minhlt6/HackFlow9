@@ -2088,6 +2088,21 @@ async def update_hackathon_config(
     if new_start is not None:
         cfg.start_time = new_start
     if new_end is not None:
+        if raw_end is not None:
+            from app.repositories.checkpoint_repo import checkpoint_repo
+            from app.services.checkpoint_service import ensure_utc
+
+            e_utc = ensure_utc(new_end)
+            all_cps = await checkpoint_repo.get_all(db)
+            for pcp in all_cps:
+                if not pcp.is_final_checkpoint and e_utc < ensure_utc(pcp.deadline):
+                    raise BadRequestException(
+                        message="Hạn chót cuộc thi không được sớm hơn hạn nộp bài của các chặng tiến độ."
+                    )
+            for fcp in all_cps:
+                if fcp.is_final_checkpoint and e_utc > ensure_utc(fcp.start_time):
+                    fcp.deadline = e_utc
+                    db.add(fcp)
         cfg.end_time = new_end
 
     # 3. Topic & Result publish flags

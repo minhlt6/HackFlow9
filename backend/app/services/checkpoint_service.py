@@ -378,6 +378,14 @@ class CheckpointService:
         if deadline_utc <= start_utc:
             raise BadRequestException(message="Hạn chót (deadline) phải diễn ra sau thời điểm mở cổng (start_time).")
 
+        if data.display_order is not None and not data.is_final_checkpoint:
+            existing_cps = await checkpoint_repo.get_all(db)
+            for fcp in existing_cps:
+                if fcp.is_final_checkpoint and deadline_utc > ensure_utc(fcp.deadline):
+                    raise BadRequestException(
+                        message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
+                    )
+
         raw_fields = (
             [f.model_dump() for f in data.submission_fields]
             if data.submission_fields is not None
@@ -457,6 +465,28 @@ class CheckpointService:
         if new_deadline <= new_start:
             raise BadRequestException(message="Hạn chót (deadline) phải diễn ra sau thời điểm mở cổng (start_time).")
 
+        if data.deadline is not None:
+            existing_cps = await checkpoint_repo.get_all(db)
+            if not effective_is_final:
+                for fcp in existing_cps:
+                    if fcp.is_final_checkpoint and str(fcp.id) != str(cp.id) and new_deadline > ensure_utc(fcp.deadline):
+                        raise BadRequestException(
+                            message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
+                        )
+            else:
+                for pcp in existing_cps:
+                    if not pcp.is_final_checkpoint and str(pcp.id) != str(cp.id) and new_deadline < ensure_utc(pcp.deadline):
+                        raise BadRequestException(
+                            message="Hạn chót của Chặng Chung kết không được sớm hơn hạn chót của các chặng tiến độ."
+                        )
+                from sqlalchemy import select
+                from app.models.config import HackathonConfig
+                cfg_res = await db.execute(select(HackathonConfig).order_by(HackathonConfig.created_at.asc()))
+                cfg = cfg_res.scalars().first()
+                if cfg and cfg.end_time and new_deadline > ensure_utc(cfg.end_time):
+                    cfg.end_time = new_deadline
+                    db.add(cfg)
+
         if data.start_time is not None:
             update_fields["start_time"] = new_start
         if data.deadline is not None:
@@ -518,6 +548,25 @@ class CheckpointService:
         cp = await checkpoint_repo.get_by_id(db, checkpoint_id)
         if not cp:
             raise NotFoundException(message=f"Không tìm thấy checkpoint với ID '{checkpoint_id}'.")
+
+        if cp.is_final_checkpoint:
+            raise BadRequestException(message="Không thể xóa Chặng Chung kết của cuộc thi.")
+
+        from sqlalchemy import select, func
+        from app.models.checkpoint import Submission
+
+        sub_count = await db.scalar(
+            select(func.count()).select_from(Submission).where(Submission.checkpoint_id == str(cp.id))
+        )
+        if sub_count and sub_count > 0:
+            raise BadRequestException(
+                message="Không thể xóa chặng nộp bài đã có dữ liệu bài nộp của đội thi."
+            )
+
+        if cp.is_active and self.calculate_time_gate_info(cp)["status"] == CheckpointStatus.CLOSED.value:
+            raise BadRequestException(
+                message="Không thể xóa chặng nộp bài đã kết thúc (Đã đóng)."
+            )
 
         await checkpoint_repo.delete(db, cp)
         await db.commit()
