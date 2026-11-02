@@ -1,4 +1,3 @@
-import { checkpointScheduleWarning } from '../../utils/progress';
 import { useLiveCheckpoints } from '../../hooks/useLiveCheckpoints';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -99,7 +98,6 @@ export const CandidateCheckpointsPage: React.FC = () => {
   const handleSelectCheckpoint = (cpId: string) => {
     setSelectedCheckpointId(cpId);
     fetchSubmissions(cpId);
-    setCheckpoints((items) => items.map((cp) => cp.id === cpId ? {...cp, availability_error:'Đang kiểm tra trạng thái chặng.'} : cp));
     void checkpointApi.getCheckpoints().then(setCheckpoints).catch(() => setLoadError('Không thể kiểm tra trạng thái chặng. Vui lòng tải lại.'));
   };
 
@@ -146,17 +144,16 @@ export const CandidateCheckpointsPage: React.FC = () => {
       case 'grace_period':
         return <Badge variant="warning">Ân hạn mạng (Grace Period)</Badge>;
       case 'upcoming':
-        return <Badge variant="indigo">Sắp diễn ra</Badge>;
+        return <Badge variant="indigo">Chưa mở</Badge>;
       case 'closed':
         return <Badge variant="neutral">Đã đóng</Badge>;
       default:
-        return <Badge variant="neutral">Chưa bắt đầu</Badge>;
+        return <Badge variant="neutral">Chưa mở</Badge>;
     }
   };
 
   return (
     <div className="space-y-6 text-foreground max-w-7xl mx-auto ">
-      {checkpointScheduleWarning(checkpoints) && <p role="status" className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm">{checkpointScheduleWarning(checkpoints)}</p>}
       {checkpoints.some((cp) => cp.availability_error) && <p role="alert" className="rounded-xl border border-amber-500/30 p-4 text-sm">Không thể xác minh trạng thái các chặng. Form nộp tạm khóa cho đến khi kết nối lại.</p>}
       {/* Tiêu đề trang */}
       {loadError && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-destructive">{loadError}</p>}
@@ -417,24 +414,27 @@ export const CandidateCheckpointsPage: React.FC = () => {
                       </p>
                     </div>
 
-                    {selectedCheckpoint.latest_submission && (
-                      <Badge
-                        variant={
-                          getSubmissionStatusMeta(
-                            selectedCheckpoint.latest_submission.status,
-                            Boolean(selectedCheckpoint.is_final_checkpoint)
-                          ).badgeVariant
-                        }
-                        size="sm"
-                      >
-                        {
-                          getSubmissionStatusMeta(
-                            selectedCheckpoint.latest_submission.status,
-                            Boolean(selectedCheckpoint.is_final_checkpoint)
-                          ).badgeLabel
-                        }
-                      </Badge>
-                    )}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      { getStatusBadge(selectedCheckpoint.status) }
+                      {selectedCheckpoint.latest_submission && (
+                        <Badge
+                          variant={
+                            getSubmissionStatusMeta(
+                              selectedCheckpoint.latest_submission.status,
+                              Boolean(selectedCheckpoint.is_final_checkpoint)
+                            ).badgeVariant
+                          }
+                          size="sm"
+                        >
+                          {
+                            getSubmissionStatusMeta(
+                              selectedCheckpoint.latest_submission.status,
+                              Boolean(selectedCheckpoint.is_final_checkpoint)
+                            ).badgeLabel
+                          }
+                        </Badge>
+                      )}
+                    </div>
                   </div>
 
                   {/* Component Form nộp bài theo tiêu chuẩn HF-30 */}

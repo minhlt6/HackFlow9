@@ -384,11 +384,11 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
         <div className="p-3.5 rounded-[12px] bg-indigo-500/10 border border-indigo-500/30 text-primary text-xs flex items-center gap-2.5">
           <Lock size={18} className="text-primary shrink-0" />
           <span>
-            <strong>Chưa đến giờ mở cổng (UPCOMING):</strong> Cổng nộp bài cho chặng này sẽ mở vào lúc{' '}
+            <strong>Chưa mở:</strong> Cổng nộp bài cho chặng này sẽ mở vào lúc{' '}
             <span className="font-mono text-foreground">
               {new Date(checkpoint.start_time).toLocaleString('vi-VN')}
             </span>
-            . Hiện tại các trường nhập liệu đang tạm khóa.
+            . Hiện tại form nộp bài đang khóa, không cho phép điền hoặc tải lên.
           </span>
         </div>
       )}
@@ -544,6 +544,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
 
       {/* Form nộp bài sử dụng React Hook Form & Render động theo checkpoint.submission_fields */}
       <form onSubmit={handleSubmit(handlePreSubmit)} className="space-y-5" noValidate>
+        <fieldset disabled={isFormLocked || isSubmitting || !isTeamLeader} className="space-y-5 disabled:opacity-75">
         {effectiveFields.map((field) => {
           const isRepoField =
             field.field_key === 'repo_url' || Boolean(field.apply_sha_freeze);
@@ -701,7 +702,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                 !isTeamLeader
                   ? 'Chỉ Đội trưởng mới có quyền nộp/cập nhật bài thi cho đội'
                   : isUpcoming
-                  ? 'Chưa đến giờ mở cổng nộp bài'
+                  ? 'Chưa mở — Form nộp bài đang khóa'
                   : isFormLocked
                   ? 'Cổng nộp bài đã đóng hoặc tạm khóa'
                   : undefined
@@ -709,7 +710,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
               className="w-full sm:w-auto min-w-[140px]"
             >
               {isUpcoming
-                ? 'Chưa mở cổng nộp'
+                ? 'Chưa mở'
                 : isClosed
                 ? 'Đã đóng cổng nộp'
                 : lastSubmitted
@@ -718,6 +719,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
             </Button>
           </div>
         </div>
+        </fieldset>
       </form>
 
       {/* ======================================================== */}
