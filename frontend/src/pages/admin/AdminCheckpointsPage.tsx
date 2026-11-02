@@ -465,7 +465,7 @@ export const AdminCheckpointsPage: React.FC = () => {
   const [editReqInput, setEditReqInput] = useState('');
   const [alert, setAlert] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
 
-  const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'success', duration = 4000) => {
+  const showAlert = (message: string, type: 'success' | 'error' | 'info' = 'success', duration = 5000) => {
     setAlert({ type, message });
     setTimeout(() => {
       setAlert((curr) => (curr?.message === message ? null : curr));
@@ -588,13 +588,16 @@ export const AdminCheckpointsPage: React.FC = () => {
 
   const blocker = useUnsavedChangesWarning(isDirty);
 
+  const finalCheckpointIndex = checkpoints.findIndex((cp) => Boolean(cp.isFinalCheckpoint));
+
   const handleOpenAdd = () => {
+    setAlert(null);
     setIsAddOpen(true);
     setNewTitle('');
     setNewDescription('');
     setNewDurationMinutes(180);
     setNewWeight(25);
-    setInsertPosition('end');
+    setInsertPosition(finalCheckpointIndex >= 0 ? String(finalCheckpointIndex) : 'end');
     setNewRequirements([
       'Sơ đồ kiến trúc & đặc tả kỹ thuật',
       'Kho mã nguồn cập nhật trên GitHub',
@@ -731,37 +734,73 @@ export const AdminCheckpointsPage: React.FC = () => {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    if (!newTitle.trim()) {
+      showAlert('Vui lòng nhập tiêu đề chặng nộp bài.', 'error');
+      return;
+    }
+    if (
+      finalCheckpointIndex >= 0 &&
+      (insertPosition === 'end' || Number(insertPosition) > finalCheckpointIndex)
+    ) {
+      showAlert(
+        'Không thể chèn chặng nộp mới vào sau Chặng Chung Kết đã khóa. Vui lòng chọn vị trí trước Chặng Chung Kết.',
+        'error'
+      );
+      return;
+    }
 
     setSubmitting(true);
     try {
       const now = new Date();
       const deadlineDate = new Date(now.getTime() + Number(newDurationMinutes) * 60 * 1000);
+      const hasExistingFinal = finalCheckpointIndex >= 0;
+      const isFinal =
+        !hasExistingFinal &&
+        newSubmissionFields.some((f) => f.type === 'repoUrl' && f.required);
+      let freezeAssigned = false;
+
+      const targetIndex =
+        insertPosition === 'end'
+          ? hasExistingFinal
+            ? finalCheckpointIndex
+            : checkpoints.length
+          : Math.min(
+              Number(insertPosition),
+              hasExistingFinal ? finalCheckpointIndex : checkpoints.length
+            );
 
       const payload: CheckpointCreatePayload = {
         title: newTitle.trim(),
         weight: Number(newWeight),
-        display_order: checkpoints.length,
+        display_order: targetIndex,
         description: newDescription.trim() || undefined,
         start_time: now.toISOString(),
         deadline: deadlineDate.toISOString(),
         requirements: newRequirements.join('\n'),
         is_active: true,
-        is_final_checkpoint: newSubmissionFields.some((f) => f.type === 'repoUrl' && f.required),
+        is_final_checkpoint: isFinal,
         grace_period_seconds: 5,
-        submission_fields: newSubmissionFields.map((f) => ({
-          field_key: f.type === 'repoUrl' ? 'repo_url' : f.type === 'demoUrl' ? 'demo_url' : f.id,
-          field_label: f.label,
-          required: f.required,
-          apply_sha_freeze: f.type === 'repoUrl',
-        })),
+        submission_fields: newSubmissionFields.map((f) => {
+          const shouldFreeze = isFinal && f.type === 'repoUrl' && !freezeAssigned;
+          if (shouldFreeze) freezeAssigned = true;
+          return {
+            field_key: f.type === 'repoUrl' ? 'repo_url' : f.type === 'demoUrl' ? 'demo_url' : f.id,
+            field_label: f.label,
+            required: f.required,
+            apply_sha_freeze: shouldFreeze,
+          };
+        }),
       };
 
       const created = await checkpointApi.createCheckpoint(payload);
-      if (insertPosition !== 'end') {
-        const orderedIds = checkpoints.map(cp => cp.id);
-        orderedIds.splice(Number(insertPosition), 0, created.id);
-        await Promise.all(orderedIds.map((id, index) => checkpointApi.updateCheckpoint(id, { display_order: index })));
+      if (targetIndex < checkpoints.length) {
+        const orderedIds = checkpoints.map((cp) => cp.id);
+        orderedIds.splice(targetIndex, 0, created.id);
+        await Promise.all(
+          orderedIds.map((id, index) =>
+            checkpointApi.updateCheckpoint(id, { display_order: index })
+          )
+        );
       }
       await loadCheckpoints();
 
@@ -772,7 +811,7 @@ export const AdminCheckpointsPage: React.FC = () => {
       setNewWeight(25);
       setNewRequirements([]);
       setNewSubmissionFields([]);
-      setInsertPosition('end');
+      setInsertPosition(finalCheckpointIndex >= 0 ? String(finalCheckpointIndex) : 'end');
       showAlert(`Đã tạo chặng nộp "${newTitle}" thành công lên máy chủ!`, 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
@@ -879,7 +918,12 @@ export const AdminCheckpointsPage: React.FC = () => {
 
       {alert && (
         <div
-          className={`p-3.5 rounded-[10px] border text-xs sm:text-sm flex items-center justify-between shadow-lg animate-in fade-in ${
+          role="alert"
+          className={`p-3.5 rounded-[10px] border text-xs sm:text-sm flex items-center justify-between shadow-xl animate-in fade-in ${
+            isAddOpen || Boolean(editingCp)
+              ? 'fixed top-5 right-5 z-[100] max-w-lg bg-card'
+              : ''
+          } ${
             alert.type === 'success'
               ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-400'
               : alert.type === 'error'
@@ -1103,6 +1147,24 @@ export const AdminCheckpointsPage: React.FC = () => {
         maxWidth="4xl"
       >
         <form onSubmit={handleAdd} className="space-y-4">
+          {alert && alert.type === 'error' && (
+            <div
+              role="alert"
+              className="p-3 rounded-[10px] border bg-rose-500/10 border-rose-500/40 text-rose-700 dark:text-rose-400 text-xs sm:text-sm flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{alert.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAlert(null)}
+                className="hover:underline text-xs cursor-pointer ml-3 shrink-0"
+              >
+                Đóng
+              </button>
+            </div>
+          )}
           {/* Top Row: Title & Weight */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
             <div className="sm:col-span-8">
@@ -1204,14 +1266,32 @@ export const AdminCheckpointsPage: React.FC = () => {
                   onChange={(e) => setInsertPosition(e.target.value)}
                   className="w-full p-2.5 rounded-[10px] bg-card border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none"
                 >
-                  <option value="end">Chèn vào cuối cùng (Mặc định)</option>
+                  <option value="end" disabled={finalCheckpointIndex >= 0}>
+                    Chèn vào cuối cùng{' '}
+                    {finalCheckpointIndex >= 0
+                      ? '(Đã khóa — Không thể chèn sau Chặng Chung Kết)'
+                      : '(Mặc định)'}
+                  </option>
                   <option value="0">Chèn lên đầu tiên (Trước Chặng 1)</option>
-                  {checkpoints.map((cp, idx) => (
-                    <option key={cp.id} value={String(idx + 1)}>
-                      Chèn vào sau Chặng {idx + 1}: {cp.title || cp.name}
-                      {idx === 0 && checkpoints.length > 1 ? ' (ở giữa Chặng 1 và Chặng 2)' : ''}
-                    </option>
-                  ))}
+                  {checkpoints.map((cp, idx) => {
+                    const isAfterFinal =
+                      Boolean(cp.isFinalCheckpoint) ||
+                      (finalCheckpointIndex >= 0 && idx >= finalCheckpointIndex);
+                    return (
+                      <option
+                        key={cp.id}
+                        value={String(idx + 1)}
+                        disabled={isAfterFinal}
+                      >
+                        Chèn vào sau Chặng {idx + 1}: {cp.title || cp.name}
+                        {isAfterFinal
+                          ? ' (Đã khóa — Chặng Chung Kết)'
+                          : idx === 0 && checkpoints.length > 1
+                          ? ' (ở giữa Chặng 1 và Chặng 2)'
+                          : ''}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
@@ -1257,6 +1337,24 @@ export const AdminCheckpointsPage: React.FC = () => {
         maxWidth="4xl"
       >
         <form onSubmit={handleSave} className="space-y-4">
+          {alert && alert.type === 'error' && (
+            <div
+              role="alert"
+              className="p-3 rounded-[10px] border bg-rose-500/10 border-rose-500/40 text-rose-700 dark:text-rose-400 text-xs sm:text-sm flex items-center justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <AlertCircle size={16} className="shrink-0" />
+                <span>{alert.message}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAlert(null)}
+                className="hover:underline text-xs cursor-pointer ml-3 shrink-0"
+              >
+                Đóng
+              </button>
+            </div>
+          )}
           {/* Top Row: Title & Weight */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
             <div className="sm:col-span-8">

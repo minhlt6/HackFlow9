@@ -63,8 +63,8 @@ const RubricScoringPanel: React.FC<RubricPanelProps> = ({
   saveEvaluation,
   onAlert,
 }) => {
-  const isLocked = Boolean(existingEval && !existingEval.isDraft && team.canEvaluate === true);
-  const isIneligible = team.canEvaluate !== true;
+  const isIneligible = team.canEvaluate === false;
+  const isLocked = Boolean(existingEval && !existingEval.isDraft && !isIneligible);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isUnlockConfirmOpen, setIsUnlockConfirmOpen] = useState(false);
 
@@ -604,8 +604,10 @@ export const JudgingWorkspace: React.FC = () => {
       const existing = evaluations.find(
         (e) => e.teamId === team.id && e.judgeId === currentUser.id,
       );
-      let judgingStatus: 'unscored' | 'draft' | 'locked' = 'unscored';
-      if (existing && team.canEvaluate === true) {
+      let judgingStatus: 'unscored' | 'draft' | 'locked' | 'ineligible' = 'unscored';
+      if (team.canEvaluate === false) {
+        judgingStatus = 'ineligible';
+      } else if (existing) {
         judgingStatus = existing.isDraft ? 'draft' : 'locked';
       }
       const anonCode = user?.role === 'judge' ? team.name : `Team #${idx + 1}`;
@@ -711,6 +713,8 @@ export const JudgingWorkspace: React.FC = () => {
                     ? ' [Đã khóa]'
                     : t.judgingStatus === 'draft'
                     ? ' [Nháp]'
+                    : t.judgingStatus === 'ineligible'
+                    ? ' [Chưa đủ ĐK]'
                     : ' [Chưa chấm]';
                 return (
                   <option key={t.id} value={t.id}>

@@ -65,11 +65,14 @@ async def test_demo_database_real_api_lifecycle(stage, db_session, client):
         assert foreign.status_code == 403, foreign.text
         payload = {"submission_id": manifest["final_submissions"]["cyber"], "status": "draft",
                    "evaluations": [{"criteria_id": c["id"], "score": 8, "comment": "Demo"} for c in criteria]}
-        blocked = await client.post("/api/v1/evaluations", headers=judge, json=payload)
-        assert blocked.status_code == 409  # Unverified fixtures are intentionally not gradeable.
         from app.models.checkpoint import Submission
         sub = await db_session.get(Submission, manifest['final_submissions']['cyber'])
-        sub.status = 'submitted'; sub.commit_sha = 'a' * 40
+        orig_sha = sub.commit_sha
+        sub.status = 'sha_verification_failed'; sub.commit_sha = None
+        await db_session.commit()
+        blocked = await client.post("/api/v1/evaluations", headers=judge, json=payload)
+        assert blocked.status_code == 409  # Unverified fixtures are intentionally not gradeable.
+        sub.status = 'submitted'; sub.commit_sha = orig_sha or ('a' * 40)
         await db_session.commit()
         draft = await client.post("/api/v1/evaluations", headers=judge, json=payload)
         assert draft.status_code in (200, 201), draft.text

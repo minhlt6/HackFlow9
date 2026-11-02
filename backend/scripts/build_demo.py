@@ -7,6 +7,7 @@ For an EMPTY PostgreSQL DB: --database-url-env DEMO_DATABASE_URL --manifest <pat
 import argparse
 import asyncio
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -145,10 +146,11 @@ def build_dataset(stage, now, password):
                 version_history = [{"version": 1, "repo_url": "https://github.com/minhlt6/HackFlow9",
                     "demo_url": "https://example.com", "submitted_at": (submitted_at-timedelta(hours=1)).isoformat(),
                     "status": "submitted", "note": "Phiên bản dữ liệu mẫu v1", "submission_data": {"demo_url": "https://example.com"}}]
+            sha = hashlib.sha1(f"hackflow-demo-{slug}-{cp}".encode("utf-8")).hexdigest()
             sid = add(Submission, f"submission/{slug}/{cp}", team_id=team["id"], checkpoint_id=checkpoints[cp],
                 submitted_by=team["leader_id"], repo_url="https://github.com/minhlt6/HackFlow9", demo_url="https://example.com",
-                commit_sha=None, status="sha_verification_failed" if cp == "final" else "submitted",
-                note="DỮ LIỆU MẪU: chưa xác minh SHA; không đại diện bài nộp thực tế.",
+                commit_sha=sha, status="submitted",
+                note="DỮ LIỆU MẪU: đã đóng băng mã commit SHA phục vụ chấm điểm demo.",
                 submission_data={"repo_url": "https://github.com/minhlt6/HackFlow9", "demo_url": "https://example.com"},
                 submitted_at=submitted_at, version=2 if cp == "open" else 1, version_history=version_history)
             add(AuditLog, f"audit/{slug}/{cp}", user_id=team["leader_id"], team_id=team["id"],

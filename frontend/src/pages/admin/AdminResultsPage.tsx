@@ -44,6 +44,7 @@ export const AdminResultsPage: React.FC = () => {
   const [alert, setAlert] = useState<string | null>(null);
   const [errorAlert, setErrorAlert] = useState<string | null>(null);
   const [apiRows, setApiRows] = useState<ResultRow[] | null>(null);
+  const [unlockedTeamIds, setUnlockedTeamIds] = useState<string[]>([]);
   const [refreshTick, setRefreshTick] = useState(0);
   const [unlockModalOpen, setUnlockModalOpen] = useState(false);
   const [publishConfirmOpen, setPublishConfirmOpen] = useState(false);
@@ -191,6 +192,9 @@ export const AdminResultsPage: React.FC = () => {
       return;
     }
     useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: nextPublished } }));
+    if (!nextPublished) {
+      setUnlockedTeamIds([]);
+    }
     setApiRows((prev) =>
       prev
         ? prev.map((r) => ({
@@ -206,7 +210,6 @@ export const AdminResultsPage: React.FC = () => {
         : 'Đã chuyển bảng xếp hạng về chế độ bảo mật (Ẩn đối với thí sinh).'
     );
     setTimeout(() => setAlert(null), 3500);
-    setRefreshTick((t) => t + 1);
   };
 
   const openUnlockModal = (row: ResultRow) => {
@@ -276,6 +279,11 @@ export const AdminResultsPage: React.FC = () => {
         : prev
     );
     await syncFromBackend?.();
+    setUnlockedTeamIds((prev) =>
+      unlockTarget?.teamId && !prev.includes(unlockTarget.teamId)
+        ? [...prev, unlockTarget.teamId]
+        : prev
+    );
     setRefreshTick((t) => t + 1);
     setUnlocking(false);
     setUnlockModalOpen(false);
@@ -459,7 +467,7 @@ export const AdminResultsPage: React.FC = () => {
                     <td className="py-3.5 px-4 text-right">
                       {config.resultsPublished ? (
                         <Badge variant="success">Đã mở khóa</Badge>
-                      ) : row.hasLockedEvaluations || (!row.hasDraftEvaluations && row.evalCount >= 0) ? (
+                      ) : !unlockedTeamIds.includes(row.teamId) ? (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -488,6 +496,14 @@ export const AdminResultsPage: React.FC = () => {
         title={`Mở khóa phiếu chấm — ${unlockTarget?.teamName || ''}`}
       >
         <form onSubmit={handleConfirmUnlock} className="space-y-4">
+          {errorAlert && (
+            <div
+              role="alert"
+              className="p-3 rounded-[10px] bg-rose-500/10 border border-rose-500/30 text-xs text-rose-700 dark:text-rose-400"
+            >
+              {errorAlert}
+            </div>
+          )}
           <p className="text-xs text-muted-foreground">
             Thao tác này sẽ chuyển trạng thái phiếu chấm của Giám khảo từ <strong>Đã khóa (Submitted)</strong> về{' '}
             <strong>Bản nháp (Draft)</strong> để Giám khảo điều chỉnh lại điểm số và nhận xét.
