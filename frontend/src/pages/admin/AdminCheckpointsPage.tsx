@@ -680,9 +680,48 @@ export const AdminCheckpointsPage: React.FC = () => {
     if (!await confirm({title: 'Thay đổi thứ tự các chặng?', description: ordered.map((cp, index) => `${index + 1}. ${cp.title || cp.name}`).join(' → '), confirmLabel: 'Xác nhận thứ tự'})) return;
     setSubmitting(true);
     try {
-      await Promise.all(ordered.map((cp, index) => checkpointApi.updateCheckpoint(cp.id, { display_order: index + 1 })));
+      const progressCps = ordered.filter((cp) => !cp.isFinalCheckpoint);
+      const needsTimelineSync = progressCps.some((cp, idx) => {
+        if (idx === 0) return false;
+        const prevD = new Date(progressCps[idx - 1].deadline).getTime();
+        const currD = new Date(cp.deadline).getTime();
+        return Number.isFinite(prevD) && Number.isFinite(currD) && prevD > currD;
+      });
+
+      const syncedTimelines = new Map<string, { start_time: string; deadline: string }>();
+      if (needsTimelineSync && progressCps.length > 1) {
+        const validStarts = progressCps
+          .map((cp) => (cp.startTime ? new Date(cp.startTime).getTime() : NaN))
+          .filter(Number.isFinite);
+        if (validStarts.length > 0) {
+          let cursorMs = Math.min(...validStarts);
+
+          for (const cp of progressCps) {
+            const oldStart = cp.startTime ? new Date(cp.startTime).getTime() : NaN;
+            const oldEnd = cp.deadline ? new Date(cp.deadline).getTime() : NaN;
+            const inferredMin =
+              Number.isFinite(oldStart) && Number.isFinite(oldEnd) && oldEnd > oldStart
+                ? Math.round((oldEnd - oldStart) / 60000)
+                : 60;
+            const durMin = Math.max(5, Number(cp.durationMinutes) || inferredMin);
+            const nextStartIso = new Date(cursorMs).toISOString();
+            cursorMs += durMin * 60 * 1000;
+            const nextDeadlineIso = new Date(cursorMs).toISOString();
+            syncedTimelines.set(cp.id, { start_time: nextStartIso, deadline: nextDeadlineIso });
+          }
+        }
+      }
+
+      for (let index = 0; index < ordered.length; index += 1) {
+        const cp = ordered[index];
+        const timeline = syncedTimelines.get(cp.id);
+        await checkpointApi.updateCheckpoint(cp.id, {
+          display_order: index + 1,
+          ...(timeline ?? {}),
+        });
+      }
       await loadCheckpoints();
-      showAlert('Đã lưu thứ tự các chặng.', 'success');
+      showAlert('Đã lưu thứ tự và đồng bộ mốc thời gian các chặng.', 'success');
     } catch {
       await loadCheckpoints();
       showAlert('Không thể lưu đầy đủ thứ tự các chặng. Đã tải lại dữ liệu máy chủ.', 'error');
@@ -740,6 +779,33 @@ export const AdminCheckpointsPage: React.FC = () => {
           'error'
         );
         return;
+      }
+    }
+
+    const editingIndex = checkpoints.findIndex((c) => c.id === editingCp.id);
+    if (!effectiveIsFinal && editingIndex >= 0) {
+      const prevCp = editingIndex > 0 ? checkpoints[editingIndex - 1] : undefined;
+      if (prevCp && !prevCp.isFinalCheckpoint) {
+        const prevDeadlineMs = new Date(prevCp.deadline).getTime();
+        if (Number.isFinite(prevDeadlineMs) && deadlineDate.getTime() < prevDeadlineMs) {
+          showAlert(
+            `Hạn chót mới (${deadlineDate.toLocaleString('vi-VN')}) không được sớm hơn hạn chót của chặng đứng trước "${prevCp.title || prevCp.name}" (${new Date(prevDeadlineMs).toLocaleString('vi-VN')}).`,
+            'error'
+          );
+          return;
+        }
+      }
+
+      const nextCp = editingIndex < checkpoints.length - 1 ? checkpoints[editingIndex + 1] : undefined;
+      if (nextCp && !nextCp.isFinalCheckpoint) {
+        const nextDeadlineMs = new Date(nextCp.deadline).getTime();
+        if (Number.isFinite(nextDeadlineMs) && deadlineDate.getTime() > nextDeadlineMs) {
+          showAlert(
+            `Hạn chót mới (${deadlineDate.toLocaleString('vi-VN')}) vượt quá hạn chót của chặng kế tiếp "${nextCp.title || nextCp.name}" (${new Date(nextDeadlineMs).toLocaleString('vi-VN')}). Vui lòng giảm thời lượng hoặc lùi hạn chặng kế tiếp trước.`,
+            'error'
+          );
+          return;
+        }
       }
     }
 

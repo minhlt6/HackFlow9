@@ -18,6 +18,7 @@ from app.models.user import ApprovalStatus, User, UserRole
 from app.repositories.checkpoint_repo import checkpoint_repo
 from app.repositories.submission_repo import submission_repo
 from app.repositories.team_repo import team_repo
+from app.repositories.topic_repo import topic_repo
 from app.schemas.checkpoint import CheckpointStatus
 from app.schemas.submission import (
     AuditLogResponse,
@@ -245,7 +246,16 @@ class SubmissionService:
                 error_code="CHECKPOINT_NOT_FOUND",
             )
 
-        # ── Bước 2.2 & Mục 3: Kiểm tra trạng thái Checkpoint & Công thức Time-Gated + Grace Period ──
+        # ── Bước 2.2 & Mục 3: Kiểm tra trạng thái Cuộc thi, Checkpoint & Công thức Time-Gated + Grace Period ──
+        contest_config = await topic_repo.get_config(db)
+        if contest_config and isinstance(contest_config.settings_data, dict):
+            contest_status = str(contest_config.settings_data.get("status") or "").strip().lower()
+            if contest_status in {"judging", "completed"}:
+                raise BadRequestException(
+                    message="Cuộc thi đã chuyển sang giai đoạn chấm điểm hoặc đã kết thúc, không thể nộp hoặc cập nhật bài thi.",
+                    error_code="CONTEST_CLOSED",
+                )
+
         server_timestamp = ensure_utc((payload.simulate_time if settings.demo_enabled else None) or datetime.now(timezone.utc))
         gate_info = checkpoint_service.calculate_time_gate_info(checkpoint, now=server_timestamp)
         grace_sec = gate_info.get("grace_period_seconds", 5)

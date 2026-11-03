@@ -380,11 +380,15 @@ class CheckpointService:
 
         if data.display_order is not None and not data.is_final_checkpoint:
             existing_cps = await checkpoint_repo.get_all(db)
-            for fcp in existing_cps:
-                if fcp.is_final_checkpoint and deadline_utc > ensure_utc(fcp.deadline):
-                    raise BadRequestException(
-                        message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
-                    )
+            final_deadlines = [
+                ensure_utc(fcp.deadline)
+                for fcp in existing_cps
+                if fcp.is_final_checkpoint and fcp.is_active
+            ]
+            if final_deadlines and deadline_utc > max(final_deadlines):
+                raise BadRequestException(
+                    message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
+                )
 
         raw_fields = (
             [f.model_dump() for f in data.submission_fields]
@@ -468,11 +472,34 @@ class CheckpointService:
         if data.deadline is not None:
             existing_cps = await checkpoint_repo.get_all(db)
             if not effective_is_final:
-                for fcp in existing_cps:
-                    if fcp.is_final_checkpoint and str(fcp.id) != str(cp.id) and new_deadline > ensure_utc(fcp.deadline):
-                        raise BadRequestException(
-                            message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
-                        )
+                final_deadlines = [
+                    ensure_utc(fcp.deadline)
+                    for fcp in existing_cps
+                    if fcp.is_final_checkpoint and fcp.is_active and str(fcp.id) != str(cp.id)
+                ]
+                if final_deadlines and new_deadline > max(final_deadlines):
+                    raise BadRequestException(
+                        message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
+                    )
+                # Khi chỉnh sửa hạn chót của một chặng có thứ tự xác định (display_order > 0),
+                # kiểm tra tính tuần tự với chặng liền trước và liền sau
+                curr_order = int(cp.display_order or 0)
+                if curr_order > 0 and data.display_order is None:
+                    for neighbor in existing_cps:
+                        if str(neighbor.id) == str(cp.id) or neighbor.is_final_checkpoint:
+                            continue
+                        n_order = int(neighbor.display_order or 0)
+                        if n_order <= 0:
+                            continue
+                        n_deadline = ensure_utc(neighbor.deadline)
+                        if n_order == curr_order - 1 and new_deadline < n_deadline:
+                            raise BadRequestException(
+                                message=f"Hạn chót của chặng #{curr_order} không được sớm hơn hạn chót của chặng đứng trước ({neighbor.title})."
+                            )
+                        if n_order == curr_order + 1 and new_deadline > n_deadline:
+                            raise BadRequestException(
+                                message=f"Hạn chót của chặng #{curr_order} không được vượt quá hạn chót của chặng kế tiếp ({neighbor.title})."
+                            )
             else:
                 for pcp in existing_cps:
                     if not pcp.is_final_checkpoint and str(pcp.id) != str(cp.id) and new_deadline < ensure_utc(pcp.deadline):

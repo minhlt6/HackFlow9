@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
@@ -14,11 +14,19 @@ import {
   ShieldCheck,
   AlertCircle,
   Edit3,
+  Clock,
 } from 'lucide-react';
 
 export const CandidateFinalSubmissionPage: React.FC = () => {
-  const { currentUser, teams, finalSubmissions, checkpoints, openWizardAtStep, syncFromBackend } =
-    useMockStore();
+  const {
+    currentUser,
+    teams,
+    finalSubmissions,
+    checkpoints,
+    config,
+    openWizardAtStep,
+    syncFromBackend,
+  } = useMockStore();
 
   const myTeam = currentUser.teamId ? teams.find((t) => t.id === currentUser.teamId) : undefined;
 
@@ -42,23 +50,79 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
   const [isEditingSubmitted, setIsEditingSubmitted] = useState(false);
   const [successSha, setSuccessSha] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+
+  const finalCheckpoint = useMemo(
+    () =>
+      checkpoints
+        .filter((cp) => cp.isFinalCheckpoint)
+        .sort((a, b) => (b.deadline || '').localeCompare(a.deadline || ''))[0],
+    [checkpoints],
+  );
+
+  // Chỉ hẹn giờ cập nhật tại đúng mốc chuyển trạng thái (startTime / deadline) hoặc mỗi 30s
+  // nhằm tránh re-render toàn bộ form mỗi giây khi thí sinh đang nhập liệu.
   useEffect(() => {
-    const timer = window.setInterval(() => setNowMs(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  const finalCheckpoint = checkpoints.filter((cp) => cp.isFinalCheckpoint).sort((a, b) => b.deadline.localeCompare(a.deadline))[0];
+    const now = Date.now();
+    const startMs = finalCheckpoint?.startTime
+      ? new Date(finalCheckpoint.startTime).getTime()
+      : NaN;
+    const deadlineMs = finalCheckpoint?.deadline
+      ? new Date(finalCheckpoint.deadline).getTime()
+      : NaN;
+
+    const upcomingTransitions = [startMs, deadlineMs]
+      .filter((t) => Number.isFinite(t) && t > now)
+      .map((t) => t - now);
+
+    const nextDelay =
+      upcomingTransitions.length > 0
+        ? Math.min(30_000, Math.max(250, Math.min(...upcomingTransitions) + 50))
+        : 30_000;
+
+    const timer = window.setTimeout(() => setNowMs(Date.now()), nextDelay);
+    return () => window.clearTimeout(timer);
+  }, [nowMs, finalCheckpoint?.startTime, finalCheckpoint?.deadline]);
 
   useEffect(() => {
     void syncFromBackend?.();
   }, [syncFromBackend]);
 
-  const isDeadlinePassed =
-    Boolean(finalCheckpoint?.deadline) &&
-    new Date(finalCheckpoint?.deadline).getTime() < nowMs;
+  const formattedDeadline = useMemo(() => {
+    const raw = finalCheckpoint?.deadline || config?.finalSubmissionDeadline;
+    if (!raw) return 'Chưa cấu hình';
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return 'Chưa cấu hình';
+    return parsed.toLocaleString('vi-VN');
+  }, [finalCheckpoint?.deadline, config?.finalSubmissionDeadline]);
+
+  const isDeadlinePassed = Boolean(
+    finalCheckpoint?.deadline &&
+      Number.isFinite(new Date(finalCheckpoint.deadline).getTime()) &&
+      new Date(finalCheckpoint.deadline).getTime() < nowMs,
+  );
+
+  const isNotOpenYet = Boolean(
+    finalCheckpoint &&
+      (finalCheckpoint.status === 'upcoming' ||
+        (finalCheckpoint.startTime &&
+          Number.isFinite(new Date(finalCheckpoint.startTime).getTime()) &&
+          new Date(finalCheckpoint.startTime).getTime() > nowMs)),
+  );
+
+  const isSubmissionClosed =
+    isDeadlinePassed || finalCheckpoint?.status === 'closed';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!myTeam) return;
+    if (isNotOpenYet) {
+      setError('Cổng nộp bài chung cuộc chưa đến giờ mở.');
+      return;
+    }
+    if (isSubmissionClosed) {
+      setError('Đã quá thời hạn nộp bài chung cuộc.');
+      return;
+    }
 
     setIsSubmitting(true);
     setError(null);
@@ -122,6 +186,25 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
         </div>
       )}
 
+      {/* Time-gate Banner when final checkpoint is upcoming or closed */}
+      {myTeam && isNotOpenYet && (
+        <div className="rounded-[14px] border border-amber-500/40 bg-amber-500/10 p-4 flex items-center gap-3">
+          <Clock size={20} className="text-amber-700 dark:text-amber-400 shrink-0" />
+          <div className="text-xs text-foreground">
+            <strong>Cổng nộp bài chung cuộc chưa mở:</strong> Bạn có thể chuẩn bị trước thông tin nhưng chỉ có thể gửi bài khi Chặng Chung Kết chính thức mở cổng.
+          </div>
+        </div>
+      )}
+
+      {myTeam && isSubmissionClosed && (
+        <div className="rounded-[14px] border border-rose-500/40 bg-rose-500/10 p-4 flex items-center gap-3">
+          <AlertCircle size={20} className="text-rose-700 dark:text-rose-400 shrink-0" />
+          <div className="text-xs text-foreground">
+            <strong>Cổng nộp bài chung cuộc đã đóng:</strong> Thời hạn nộp bài ({formattedDeadline}) đã kết thúc. Mọi thao tác nộp mới hoặc chỉnh sửa đã bị khóa.
+          </div>
+        </div>
+      )}
+
       {(existingFinal || successSha) && !isEditingSubmitted ? (
         /* Submitted View with Frozen SHA */
         <div className="rounded-[16px] border border-emerald-500/40 bg-card p-6 lg:p-8 space-y-6">
@@ -141,7 +224,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-2">
-              {!isDeadlinePassed && (
+              {!isSubmissionClosed && !isNotOpenYet && (
                 <Button
                   variant="secondary"
                   size="sm"
@@ -249,6 +332,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
               placeholder="https://github.com/your-team/final-project"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
+              disabled={isSubmissionClosed}
               required
             />
 
@@ -257,6 +341,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
               placeholder="https://youtu.be/..."
               value={demoVideoUrl}
               onChange={(e) => setDemoVideoUrl(e.target.value)}
+              disabled={isSubmissionClosed}
               required
             />
 
@@ -265,6 +350,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
               placeholder="https://docs.google.com/presentation/d/..."
               value={slideUrl}
               onChange={(e) => setSlideUrl(e.target.value)}
+              disabled={isSubmissionClosed}
               required
             />
 
@@ -276,8 +362,9 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
                 rows={4}
                 value={summary}
                 onChange={(e) => setSummary(e.target.value)}
+                disabled={isSubmissionClosed}
                 placeholder="Mô tả công nghệ sử dụng, bài toán giải quyết, độ chính xác mô hình hoặc phản hồi từ người dùng thử nghiệm..."
-                className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground text-sm focus:border-[#6366F1] focus:outline-none"
+                className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground placeholder:text-muted-foreground text-sm focus:border-[#6366F1] focus:outline-none disabled:opacity-60"
                 required
               />
             </div>
@@ -289,7 +376,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
               </div>
               <p>
                 Sau khi nhấn Nộp bài chung cuộc, hệ thống sẽ thực hiện chốt commit SHA tự động. Sau thời hạn{' '}
-                <strong>{new Date(finalCheckpoint?.deadline).toLocaleString('vi-VN')}</strong>, mọi thao tác chỉnh sửa hoặc nộp lại sẽ bị vô hiệu hóa hoàn toàn.
+                <strong>{formattedDeadline}</strong>, mọi thao tác chỉnh sửa hoặc nộp lại sẽ bị vô hiệu hóa hoàn toàn.
               </p>
             </div>
 
@@ -298,6 +385,7 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
                 type="checkbox"
                 checked={confirmLock}
                 onChange={(e) => setConfirmLock(e.target.checked)}
+                disabled={isSubmissionClosed || isNotOpenYet}
                 className="mt-0.5 rounded border-border bg-muted/40 dark:bg-slate-900/60 text-[#6366F1] focus:ring-[#6366F1]"
                 required
               />
@@ -308,15 +396,23 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
 
             <div className="flex justify-end pt-3">
               <Button
-                variant="primary"
                 type="submit"
                 size="lg"
-                disabled={!confirmLock || !myTeam || isSubmitting}
-                isLoading={isSubmitting}
-                className="gap-2 px-8"
+                disabled={isSubmitting || !confirmLock || isSubmissionClosed || isNotOpenYet}
+                className="w-full sm:w-auto"
               >
-                <Send size={18} />
-                <span>Xác nhận Nộp Bài Chung Cuộc</span>
+                <Send size={16} />
+                <span>
+                  {isSubmitting
+                    ? 'Đang đóng băng Commit SHA...'
+                    : isSubmissionClosed
+                      ? 'Đã đóng cổng nộp bài'
+                      : isNotOpenYet
+                        ? 'Chưa đến giờ mở cổng'
+                        : isEditingSubmitted
+                          ? 'Cập Nhật & Chốt Lại Commit SHA'
+                          : 'Chốt Commit SHA & Nộp Bài Chung Cuộc'}
+                </span>
               </Button>
             </div>
           </form>
