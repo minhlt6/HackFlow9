@@ -61,7 +61,13 @@ async def client():
         async with TestSessionLocal() as session:
             try:
                 yield session
-                await session.commit()
+                if (
+                    session.info.get("_has_flushed_writes")
+                    or session.new
+                    or session.dirty
+                    or session.deleted
+                ):
+                    await session.commit()
             except Exception:
                 await session.rollback()
                 raise

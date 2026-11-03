@@ -394,6 +394,8 @@ export const useMockStore = create<MockStoreState>()(
           const curr = get().currentUser;
           useAuthStore.getState().updateUser({
             fullName: curr.fullName,
+            avatarUrl: curr.avatarUrl,
+            githubUsername: curr.githubUsername,
             studentId: curr.studentId,
             university: curr.university,
             school: curr.school,
@@ -1626,7 +1628,12 @@ export const useMockStore = create<MockStoreState>()(
             });
             updates.teams = mappedTeams;
 
-            const currUser = get().currentUser;
+            const rawCurrUser = updates.currentUser || get().currentUser;
+            const authUser = useAuthStore.getState().user;
+            const currUser =
+              authUser && authUser.id
+                ? { ...rawCurrUser, ...authUser }
+                : rawCurrUser;
             const matchedTeam = mappedTeams.find((t) =>
               t.members.some(
                 (m) =>
@@ -1875,57 +1882,71 @@ export const useMockStore = create<MockStoreState>()(
         if (meRes.status === 'fulfilled' && meRes.value.data) {
           const meObj = unwrap(meRes.value.data) as Record<string, unknown> | null;
           if (meObj && typeof meObj === 'object' && meObj.email) {
-            const baseUser = updates.currentUser || get().currentUser;
-            if (
-              !baseUser.email ||
-              String(meObj.email).toLowerCase() === baseUser.email.toLowerCase()
-            ) {
-              const syncedUser: User = {
-                ...baseUser,
-                id: String(meObj.id ?? baseUser.id),
-                role: (meObj.role as User['role']) || baseUser.role,
-                approvalStatus: (meObj.approval_status as User['approvalStatus']) || baseUser.approvalStatus,
-                fullName: String(meObj.full_name ?? baseUser.fullName),
-                studentId: meObj.student_id ? String(meObj.student_id) : baseUser.studentId,
-                university: meObj.school ? String(meObj.school) : baseUser.university,
-                school: meObj.school ? String(meObj.school) : baseUser.school,
-                phone: meObj.phone ? String(meObj.phone) : baseUser.phone,
-                skills: Array.isArray(meObj.skills)
-                  ? (meObj.skills as string[])
-                  : baseUser.skills,
-                bio: meObj.bio ? String(meObj.bio) : baseUser.bio,
-                githubUsername: meObj.github_username
-                  ? String(meObj.github_username)
-                  : baseUser.githubUsername,
+            const authUser = useAuthStore.getState().user;
+            const rawBase = updates.currentUser || get().currentUser;
+            const meEmailLower = String(meObj.email).toLowerCase();
+            const sameRawEmail =
+              !rawBase.email || rawBase.email.toLowerCase() === meEmailLower;
+            const sameAuthEmail =
+              Boolean(authUser?.email) &&
+              authUser!.email.toLowerCase() === meEmailLower;
+            const baseUser: User = sameRawEmail
+              ? { ...rawBase, ...(sameAuthEmail ? authUser : {}) }
+              : sameAuthEmail && authUser
+                ? authUser
+                : emptyUser;
+
+            const syncedUser: User = {
+              ...baseUser,
+              id: String(meObj.id ?? baseUser.id),
+              email: String(meObj.email),
+              role: (meObj.role as User['role']) || baseUser.role,
+              approvalStatus: (meObj.approval_status as User['approvalStatus']) || baseUser.approvalStatus,
+              fullName: String(meObj.full_name || baseUser.fullName || meObj.github_username || meObj.email),
+              avatarUrl: meObj.avatar_url ? String(meObj.avatar_url) : baseUser.avatarUrl,
+              studentId: meObj.student_id ? String(meObj.student_id) : baseUser.studentId,
+              university: meObj.school ? String(meObj.school) : baseUser.university,
+              school: meObj.school ? String(meObj.school) : baseUser.school,
+              phone: meObj.phone ? String(meObj.phone) : baseUser.phone,
+              skills: Array.isArray(meObj.skills)
+                ? (meObj.skills as string[])
+                : baseUser.skills,
+              bio: meObj.bio ? String(meObj.bio) : baseUser.bio,
+              githubUsername: meObj.github_username
+                ? String(meObj.github_username)
+                : baseUser.githubUsername,
+            };
+            updates.currentUser = syncedUser;
+            if (typeof meObj.onboarding_completed === 'boolean') {
+              updates.onboardingCompletedUsers = {
+                ...get().onboardingCompletedUsers,
+                [syncedUser.id]: meObj.onboarding_completed,
               };
-              updates.currentUser = syncedUser;
-              if (typeof meObj.onboarding_completed === 'boolean') {
-                updates.onboardingCompletedUsers = {
-                  ...get().onboardingCompletedUsers,
-                  [syncedUser.id]: meObj.onboarding_completed,
-                };
-              }
-              if (typeof meObj.pledged === 'boolean') {
-                updates.pledgedUsers = {
-                  ...get().pledgedUsers,
-                  [syncedUser.id]: meObj.pledged,
-                };
-              }
-              const authPatch = {
-                id: syncedUser.id,
-                fullName: syncedUser.fullName,
-                studentId: syncedUser.studentId,
-                university: syncedUser.university,
-                school: syncedUser.school,
-                phone: syncedUser.phone,
-                skills: syncedUser.skills,
-                bio: syncedUser.bio,
-                githubUsername: syncedUser.githubUsername,
+            }
+            if (typeof meObj.pledged === 'boolean') {
+              updates.pledgedUsers = {
+                ...get().pledgedUsers,
+                [syncedUser.id]: meObj.pledged,
               };
-              const auth = useAuthStore.getState();
-              if (auth.user && Object.entries(authPatch).some(([key, value]) => JSON.stringify(auth.user?.[key as keyof User]) !== JSON.stringify(value))) {
-                auth.updateUser(authPatch);
-              }
+            }
+            const authPatch: Partial<User> = {
+              id: syncedUser.id,
+              email: syncedUser.email,
+              role: syncedUser.role,
+              approvalStatus: syncedUser.approvalStatus,
+              fullName: syncedUser.fullName,
+              avatarUrl: syncedUser.avatarUrl,
+              studentId: syncedUser.studentId,
+              university: syncedUser.university,
+              school: syncedUser.school,
+              phone: syncedUser.phone,
+              skills: syncedUser.skills,
+              bio: syncedUser.bio,
+              githubUsername: syncedUser.githubUsername,
+            };
+            const auth = useAuthStore.getState();
+            if (auth.user && Object.entries(authPatch).some(([key, value]) => JSON.stringify(auth.user?.[key as keyof User]) !== JSON.stringify(value))) {
+              auth.updateUser(authPatch);
             }
           }
         }

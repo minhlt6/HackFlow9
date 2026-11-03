@@ -53,7 +53,6 @@ const loadSavedProfileForm = (
     const keysToTry = [
       user?.email ? getProfileStorageKey(user.email) : null,
       user?.id ? getProfileStorageKey(user.id) : null,
-      'hackflow_last_profile',
     ].filter(Boolean) as string[];
 
     for (const key of keysToTry) {
@@ -61,15 +60,15 @@ const loadSavedProfileForm = (
       if (raw) {
         const parsed = JSON.parse(raw) as Partial<ProfileForm>;
         return {
-          fullName: (parsed.fullName || user?.fullName || '').trim(),
-          studentId: (parsed.studentId || user?.studentId || '').trim(),
-          university: (parsed.university || user?.university || user?.school || '').trim(),
-          phone: (parsed.phone || user?.phone || '').trim(),
+          fullName: (user?.fullName || parsed.fullName || '').trim(),
+          studentId: (user?.studentId || parsed.studentId || '').trim(),
+          university: (user?.university || user?.school || parsed.university || '').trim(),
+          phone: (user?.phone || parsed.phone || '').trim(),
           skills:
-            Array.isArray(parsed.skills) && parsed.skills.length > 0
-              ? parsed.skills
-              : Array.isArray(user?.skills)
+            Array.isArray(user?.skills) && user.skills.length > 0
               ? user.skills
+              : Array.isArray(parsed.skills) && parsed.skills.length > 0
+              ? parsed.skills
               : [],
         };
       }
@@ -97,7 +96,6 @@ const saveProfileFormToStorage = (
     const payload = JSON.stringify(form);
     if (email) localStorage.setItem(getProfileStorageKey(email), payload);
     if (userId) localStorage.setItem(getProfileStorageKey(userId), payload);
-    localStorage.setItem('hackflow_last_profile', payload);
 
     // Đồng bộ thông tin (tên, trường, kỹ năng) sang bảng thành viên đội thi hiện tại
     const teamRaw = localStorage.getItem('hackflow_team_details_v2');
@@ -129,15 +127,16 @@ export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, updateUser } = useAuthStore();
+  const currentUser = useMockStore((state) => state.currentUser);
   const updateMockUserProfile = useMockStore((state) => state.updateCurrentUserProfile);
 
-  const activeUser = user || {
-    id: 'candidate-demo-1',
-    email: 'leader@cybersamurai.team',
-    fullName: 'Nguyễn Văn Minh',
+  const activeUser = user || currentUser || {
+    id: '',
+    email: '',
+    fullName: '',
     role: 'candidate' as UserRole,
     approvalStatus: 'pending' as ApprovalStatus,
-    githubUsername: 'github_user',
+    githubUsername: '',
   };
 
   const [form, setForm] = useState<ProfileForm>(() => loadSavedProfileForm(user));
@@ -200,6 +199,23 @@ export const OnboardingPage: React.FC = () => {
               phone: syncedPhone || undefined,
               skills: syncedSkills.length > 0 ? syncedSkills : undefined,
             });
+            updateMockUserProfile(
+              {
+                id: me.id,
+                email: me.email,
+                fullName: syncedName || me.github_username || me.email,
+                role: me.role,
+                approvalStatus: me.approval_status,
+                githubUsername: me.github_username,
+                avatarUrl: me.avatar_url,
+                studentId: syncedStudentId || undefined,
+                university: syncedUniversity || undefined,
+                school: syncedUniversity || undefined,
+                phone: syncedPhone || undefined,
+                skills: syncedSkills.length > 0 ? syncedSkills : undefined,
+              },
+              true,
+            );
             setStatus(me.approval_status);
             setForm((prev) => ({
               fullName: syncedName || prev.fullName || me.github_username || '',
@@ -215,13 +231,14 @@ export const OnboardingPage: React.FC = () => {
         }
       }
 
-      if (!user) {
+      const currentAuthUser = useAuthStore.getState().user;
+      if (!currentAuthUser) {
         navigate('/login', { replace: true });
       } else {
-        const savedLocal = loadSavedProfileForm(user);
-        setStatus(user.approvalStatus || 'pending');
+        const savedLocal = loadSavedProfileForm(currentAuthUser);
+        setStatus(currentAuthUser.approvalStatus || 'pending');
         setForm((prev) => ({
-          fullName: prev.fullName || savedLocal.fullName || user.fullName.trim(),
+          fullName: prev.fullName || savedLocal.fullName || currentAuthUser.fullName.trim(),
           studentId: prev.studentId || savedLocal.studentId,
           university: prev.university || savedLocal.university,
           phone: prev.phone || savedLocal.phone,

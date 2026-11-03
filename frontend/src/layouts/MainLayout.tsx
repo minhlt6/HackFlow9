@@ -156,8 +156,9 @@ export const MainLayout: React.FC = () => {
     navigate('/login');
   };
 
-  const displayName = user?.fullName || currentUser?.fullName || 'Nguyễn Văn Minh';
-  const displayEmail = user?.email || currentUser?.email || 'leader@cybersamurai.team';
+  const displayName = user?.fullName || currentUser?.fullName || 'Thí sinh';
+  const displayEmail = user?.email || currentUser?.email || '';
+  const displayAvatarUrl = user?.avatarUrl || currentUser?.avatarUrl;
   const currentRole = user?.role || 'candidate';
   const isApproved =
     currentRole !== 'candidate' || user?.approvalStatus === 'approved';
@@ -172,7 +173,7 @@ export const MainLayout: React.FC = () => {
         isApproved={isApproved}
         displayName={displayName}
         displayEmail={displayEmail}
-        avatarUrl={user?.avatarUrl}
+        avatarUrl={displayAvatarUrl}
         pendingApprovalsCount={pendingCandidates.length}
         openTicketsCount={openTicketsCount}
         mobileOpen={mobileMenuOpen}
@@ -212,7 +213,7 @@ export const MainLayout: React.FC = () => {
           announcements={announcements}
           displayName={displayName}
           displayEmail={displayEmail}
-          avatarUrl={user?.avatarUrl}
+          avatarUrl={displayAvatarUrl}
           onOpenMobileMenu={() => setMobileMenuOpen(true)}
         />
 

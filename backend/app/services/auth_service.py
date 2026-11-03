@@ -158,6 +158,8 @@ class AuthService:
         )
 
         created_user = await user_repo.create(db, user)
+        await db.commit()
+        await db.refresh(created_user)
         token = cls.create_user_token(created_user)
         return created_user, token
 
@@ -233,9 +235,37 @@ class AuthService:
 
             if emails_res.status_code == 200:
                 emails_data = emails_res.json()
-                if isinstance(emails_data, list):
-                    primary_email = next((e["email"] for e in emails_data if e.get("primary")), None)
-                    email = primary_email or email or (emails_data[0]["email"] if emails_data else None)
+                if isinstance(emails_data, list) and emails_data:
+                    verified_primary = next(
+                        (
+                            e["email"]
+                            for e in emails_data
+                            if isinstance(e, dict)
+                            and e.get("primary")
+                            and e.get("verified")
+                            and e.get("email")
+                        ),
+                        None,
+                    )
+                    primary_email = next(
+                        (
+                            e["email"]
+                            for e in emails_data
+                            if isinstance(e, dict) and e.get("primary") and e.get("email")
+                        ),
+                        None,
+                    )
+                    first_email = next(
+                        (
+                            e["email"]
+                            for e in emails_data
+                            if isinstance(e, dict) and e.get("email")
+                        ),
+                        None,
+                    )
+                    email = verified_primary or primary_email or email or first_email
+            if not email and (github_username or github_id):
+                email = f"{github_username or github_id}@users.noreply.github.com"
         else:
             if not settings.demo_enabled:
                 raise BadRequestException(message="GitHub OAuth chưa được cấu hình.")
@@ -256,7 +286,11 @@ class AuthService:
             or_(User.github_id == str(github_id), User.email == clean_email)
         )
         user_result = await db.execute(user_stmt)
-        user = user_result.scalars().first()
+        matched_users = list(user_result.scalars().all())
+        user = next(
+            (u for u in matched_users if github_id and u.github_id == str(github_id)),
+            matched_users[0] if matched_users else None,
+        )
 
         # Only query whitelist if user does not exist yet or is still pending
         whitelist_entry = None
@@ -265,8 +299,8 @@ class AuthService:
 
         if user:
             changed = False
-            if not user.github_id:
-                user.github_id = github_id
+            if github_id and user.github_id != str(github_id):
+                user.github_id = str(github_id)
                 changed = True
             if github_username and user.github_username != github_username:
                 user.github_username = github_username
@@ -289,6 +323,8 @@ class AuthService:
             if changed:
                 db.add(user)
                 await db.flush()
+                await db.commit()
+                await db.refresh(user)
         else:
             initial_approval = (
                 ApprovalStatus.APPROVED.value
@@ -298,7 +334,7 @@ class AuthService:
             user = User(
                 email=clean_email,
                 full_name=full_name or "Thí sinh Hackathon",
-                github_id=github_id,
+                github_id=str(github_id) if github_id else None,
                 github_username=github_username,
                 avatar_url=avatar_url,
                 role=UserRole.CANDIDATE.value,
@@ -307,6 +343,8 @@ class AuthService:
             )
             db.add(user)
             await db.flush()
+            await db.commit()
+            await db.refresh(user)
 
         token = cls.create_user_token(user)
         return user, token

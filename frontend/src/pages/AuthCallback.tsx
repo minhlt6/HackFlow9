@@ -88,14 +88,23 @@ const syncMockStoreWithUser = (user: User) => {
   else targetPersona = 'leader';
 
   mockStore.switchPersona(targetPersona);
-  mockStore.updateCurrentUserProfile({
-    fullName: user.fullName,
-    email: user.email,
-    role: user.role,
-    approvalStatus: user.approvalStatus,
-    githubUsername: user.githubUsername,
-    avatarUrl: user.avatarUrl,
-  });
+  mockStore.updateCurrentUserProfile(
+    {
+      id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      role: user.role,
+      approvalStatus: user.approvalStatus,
+      githubUsername: user.githubUsername,
+      avatarUrl: user.avatarUrl,
+      studentId: user.studentId,
+      university: user.university || user.school,
+      school: user.school || user.university,
+      phone: user.phone,
+      skills: user.skills,
+    },
+    true,
+  );
 };
 
 const getRedirectPath = (user: User): string => {

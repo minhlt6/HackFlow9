@@ -4,8 +4,8 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import text
+from sqlalchemy.orm import DeclarativeBase, Session
+from sqlalchemy import event, text
 
 from app.core.config import settings
 
@@ -60,6 +60,17 @@ class Base(DeclarativeBase):
     pass
 
 
+@event.listens_for(Session, "after_flush")
+def _mark_session_flushed(session: Session, flush_context) -> None:
+    session.info["_has_flushed_writes"] = True
+
+
+@event.listens_for(Session, "after_commit")
+@event.listens_for(Session, "after_rollback")
+def _clear_session_flushed(session: Session) -> None:
+    session.info.pop("_has_flushed_writes", None)
+
+
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     """
     FastAPI dependency yielding an async database session per request.
@@ -68,7 +79,12 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
-            if session.new or session.dirty or session.deleted:
+            if (
+                session.info.get("_has_flushed_writes")
+                or session.new
+                or session.dirty
+                or session.deleted
+            ):
                 await session.commit()
         except Exception:
             await session.rollback()

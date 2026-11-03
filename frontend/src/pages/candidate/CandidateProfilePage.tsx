@@ -157,9 +157,17 @@ export const CandidateProfilePage: React.FC = () => {
       {/* Main Profile Card */}
       <div className="rounded-[16px] border border-border bg-card p-6 lg:p-8 space-y-6">
         <div className="flex flex-col sm:flex-row items-center gap-5 pb-6 border-b border-border">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#6366F1] text-white text-3xl font-bold tracking-tight shadow-lg shadow-[#6366F1]/30">
-            {resolvedName ? resolvedName.charAt(0).toUpperCase() : 'U'}
-          </div>
+          {authUser?.avatarUrl || currentUser.avatarUrl ? (
+            <img
+              src={authUser?.avatarUrl || currentUser.avatarUrl}
+              alt={resolvedName || 'Avatar'}
+              className="h-20 w-20 rounded-full object-cover shadow-lg border border-indigo-400/30 shrink-0"
+            />
+          ) : (
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#6366F1] text-white text-3xl font-bold tracking-tight shadow-lg shadow-[#6366F1]/30">
+              {resolvedName ? resolvedName.charAt(0).toUpperCase() : 'U'}
+            </div>
+          )}
 
           <div className="space-y-1.5 text-center sm:text-left">
             <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
