@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -52,6 +52,7 @@ class Evaluation(BaseModel):
             "criteria_id",
             name="uq_eval_submission_judge_criteria",
         ),
+        Index("ix_evaluations_sub_status", "submission_id", "status"),
     )
 
     submission_id: Mapped[str] = mapped_column(

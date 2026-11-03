@@ -147,16 +147,9 @@ class LeaderboardService:
 
         submissions = await self._list_final_submissions()
         submission_ids = [s.id for s in submissions]
-        submitted_evals = await self._list_submitted_evaluations(submission_ids)
         all_evals = await self._list_all_evaluations(submission_ids)
 
         # Group evaluations by submission_id -> judge_id -> list[Evaluation]
-        evals_by_sub_and_judge: Dict[str, Dict[str, List[Evaluation]]] = {}
-        for ev in submitted_evals:
-            evals_by_sub_and_judge.setdefault(ev.submission_id, {}).setdefault(
-                ev.judge_id, []
-            ).append(ev)
-
         all_evals_by_sub_and_judge: Dict[str, Dict[str, List[Evaluation]]] = {}
         for ev in all_evals:
             all_evals_by_sub_and_judge.setdefault(ev.submission_id, {}).setdefault(
@@ -173,7 +166,6 @@ class LeaderboardService:
                 elif sub.team.topic and sub.team.topic.title:
                     topic_title = sub.team.topic.title
 
-            judge_groups = evals_by_sub_and_judge.get(sub.id, {})
             all_judge_groups = all_evals_by_sub_and_judge.get(sub.id, {})
             judge_scores_list: List[Dict[str, Any]] = []
             all_judge_scores_list: List[Dict[str, Any]] = []

@@ -1,9 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import apiClient from '../api/axiosClient';
+import apiClient, { lastApiMutationVersion } from '../api/axiosClient';
 import { notificationsApi } from '../api/notificationsApi';
 import { ticketService } from '../services/ticketService';
 import { useAuthStore } from './useAuthStore';
+
+let inFlightSyncPromise: Promise<void> | null = null;
+let inFlightSyncKey = '';
 import type {
   User,
   Team,
@@ -1429,6 +1432,18 @@ export const useMockStore = create<MockStoreState>()(
         const authUserNow = useAuthStore.getState?.()?.user;
         const roleNow: string = authUserNow?.role || get().currentUser.role || get().activeRolePersona;
         const approvalNow = authUserNow?.approvalStatus || get().currentUser.approvalStatus;
+        const syncKey = `${authUserNow?.id || 'anon'}:${roleNow}:${approvalNow || 'none'}:${lastApiMutationVersion}`;
+
+        if (inFlightSyncPromise && inFlightSyncKey === syncKey) {
+          return inFlightSyncPromise;
+        }
+
+        const isUnapprovedCandidate =
+          (roleNow === 'candidate' || roleNow === 'pending' || roleNow === 'rejected') &&
+          Boolean(approvalNow) &&
+          approvalNow !== 'approved';
+
+        const runSync = async (): Promise<void> => {
         const [
           topicsRes,
           checkpointsRes,
@@ -1447,14 +1462,14 @@ export const useMockStore = create<MockStoreState>()(
           apiClient.get('/checkpoints'),
           apiClient.get('/rubrics'),
           notificationsApi.listAllAnnouncements().then((items) => ({ data: { data: items } })),
-          roleNow === 'judge' ? Promise.resolve({ data: null }) : apiClient.get('/teams'),
+          roleNow === 'judge' || isUnapprovedCandidate ? Promise.resolve({ data: null }) : apiClient.get('/teams'),
           roleNow === 'admin' || roleNow === 'mentor'
             ? ticketService.getAllTickets().then((data) => ({ data }))
             : (roleNow === 'candidate' || roleNow === 'leader' || roleNow === 'member') &&
                 approvalNow === 'approved'
               ? apiClient.get('/tickets/me')
               : Promise.resolve({ data: null }),
-          roleNow === 'judge' ? Promise.resolve({ data: null }) : apiClient.get('/submissions'),
+          roleNow === 'judge' || isUnapprovedCandidate ? Promise.resolve({ data: null }) : apiClient.get('/submissions'),
           roleNow === 'judge' || roleNow === 'admin'
             ? apiClient.get('/evaluations/submissions')
             : Promise.resolve({ data: null }),
@@ -2035,6 +2050,17 @@ export const useMockStore = create<MockStoreState>()(
         if (Object.keys(updates).length > 0) {
           set(updates);
         }
+        };
+
+        const promise = runSync().finally(() => {
+          if (inFlightSyncPromise === promise) {
+            inFlightSyncPromise = null;
+            inFlightSyncKey = '';
+          }
+        });
+        inFlightSyncPromise = promise;
+        inFlightSyncKey = syncKey;
+        return promise;
       },
 
       // Reset

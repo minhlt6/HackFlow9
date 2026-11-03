@@ -13,6 +13,7 @@ if hasattr(sys.stdout, "reconfigure"):
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.router import api_router
@@ -69,6 +70,11 @@ async def _seed_default_accounts() -> None:
                                 f'ALTER TABLE "{table_name}" ADD COLUMN "{col.name}" {col_type}{default_clause}'
                             )
                         )
+                for idx_obj in table.indexes:
+                    try:
+                        idx_obj.create(bind=sync_conn, checkfirst=True)
+                    except Exception:
+                        pass
 
         await conn.run_sync(_ensure_schema_columns)
 
@@ -767,7 +773,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # 1. Cấu hình CORS Middleware
+    # 1. Cấu hình CORS & GZip Middleware
+    app.add_middleware(GZipMiddleware, minimum_size=500)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,

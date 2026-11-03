@@ -22,8 +22,14 @@ export const axiosClient = axios.create({
   },
 });
 
-// Interceptor tự động gắn Bearer Token
+export let lastApiMutationVersion = 0;
+
+// Interceptor tự động gắn Bearer Token & đánh dấu phiên bản dữ liệu khi có mutation
 axiosClient.interceptors.request.use((config) => {
+  const method = (config.method || 'get').toLowerCase();
+  if (method !== 'get' && method !== 'head' && method !== 'options') {
+    lastApiMutationVersion += 1;
+  }
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

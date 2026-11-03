@@ -755,10 +755,19 @@ async def auto_match_unassigned_candidates(
 
     affected_ids = created_team_ids + filled_existing_team_ids
     serialized_teams: List[Dict[str, Any]] = []
-    for tid in affected_ids:
-        loaded_t = await _load_team_full(db, tid)
-        if loaded_t:
-            serialized_teams.append(await _serialize_configured_team(db, loaded_t))
+    if affected_ids:
+        loaded_res = await db.execute(
+            select(Team)
+            .where(Team.id.in_(affected_ids))
+            .options(
+                selectinload(Team.members).selectinload(TeamMember.user),
+                selectinload(Team.topic),
+                selectinload(Team.subtopic),
+            )
+        )
+        loaded_map = {str(t.id): t for t in loaded_res.scalars().all()}
+        ordered_teams = [loaded_map[tid] for tid in affected_ids if tid in loaded_map]
+        serialized_teams = await _serialize_admin_teams(db, ordered_teams)
 
     return success_response(
         data={
@@ -1758,9 +1767,15 @@ async def bulk_add_whitelist(
     entries = await whitelist_repo.bulk_add(
         db, body.emails, added_by=str(current_user.id), note=body.note
     )
-    for email_str in body.emails:
-        existing_user = await user_repo.get_by_email(db, email_str)
-        if existing_user and existing_user.approval_status == ApprovalStatus.PENDING.value:
+    clean_emails = list({e.strip().lower() for e in body.emails if e and e.strip()})
+    if clean_emails:
+        pending_res = await db.execute(
+            select(User).where(
+                User.email.in_(clean_emails),
+                User.approval_status == ApprovalStatus.PENDING.value,
+            )
+        )
+        for existing_user in pending_res.scalars().all():
             existing_user.approval_status = ApprovalStatus.APPROVED.value
             db.add(existing_user)
     await db.commit()
@@ -2302,33 +2317,38 @@ async def get_admin_stats(
     from app.models.checkpoint import Submission
     from app.models.support import SupportTicket, TicketStatus
 
-    total_candidates_res = await db.execute(
-        select(func.count()).select_from(User).where(User.role == UserRole.CANDIDATE.value)
-    )
-    pending_approvals_res = await db.execute(
-        select(func.count())
-        .select_from(User)
-        .where(
-            User.role == UserRole.CANDIDATE.value,
-            User.approval_status == ApprovalStatus.PENDING.value,
+    row = (
+        await db.execute(
+            select(
+                select(func.count())
+                .select_from(User)
+                .where(User.role == UserRole.CANDIDATE.value)
+                .scalar_subquery(),
+                select(func.count())
+                .select_from(User)
+                .where(
+                    User.role == UserRole.CANDIDATE.value,
+                    User.approval_status == ApprovalStatus.PENDING.value,
+                )
+                .scalar_subquery(),
+                select(func.count()).select_from(Team).scalar_subquery(),
+                select(func.count()).select_from(Topic).scalar_subquery(),
+                select(func.count()).select_from(Submission).scalar_subquery(),
+                select(func.count())
+                .select_from(SupportTicket)
+                .where(SupportTicket.status != TicketStatus.RESOLVED.value)
+                .scalar_subquery(),
+            )
         )
-    )
-    total_teams_res = await db.execute(select(func.count()).select_from(Team))
-    total_topics_res = await db.execute(select(func.count()).select_from(Topic))
-    total_submissions_res = await db.execute(select(func.count()).select_from(Submission))
-    open_tickets_res = await db.execute(
-        select(func.count())
-        .select_from(SupportTicket)
-        .where(SupportTicket.status != TicketStatus.RESOLVED.value)
-    )
+    ).one()
 
     stats = {
-        "total_candidates": int(total_candidates_res.scalar() or 0),
-        "pending_approvals": int(pending_approvals_res.scalar() or 0),
-        "total_teams": int(total_teams_res.scalar() or 0),
-        "total_topics": int(total_topics_res.scalar() or 0),
-        "total_submissions": int(total_submissions_res.scalar() or 0),
-        "open_tickets": int(open_tickets_res.scalar() or 0),
+        "total_candidates": int(row[0] or 0),
+        "pending_approvals": int(row[1] or 0),
+        "total_teams": int(row[2] or 0),
+        "total_topics": int(row[3] or 0),
+        "total_submissions": int(row[4] or 0),
+        "open_tickets": int(row[5] or 0),
     }
     return success_response(
         data=stats,

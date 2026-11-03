@@ -246,15 +246,15 @@ class EvaluationService:
         has_assignments = await self.repo.has_any_judge_assignments()
 
         if current_user.role == UserRole.JUDGE.value and has_assignments:
-            filtered = []
-            for sub in submissions:
-                if await self.repo.is_judge_assigned_to_submission(current_user.id, sub):
-                    filtered.append(sub)
-            submissions = filtered
-
-        if current_user.role == UserRole.JUDGE.value and has_assignments:
             assigned = await self.repo.list_judge_assignments(current_user.id)
-            missing_ids = {row.team_id for row in assigned if row.team_id} - {s.team_id for s in submissions}
+            assigned_sub_ids = {str(row.submission_id) for row in assigned if row.submission_id}
+            assigned_team_ids = {str(row.team_id) for row in assigned if row.team_id}
+            submissions = [
+                sub
+                for sub in submissions
+                if str(sub.id) in assigned_sub_ids or str(sub.team_id) in assigned_team_ids
+            ]
+            missing_ids = assigned_team_ids - {str(s.team_id) for s in submissions}
             if missing_ids:
                 missing = (await self.db.execute(select(Team).where(Team.id.in_(missing_ids)).options(
                     selectinload(Team.topic), selectinload(Team.subtopic)))).scalars().all()

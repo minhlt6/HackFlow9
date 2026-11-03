@@ -9,17 +9,35 @@ from sqlalchemy import event, text
 
 from app.core.config import settings
 
+def _attach_sqlite_pragmas(target_engine) -> None:
+    @event.listens_for(target_engine.sync_engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, _connection_record) -> None:
+        try:
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA synchronous=NORMAL;")
+            cursor.execute("PRAGMA temp_store=MEMORY;")
+            cursor.execute("PRAGMA cache_size=-32000;")
+            cursor.execute("PRAGMA busy_timeout=5000;")
+            cursor.close()
+        except Exception:
+            pass
+
+
 # Create async engine with connection pooling and pre-ping
-_engine_kwargs = {"echo": False, "pool_pre_ping": True, "pool_recycle": 300}
+_engine_kwargs = {"echo": False, "pool_pre_ping": True, "pool_recycle": 600}
 if not settings.async_database_url.startswith("sqlite"):
-    _engine_kwargs["pool_size"] = 5
-    _engine_kwargs["max_overflow"] = 10
+    _engine_kwargs["pool_size"] = 10
+    _engine_kwargs["max_overflow"] = 20
+    _engine_kwargs["pool_timeout"] = 30
     _engine_kwargs["connect_args"] = {"statement_cache_size": 0}
 
 engine = create_async_engine(
     settings.async_database_url,
     **_engine_kwargs,
 )
+if settings.async_database_url.startswith("sqlite"):
+    _attach_sqlite_pragmas(engine)
 
 # Async session factory
 AsyncSessionLocal = async_sessionmaker(
@@ -43,6 +61,7 @@ def switch_to_sqlite_fallback() -> None:
         echo=False,
         pool_pre_ping=True,
     )
+    _attach_sqlite_pragmas(engine)
     AsyncSessionLocal.configure(bind=engine)
     AsyncSessionLocal = async_sessionmaker(
         bind=engine,

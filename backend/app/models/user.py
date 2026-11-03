@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import Boolean, String, Text, JSON
+from sqlalchemy import Boolean, Index, String, Text, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -29,6 +29,9 @@ class User(BaseModel):
     User account model supporting GitHub OAuth and traditional password credentials.
     """
     __tablename__ = "users"
+    __table_args__ = (
+        Index("ix_users_role_approval_active", "role", "approval_status", "is_active"),
+    )
 
     notification_state: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")
     profile_meta: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict, server_default="{}")

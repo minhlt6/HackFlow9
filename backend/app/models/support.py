@@ -1,7 +1,7 @@
 from enum import Enum
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
-from sqlalchemy import ForeignKey, String, Text, JSON, DateTime
+from sqlalchemy import ForeignKey, Index, String, Text, JSON, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -30,6 +30,9 @@ class SupportTicket(BaseModel):
     Candidate helpdesk / mentor support ticket model.
     """
     __tablename__ = "support_tickets"
+    __table_args__ = (
+        Index("ix_support_tickets_status_assigned_created", "status", "assigned_to", "created_at"),
+    )
 
     team_id: Mapped[Optional[str]] = mapped_column(
         String(36), ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True

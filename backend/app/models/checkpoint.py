@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, Any, List, Optional
-from sqlalchemy import Boolean, Float, DateTime, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Float, DateTime, ForeignKey, Index, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -25,6 +25,9 @@ class Checkpoint(BaseModel):
     Hackathon time-gated checkpoint / milestone.
     """
     __tablename__ = "checkpoints"
+    __table_args__ = (
+        Index("ix_checkpoints_final_order", "is_final_checkpoint", "display_order"),
+    )
 
     weight: Mapped[float] = mapped_column(Float, nullable=False, default=0, server_default="0")
     display_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")

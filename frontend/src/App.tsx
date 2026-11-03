@@ -1,45 +1,92 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { RejectedAccountPage } from './pages/RejectedAccountPage';
 import { AuthCallback } from './pages/AuthCallback';
-import { TeamsPage } from './pages/TeamsPage';
-import { CandidateDashboardPage } from './pages/candidate/CandidateDashboardPage';
-
-import { CandidateCheckpointsPage } from './pages/candidate/candidateCheckpointsPage';
-import { TopicsPage } from './pages/TopicsPage';
-import { CandidateFinalSubmissionPage } from './pages/candidate/CandidateFinalSubmissionPage';
-import { CandidateProfilePage } from './pages/candidate/CandidateProfilePage';
 import { MainLayout } from './layouts/MainLayout';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { useAuthStore } from './store/useAuthStore';
 
-// Admin Pages
-import { AdminDashboardPage } from './pages/admin/AdminDashboardPage';
-import { AdminApprovalsPage } from './pages/admin/AdminApprovalsPage';
-import { AdminWhitelistPage } from './pages/admin/AdminWhitelistPage';
-import { AdminTeamsPage } from './pages/admin/AdminTeamsPage';
-import { AdminTopicsPage } from './pages/admin/AdminTopicsPage';
-import { AdminCheckpointsPage } from './pages/admin/AdminCheckpointsPage';
-import { AdminCriteriaPage } from './pages/admin/AdminCriteriaPage';
-import { AdminMentorsJudgesPage } from './pages/admin/AdminMentorsJudgesPage';
-import { AdminResultsPage } from './pages/admin/AdminResultsPage';
-import { AdminAnnouncementsPage } from './pages/admin/AdminAnnouncementsPage';
-import { AdminConfigPage } from './pages/admin/AdminConfigPage';
+// Candidate & Shared Pages (Lazy-loaded per route)
+const TeamsPage = lazy(() => import('./pages/TeamsPage').then((m) => ({ default: m.TeamsPage })));
+const CandidateDashboardPage = lazy(() =>
+  import('./pages/candidate/CandidateDashboardPage').then((m) => ({ default: m.CandidateDashboardPage })),
+);
+const CandidateCheckpointsPage = lazy(() =>
+  import('./pages/candidate/candidateCheckpointsPage').then((m) => ({ default: m.CandidateCheckpointsPage })),
+);
+const TopicsPage = lazy(() => import('./pages/TopicsPage').then((m) => ({ default: m.TopicsPage })));
+const CandidateFinalSubmissionPage = lazy(() =>
+  import('./pages/candidate/CandidateFinalSubmissionPage').then((m) => ({ default: m.CandidateFinalSubmissionPage })),
+);
+const CandidateProfilePage = lazy(() =>
+  import('./pages/candidate/CandidateProfilePage').then((m) => ({ default: m.CandidateProfilePage })),
+);
 
-// Judge Pages
-import { JudgeDashboardPage } from './pages/judge/JudgeDashboardPage';
-import { JudgeTopicsPage } from './pages/judge/JudgeTopicsPage';
-import { JudgeResultsPage } from './pages/judge/JudgeResultsPage';
-import { JudgingWorkspace } from './pages/JudgingWorkspace';
-import { Scoreboard } from './pages/Scoreboard';
-import { SupportTickets } from './pages/SupportTickets';
+// Admin Pages (Lazy-loaded per route)
+const AdminDashboardPage = lazy(() =>
+  import('./pages/admin/AdminDashboardPage').then((m) => ({ default: m.AdminDashboardPage })),
+);
+const AdminApprovalsPage = lazy(() =>
+  import('./pages/admin/AdminApprovalsPage').then((m) => ({ default: m.AdminApprovalsPage })),
+);
+const AdminWhitelistPage = lazy(() =>
+  import('./pages/admin/AdminWhitelistPage').then((m) => ({ default: m.AdminWhitelistPage })),
+);
+const AdminTeamsPage = lazy(() =>
+  import('./pages/admin/AdminTeamsPage').then((m) => ({ default: m.AdminTeamsPage })),
+);
+const AdminTopicsPage = lazy(() =>
+  import('./pages/admin/AdminTopicsPage').then((m) => ({ default: m.AdminTopicsPage })),
+);
+const AdminCheckpointsPage = lazy(() =>
+  import('./pages/admin/AdminCheckpointsPage').then((m) => ({ default: m.AdminCheckpointsPage })),
+);
+const AdminCriteriaPage = lazy(() =>
+  import('./pages/admin/AdminCriteriaPage').then((m) => ({ default: m.AdminCriteriaPage })),
+);
+const AdminMentorsJudgesPage = lazy(() =>
+  import('./pages/admin/AdminMentorsJudgesPage').then((m) => ({ default: m.AdminMentorsJudgesPage })),
+);
+const AdminResultsPage = lazy(() =>
+  import('./pages/admin/AdminResultsPage').then((m) => ({ default: m.AdminResultsPage })),
+);
+const AdminAnnouncementsPage = lazy(() =>
+  import('./pages/admin/AdminAnnouncementsPage').then((m) => ({ default: m.AdminAnnouncementsPage })),
+);
+const AdminConfigPage = lazy(() =>
+  import('./pages/admin/AdminConfigPage').then((m) => ({ default: m.AdminConfigPage })),
+);
 
-// Mentor Pages
-import { MentorDashboardPage } from './pages/mentor/MentorDashboardPage';
-import { MentorTeamsPage } from './pages/mentor/MentorTeamsPage';
-import { MentorCheckpointsPage } from './pages/mentor/MentorCheckpointsPage';
+// Judge Pages (Lazy-loaded per route)
+const JudgeDashboardPage = lazy(() =>
+  import('./pages/judge/JudgeDashboardPage').then((m) => ({ default: m.JudgeDashboardPage })),
+);
+const JudgeTopicsPage = lazy(() =>
+  import('./pages/judge/JudgeTopicsPage').then((m) => ({ default: m.JudgeTopicsPage })),
+);
+const JudgeResultsPage = lazy(() =>
+  import('./pages/judge/JudgeResultsPage').then((m) => ({ default: m.JudgeResultsPage })),
+);
+const JudgingWorkspace = lazy(() =>
+  import('./pages/JudgingWorkspace').then((m) => ({ default: m.JudgingWorkspace })),
+);
+const Scoreboard = lazy(() => import('./pages/Scoreboard').then((m) => ({ default: m.Scoreboard })));
+const SupportTickets = lazy(() =>
+  import('./pages/SupportTickets').then((m) => ({ default: m.SupportTickets })),
+);
+
+// Mentor Pages (Lazy-loaded per route)
+const MentorDashboardPage = lazy(() =>
+  import('./pages/mentor/MentorDashboardPage').then((m) => ({ default: m.MentorDashboardPage })),
+);
+const MentorTeamsPage = lazy(() =>
+  import('./pages/mentor/MentorTeamsPage').then((m) => ({ default: m.MentorTeamsPage })),
+);
+const MentorCheckpointsPage = lazy(() =>
+  import('./pages/mentor/MentorCheckpointsPage').then((m) => ({ default: m.MentorCheckpointsPage })),
+);
 
 const ROUTE_TITLES: Record<string, string> = {
   '/login': 'Đăng nhập hệ thống',
@@ -101,7 +148,11 @@ const RootTitleLayout: React.FC = () => {
     iconLink.href = '/hackflow-logo.svg';
   }, [location.pathname]);
 
-  return <Outlet />;
+  return (
+    <Suspense fallback={null}>
+      <Outlet />
+    </Suspense>
+  );
 };
 
 const RoleRootPage: React.FC = () => {

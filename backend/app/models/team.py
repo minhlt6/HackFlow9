@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from enum import Enum
 from typing import TYPE_CHECKING, List, Optional
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, JSON
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import BaseModel
@@ -59,6 +59,9 @@ class TeamMember(BaseModel):
     Many-to-many junction model linking Users to Teams with specific role (leader/member).
     """
     __tablename__ = "team_members"
+    __table_args__ = (
+        Index("ix_team_members_team_user", "team_id", "user_id"),
+    )
 
     team_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("teams.id", ondelete="CASCADE"), nullable=False, index=True

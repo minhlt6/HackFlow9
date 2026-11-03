@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useMockStore } from '../../store/useMockStore';
-import { axiosClient } from '../../api/axiosClient';
 import { StatCard } from '../../components/common/StatCard';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/button';
@@ -40,42 +39,13 @@ export const AdminDashboardPage: React.FC = () => {
   } = useMockStore();
 
   const navigate = useNavigate();
-  const [backendPendingCount, setBackendPendingCount] = useState<number | null>(null);
-  const [backendWhitelistCount, setBackendWhitelistCount] = useState<number | null>(null);
 
   useEffect(() => {
-    let active = true;
-    axiosClient
-      .get<{ data?: Array<{ email: string }> }>('/admin/candidates/pending')
-      .then((res) => {
-        const list = res.data?.data;
-        if (active && Array.isArray(list)) {
-          setBackendPendingCount(list.length);
-        }
-      })
-      .catch(() => {
-        // Fallback to mock count
-      });
+    void useMockStore.getState().syncFromBackend?.();
+  }, []);
 
-    axiosClient
-      .get<{ data?: Array<{ email: string }> }>('/admin/whitelist?include_inactive=true')
-      .then((res) => {
-        const list = res.data?.data;
-        if (active && Array.isArray(list)) {
-          setBackendWhitelistCount(list.length);
-        }
-      })
-      .catch(() => {
-        // Fallback to mock count
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [pendingCandidates, whitelist]);
-
-  const totalPendingCount = backendPendingCount ?? pendingCandidates.length;
-  const totalWhitelistCount = backendWhitelistCount ?? whitelist.length;
+  const totalPendingCount = pendingCandidates.length;
+  const totalWhitelistCount = whitelist.length;
   const approvedTeamsCount = teams.filter(
     (t) => t.status.toLowerCase() === 'approved',
   ).length;
