@@ -120,8 +120,11 @@ class TopicService:
             end = config.end_time
             start = start.replace(tzinfo=timezone.utc) if start.tzinfo is None else start
             end = end.replace(tzinfo=timezone.utc) if end.tzinfo is None else end
+            status_code = str((config.settings_data or {}).get("status", "")).strip().lower()
             if not config.is_topic_published:
                 reason = "Đề tài chưa được công bố."
+            elif status_code in {"judging", "completed"}:
+                reason = "Đã qua giai đoạn đăng ký đề tài."
             elif now < start:
                 reason = "Chưa đến thời gian đăng ký đề tài."
             elif now > end:
@@ -361,6 +364,12 @@ class TopicService:
         config = await topic_repo.get_config(db)
         if config:
             now_utc = datetime.now(timezone.utc)
+            status_code = str((config.settings_data or {}).get("status", "")).strip().lower()
+            if status_code in {"judging", "completed"}:
+                raise ConflictException(
+                    message="Đã qua giai đoạn chọn đề tài; cuộc thi đang chấm điểm hoặc đã kết thúc.",
+                    error_code="TOPIC_SELECTION_CLOSED",
+                )
             if not config.is_topic_published:
                 raise ConflictException(
                     message="Đề tài cuộc thi chưa được công bố.",

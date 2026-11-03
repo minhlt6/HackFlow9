@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 import secrets
 from typing import Dict, List, Optional
 from sqlalchemy import select
@@ -15,6 +16,7 @@ from app.core.exceptions import (
 from app.models.team import Team, TeamMember, TeamMemberRole
 from app.models.user import User
 from app.repositories.team_repo import team_repo
+from app.repositories.topic_repo import topic_repo
 from app.schemas.team import TeamMemberResponse, TeamResponse
 from app.services.team_policy import get_team_limits, check_member_removal
 
@@ -171,6 +173,29 @@ class TeamService:
         minimum, maximum = await get_team_limits(db)
         return [self.build_team_response(t, minimum, maximum) for t in teams]
 
+    @staticmethod
+    async def _assert_team_registration_open(db: AsyncSession) -> None:
+        config = await topic_repo.get_config(db)
+        if not config:
+            return
+        status_code = str((config.settings_data or {}).get("status", "")).strip().lower()
+        if status_code in {"judging", "completed"}:
+            raise ConflictException(
+                message="Thời gian lập đội và tham gia đội thi đã kết thúc.",
+                error_code="TEAM_REGISTRATION_CLOSED",
+            )
+        if config.end_time:
+            end_utc = (
+                config.end_time.replace(tzinfo=timezone.utc)
+                if config.end_time.tzinfo is None
+                else config.end_time
+            )
+            if datetime.now(timezone.utc) > end_utc:
+                raise ConflictException(
+                    message="Thời gian lập đội và tham gia đội thi đã kết thúc.",
+                    error_code="TEAM_REGISTRATION_CLOSED",
+                )
+
     async def create_team(
         self,
         db: AsyncSession,
@@ -178,6 +203,7 @@ class TeamService:
         team_name: str,
         description: Optional[str] = None,
     ) -> TeamResponse:
+        await self._assert_team_registration_open(db)
         cleaned_name = team_name.strip()
         if len(cleaned_name) < 3 or len(cleaned_name) > 50:
             raise AppException(
@@ -277,6 +303,7 @@ class TeamService:
         current_user: User,
         invite_code: str,
     ) -> TeamResponse:
+        await self._assert_team_registration_open(db)
         cleaned_code = invite_code.strip().upper()
         if not cleaned_code or len(cleaned_code) < 4:
             raise BadRequestException(
@@ -348,10 +375,16 @@ class TeamService:
             await db.delete(membership)
             await db.flush()
             if count == 1:
-                if team.topic and team.topic.current_teams > 0:
-                    team.topic.current_teams -= 1
-                if team.subtopic and team.subtopic.current_teams > 0:
-                    team.subtopic.current_teams -= 1
+                meta_now = team.admin_meta if isinstance(getattr(team, "admin_meta", None), dict) else {}
+                slot_held = (
+                    meta_now.get("topic_slot_released") is not True
+                    and str(meta_now.get("approval_status", "")).lower() != "rejected"
+                )
+                if slot_held:
+                    if team.topic and team.topic.current_teams > 0:
+                        team.topic.current_teams -= 1
+                    if team.subtopic and team.subtopic.current_teams > 0:
+                        team.subtopic.current_teams -= 1
                 await db.delete(team)
             elif isinstance(getattr(team, "admin_meta", None), dict):
                 meta = dict(team.admin_meta)

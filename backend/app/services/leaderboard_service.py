@@ -17,6 +17,7 @@ from app.services.evaluation_service import (
     calculate_weighted_score,
     generate_anonymous_team_code,
 )
+from app.services.judging_policy import judging_block_reason
 
 DEFAULT_MAX_SPREAD_THRESHOLD = 15.0
 DEFAULT_STD_DEV_THRESHOLD = 10.0
@@ -58,7 +59,7 @@ class LeaderboardService:
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
-    async def _list_final_submissions(self) -> List[Submission]:
+    async def _query_all_final_checkpoint_submissions(self) -> List[Submission]:
         stmt = (
             select(Submission)
             .join(Checkpoint, Submission.checkpoint_id == Checkpoint.id)
@@ -81,6 +82,31 @@ class LeaderboardService:
                 and str(s.team.admin_meta.get("approval_status", "")).lower() == "rejected"
             )
         ]
+
+    async def _list_final_submissions(self) -> List[Submission]:
+        all_non_rejected = await self._query_all_final_checkpoint_submissions()
+        return [
+            s
+            for s in all_non_rejected
+            if judging_block_reason(s) is None
+        ]
+
+    async def _list_ineligible_final_submissions(self) -> List[Dict[str, Any]]:
+        all_non_rejected = await self._query_all_final_checkpoint_submissions()
+        ineligible: List[Dict[str, Any]] = []
+        for s in all_non_rejected:
+            reason = judging_block_reason(s)
+            if reason is not None:
+                ineligible.append(
+                    {
+                        "submission_id": s.id,
+                        "team_id": s.team_id,
+                        "team_name": s.team.team_name if s.team else f"Team {s.team_id[:6]}",
+                        "status": s.status,
+                        "block_reason": reason,
+                    }
+                )
+        return ineligible
 
     async def _list_submitted_evaluations(
         self, submission_ids: List[str]
@@ -354,16 +380,19 @@ class LeaderboardService:
         ranked = await self.aggregate_and_rank()
 
         if is_admin:
+            ineligible = await self._list_ineligible_final_submissions()
             return {
                 "is_result_published": is_published,
                 "status": "PUBLISHED" if is_published else "DRAFT",
                 "leaderboard": ranked,
+                "ineligible_submissions": ineligible,
             }
 
-        # Public view for non-admin users when published: strip internal judge_scores and discrepancy flags
+        # Public view for non-admin users when published: strip internal judge_scores, discrepancy flags, and unscored entries
+        scored_ranked = [item for item in ranked if item["eval_count"] > 0]
         public_entries = [
             {
-                "rank": item["rank"],
+                "rank": idx,
                 "submission_id": item["submission_id"],
                 "team_id": item["team_id"],
                 "team_name": item["team_name"],
@@ -373,7 +402,7 @@ class LeaderboardService:
                 "eval_count": item["eval_count"],
                 "submitted_at": item["submitted_at"],
             }
-            for item in ranked
+            for idx, item in enumerate(scored_ranked, start=1)
         ]
         return {
             "is_result_published": True,
@@ -390,6 +419,7 @@ class LeaderboardService:
         Publish or unpublish the official competition leaderboard (PATCH /api/v1/admin/leaderboard/publish).
         - Admin only (403 FORBIDDEN for others).
         - If already published and not unpublishing -> 409 RESULTS_ALREADY_PUBLISHED.
+        - Requires at least one eligible final submission with a submitted (locked) evaluation before publishing -> 409 NO_VALID_EVALUATIONS_TO_PUBLISH.
         - Records LEADERBOARD_PUBLISHED / LEADERBOARD_UNPUBLISHED in AuditLog.
         """
         if current_user.role != UserRole.ADMIN.value:
@@ -407,6 +437,8 @@ class LeaderboardService:
             and (payload.unpublish is True or payload.is_result_published is False)
         )
         now = datetime.now(timezone.utc)
+        sdata = dict(config.settings_data or {})
+        current_version = int(sdata.get("result_version", 0) or 0)
 
         if not wants_unpublish:
             if config.is_result_published:
@@ -416,6 +448,18 @@ class LeaderboardService:
                     error_code="RESULTS_ALREADY_PUBLISHED",
                 )
 
+            ranked = await self.aggregate_and_rank()
+            scored_entries = [r for r in ranked if r["eval_count"] > 0]
+            if not scored_entries:
+                raise AppException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    message="Chưa có đội thi hợp lệ nào có phiếu chấm điểm chính thức (đã khóa) để công bố bảng xếp hạng.",
+                    error_code="NO_VALID_EVALUATIONS_TO_PUBLISH",
+                )
+
+            next_version = current_version + 1
+            sdata["result_version"] = next_version
+            config.settings_data = sdata
             config.is_result_published = True
             audit = AuditLog(
                 user_id=current_user.id,
@@ -425,7 +469,8 @@ class LeaderboardService:
                 details={
                     "published_by": current_user.id,
                     "published_at": now.isoformat(),
-                    "result_version": 1,
+                    "result_version": next_version,
+                    "ranked_teams_count": len(scored_entries),
                 },
             )
             self.db.add(audit)
@@ -437,7 +482,7 @@ class LeaderboardService:
                 "status": "PUBLISHED",
                 "published_by": current_user.id,
                 "published_at": now.isoformat(),
-                "result_version": 1,
+                "result_version": next_version,
             }
 
         # Unpublish back to DRAFT
@@ -450,6 +495,7 @@ class LeaderboardService:
             details={
                 "unpublished_by": current_user.id,
                 "unpublished_at": now.isoformat(),
+                "result_version": max(1, current_version),
             },
         )
         self.db.add(audit)
@@ -461,5 +507,5 @@ class LeaderboardService:
             "status": "DRAFT",
             "published_by": current_user.id,
             "published_at": None,
-            "result_version": 1,
+            "result_version": max(1, current_version),
         }

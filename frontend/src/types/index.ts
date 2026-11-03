@@ -282,6 +282,8 @@ export interface HackathonConfig {
   topicSelectionDeadline?: string;
   isContestStarted?: boolean;
   contestStartedAt?: string;
+  expectedResultPublishAt?: string | null;
+  discrepancyThreshold?: number;
 }
 
 export interface ApiResponse<T> {

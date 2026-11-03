@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { getLeaderboard, publishLeaderboard } from '../../services/evaluationService';
 import { apiClient } from '../../api/axiosClient';
@@ -27,6 +27,7 @@ interface ResultRow {
   hasLockedEvaluations: boolean;
   hasDraftEvaluations: boolean;
   avgScore: number;
+  draftScore: number;
   hasDiscrepancy: boolean;
   maxSpread: number;
   judges: Array<{
@@ -43,6 +44,9 @@ export const AdminResultsPage: React.FC = () => {
 
   const [alert, setAlert] = useState<string | null>(null);
   const [errorAlert, setErrorAlert] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isStale, setIsStale] = useState<boolean>(false);
   const [apiRows, setApiRows] = useState<ResultRow[] | null>(null);
   const [unlockedTeamIds, setUnlockedTeamIds] = useState<string[]>([]);
   const [refreshTick, setRefreshTick] = useState(0);
@@ -59,89 +63,125 @@ export const AdminResultsPage: React.FC = () => {
   const [unlockReason, setUnlockReason] = useState('Rà soát chênh lệch điểm giữa các giám khảo');
   const [unlocking, setUnlocking] = useState(false);
 
+  const applyLeaderboardResponse = useCallback(
+    (res: unknown) => {
+      const rawData =
+        res && typeof res === 'object' && 'data' in (res as Record<string, unknown>)
+          ? (res as { data: unknown }).data
+          : res;
+      if (
+        rawData &&
+        typeof rawData === 'object' &&
+        'is_result_published' in (rawData as Record<string, unknown>)
+      ) {
+        const isPub = Boolean((rawData as { is_result_published?: boolean }).is_result_published);
+        useMockStore.setState((state) => ({
+          config: { ...state.config, resultsPublished: isPub },
+        }));
+      }
+      const entriesRaw =
+        rawData && typeof rawData === 'object' && 'leaderboard' in (rawData as Record<string, unknown>)
+          ? (rawData as { leaderboard: unknown[] }).leaderboard
+          : Array.isArray(rawData)
+            ? rawData
+            : null;
+      if (!Array.isArray(entriesRaw)) {
+        throw new Error('Dữ liệu bảng xếp hạng trả về không hợp lệ.');
+      }
+      const threshold = Number(config.discrepancyThreshold ?? 15);
+      const mapped: ResultRow[] = (entriesRaw as Array<Record<string, unknown>>).map((entry) => {
+        const tId = String(entry.team_id ?? entry.teamId ?? '');
+        const tName = String(entry.team_name ?? entry.teamName ?? '');
+        const matchedTeam = teams.find((t) => t.id === tId || t.name === tName);
+        const rawJudges = Array.isArray(entry.all_judge_scores)
+          ? (entry.all_judge_scores as Array<Record<string, unknown>>)
+          : Array.isArray(entry.judge_scores)
+            ? (entry.judge_scores as Array<Record<string, unknown>>)
+            : Array.isArray(entry.judgeBreakdown)
+              ? (entry.judgeBreakdown as Array<Record<string, unknown>>)
+              : [];
+        const judgeList = rawJudges.map((jb: Record<string, unknown>, idx: number) => ({
+          judgeId: String(jb.judge_id ?? jb.judgeName ?? `judge-${idx + 1}`),
+          judgeName: String(jb.judge_name ?? jb.judgeName ?? `Giám khảo #${idx + 1}`),
+          score: Math.round(Number(jb.total_score ?? jb.totalScore ?? 0) * 10) / 10,
+          status: (String(jb.status ?? 'submitted') === 'draft' ? 'draft' : 'submitted') as
+            | 'submitted'
+            | 'draft',
+        }));
+        const lockedCount = Number(
+          entry.evaluated_judges_count ??
+            entry.eval_count ??
+            entry.judgeCount ??
+            judgeList.filter((j) => j.status === 'submitted').length
+        );
+        const draftCount = Number(
+          entry.draft_eval_count ?? judgeList.filter((j) => j.status === 'draft').length
+        );
+        const rawFinalScore = Number(entry.final_score ?? entry.averageScore ?? 0);
+        const rawDraftScore = Number(entry.draft_score ?? 0);
+        const spread = Number(entry.max_spread ?? entry.max_discrepancy ?? entry.maxSpread ?? 0);
+        return {
+          teamId: tId,
+          submissionId: String(entry.submission_id ?? tId),
+          teamName: tName || matchedTeam?.name || 'Đội thi',
+          leaderName: matchedTeam?.leaderName || 'Trưởng nhóm',
+          evalCount: lockedCount,
+          draftEvalCount: draftCount,
+          hasLockedEvaluations: Boolean(entry.has_locked_evaluations ?? lockedCount > 0),
+          hasDraftEvaluations: Boolean(entry.has_draft_evaluations ?? draftCount > 0),
+          avgScore: lockedCount > 0 ? Math.round(rawFinalScore * 10) / 10 : 0,
+          draftScore: draftCount > 0 ? Math.round(rawDraftScore * 10) / 10 : 0,
+          hasDiscrepancy: Boolean(entry.has_discrepancy ?? entry.hasDiscrepancy ?? spread > threshold),
+          maxSpread: spread,
+          judges: judgeList,
+        };
+      });
+      setApiRows(mapped);
+      setLoadError(null);
+      setIsStale(false);
+    },
+    [teams, config.discrepancyThreshold]
+  );
+
+  const loadLeaderboard = useCallback(async (): Promise<boolean> => {
+    setIsLoading(true);
+    try {
+      const res: unknown = await getLeaderboard();
+      applyLeaderboardResponse(res);
+      return true;
+    } catch {
+      setLoadError('Không thể tải dữ liệu bảng điểm mới nhất từ máy chủ. Vui lòng thử lại.');
+      setIsStale(true);
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [applyLeaderboardResponse]);
+
   useEffect(() => {
-    let mounted = true;
+    let active = true;
     getLeaderboard()
       .then((res: unknown) => {
-        if (!mounted) return;
-        const rawData =
-          res && typeof res === 'object' && 'data' in (res as Record<string, unknown>)
-            ? (res as { data: unknown }).data
-            : res;
-        if (
-          rawData &&
-          typeof rawData === 'object' &&
-          'is_result_published' in (rawData as Record<string, unknown>)
-        ) {
-          const isPub = Boolean((rawData as { is_result_published?: boolean }).is_result_published);
-          useMockStore.setState((state) => ({
-            config: { ...state.config, resultsPublished: isPub },
-          }));
-        }
-        const entriesRaw =
-          rawData && typeof rawData === 'object' && 'leaderboard' in (rawData as Record<string, unknown>)
-            ? (rawData as { leaderboard: unknown[] }).leaderboard
-            : Array.isArray(rawData)
-              ? rawData
-              : [];
-        if (!Array.isArray(entriesRaw)) return;
-        const mapped: ResultRow[] = (entriesRaw as Array<Record<string, unknown>>).map((entry) => {
-          const tId = String(entry.team_id ?? entry.teamId ?? '');
-          const tName = String(entry.team_name ?? entry.teamName ?? '');
-          const matchedTeam = teams.find((t) => t.id === tId || t.name === tName);
-          const rawJudges = Array.isArray(entry.all_judge_scores)
-            ? (entry.all_judge_scores as Array<Record<string, unknown>>)
-            : Array.isArray(entry.judge_scores)
-              ? (entry.judge_scores as Array<Record<string, unknown>>)
-              : Array.isArray(entry.judgeBreakdown)
-                ? (entry.judgeBreakdown as Array<Record<string, unknown>>)
-                : [];
-          const judgeList = rawJudges.map((jb: Record<string, unknown>, idx: number) => ({
-            judgeId: String(jb.judge_id ?? jb.judgeName ?? `judge-${idx + 1}`),
-            judgeName: String(jb.judge_name ?? jb.judgeName ?? `Giám khảo #${idx + 1}`),
-            score: Math.round(Number(jb.total_score ?? jb.totalScore ?? 0) * 10) / 10,
-            status: (String(jb.status ?? 'submitted') === 'draft' ? 'draft' : 'submitted') as
-              | 'submitted'
-              | 'draft',
-          }));
-          const lockedCount = Number(
-            entry.evaluated_judges_count ??
-              entry.eval_count ??
-              entry.judgeCount ??
-              judgeList.filter((j) => j.status === 'submitted').length
-          );
-          const draftCount = Number(
-            entry.draft_eval_count ?? judgeList.filter((j) => j.status === 'draft').length
-          );
-          const rawFinalScore = Number(entry.final_score ?? entry.averageScore ?? 0);
-          const rawDraftScore = Number(entry.draft_score ?? 0);
-          const displayScore =
-            lockedCount > 0 ? rawFinalScore : draftCount > 0 ? rawDraftScore : rawFinalScore;
-          const spread = Number(entry.max_spread ?? entry.max_discrepancy ?? entry.maxSpread ?? 0);
-          return {
-            teamId: tId,
-            submissionId: String(entry.submission_id ?? tId),
-            teamName: tName || matchedTeam?.name || 'Đội thi',
-            leaderName: matchedTeam?.leaderName || 'Trưởng nhóm',
-            evalCount: lockedCount,
-            draftEvalCount: draftCount,
-            hasLockedEvaluations: Boolean(entry.has_locked_evaluations ?? lockedCount > 0),
-            hasDraftEvaluations: Boolean(entry.has_draft_evaluations ?? draftCount > 0),
-            avgScore: Math.round(displayScore * 10) / 10,
-            hasDiscrepancy: Boolean(entry.has_discrepancy ?? entry.hasDiscrepancy ?? spread > 15),
-            maxSpread: spread,
-            judges: judgeList,
-          };
-        });
-        setApiRows(mapped);
+        if (!active) return;
+        applyLeaderboardResponse(res);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (!active) return;
+        setLoadError('Không thể tải dữ liệu bảng điểm mới nhất từ máy chủ. Vui lòng thử lại.');
+        setIsStale(true);
+      })
+      .finally(() => {
+        if (active) setIsLoading(false);
+      });
     return () => {
-      mounted = false;
+      active = false;
     };
-  }, [teams, refreshTick]);
+  }, [applyLeaderboardResponse, refreshTick]);
 
   const teamScoreRows = apiRows || [];
+  const lockedTeamsCount = teamScoreRows.filter((r) => r.evalCount > 0).length;
+  const draftTeamsCount = teamScoreRows.filter((r) => r.draftEvalCount > 0).length;
+  const discrepancyTeamsCount = teamScoreRows.filter((r) => r.hasDiscrepancy).length;
 
   const handleExportCsv = () => {
     const headers = [
@@ -186,26 +226,26 @@ export const AdminResultsPage: React.FC = () => {
 
   const handleTogglePublish = async () => {
     const nextPublished = !config.resultsPublished;
+    setErrorAlert(null);
     try {
       await publishLeaderboard({ is_result_published: nextPublished });
-    } catch {
-      setErrorAlert('Không thể công bố kết quả. Vui lòng thử lại.');
-      setTimeout(() => setErrorAlert(null), 3500);
+    } catch (err: unknown) {
+      const apiMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErrorAlert(apiMsg || 'Không thể cập nhật trạng thái công bố kết quả. Vui lòng thử lại.');
+      setTimeout(() => setErrorAlert(null), 4500);
       return;
     }
     useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: nextPublished } }));
     if (!nextPublished) {
       setUnlockedTeamIds([]);
     }
-    setApiRows((prev) =>
-      prev
-        ? prev.map((r) => ({
-            ...r,
-            hasLockedEvaluations: !nextPublished ? true : r.hasLockedEvaluations,
-            hasDraftEvaluations: nextPublished ? true : false,
-          }))
-        : prev
-    );
+    const synced = await loadLeaderboard();
+    if (!synced) {
+      setErrorAlert(
+        'Đã cập nhật trạng thái công bố trên máy chủ nhưng chưa tải lại được bảng điểm mới nhất. Vui lòng bấm Thử lại.'
+      );
+      return;
+    }
     setAlert(
       nextPublished
         ? 'Đã công bố bảng xếp hạng chính thức cho toàn bộ thí sinh!'
@@ -242,9 +282,12 @@ export const AdminResultsPage: React.FC = () => {
         reason: unlockReason.trim(),
         judge_id: unlockTarget.judgeId || undefined,
       });
-    } catch {
-      setErrorAlert('Không thể mở khóa phiếu chấm. Phiếu chấm chưa tồn tại hoặc đã ở trạng thái Nháp.');
-      setTimeout(() => setErrorAlert(null), 4000);
+    } catch (err: unknown) {
+      const apiMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setErrorAlert(
+        apiMsg || 'Không thể mở khóa phiếu chấm. Phiếu chấm chưa tồn tại hoặc kết quả đang được công bố.'
+      );
+      setTimeout(() => setErrorAlert(null), 4500);
       setUnlocking(false);
       return;
     }
@@ -256,6 +299,7 @@ export const AdminResultsPage: React.FC = () => {
           : ev
       ),
     }));
+    const threshold = Number(config.discrepancyThreshold ?? 15);
     setApiRows((prev) =>
       prev
         ? prev.map((r) => {
@@ -267,14 +311,38 @@ export const AdminResultsPage: React.FC = () => {
                 ? { ...j, status: 'draft' as const }
                 : j
             );
-            const lockedCount = nextJudges.filter((j) => j.status === 'submitted').length;
-            const draftCount = nextJudges.filter((j) => j.status === 'draft').length;
+            const submittedJudges = nextJudges.filter((j) => j.status === 'submitted');
+            const draftJudges = nextJudges.filter((j) => j.status === 'draft');
+            const lockedCount = submittedJudges.length;
+            const draftCount = draftJudges.length;
+            const nextAvgScore =
+              lockedCount > 0
+                ? Math.round(
+                    (submittedJudges.reduce((acc, j) => acc + j.score, 0) / lockedCount) * 10
+                  ) / 10
+                : 0;
+            const nextDraftScore =
+              draftCount > 0
+                ? Math.round((draftJudges.reduce((acc, j) => acc + j.score, 0) / draftCount) * 10) /
+                  10
+                : 0;
+            const submittedScores = submittedJudges.map((j) => j.score);
+            const nextMaxSpread =
+              lockedCount >= 2
+                ? Math.round((Math.max(...submittedScores) - Math.min(...submittedScores)) * 100) /
+                  100
+                : 0;
+            const nextHasDiscrepancy = lockedCount >= 2 && nextMaxSpread > threshold;
             return {
               ...r,
               evalCount: lockedCount,
               draftEvalCount: draftCount,
               hasLockedEvaluations: lockedCount > 0,
               hasDraftEvaluations: draftCount > 0,
+              avgScore: nextAvgScore,
+              draftScore: nextDraftScore,
+              maxSpread: nextMaxSpread,
+              hasDiscrepancy: nextHasDiscrepancy,
               judges: nextJudges,
             };
           })
@@ -286,9 +354,15 @@ export const AdminResultsPage: React.FC = () => {
         ? [...prev, unlockTarget.teamId]
         : prev
     );
-    setRefreshTick((t) => t + 1);
+    const synced = await loadLeaderboard();
     setUnlocking(false);
     setUnlockModalOpen(false);
+    if (!synced) {
+      setErrorAlert(
+        `Đã mở khóa phiếu chấm của đội "${unlockTarget.teamName}" trên máy chủ, nhưng chưa tải lại được bảng điểm. Dữ liệu đang hiển thị là bản tạm tính.`
+      );
+      return;
+    }
     setAlert(`Đã mở khóa phiếu chấm của đội "${unlockTarget.teamName}" về trạng thái Nháp (Draft) để Giám khảo chấm lại.`);
     setTimeout(() => setAlert(null), 4000);
   };
@@ -336,6 +410,30 @@ export const AdminResultsPage: React.FC = () => {
         <div className="p-3.5 rounded-[10px] bg-red-500/10 border border-red-500/30 text-xs text-red-700 dark:text-red-400 flex items-center gap-2">
           <AlertTriangle size={15} />
           <span>{errorAlert}</span>
+        </div>
+      )}
+
+      {loadError && (
+        <div
+          role="alert"
+          className="p-3.5 rounded-[10px] bg-amber-500/10 border border-amber-500/30 text-xs text-amber-700 dark:text-amber-400 flex items-center justify-between gap-3"
+        >
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={15} />
+            <span>
+              {loadError}
+              {isStale && apiRows ? ' (Dữ liệu đang hiển thị có thể đã cũ)' : ''}
+            </span>
+          </div>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setRefreshTick((t) => t + 1)}
+            isLoading={isLoading}
+            className="text-xs px-2.5 py-1"
+          >
+            Thử lại
+          </Button>
         </div>
       )}
 
@@ -428,17 +526,42 @@ export const AdminResultsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-center">
-                      {row.evalCount > 0 ? (
-                        <Badge variant="success">{row.evalCount} lượt (Đã khóa)</Badge>
-                      ) : row.hasDraftEvaluations ? (
-                        <Badge variant="cyan">{row.draftEvalCount} lượt (Đang mở khóa)</Badge>
-                      ) : (
-                        <Badge variant="neutral">0 lượt</Badge>
-                      )}
+                      <div className="flex flex-col items-center gap-1">
+                        {row.evalCount > 0 ? (
+                          <Badge variant="success">{row.evalCount} lượt (Đã khóa)</Badge>
+                        ) : (
+                          <Badge variant="neutral">0 lượt khóa</Badge>
+                        )}
+                        {row.hasDraftEvaluations && (
+                          <Badge variant="cyan">{row.draftEvalCount} phiếu nháp</Badge>
+                        )}
+                      </div>
                     </td>
 
-                    <td className="py-3.5 px-4 text-right font-semibold tracking-tight text-lg text-emerald-700 dark:text-emerald-400 font-mono">
-                      {row.avgScore} / 100
+                    <td className="py-3.5 px-4 text-right font-mono">
+                      {row.evalCount > 0 ? (
+                        <div>
+                          <span className="font-semibold tracking-tight text-lg text-emerald-700 dark:text-emerald-400">
+                            {row.avgScore} / 100
+                          </span>
+                          {row.hasDraftEvaluations && (
+                            <div className="text-[11px] text-cyan-600 dark:text-cyan-400">
+                              Nháp: {row.draftScore}đ ({row.draftEvalCount} phiếu)
+                            </div>
+                          )}
+                        </div>
+                      ) : row.hasDraftEvaluations ? (
+                        <div>
+                          <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                            Chưa khóa điểm
+                          </span>
+                          <div className="text-[11px] text-cyan-600 dark:text-cyan-400">
+                            Điểm nháp: {row.draftScore} / 100
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">Chưa có điểm</span>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4 text-center">
@@ -453,23 +576,27 @@ export const AdminResultsPage: React.FC = () => {
                     </td>
 
                     <td className="py-3.5 px-4 text-center">
-                      <span
-                        className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                          row.avgScore >= 85
-                            ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
-                            : row.avgScore >= 70
-                            ? 'bg-[#6366F1]/15 text-primary border border-[#6366F1]/30'
-                            : 'bg-muted text-muted-foreground'
-                        }`}
-                      >
-                        {row.avgScore >= 85 ? 'Xuất Sắc' : row.avgScore >= 70 ? 'Khá Giỏi' : 'Đạt'}
-                      </span>
+                      {row.evalCount > 0 ? (
+                        <span
+                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                            row.avgScore >= 85
+                              ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30'
+                              : row.avgScore >= 70
+                                ? 'bg-[#6366F1]/15 text-primary border border-[#6366F1]/30'
+                                : 'bg-muted text-muted-foreground'
+                          }`}
+                        >
+                          {row.avgScore >= 85 ? 'Xuất Sắc' : row.avgScore >= 70 ? 'Khá Giỏi' : 'Đạt'}
+                        </span>
+                      ) : (
+                        <Badge variant="neutral">Chưa xếp loại</Badge>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
                       {config.resultsPublished ? (
-                        <Badge variant="success">Đã mở khóa</Badge>
-                      ) : !unlockedTeamIds.includes(row.teamId) ? (
+                        <Badge variant="neutral">Đang công bố (Khóa)</Badge>
+                      ) : row.hasLockedEvaluations && !unlockedTeamIds.includes(row.teamId) ? (
                         <Button
                           variant="secondary"
                           size="sm"
@@ -479,8 +606,10 @@ export const AdminResultsPage: React.FC = () => {
                           <Unlock size={13} />
                           <span>Mở khóa phiếu</span>
                         </Button>
+                      ) : row.hasDraftEvaluations || unlockedTeamIds.includes(row.teamId) ? (
+                        <Badge variant="cyan">Đang mở khóa (Nháp)</Badge>
                       ) : (
-                        <Badge variant="cyan">Đã mở khóa</Badge>
+                        <Badge variant="neutral">Chưa có phiếu khóa</Badge>
                       )}
                     </td>
                   </tr>
@@ -576,7 +705,20 @@ export const AdminResultsPage: React.FC = () => {
         description={
           config.resultsPublished
             ? 'Sau khi tạm khóa, Bảng xếp hạng sẽ chuyển về chế độ bảo mật nội bộ. Thí sinh sẽ không thể xem điểm số và thứ hạng cho đến khi được công bố lại.'
-            : 'Sau khi công bố, tất cả thí sinh và đội thi hợp lệ sẽ nhìn thấy điểm tổng kết chính thức và thứ hạng chung cuộc trên màn hình Leaderboard.'
+            : [
+                'Sau khi công bố, tất cả thí sinh và đội thi hợp lệ sẽ nhìn thấy điểm tổng kết chính thức và thứ hạng chung cuộc trên màn hình Leaderboard.',
+                lockedTeamsCount === 0
+                  ? '⚠️ CẢNH BÁO: Hiện chưa có đội thi hợp lệ nào có phiếu điểm chính thức (Đã khóa). Máy chủ sẽ từ chối công bố cho đến khi có ít nhất 1 đội được khóa điểm.'
+                  : '',
+                draftTeamsCount > 0
+                  ? `⚠️ Lưu ý: Hiện còn ${draftTeamsCount} đội thi đang có phiếu chấm ở trạng thái Nháp (chưa khóa). Điểm nháp sẽ không được tính vào kết quả công bố.`
+                  : '',
+                discrepancyTeamsCount > 0
+                  ? `⚠️ Lưu ý: Phát hiện ${discrepancyTeamsCount} đội thi đang có cảnh báo lệch điểm cao giữa các giám khảo.`
+                  : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
         }
         confirmLabel={config.resultsPublished ? 'Xác nhận tạm khóa' : 'Xác nhận công bố'}
         variant={config.resultsPublished ? 'warning' : 'primary'}

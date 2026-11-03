@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { useMockStore } from '../../store/useMockStore';
+import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import { StatCard } from '../../components/common/StatCard';
 import { PageHeader } from '../../components/layout/PageHeader';
 import { Button } from '../../components/ui/button';
@@ -37,6 +38,7 @@ export const AdminDashboardPage: React.FC = () => {
     toggleResultsPublished,
     toggleContestStarted,
   } = useMockStore();
+  const { confirm, confirmationDialog } = useActionConfirmation();
 
   const navigate = useNavigate();
 
@@ -49,7 +51,22 @@ export const AdminDashboardPage: React.FC = () => {
   const approvedTeamsCount = teams.filter(
     (t) => t.status.toLowerCase() === 'approved',
   ).length;
-  const openTicketsCount = tickets.filter((t) => t.status !== 'resolved').length;
+  const openTicketsCount = tickets.filter(
+    (t) => t.status === 'open' || t.status === 'in_progress',
+  ).length;
+
+  const formattedFinalDeadline = React.useMemo(() => {
+    if (!config.finalSubmissionDeadline) return '15/11/2026 23:59';
+    const d = new Date(config.finalSubmissionDeadline);
+    if (Number.isNaN(d.getTime())) return '15/11/2026 23:59';
+    return d.toLocaleString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }, [config.finalSubmissionDeadline]);
 
   return (
     <div className="space-y-6">
@@ -63,9 +80,23 @@ export const AdminDashboardPage: React.FC = () => {
               type="button"
               variant={config.isContestStarted ? 'outline' : 'success'}
               size="sm"
-              onClick={() => {
-                void toggleContestStarted().catch(() => toast.error('Không thể lưu thay đổi. Vui lòng thử lại.'));
-
+              onClick={async () => {
+                const accepted = await confirm({
+                  title: config.isContestStarted
+                    ? 'Tạm dừng cuộc thi?'
+                    : 'Bắt đầu cuộc thi?',
+                  description: config.isContestStarted
+                    ? 'Tạm dừng bộ đếm thời gian sẽ đóng băng trạng thái chạy của cuộc thi trên giao diện thí sinh.'
+                    : 'Kích hoạt cuộc thi sẽ bắt đầu tính giờ các mốc Checkpoint và cho phép các đội thi nộp bài.',
+                  confirmLabel: config.isContestStarted
+                    ? 'Tạm dừng ngay'
+                    : 'Bắt đầu ngay',
+                  variant: config.isContestStarted ? 'warning' : 'primary',
+                });
+                if (!accepted) return;
+                void toggleContestStarted().catch(() =>
+                  toast.error('Không thể lưu thay đổi. Vui lòng thử lại.'),
+                );
               }}
             >
               {config.isContestStarted ? <Pause size={15} /> : <Play size={15} />}
@@ -80,9 +111,23 @@ export const AdminDashboardPage: React.FC = () => {
               type="button"
               variant="primary"
               size="sm"
-              onClick={() => {
-                void toggleResultsPublished().catch(() => toast.error('Không thể lưu thay đổi. Vui lòng thử lại.'));
-
+              onClick={async () => {
+                const accepted = await confirm({
+                  title: config.resultsPublished
+                    ? 'Ẩn bảng xếp hạng?'
+                    : 'Công bố bảng xếp hạng chính thức?',
+                  description: config.resultsPublished
+                    ? 'Bảng xếp hạng sẽ chuyển về chế độ bảo mật và ẩn khỏi giao diện thí sinh.'
+                    : 'Toàn bộ thí sinh và khách truy cập sẽ xem được điểm số và thứ hạng chung cuộc.',
+                  confirmLabel: config.resultsPublished
+                    ? 'Ẩn kết quả'
+                    : 'Công bố ngay',
+                  variant: config.resultsPublished ? 'warning' : 'primary',
+                });
+                if (!accepted) return;
+                void toggleResultsPublished().catch(() =>
+                  toast.error('Không thể lưu thay đổi. Vui lòng thử lại.'),
+                );
               }}
             >
               <Trophy size={15} />
@@ -250,7 +295,7 @@ export const AdminDashboardPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Hạn nộp chung cuộc:</span>
-                  <span className="font-mono font-medium text-foreground">15/11/2026 23:59</span>
+                  <span className="font-mono font-medium text-foreground">{formattedFinalDeadline}</span>
                 </div>
               </div>
 
@@ -268,6 +313,7 @@ export const AdminDashboardPage: React.FC = () => {
           </Card>
         </div>
       </div>
+      {confirmationDialog}
     </div>
   );
 };

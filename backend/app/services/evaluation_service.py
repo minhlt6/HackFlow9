@@ -480,6 +480,17 @@ class EvaluationService:
                 )
 
         await self.repo.lock_rubric()
+        config = (
+            await self.db.execute(
+                select(HackathonConfig).order_by(HackathonConfig.created_at.asc()).limit(1)
+            )
+        ).scalar_one_or_none()
+        if config and config.is_result_published:
+            raise AppException(
+                status_code=status.HTTP_409_CONFLICT,
+                message="Bảng xếp hạng đang được công bố công khai; không thể chấm hoặc sửa điểm cho đến khi BTC tạm ẩn kết quả.",
+                error_code="RESULTS_PUBLISHED_LOCKED",
+            )
         reason = judging_block_reason(submission)
         if reason:
             raise AppException(status_code=status.HTTP_409_CONFLICT, message=reason, error_code="FINAL_SUBMISSION_NOT_ELIGIBLE")
@@ -665,6 +676,18 @@ class EvaluationService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 message="Only Admin can unlock a submitted evaluation.",
                 error_code="FORBIDDEN",
+            )
+
+        config = (
+            await self.db.execute(
+                select(HackathonConfig).order_by(HackathonConfig.created_at.asc()).limit(1)
+            )
+        ).scalar_one_or_none()
+        if config and config.is_result_published:
+            raise AppException(
+                status_code=status.HTTP_409_CONFLICT,
+                message="Không thể mở khóa phiếu chấm khi bảng xếp hạng đang được công bố công khai. Vui lòng tạm ẩn kết quả trước khi mở khóa.",
+                error_code="RESULTS_PUBLISHED_LOCKED",
             )
 
         submission = await self.repo.get_submission_by_id_or_team(submission_id)

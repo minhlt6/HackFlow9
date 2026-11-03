@@ -54,13 +54,28 @@ export const Scoreboard: React.FC = () => {
     avgScore: row.final_score, evalCount: row.eval_count, hasDiscrepancy: Boolean(row.has_discrepancy),
   }));
 
+  const formattedExpectedPublish = React.useMemo(() => {
+    const raw = config.expectedResultPublishAt;
+    if (!raw) return null;
+    const parsed = new Date(raw);
+    if (Number.isNaN(parsed.getTime())) return String(raw);
+    return parsed.toLocaleString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  }, [config.expectedResultPublishAt]);
+
   // Handle Admin publishing / unpublishing
   const handlePublishToggle = async () => {
     const nextStatus = !config.resultsPublished;
     try {
       await evaluationService.publishLeaderboard({ is_result_published: nextStatus });
-    } catch {
-      window.alert('Không thể công bố kết quả. Vui lòng thử lại.');
+    } catch (err: unknown) {
+      const apiMsg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      window.alert(apiMsg || 'Không thể công bố kết quả. Vui lòng thử lại.');
       return;
     }
     useMockStore.setState((state) => ({ config: { ...state.config, resultsPublished: nextStatus } }));
@@ -167,8 +182,10 @@ export const Scoreboard: React.FC = () => {
           </div>
 
           <div className="inline-flex items-center gap-2 rounded-full bg-muted/40 dark:bg-slate-900/60 border border-border px-4 py-2 text-xs text-muted-foreground font-mono">
-            <span>Dự kiến công bố:</span>
-            <span className="text-primary font-bold">20:00 - 15/11/2026</span>
+            <span>Thời điểm công bố:</span>
+            <span className="text-primary font-bold">
+              {formattedExpectedPublish || 'Chờ Ban Tổ Chức công bố'}
+            </span>
           </div>
         </div>
       ) : (

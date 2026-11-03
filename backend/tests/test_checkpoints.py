@@ -667,3 +667,64 @@ async def test_checkpoint_grace_period_validation_bounds(client: AsyncClient):
     )
     assert res_max.status_code == 422
 
+
+@pytest.mark.asyncio
+async def test_checkpoint_sequential_neighbor_deadline_constraints(client: AsyncClient):
+    """
+    Ensure ordered progress checkpoints (display_order > 0) cannot have their deadline
+    extended past the next checkpoint's deadline or moved earlier than the previous checkpoint's deadline.
+    """
+    async with TestSessionLocal() as session:
+        _, admin_token = await create_test_user(
+            session, "admin_seq_bounds@hackflow.dev", "Admin Seq Bounds", role=UserRole.ADMIN.value
+        )
+
+    now = datetime.now(timezone.utc)
+    r1 = await client.post(
+        "/api/v1/checkpoints",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "title": "Sequential CP 10",
+            "start_time": (now + timedelta(minutes=10)).isoformat(),
+            "deadline": (now + timedelta(hours=1)).isoformat(),
+            "display_order": 10,
+        },
+    )
+    assert r1.status_code == 201
+    cp10_id = r1.json()["data"]["id"]
+
+    r2 = await client.post(
+        "/api/v1/checkpoints",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "title": "Sequential CP 11",
+            "start_time": (now + timedelta(hours=1)).isoformat(),
+            "deadline": (now + timedelta(hours=2)).isoformat(),
+            "display_order": 11,
+        },
+    )
+    assert r2.status_code == 201
+    cp11_id = r2.json()["data"]["id"]
+
+    # 1. Extending CP 10 deadline past CP 11 deadline (now + 3h > now + 2h) -> 400 Bad Request
+    bad_ext = await client.put(
+        f"/api/v1/checkpoints/{cp10_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={"deadline": (now + timedelta(hours=3)).isoformat()},
+    )
+    assert bad_ext.status_code == 400
+    assert "vượt quá hạn chót của chặng kế tiếp" in bad_ext.json()["message"]
+
+    # 2. Moving CP 11 deadline earlier than CP 10 deadline -> 400 Bad Request
+    bad_shrink = await client.put(
+        f"/api/v1/checkpoints/{cp11_id}",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json={
+            "start_time": (now + timedelta(minutes=15)).isoformat(),
+            "deadline": (now + timedelta(minutes=30)).isoformat(),
+        },
+    )
+    assert bad_shrink.status_code == 400
+    assert "không được sớm hơn hạn chót của chặng đứng trước" in bad_shrink.json()["message"]
+
+

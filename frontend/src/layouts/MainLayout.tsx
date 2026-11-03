@@ -163,7 +163,9 @@ export const MainLayout: React.FC = () => {
   const isApproved =
     currentRole !== 'candidate' || user?.approvalStatus === 'approved';
 
-  const openTicketsCount = tickets.filter((t) => t.status !== 'resolved').length;
+  const openTicketsCount = tickets.filter(
+    (t) => t.status === 'open' || t.status === 'in_progress',
+  ).length;
   const effectiveDesktopWidth = sidebarCollapsed ? 64 : sidebarWidth;
 
   return (
@@ -204,11 +206,19 @@ export const MainLayout: React.FC = () => {
             'HackFlow AI và DeepTech Hackathon 2026'
           }
           currentPhase={
-            !config?.currentPhase ||
-            config.currentPhase === 'hacking' ||
-            config.currentPhase === 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi'
+            !config?.currentPhase
               ? 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng'
-              : config.currentPhase
+              : config.currentPhase === 'registration'
+                ? 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi'
+                : config.currentPhase === 'team_formation'
+                  ? 'Giai đoạn 2: Lựa chọn Đề tài và Phê duyệt Đội thi'
+                  : config.currentPhase === 'hacking'
+                    ? 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng'
+                    : config.currentPhase === 'judging'
+                      ? 'Giai đoạn 4: Thuyết trình Demo & Chấm điểm Chung cuộc'
+                      : config.currentPhase === 'completed'
+                        ? 'Giai đoạn 5: Công bố Kết quả & Vinh danh'
+                        : config.currentPhase
           }
           announcements={announcements}
           displayName={displayName}

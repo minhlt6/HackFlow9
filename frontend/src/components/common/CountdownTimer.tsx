@@ -24,6 +24,8 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 
   // If isStarted is not explicitly passed as prop, use global config state
   const contestActive = isStarted !== undefined ? isStarted : Boolean(config.isContestStarted);
+  const parsedTargetMs = targetDate ? new Date(targetDate).getTime() : NaN;
+  const hasValidTarget = Number.isFinite(parsedTargetMs);
 
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -34,10 +36,10 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   }>({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: false });
 
   useEffect(() => {
-    if (!contestActive) return;
+    if (!contestActive || !hasValidTarget) return;
 
     const calculateTime = () => {
-      const difference = new Date(targetDate).getTime() - new Date().getTime();
+      const difference = parsedTargetMs - Date.now();
 
       if (difference <= 0) {
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, isExpired: true });
@@ -55,12 +57,12 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     calculateTime();
     const interval = setInterval(calculateTime, 1000);
     return () => clearInterval(interval);
-  }, [targetDate, contestActive]);
+  }, [parsedTargetMs, hasValidTarget, contestActive]);
 
   const pad = (n: number) => n.toString().padStart(2, '0');
 
-  // WHEN CONTEST HAS NOT STARTED YET
-  if (!contestActive) {
+  // WHEN CONTEST HAS NOT STARTED YET OR TARGET DATE IS STILL LOADING
+  if (!contestActive || !hasValidTarget) {
     return (
       <div
         className={`rounded-[16px] border border-amber-500/30 bg-card p-5 lg:p-6 shadow-xl relative overflow-hidden  ${className}`}
@@ -75,14 +77,20 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="font-semibold tracking-tight text-foreground text-lg sm:text-xl text-foreground tracking-wide">
-                  Cuộc Thi Chưa Bắt Đầu
+                  {!contestActive ? 'Cuộc Thi Chưa Bắt Đầu' : title}
                 </h4>
                 <Badge variant="warning" className="text-[10px]">
-                  Chờ phát lệnh
+                  {!contestActive ? 'Chờ phát lệnh' : 'Chưa cấu hình hạn'}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground mt-1 max-w-xl leading-relaxed">
-                Đồng hồ đếm ngược đến hạn chót nộp bài sẽ <strong>chính thức bắt đầu chạy</strong> khi Ban Quản Trị phát lệnh mở màn cuộc thi.
+                {!contestActive ? (
+                  <>
+                    Đồng hồ đếm ngược đến hạn chót nộp bài sẽ <strong>chính thức bắt đầu chạy</strong> khi Ban Quản Trị phát lệnh mở màn cuộc thi.
+                  </>
+                ) : (
+                  subtitle || 'Đang đồng bộ mốc thời gian hạn chót từ hệ thống...'
+                )}
               </p>
             </div>
           </div>
@@ -134,7 +142,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
               </Badge>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {subtitle || `Hạn nộp chính thức: ${new Date(targetDate).toLocaleString('vi-VN')}`}
+              {subtitle || `Hạn nộp chính thức: ${new Date(parsedTargetMs).toLocaleString('vi-VN')}`}
             </p>
           </div>
         </div>

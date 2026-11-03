@@ -43,6 +43,7 @@ export const JudgeResultsPage: React.FC = () => {
             <tbody className="divide-y divide-border text-foreground">
               {teams.filter((t) => t.status !== 'REJECTED' && t.approvalStatus !== 'rejected').map((t) => {
                 const evalItem = myEvaluations.find((e) => e.teamId === t.id);
+                const isIneligible = t.canEvaluate === false;
                 const hasScore = Boolean(evalItem);
                 const isLocked = Boolean(evalItem && !evalItem.isDraft);
                 const normalizedScore = evalItem
@@ -56,27 +57,45 @@ export const JudgeResultsPage: React.FC = () => {
                     <td className="py-3.5 px-4 text-center">
                       <Badge
                         variant={
-                          !hasScore
-                            ? 'warning'
-                            : evalItem?.isDraft
-                            ? 'cyan'
-                            : 'success'
+                          isIneligible
+                            ? 'danger'
+                            : !hasScore
+                              ? 'warning'
+                              : evalItem?.isDraft
+                                ? 'cyan'
+                                : 'success'
                         }
                       >
-                        {!hasScore ? 'Chưa chấm' : evalItem?.isDraft ? 'Lưu nháp' : 'Chính thức'}
+                        {isIneligible
+                          ? 'Chưa đủ ĐK chấm'
+                          : !hasScore
+                            ? 'Chưa chấm'
+                            : evalItem?.isDraft
+                              ? 'Lưu nháp'
+                              : 'Chính thức'}
                       </Badge>
                     </td>
 
                     <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                      {hasScore ? `${normalizedScore}đ` : '—'}
+                      {hasScore && !isIneligible ? `${normalizedScore}đ` : '—'}
                     </td>
 
                     <td className="py-3.5 px-4 text-muted-foreground max-w-sm truncate text-xs">
-                      {evalItem?.generalComment || 'Chưa có nhận xét'}
+                      {isIneligible
+                        ? t.evaluationBlockReason || 'Chưa có bài nộp chung kết hợp lệ'
+                        : evalItem?.generalComment || 'Chưa có nhận xét'}
                     </td>
 
                     <td className="py-3.5 px-4 text-right">
-                      {isLocked ? (
+                      {isIneligible ? (
+                        <span
+                          title={t.evaluationBlockReason || 'Đội chưa có bài nộp chung kết hợp lệ'}
+                          className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 dark:text-amber-400 px-2.5 py-1"
+                        >
+                          <Lock size={12} />
+                          <span>Chưa đủ ĐK chấm</span>
+                        </span>
+                      ) : isLocked ? (
                         <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground px-2.5 py-1">
                           <Lock size={12} />
                           <span>Đã khóa điểm</span>
