@@ -51,7 +51,9 @@ export const AdminDashboardPage: React.FC = () => {
   const approvedTeamsCount = teams.filter(
     (t) => t.status.toLowerCase() === 'approved',
   ).length;
-  const openTicketsCount = tickets.filter((t) => t.status !== 'resolved').length;
+  const openTicketsCount = tickets.filter(
+    (t) => t.status === 'open' || t.status === 'in_progress',
+  ).length;
 
   const formattedFinalDeadline = React.useMemo(() => {
     if (!config.finalSubmissionDeadline) return '15/11/2026 23:59';

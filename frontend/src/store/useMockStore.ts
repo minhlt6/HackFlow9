@@ -2008,6 +2008,11 @@ export const useMockStore = create<MockStoreState>()(
               maxTeamSize: maxMembersVal,
               maxTeamMembers: maxMembersVal,
               finalSubmissionDeadline: String(cfgObj.end_time ?? cfgObj.endAt ?? currCfg.finalSubmissionDeadline),
+              discrepancyThreshold: Number(cfgObj.discrepancyThreshold ?? currCfg.discrepancyThreshold ?? 15),
+              expectedResultPublishAt:
+                cfgObj.expectedResultPublishAt !== undefined
+                  ? (cfgObj.expectedResultPublishAt as string | null)
+                  : currCfg.expectedResultPublishAt,
             };
           }
         }

@@ -163,7 +163,9 @@ export const MainLayout: React.FC = () => {
   const isApproved =
     currentRole !== 'candidate' || user?.approvalStatus === 'approved';
 
-  const openTicketsCount = tickets.filter((t) => t.status !== 'resolved').length;
+  const openTicketsCount = tickets.filter(
+    (t) => t.status === 'open' || t.status === 'in_progress',
+  ).length;
   const effectiveDesktopWidth = sidebarCollapsed ? 64 : sidebarWidth;
 
   return (

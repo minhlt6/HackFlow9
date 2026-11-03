@@ -345,7 +345,7 @@ async def test_github_oauth_callback_commits_user_and_preserves_name_avatar_on_m
 
     # 2. Existing DB account with old name and no avatar logs in via GitHub OAuth -> updates & commits name + avatar
     existing_user = User(
-        email='dev_existing_code_02@example.com',
+        email='dev_dev_mock_existing_02@example.com',
         full_name='Tên Cũ Trong CSDL',
         avatar_url=None,
         role='candidate',
@@ -355,15 +355,15 @@ async def test_github_oauth_callback_commits_user_and_preserves_name_avatar_on_m
     db_session.add(existing_user)
     await db_session.commit()
 
-    res_existing = await client.post('/api/v1/auth/github/callback', json={'code': 'existing_code_02'})
+    res_existing = await client.post('/api/v1/auth/github/callback', json={'code': 'dev_mock_existing_02'})
     assert res_existing.status_code == 200, res_existing.text
     token_existing = res_existing.json()['data']['access_token']
 
     me_existing = await client.get('/api/v1/auth/me', headers={'Authorization': f'Bearer {token_existing}'})
     assert me_existing.status_code == 200, me_existing.text
     me_existing_data = me_existing.json()['data']
-    assert me_existing_data['full_name'] == 'GitHub User existing_code_02'
+    assert me_existing_data['full_name'] == 'GitHub User dev_mock_existing_02'
     assert me_existing_data['avatar_url'] == 'https://github.com/identicons/default.png'
-    assert me_existing_data['github_username'] == 'github_user_existing_code_02'
+    assert me_existing_data['github_username'] == 'github_user_dev_mock_existing_02'
 
 

@@ -270,6 +270,24 @@ async def test_full_fe_be_integration_flows(client: AsyncClient, monkeypatch):
     assert stats_data["total_submissions"] >= 1
 
     # Unlock evaluation via POST /api/v1/admin/evaluations/{id}/unlock
+    # L10: Unlock is blocked with 409 RESULTS_PUBLISHED_LOCKED while results are published
+    res_unlock_blocked = await client.post(
+        f"/api/v1/admin/evaluations/{team_id}/unlock",
+        headers=admin_headers,
+        json={"reason": "Re-check discrepancy score"},
+    )
+    assert res_unlock_blocked.status_code == 409
+    assert res_unlock_blocked.json()["error_code"] == "RESULTS_PUBLISHED_LOCKED"
+
+    # Unpublish first, then unlock succeeds
+    res_unpub = await client.patch(
+        "/api/v1/admin/config",
+        headers=admin_headers,
+        json={"is_result_published": False},
+    )
+    assert res_unpub.status_code == 200
+    assert res_unpub.json()["data"]["is_result_published"] is False
+
     res_unlock = await client.post(
         f"/api/v1/admin/evaluations/{team_id}/unlock",
         headers=admin_headers,

@@ -375,10 +375,16 @@ class TeamService:
             await db.delete(membership)
             await db.flush()
             if count == 1:
-                if team.topic and team.topic.current_teams > 0:
-                    team.topic.current_teams -= 1
-                if team.subtopic and team.subtopic.current_teams > 0:
-                    team.subtopic.current_teams -= 1
+                meta_now = team.admin_meta if isinstance(getattr(team, "admin_meta", None), dict) else {}
+                slot_held = (
+                    meta_now.get("topic_slot_released") is not True
+                    and str(meta_now.get("approval_status", "")).lower() != "rejected"
+                )
+                if slot_held:
+                    if team.topic and team.topic.current_teams > 0:
+                        team.topic.current_teams -= 1
+                    if team.subtopic and team.subtopic.current_teams > 0:
+                        team.subtopic.current_teams -= 1
                 await db.delete(team)
             elif isinstance(getattr(team, "admin_meta", None), dict):
                 meta = dict(team.admin_meta)
