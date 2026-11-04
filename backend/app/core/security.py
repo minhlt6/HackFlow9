@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional, Union
 import jwt
 
-from app.core.config import settings
+from app.core.config import DEFAULT_DEV_SECRET_KEY, settings
 
 
 def create_access_token(
@@ -62,5 +62,12 @@ def hash_password(password: str, salt: str = "hackflow-salt") -> str:
 def verify_password(plain_password: str, hashed_password: str, salt: str = "hackflow-salt") -> bool:
     """
     Verify plain text password against stored hash.
+    Supports hashes created with either the active SECRET_KEY or DEFAULT_DEV_SECRET_KEY
+    so pre-seeded SQLite databases work seamlessly across local and cloud deployments.
     """
-    return hash_password(plain_password, salt) == hashed_password
+    if hash_password(plain_password, salt) == hashed_password:
+        return True
+    dev_hash = hashlib.sha256(
+        f"{plain_password}:{salt}:{DEFAULT_DEV_SECRET_KEY}".encode()
+    ).hexdigest()
+    return dev_hash == hashed_password
