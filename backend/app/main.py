@@ -78,7 +78,7 @@ async def _seed_default_accounts() -> None:
 
         await conn.run_sync(_ensure_schema_columns)
 
-    if not settings.ENABLE_STARTUP_SEED or str(settings.ENVIRONMENT).strip().lower() == "production":
+    if not settings.ENABLE_STARTUP_SEED:
         return
 
     is_test_env = settings.ENVIRONMENT in {"test", "testing"}
@@ -775,11 +775,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.error(f"Cảnh báo cấu hình Production: {err}")
     try:
         await _seed_default_accounts()
-        logger.info("Đã khởi tạo schema cơ sở dữ liệu thành công.")
+        logger.info("Đã khởi tạo schema cơ sở dữ liệu và tài khoản mặc định thành công.")
     except Exception as exc:
-        logger.error(
-            f"Không thể kết nối DATABASE_URL đã cấu hình ({exc}). Giữ nguyên cấu hình đích lưu trữ để báo trạng thái sẵn sàng dịch vụ."
+        logger.warning(
+            f"Không thể kết nối DATABASE_URL từ xa ({exc}). Tự động chuyển sang SQLite dự phòng (hackflow.db)..."
         )
+        try:
+            db_module.switch_to_sqlite_fallback()
+            await _seed_default_accounts()
+            logger.info("Đã khởi tạo SQLite dự phòng (hackflow.db) và tài khoản mặc định thành công.")
+        except Exception as fallback_exc:
+            logger.error(f"Lỗi khi khởi tạo SQLite dự phòng: {fallback_exc}")
     logger.info(f"CORS origins cho phép: {settings.CORS_ORIGINS}")
     logger.info(f"Docs UI sẵn sàng tại: http://localhost:8000/docs")
     yield

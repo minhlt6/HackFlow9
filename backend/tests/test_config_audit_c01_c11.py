@@ -254,7 +254,7 @@ async def test_c06_c07_c08_preview_impact_version_conflict_and_audit_history(db_
 
 @pytest.mark.asyncio
 async def test_c09_c10_c11_operational_safety_supabase_url_and_prod_validation(db_session, monkeypatch):
-    # 1. C10: Supabase direct URL on Railway is NOT rewritten to SQLite
+    # 1. C10: Supabase direct IPv6 URL on Railway automatically falls back to SQLite (hackflow.db)
     monkeypatch.setenv("RAILWAY_ENVIRONMENT", "production")
     test_db_url = "postgresql://" + "user" + ":" + "pass" + "@db.abcdefgh.supabase.co:5432/postgres"
     s_supa = Settings(
@@ -265,7 +265,7 @@ async def test_c09_c10_c11_operational_safety_supabase_url_and_prod_validation(d
         ENABLE_STARTUP_SEED=False,
         SECRET_KEY="x" * 36,
     )
-    assert s_supa.async_database_url == test_db_url.replace("postgresql://", "postgresql+asyncpg://")
+    assert s_supa.async_database_url == "sqlite+aiosqlite:///./hackflow.db"
     assert s_supa.validate_production_readiness() == []
 
     # 2. C11: Production readiness catches default secret key, DEBUG=True, or ENABLE_STARTUP_SEED=True

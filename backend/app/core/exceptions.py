@@ -220,7 +220,18 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(Exception)
     async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         logger.exception(f"Unhandled server error on {request.method} {request.url.path}: {exc}")
+        import re
         message = str(exc) if settings.DEBUG else "Lỗi máy chủ nội bộ (Internal Server Error)"
+        cors_headers = {}
+        origin = request.headers.get("origin")
+        if origin and (
+            origin in (settings.CORS_ORIGINS or [])
+            or re.match(r"^https://.*\.(vercel\.app|up\.railway\.app|onrender\.com)$", origin)
+        ):
+            cors_headers["Access-Control-Allow-Origin"] = origin
+            cors_headers["Access-Control-Allow-Credentials"] = "true"
+        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"success": False, "data": None, "message": message}, headers=cors_headers)
+        #
         return JSONResponse(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             content={

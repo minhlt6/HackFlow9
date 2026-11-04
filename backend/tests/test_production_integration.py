@@ -158,8 +158,8 @@ async def test_production_lifespan_falls_back_to_sqlite_on_gaierror(monkeypatch)
     monkeypatch.setattr(db_module, "switch_to_sqlite_fallback", fake_switch)
 
     async with main_module.lifespan(main_module.app):
-        assert calls["switched"] is False
-        assert calls["count"] == 1
+        assert calls["switched"] is True
+        assert calls["count"] == 2
 
 
 @pytest.mark.asyncio
