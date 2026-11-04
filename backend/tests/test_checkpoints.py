@@ -292,8 +292,8 @@ async def test_checkpoint_time_gating_grace_period(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_checkpoint_time_gating_deadline_exceeded(client: AsyncClient):
     """
-    Time-gating test: When now > deadline + 5s -> Status is CLOSED,
-    and validating submission window raises 403 Forbidden with DEADLINE_EXCEEDED.
+    Time-gating test: When now > deadline + 5s and is_active=True -> Status is LATE,
+    and validating submission window returns 200 OK with is_late_window=True.
     """
     async with TestSessionLocal() as session:
         _, admin_token = await create_test_user(
@@ -319,24 +319,26 @@ async def test_checkpoint_time_gating_deadline_exceeded(client: AsyncClient):
     )
     cp_id = create_res.json()["data"]["id"]
 
-    # 1. Check status endpoint
+    # 1. Check status endpoint -> status is 'late', can_submit is True, is_late_window is True
     status_res = await client.get(f"/api/v1/checkpoints/{cp_id}/status")
     assert status_res.status_code == 200
     st_data = status_res.json()["data"]
-    assert st_data["status"] == "closed"
-    assert st_data["is_open"] is False
-    assert st_data["can_submit"] is False
+    assert st_data["status"] == "late"
+    assert st_data["is_open"] is True
+    assert st_data["can_submit"] is True
+    assert st_data["is_late_window"] is True
 
-    # 2. Validate window -> Must raise 403 Forbidden with DEADLINE_EXCEEDED
+    # 2. Validate window -> Returns 200 OK with is_valid=True and is_late_window=True
     val_res = await client.post(
         f"/api/v1/checkpoints/{cp_id}/validate-window",
         headers={"Authorization": f"Bearer {user_token}"},
     )
-    assert val_res.status_code == 403
+    assert val_res.status_code == 200
     val_json = val_res.json()
-    assert val_json["success"] is False
-    assert val_json["error_code"] == "DEADLINE_EXCEEDED"
-    assert "quá thời hạn nộp bài" in val_json["message"]
+    assert val_json["success"] is True
+    assert val_json["data"]["is_valid"] is True
+    assert val_json["data"]["is_late_window"] is True
+    assert "nộp muộn" in val_json["data"]["message"].lower()
 
 
 @pytest.mark.asyncio
@@ -490,7 +492,7 @@ async def test_dependency_require_checkpoint_open():
         assert cp.id == open_cp.id
         assert grace is False
 
-        # 2. Create expired checkpoint
+        # 2. Create expired active checkpoint -> allowed in late window (grace is False)
         expired_cp = await checkpoint_repo.create(
             db=session,
             title="Expired Dep Checkpoint",
@@ -500,9 +502,24 @@ async def test_dependency_require_checkpoint_open():
         await session.commit()
         await session.refresh(expired_cp)
 
+        cp_late, grace_late = await require_checkpoint_open_by_id(str(expired_cp.id), db=session)
+        assert cp_late.id == expired_cp.id
+        assert grace_late is False
+
+        # 2b. Create inactive checkpoint -> raises CHECKPOINT_INACTIVE
+        inactive_cp = await checkpoint_repo.create(
+            db=session,
+            title="Inactive Dep Checkpoint",
+            start_time=now - timedelta(minutes=20),
+            deadline=now - timedelta(minutes=10),
+            is_active=False,
+        )
+        await session.commit()
+        await session.refresh(inactive_cp)
+
         with pytest.raises(ForbiddenException) as exc_info:
-            await require_checkpoint_open_by_id(str(expired_cp.id), db=session)
-        assert exc_info.value.error_code == "DEADLINE_EXCEEDED"
+            await require_checkpoint_open_by_id(str(inactive_cp.id), db=session)
+        assert exc_info.value.error_code == "CHECKPOINT_INACTIVE"
 
         # 3. Non-existent ID raises NotFoundException
         with pytest.raises(NotFoundException):
@@ -555,14 +572,16 @@ async def test_checkpoint_custom_grace_period(client: AsyncClient):
     assert val_res.status_code == 200
     assert val_res.json()["data"]["grace_period_applied"] is True
 
-    # Simulate 25s after deadline -> Should be rejected
+    # Simulate 25s after deadline -> Accepted in late window with is_late_window=True
     val_late_res = await client.post(
         f"/api/v1/checkpoints/{cp_data['id']}/validate-window",
         headers={"Authorization": f"Bearer {user_token}"},
         json={"simulate_time": (deadline + timedelta(seconds=25)).isoformat()},
     )
-    assert val_late_res.status_code == 403
-    assert val_late_res.json()["error_code"] == "DEADLINE_EXCEEDED"
+    assert val_late_res.status_code == 200
+    assert val_late_res.json()["data"]["is_valid"] is True
+    assert val_late_res.json()["data"]["is_late_window"] is True
+    assert val_late_res.json()["data"]["grace_period_applied"] is False
 
 
 @pytest.mark.asyncio

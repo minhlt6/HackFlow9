@@ -16,7 +16,6 @@ import {
   CheckSquare,
   HelpCircle,
   ArrowRight,
-  GitBranch,
   ShieldCheck,
   Megaphone,
 } from 'lucide-react';
@@ -67,11 +66,14 @@ export const CandidateDashboardPage: React.FC = () => {
   }
 
   // Count submissions
-  const completedCount = checkpoints.filter((cp) => isCompletedSubmission(cp.latest_submission?.status)).length;
+  const completedCount = checkpoints.filter(
+    (cp) => cp.status !== 'upcoming' && isCompletedSubmission(cp.latest_submission?.status),
+  ).length;
 
   // Next active checkpoint
   const nextCheckpoint = checkpoints.find((cp) => {
-    const isSubmitted = isCompletedSubmission(cp.latest_submission?.status);
+    const isSubmitted =
+      cp.status !== 'upcoming' && isCompletedSubmission(cp.latest_submission?.status);
     return !isSubmitted;
   });
 
@@ -240,9 +242,15 @@ export const CandidateDashboardPage: React.FC = () => {
 
             <div className="space-y-3">
               {checkpoints.map((cp, idx) => {
-                const sub = cp.latest_submission;
+                const sub = cp.status === 'upcoming' ? null : cp.latest_submission;
                 const isSubmitted = isCompletedSubmission(sub?.status);
-                const meta = sub ? getSubmissionStatusMeta(sub.status, Boolean(cp.is_final_checkpoint)) : null;
+                const meta = sub
+                  ? getSubmissionStatusMeta(
+                      sub.status,
+                      Boolean(cp.is_final_checkpoint),
+                      Boolean(sub.is_late)
+                    )
+                  : null;
 
                 return (
                   <div
@@ -271,10 +279,15 @@ export const CandidateDashboardPage: React.FC = () => {
                       {sub ? (
                         <div className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400 font-mono">
                           <Badge variant={meta?.badgeVariant || 'neutral'}>{meta?.badgeLabel}</Badge>
-                          {sub.commit_sha && <><GitBranch size={13} /><span>SHA: {sub.commit_sha.slice(0, 7)}</span></>}
                         </div>
                       ) : (
-                        <Badge variant="warning">{cp.status === 'upcoming' ? 'Chưa mở' : 'Chưa nộp'}</Badge>
+                        <Badge variant="warning">
+                          {cp.status === 'upcoming'
+                            ? 'Chưa mở'
+                            : cp.status === 'late'
+                            ? 'Quá hạn (Mở nộp muộn)'
+                            : 'Chưa nộp'}
+                        </Badge>
                       )}
                     </div>
                   </div>

@@ -1,6 +1,6 @@
 import type { BadgeVariant } from '../components/Badge';
 
-export type CheckpointStatus = 'upcoming' | 'open' | 'grace_period' | 'closed';
+export type CheckpointStatus = 'upcoming' | 'open' | 'grace_period' | 'late' | 'closed';
 
 export type SubmissionStatus =
   | 'submitted'
@@ -22,6 +22,8 @@ export type CheckpointErrorCode =
   | 'INVALID_CHECKPOINT_STATUS'
   | 'CHECKPOINT_NOT_OPEN'
   | 'CHECKPOINT_INACTIVE'
+  | 'CONTEST_PAUSED'
+  | 'SUBMISSION_CLOSED'
   | 'DEADLINE_EXCEEDED'
   | 'MISSING_REQUIRED_FIELD'
   | 'GITHUB_REPO_INACCESSIBLE'
@@ -55,6 +57,9 @@ export interface Checkpoint {
   status?: CheckpointStatus;
   is_open?: boolean;
   can_submit?: boolean;
+  is_late_window?: boolean;
+  contest_allows_submission?: boolean;
+  submission_block_reason?: string | null;
   time_remaining_seconds?: number;
   time_until_start_seconds?: number;
   server_time?: string;
@@ -70,6 +75,7 @@ export interface Submission {
   submission_data?: Record<string, string> | null;
   status: SubmissionStatus;
   grace_period_applied?: boolean;
+  is_late?: boolean;
   submitted_at: string;
   feedback?: string | null;
   note?: string | null;
@@ -158,7 +164,11 @@ export function getEffectiveSubmissionFields(checkpoint: Checkpoint): Submission
  * Phân tích trạng thái bài nộp (`Submission.status`) theo chuẩn SRS HF-23:
  * SUBMITTED | PENDING_SHA_FREEZE | SHA_VERIFICATION_FAILED | EVALUATED | LATE | INVALID
  */
-export function getSubmissionStatusMeta(status: SubmissionStatus, isFinal: boolean): {
+export function getSubmissionStatusMeta(
+  status: SubmissionStatus,
+  isFinal: boolean,
+  isLate?: boolean
+): {
   normalizedStatus: string;
   badgeVariant: BadgeVariant;
   badgeLabel: string;
@@ -167,14 +177,16 @@ export function getSubmissionStatusMeta(status: SubmissionStatus, isFinal: boole
   title: string;
   statusNote?: string;
 } {
-  const normalizedStatus = String(status || '').toLowerCase();
+  const rawNormalized = String(status || '').toLowerCase();
+  const normalizedStatus =
+    rawNormalized === 'submitted' && isLate ? 'late' : rawNormalized;
 
   switch (normalizedStatus) {
     case 'evaluated':
       return {
         normalizedStatus,
         badgeVariant: 'success',
-        badgeLabel: 'Đã chấm điểm',
+        badgeLabel: isLate ? 'Đã chấm điểm (Nộp muộn)' : 'Đã chấm điểm',
         containerClass: 'bg-emerald-500/10 border-emerald-500/30',
         iconBgClass: 'bg-emerald-500/20 text-emerald-400',
         title: isFinal
@@ -185,32 +197,34 @@ export function getSubmissionStatusMeta(status: SubmissionStatus, isFinal: boole
       return {
         normalizedStatus,
         badgeVariant: 'indigo',
-        badgeLabel: 'Đang đóng băng SHA',
+        badgeLabel: 'Đang đồng bộ kho mã nguồn',
         containerClass: 'bg-indigo-500/10 border-indigo-500/30',
         iconBgClass: 'bg-indigo-500/20 text-indigo-400',
-        title: 'Đã ghi nhận thời điểm nộp — Đang đồng bộ Commit SHA với GitHub',
+        title: 'Đã ghi nhận thời điểm nộp — Đang đồng bộ kho lưu trữ GitHub',
         statusNote:
-          'Hệ thống đã khóa thời gian nộp hợp lệ (submitted_at) và đang kết nối GitHub API để lấy HEAD Commit SHA.',
+          'Hệ thống đã ghi nhận thời gian nộp hợp lệ (submitted_at) và đang đồng bộ thông tin kho lưu trữ.',
       };
     case 'sha_verification_failed':
       return {
         normalizedStatus,
         badgeVariant: 'warning',
-        badgeLabel: 'Chờ BTC xác minh SHA',
+        badgeLabel: 'Chờ BTC đối soát repo',
         containerClass: 'bg-amber-500/10 border-amber-500/30',
         iconBgClass: 'bg-amber-500/20 text-amber-400',
-        title: 'Đã ghi nhận nộp đúng hạn — Chờ BTC xác minh Commit SHA thủ công',
+        title: 'Đã ghi nhận nộp đúng hạn — Chờ BTC đối soát kho lưu trữ',
         statusNote:
-          'GitHub API lỗi/timeout sau 3 lần retry. Hệ thống vẫn bảo lưu thời điểm nộp đúng hạn của đội và đã báo Ban tổ chức xác minh SHA thủ công.',
+          'Hệ thống vẫn bảo lưu thời điểm nộp đúng hạn của đội và đã báo Ban tổ chức kiểm tra kho mã nguồn.',
       };
     case 'late':
       return {
-        normalizedStatus,
+        normalizedStatus: 'late',
         badgeVariant: 'warning',
         badgeLabel: 'Nộp muộn',
         containerClass: 'bg-amber-500/10 border-amber-500/30',
         iconBgClass: 'bg-amber-500/20 text-amber-400',
-        title: 'Đã ghi nhận bài nộp (Sau thời hạn chuẩn)',
+        title: 'Đã ghi nhận bài nộp (Sau thời hạn chuẩn — Cờ Nộp muộn)',
+        statusNote:
+          'Bài nộp được tiếp nhận sau thời hạn chuẩn của chặng và được hệ thống gắn cờ Nộp muộn.',
       };
     case 'invalid':
       return {

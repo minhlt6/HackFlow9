@@ -69,9 +69,11 @@ export const CandidateCheckpointsPage: React.FC = () => {
         if (!isMounted) return;
         setCheckpoints(data);
 
-        // Mặc định chọn checkpoint đang mở ('open' hoặc 'grace_period') hoặc checkpoint đầu tiên
+        // Mặc định chọn checkpoint đang mở ('open' hoặc 'grace_period'), hoặc 'late', hoặc checkpoint đầu tiên
         const openCp =
-          data.find((cp) => cp.status === 'open' || cp.status === 'grace_period') || data[0];
+          data.find((cp) => cp.status === 'open' || cp.status === 'grace_period') ||
+          data.find((cp) => cp.status === 'late') ||
+          data[0];
         if (openCp) {
           setSelectedCheckpointId(openCp.id);
           const history = await checkpointApi.getSubmissions(openCp.id);
@@ -143,6 +145,8 @@ export const CandidateCheckpointsPage: React.FC = () => {
         return <Badge variant="success">Đang mở nộp bài</Badge>;
       case 'grace_period':
         return <Badge variant="warning">Ân hạn mạng (Grace Period)</Badge>;
+      case 'late':
+        return <Badge variant="warning">Nộp muộn (Quá hạn)</Badge>;
       case 'upcoming':
         return <Badge variant="indigo">Chưa mở</Badge>;
       case 'closed':
@@ -157,7 +161,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
       {checkpoints.some((cp) => cp.availability_error) && <p role="alert" className="rounded-xl border border-amber-500/30 p-4 text-sm">Không thể xác minh trạng thái các chặng. Form nộp tạm khóa cho đến khi kết nối lại.</p>}
       {/* Tiêu đề trang */}
       {loadError && <p role="alert" className="rounded-xl border border-destructive/30 p-4 text-destructive">{loadError}</p>}
-      {!isLoading && !loadError && <p className="text-sm text-muted-foreground">Đã hoàn thành {checkpoints.filter((cp) => isCompletedSubmission(cp.latest_submission?.status)).length}/{checkpoints.length} chặng. Bài chờ xác minh SHA chưa được tính hoàn thành.</p>}
+      {!isLoading && !loadError && <p className="text-sm text-muted-foreground">Đã hoàn thành {checkpoints.filter((cp) => cp.status !== 'upcoming' && isCompletedSubmission(cp.latest_submission?.status)).length}/{checkpoints.length} chặng nộp bài.</p>}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-2">
           <span className="p-2 rounded-xl bg-[#6366F1]/15 text-primary border border-[#6366F1]/30">
@@ -170,7 +174,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
               Tiến độ và Nộp bài Checkpoint
             </h1>
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              Quản lý tiến độ các chặng thi, đóng băng Commit SHA và theo dõi lịch sử bài nộp của đội.
+              Quản lý tiến độ các chặng thi, cập nhật sản phẩm linh hoạt và theo dõi lịch sử bài nộp của đội.
             </p>
           </div>
         </div>
@@ -199,11 +203,16 @@ export const CandidateCheckpointsPage: React.FC = () => {
             <div className="space-y-3">
               {checkpoints.map((cp, idx) => {
                 const isSelected = cp.id === selectedCheckpointId;
-                const hasSubmitted = !!cp.latest_submission;
+                const hasSubmitted = cp.status !== 'upcoming' && !!cp.latest_submission;
                 const isFinal = Boolean(cp.is_final_checkpoint);
-                const subMeta = cp.latest_submission
-                  ? getSubmissionStatusMeta(cp.latest_submission.status, isFinal)
-                  : null;
+                const subMeta =
+                  hasSubmitted && cp.latest_submission
+                    ? getSubmissionStatusMeta(
+                        cp.latest_submission.status,
+                        isFinal,
+                        Boolean(cp.latest_submission.is_late)
+                      )
+                    : null;
 
                 return (
                   <div
@@ -228,7 +237,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                           {getStatusBadge(cp.status)}
                           {isFinal ? (
                             <Badge variant="danger" size="sm">
-                              Chặng cuối (Chốt SHA)
+                              Chặng cuối (Chung kết)
                             </Badge>
                           ) : (
                             <Badge variant="indigo" size="sm">
@@ -271,23 +280,28 @@ export const CandidateCheckpointsPage: React.FC = () => {
                         <span>Hạn: {new Date(cp.deadline).toLocaleDateString('vi-VN')}</span>
                       </div>
 
-                      {hasSubmitted && cp.latest_submission && (
+                      {hasSubmitted && cp.latest_submission ? (
                         <span
                           className={`text-[10px] font-mono ${
-                            subMeta?.normalizedStatus === 'sha_verification_failed'
+                            subMeta?.normalizedStatus === 'sha_verification_failed' ||
+                            subMeta?.normalizedStatus === 'late'
                               ? 'text-amber-700 dark:text-amber-400'
                               : subMeta?.normalizedStatus === 'invalid'
                               ? 'text-rose-700 dark:text-rose-400'
                               : 'text-emerald-700 dark:text-emerald-400'
                           }`}
                         >
-                          {cp.latest_submission.commit_sha
-                            ? `Commit: ${cp.latest_submission.commit_sha.slice(0, 7)}`
-                            : subMeta?.normalizedStatus === 'sha_verification_failed'
-                            ? 'Chờ xác minh SHA'
+                          {subMeta?.normalizedStatus === 'sha_verification_failed'
+                            ? 'Chờ đối soát repo'
+                            : subMeta?.normalizedStatus === 'late'
+                            ? 'Đã nộp (Nộp muộn)'
                             : 'Đã nộp báo cáo'}
                         </span>
-                      )}
+                      ) : cp.status === 'late' ? (
+                        <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400">
+                          Mở nộp muộn
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                 );
@@ -302,10 +316,10 @@ export const CandidateCheckpointsPage: React.FC = () => {
               </div>
               <ul className="list-disc pl-4 space-y-1.5 text-muted-foreground leading-relaxed text-[11px]">
                 <li>
-                  <strong className="text-muted-foreground">Chặng tiến độ trung gian:</strong> Nộp tài liệu theo cấu hình động (<code className="text-primary">submission_fields</code>). Không yêu cầu GitHub repo và không khóa Commit SHA để tiếp tục code bình thường.
+                  <strong className="text-muted-foreground">Chặng tiến độ trung gian:</strong> Nộp tài liệu theo cấu hình động (<code className="text-primary">submission_fields</code>). Đội thi tiếp tục hoàn thiện mã nguồn và giao diện linh hoạt.
                 </li>
                 <li>
-                  <strong className="text-muted-foreground">Chặng cuối cùng (Final):</strong> Bắt buộc URL GitHub repository public (bắt đầu bằng <code className="text-primary">https://github.com/</code>). Hệ thống sẽ đóng băng Commit SHA tại thời điểm nộp.
+                  <strong className="text-muted-foreground">Chặng cuối cùng (Final):</strong> Bắt buộc URL GitHub repository public (bắt đầu bằng <code className="text-primary">https://github.com/</code>) kèm sản phẩm demo và tài liệu thuyết trình.
                 </li>
                 <li>
                   <strong className="text-amber-700 dark:text-amber-400">Phân quyền:</strong> Chỉ tài khoản có vai trò Đội trưởng (<code className="text-amber-700 dark:text-amber-400 font-mono">TEAM_LEADER</code>) mới có quyền bấm nộp bài để tránh xung đột dữ liệu.
@@ -349,7 +363,18 @@ export const CandidateCheckpointsPage: React.FC = () => {
                         <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-1">
                           Thời gian còn lại
                         </span>
-                        <CountdownTimer endTime={selectedCheckpoint.deadline} />
+                        <CountdownTimer
+                          endTime={selectedCheckpoint.deadline}
+                          isPaused={
+                            selectedCheckpoint.contest_allows_submission === false &&
+                            Boolean(
+                              selectedCheckpoint.submission_block_reason
+                                ?.toLowerCase()
+                                .includes('tạm dừng')
+                            )
+                          }
+                          pausedRemainingSeconds={selectedCheckpoint.time_remaining_seconds}
+                        />
                       </div>
                     )}
                   </div>
@@ -372,14 +397,14 @@ export const CandidateCheckpointsPage: React.FC = () => {
                     <div className="p-3 rounded-[10px] bg-amber-500/10 border border-amber-500/20 text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
                       <AlertTriangle size={15} className="shrink-0 text-amber-700 dark:text-amber-400" />
                       <span>
-                        Đây là chặng cuối cùng: Hệ thống sẽ khóa và đóng băng Commit SHA khi nộp.
+                        Đây là chặng cuối cùng: Các đội có thể cập nhật thêm giao diện và kho mã nguồn linh hoạt trong thời gian mở cổng.
                       </span>
                     </div>
                   ) : (
                     <div className="p-3 rounded-[10px] bg-indigo-500/10 border border-indigo-500/20 text-xs text-primary flex items-center gap-2">
                       <Info size={15} className="shrink-0 text-primary" />
                       <span>
-                        Chặng tiến độ: Không yêu cầu GitHub repo và không đóng băng commit, bạn tiếp tục code bình thường.
+                        Chặng tiến độ: Đội thi nộp báo cáo tiến độ và tiếp tục phát triển giao diện, tính năng bình thường.
                       </span>
                     </div>
                   )}
@@ -409,19 +434,20 @@ export const CandidateCheckpointsPage: React.FC = () => {
                       </h3>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {selectedCheckpoint.is_final_checkpoint
-                          ? 'Điền đường dẫn GitHub repo để hệ thống tiến hành kiểm tra và chốt Commit SHA.'
+                          ? 'Điền đường dẫn GitHub repo và các tài nguyên sản phẩm hoàn chỉnh của đội.'
                           : 'Nộp link tài liệu báo cáo tiến độ, wireframe hoặc link demo theo cấu hình.'}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
                       { getStatusBadge(selectedCheckpoint.status) }
-                      {selectedCheckpoint.latest_submission && (
+                      {selectedCheckpoint.status !== 'upcoming' && selectedCheckpoint.latest_submission && (
                         <Badge
                           variant={
                             getSubmissionStatusMeta(
                               selectedCheckpoint.latest_submission.status,
-                              Boolean(selectedCheckpoint.is_final_checkpoint)
+                              Boolean(selectedCheckpoint.is_final_checkpoint),
+                              Boolean(selectedCheckpoint.latest_submission.is_late)
                             ).badgeVariant
                           }
                           size="sm"
@@ -429,7 +455,8 @@ export const CandidateCheckpointsPage: React.FC = () => {
                           {
                             getSubmissionStatusMeta(
                               selectedCheckpoint.latest_submission.status,
-                              Boolean(selectedCheckpoint.is_final_checkpoint)
+                              Boolean(selectedCheckpoint.is_final_checkpoint),
+                              Boolean(selectedCheckpoint.latest_submission.is_late)
                             ).badgeLabel
                           }
                         </Badge>
@@ -441,7 +468,11 @@ export const CandidateCheckpointsPage: React.FC = () => {
                   <CheckpointSubmissionForm
                     key={selectedCheckpoint.id}
                     checkpoint={selectedCheckpoint}
-                    currentSubmission={selectedCheckpoint.latest_submission}
+                    currentSubmission={
+                      selectedCheckpoint.status === 'upcoming'
+                        ? null
+                        : selectedCheckpoint.latest_submission
+                    }
                     userRole={userRole}
                     onSuccess={handleSubmissionSuccess}
                   />
@@ -449,7 +480,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
 
                 {/* BẢNG HIỂN THỊ LỊCH SỬ NỘP BÀI CỦA ĐỘI THI (HF-31) */}
                 <SubmissionHistoryTable
-                  submissions={submissions}
+                  submissions={selectedCheckpoint.status === 'upcoming' ? [] : submissions}
                   isLoading={isSubmissionsLoading}
                   errorMessage={submissionsError}
                   checkpointTitle={selectedCheckpoint.title}

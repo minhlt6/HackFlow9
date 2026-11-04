@@ -18,6 +18,12 @@ class TeamMemberRole(str, Enum):
     MEMBER = "member"
 
 
+class TeamStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class Team(BaseModel):
     """
     Hackathon competition team model.

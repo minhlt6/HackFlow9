@@ -47,6 +47,8 @@ class TopicService:
                 reason = "Đội chưa chọn đề tài."
             elif team.is_locked:
                 reason = "Đội thi đã khóa đề tài, không thể hủy."
+            elif config and bool((config.settings_data or {}).get("is_paused", False)):
+                reason = "Cuộc thi đang tạm dừng theo lệnh của Ban Tổ Chức."
             elif config and str((config.settings_data or {}).get("status", "")).lower() not in {"", "registration", "team_formation"}:
                 reason = "Đã qua giai đoạn chọn đề tài; vui lòng liên hệ Ban tổ chức."
             elif config and (not config.is_topic_published or datetime.now(timezone.utc) > (config.end_time.replace(tzinfo=timezone.utc) if config.end_time.tzinfo is None else config.end_time)):
@@ -121,7 +123,10 @@ class TopicService:
             start = start.replace(tzinfo=timezone.utc) if start.tzinfo is None else start
             end = end.replace(tzinfo=timezone.utc) if end.tzinfo is None else end
             status_code = str((config.settings_data or {}).get("status", "")).strip().lower()
-            if not config.is_topic_published:
+            is_paused = bool((config.settings_data or {}).get("is_paused", False))
+            if is_paused:
+                reason = "Cuộc thi đang tạm dừng theo lệnh của Ban Tổ Chức."
+            elif not config.is_topic_published:
                 reason = "Đề tài chưa được công bố."
             elif status_code in {"judging", "completed"}:
                 reason = "Đã qua giai đoạn đăng ký đề tài."
@@ -364,6 +369,11 @@ class TopicService:
         config = await topic_repo.get_config(db)
         if config:
             now_utc = datetime.now(timezone.utc)
+            if bool((config.settings_data or {}).get("is_paused", False)):
+                raise ConflictException(
+                    message="Cuộc thi đang tạm dừng theo lệnh của Ban Tổ Chức, tạm thời không thể chọn đề tài.",
+                    error_code="CONTEST_PAUSED",
+                )
             status_code = str((config.settings_data or {}).get("status", "")).strip().lower()
             if status_code in {"judging", "completed"}:
                 raise ConflictException(
@@ -425,7 +435,17 @@ class TopicService:
                 max_team_size = max(5, min_team_size)
 
             member_count = await team_repo.count_members(db, team.id)
-            if member_count < min_team_size and str(getattr(team, "status", "")).upper() != "APPROVED":
+            enforcement_policy = str(
+                (config.settings_data if config and isinstance(config.settings_data, dict) else {}).get(
+                    "teamSizeEnforcementPolicy"
+                )
+                or "grandfathered_approved"
+            )
+            is_grandfathered = (
+                enforcement_policy == "grandfathered_approved"
+                and str(getattr(team, "status", "")).upper() == "APPROVED"
+            )
+            if member_count < min_team_size and not is_grandfathered:
                 raise ConflictException(
                     message=f"Đội thi chưa đủ điều kiện chọn đề tài (cần tối thiểu {min_team_size} thành viên, tối đa {max_team_size} thành viên; hiện có {member_count}).",
                     error_code="TEAM_NOT_VALID",

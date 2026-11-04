@@ -31,6 +31,16 @@ export interface CountdownTimerProps {
    * Luôn hiển thị chữ '0 ngày' ngay cả khi thời gian còn lại dưới 1 ngày (mặc định: false)
    */
   alwaysShowDays?: boolean;
+
+  /**
+   * Cờ báo cuộc thi đang tạm dừng (đóng băng đồng hồ đếm ngược của chặng đang mở)
+   */
+  isPaused?: boolean;
+
+  /**
+   * Số giây còn lại tại thời điểm tạm dừng (nếu máy chủ cung cấp)
+   */
+  pausedRemainingSeconds?: number;
 }
 
 interface TimeRemaining {
@@ -50,7 +60,9 @@ interface TimeRemaining {
 function calculateTimeRemaining(
   endTimeIso: string,
   expiredText = 'Đã hết thời gian',
-  alwaysShowDays = false
+  alwaysShowDays = false,
+  isPaused = false,
+  pausedRemainingSeconds?: number
 ): TimeRemaining {
   const targetTime = new Date(endTimeIso).getTime();
 
@@ -67,7 +79,10 @@ function calculateTimeRemaining(
   }
 
   const now = Date.now();
-  const total = Math.max(0, targetTime - now);
+  const total =
+    isPaused && typeof pausedRemainingSeconds === 'number' && pausedRemainingSeconds >= 0
+      ? pausedRemainingSeconds * 1000
+      : Math.max(0, targetTime - now);
   const isExpired = total <= 0;
 
   if (isExpired) {
@@ -92,10 +107,11 @@ function calculateTimeRemaining(
   const mm = String(minutes).padStart(2, '0');
   const ss = String(seconds).padStart(2, '0');
 
+  const prefix = isPaused ? 'Tạm dừng • Còn' : 'Còn';
   const formattedText =
     days > 0 || alwaysShowDays
-      ? `Còn ${days} ngày ${hh}:${mm}:${ss}`
-      : `Còn ${hh}:${mm}:${ss}`;
+      ? `${prefix} ${days} ngày ${hh}:${mm}:${ss}`
+      : `${prefix} ${hh}:${mm}:${ss}`;
 
   return {
     total,
@@ -115,20 +131,32 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
   showIcon = true,
   expiredText = 'Đã hết thời gian',
   alwaysShowDays = false,
+  isPaused = false,
+  pausedRemainingSeconds,
 }) => {
-  const [prevConfig, setPrevConfig] = useState({ endTime, expiredText, alwaysShowDays });
+  const [prevConfig, setPrevConfig] = useState({
+    endTime,
+    expiredText,
+    alwaysShowDays,
+    isPaused,
+    pausedRemainingSeconds,
+  });
   const [timeRemaining, setTimeRemaining] = useState<TimeRemaining>(() =>
-    calculateTimeRemaining(endTime, expiredText, alwaysShowDays)
+    calculateTimeRemaining(endTime, expiredText, alwaysShowDays, isPaused, pausedRemainingSeconds)
   );
 
   // Cập nhật state an toàn trong render khi props cấu hình thay đổi (React pattern)
   if (
     prevConfig.endTime !== endTime ||
     prevConfig.expiredText !== expiredText ||
-    prevConfig.alwaysShowDays !== alwaysShowDays
+    prevConfig.alwaysShowDays !== alwaysShowDays ||
+    prevConfig.isPaused !== isPaused ||
+    prevConfig.pausedRemainingSeconds !== pausedRemainingSeconds
   ) {
-    setPrevConfig({ endTime, expiredText, alwaysShowDays });
-    setTimeRemaining(calculateTimeRemaining(endTime, expiredText, alwaysShowDays));
+    setPrevConfig({ endTime, expiredText, alwaysShowDays, isPaused, pausedRemainingSeconds });
+    setTimeRemaining(
+      calculateTimeRemaining(endTime, expiredText, alwaysShowDays, isPaused, pausedRemainingSeconds)
+    );
   }
 
   // Lưu callback ref trong effect để tránh lỗi accessing/updating ref during render
@@ -139,16 +167,32 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
 
   useEffect(() => {
     let triggered = false;
-    const initial = calculateTimeRemaining(endTime, expiredText, alwaysShowDays);
+    const initial = calculateTimeRemaining(
+      endTime,
+      expiredText,
+      alwaysShowDays,
+      isPaused,
+      pausedRemainingSeconds
+    );
 
     if (initial.isExpired) {
       onExpireRef.current?.();
       return;
     }
 
+    if (isPaused) {
+      return;
+    }
+
     // Sử dụng setInterval để cập nhật mỗi giây (AC: sử dụng setInterval hoặc requestAnimationFrame)
     const intervalId = window.setInterval(() => {
-      const updated = calculateTimeRemaining(endTime, expiredText, alwaysShowDays);
+      const updated = calculateTimeRemaining(
+        endTime,
+        expiredText,
+        alwaysShowDays,
+        false,
+        pausedRemainingSeconds
+      );
       setTimeRemaining(updated);
 
       if (updated.isExpired) {
@@ -164,7 +208,7 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [endTime, expiredText, alwaysShowDays]);
+  }, [endTime, expiredText, alwaysShowDays, isPaused, pausedRemainingSeconds]);
 
   return (
     <span

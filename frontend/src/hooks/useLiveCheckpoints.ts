@@ -4,13 +4,17 @@ import { checkpointApi } from '../api/checkpointApi';
 import type { CheckpointWithSubmission } from '../types/checkpoint';
 
 export function checkpointAtTime(cp: CheckpointWithSubmission, now: number): CheckpointWithSubmission {
-  if (cp.availability_error) return {...cp, status:'closed', can_submit:false, is_open:false};
+  if (cp.availability_error) return {...cp, status:'closed', can_submit:false, is_open:false, is_late_window:false};
   const start = Date.parse(cp.start_time), end = Date.parse(cp.deadline);
   if (!Number.isFinite(now) || !Number.isFinite(start) || !Number.isFinite(end)) return { ...cp, can_submit: false };
   const grace = end + (cp.grace_period_seconds ?? 5) * 1000;
-  const status = !cp.is_active || now > grace ? 'closed' : now < start ? 'upcoming' : now <= end ? 'open' : 'grace_period';
-  return { ...cp, status, can_submit: status === 'open' || status === 'grace_period',
-    is_open: status === 'open' || status === 'grace_period',
+  const status = !cp.is_active ? 'closed' : now < start ? 'upcoming' : now <= end ? 'open' : now <= grace ? 'grace_period' : 'late';
+  const isWindowOpen = status === 'open' || status === 'grace_period' || status === 'late';
+  const isLateWindow = status === 'late';
+  const contestAllows = cp.contest_allows_submission !== false && !cp.submission_block_reason;
+  return { ...cp, status, can_submit: isWindowOpen && contestAllows,
+    is_open: isWindowOpen,
+    is_late_window: isLateWindow,
     time_remaining_seconds: Math.max(0, Math.floor((end - now) / 1000)),
     time_until_start_seconds: Math.max(0, Math.floor((start - now) / 1000)) };
 }
@@ -32,8 +36,20 @@ export function useLiveCheckpoints(raw: CheckpointWithSubmission[], setRaw?: Dis
   useEffect(() => {
     let active = true;
     const server = Date.parse(raw.find((cp) => cp.server_time)?.server_time || '') || Date.now();
+    const isContestPaused = raw.some(
+      (cp) =>
+        cp.contest_allows_submission === false &&
+        String(cp.submission_block_reason || '').toLowerCase().includes('tạm dừng')
+    );
     const local = performance.now();
-    const update = () => {if (active) setClock({source: raw, now: server + performance.now() - local});};
+    const update = () => {
+      if (active) {
+        setClock({
+          source: raw,
+          now: isContestPaused ? server : server + performance.now() - local,
+        });
+      }
+    };
     void Promise.resolve().then(update);
     const timer = window.setInterval(update, 1000);
     return () => {active = false; window.clearInterval(timer);};

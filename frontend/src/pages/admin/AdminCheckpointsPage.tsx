@@ -1,5 +1,6 @@
 import { useActionConfirmation } from '../../hooks/useActionConfirmation';
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { useMockStore } from '../../store/useMockStore';
 import { Button } from '../../components/Button';
@@ -30,8 +31,12 @@ import {
   RefreshCw,
   Loader2,
   AlertCircle,
+  ExternalLink,
+  Users,
 } from 'lucide-react';
 import type { Checkpoint, SubmissionFieldConfig, SubmissionFieldType } from '../../types';
+import { getCheckpointCompletionStats, checkpointScheduleWarning } from '../../utils/progress';
+import { CountdownTimer } from '../../components/CountdownTimer';
 import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
 import {
@@ -449,6 +454,9 @@ export const AdminCheckpointsPage: React.FC = () => {
     teams,
   } = useMockStore();
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isProgressFocused = searchParams.get('view') === 'progress';
+  const [expandedCpId, setExpandedCpId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [deleteCpTarget, setDeleteCpTarget] = useState<{ id: string; title: string } | null>(null);
@@ -512,7 +520,9 @@ export const AdminCheckpointsPage: React.FC = () => {
         submissionFields: fields,
         deadline: cp.deadline || new Date(Date.now() + 3 * 24 * 3600 * 1000).toISOString(),
         startTime: cp.start_time || new Date().toISOString(),
-        status: (cp.status as 'upcoming' | 'open' | 'closed') || (cp.is_active ? 'open' : 'closed'),
+        status:
+          (cp.status as 'upcoming' | 'open' | 'grace_period' | 'late' | 'closed') ||
+          (cp.is_active ? 'open' : 'closed'),
         isFinalCheckpoint: Boolean(cp.is_final_checkpoint),
       };
     });
@@ -521,6 +531,7 @@ export const AdminCheckpointsPage: React.FC = () => {
   // Fetch Checkpoints from Backend
   const loadCheckpoints = useCallback(async () => {
     try {
+      void useMockStore.getState().syncFromBackend?.();
       const data = await checkpointApi.getCheckpoints();
       if (Array.isArray(data)) {
         const mapped = mapCheckpoints(data as RawCheckpoint[]);
@@ -539,6 +550,7 @@ export const AdminCheckpointsPage: React.FC = () => {
 
   useEffect(() => {
     let ignore = false;
+    void useMockStore.getState().syncFromBackend?.();
     checkpointApi
       .getCheckpoints()
       .then((data) => {
@@ -557,6 +569,17 @@ export const AdminCheckpointsPage: React.FC = () => {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (isProgressFocused && checkpoints.length > 0) {
+      const timer = window.setTimeout(() => {
+        document
+          .getElementById('admin-checkpoint-progress-matrix')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+      return () => window.clearTimeout(timer);
+    }
+  }, [isProgressFocused, checkpoints.length]);
 
   // New Checkpoint modal state
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -759,74 +782,73 @@ export const AdminCheckpointsPage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingCp) return;
-    if (editingCp.status === 'closed') {
-      showAlert('Chặng nộp bài đã đóng, không thể chỉnh sửa cấu hình.', 'error');
+
+    const editingIndex = checkpoints.findIndex((c) => c.id === editingCp.id);
+    const baseStartMs = editingCp.startTime ? new Date(editingCp.startTime).getTime() : Date.now();
+    let startMs = Number.isFinite(baseStartMs) ? baseStartMs : Date.now();
+    if (editingIndex > 0) {
+      const prevDeadlineRaw = checkpoints[editingIndex - 1]?.deadline;
+      const prevDeadlineMs = prevDeadlineRaw ? new Date(prevDeadlineRaw).getTime() : NaN;
+      if (
+        Number.isFinite(prevDeadlineMs) &&
+        (editingCp.status === 'upcoming' || startMs < prevDeadlineMs)
+      ) {
+        startMs = prevDeadlineMs;
+      }
+    }
+    const deadlineDate = new Date(startMs + Number(editDurationMinutes) * 60 * 1000);
+    const oldDeadlineMs = editingCp.deadline ? new Date(editingCp.deadline).getTime() : 0;
+
+    // BUG 56: Chặng đang diễn ra (open) hoặc đã qua (closed) chỉ cho phép gia hạn thêm thời lượng, không cho thu ngắn
+    if (
+      editingCp.status !== 'upcoming' &&
+      (Number(editDurationMinutes) < (editingCp.durationMinutes || 15) ||
+        (Number.isFinite(oldDeadlineMs) && deadlineDate.getTime() < oldDeadlineMs - 1000))
+    ) {
+      showAlert(
+        'Chặng nộp bài đang diễn ra hoặc đã qua chỉ được phép gia hạn thêm thời gian, không được thu ngắn thời lượng gây thiệt hại cho thí sinh.',
+        'error'
+      );
       return;
     }
 
-    const baseStartMs = editingCp.startTime ? new Date(editingCp.startTime).getTime() : Date.now();
-    const startMs = Number.isFinite(baseStartMs) ? baseStartMs : Date.now();
-    const deadlineDate = new Date(startMs + Number(editDurationMinutes) * 60 * 1000);
-
     const otherFinalCp = checkpoints.find((c) => Boolean(c.isFinalCheckpoint) && c.id !== editingCp.id);
-    const effectiveIsFinal = Boolean(editingCp.isFinalCheckpoint) || (!otherFinalCp && editSubmissionFields.some((f) => f.type === 'repoUrl' && f.required));
+    const effectiveIsFinal =
+      Boolean(editingCp.isFinalCheckpoint) ||
+      (!otherFinalCp && editSubmissionFields.some((f) => f.type === 'repoUrl' && f.required));
 
-    if (!effectiveIsFinal && otherFinalCp) {
-      const finalDeadlineMs = new Date(otherFinalCp.deadline).getTime();
-      if (Number.isFinite(finalDeadlineMs) && deadlineDate.getTime() > finalDeadlineMs) {
-        showAlert(
-          `Hạn chót mới (${deadlineDate.toLocaleString('vi-VN')}) vượt quá hạn Chặng Chung kết (${new Date(finalDeadlineMs).toLocaleString('vi-VN')}). Vui lòng giảm thời lượng hoặc gia hạn Chặng Chung kết trước.`,
-          'error'
-        );
-        return;
+    // Tự động tính toán dây chuyền (Auto-Cascade) mốc start_time & deadline của toàn bộ các chặng phía sau theo đúng thời lượng từng chặng
+    const cascadedAfter: Array<{ id: string; title: string; start_time: string; deadline: string }> = [];
+    if (editingIndex >= 0) {
+      let cursorEndMs = deadlineDate.getTime();
+      for (let idx = editingIndex + 1; idx < checkpoints.length; idx += 1) {
+        const nextCp = checkpoints[idx];
+        const nextDurMin = Math.max(15, Number(nextCp.durationMinutes) || 180);
+        const nextStartMs = cursorEndMs;
+        const nextEndMs = nextStartMs + nextDurMin * 60 * 1000;
+        cascadedAfter.push({
+          id: nextCp.id,
+          title: nextCp.title || nextCp.name || `Chặng ${idx + 1}`,
+          start_time: new Date(nextStartMs).toISOString(),
+          deadline: new Date(nextEndMs).toISOString(),
+        });
+        cursorEndMs = nextEndMs;
       }
     }
 
-    const editingIndex = checkpoints.findIndex((c) => c.id === editingCp.id);
-    if (!effectiveIsFinal && editingIndex >= 0) {
-      const prevCp = editingIndex > 0 ? checkpoints[editingIndex - 1] : undefined;
-      if (prevCp && !prevCp.isFinalCheckpoint) {
-        const prevDeadlineMs = new Date(prevCp.deadline).getTime();
-        if (Number.isFinite(prevDeadlineMs) && deadlineDate.getTime() < prevDeadlineMs) {
-          showAlert(
-            `Hạn chót mới (${deadlineDate.toLocaleString('vi-VN')}) không được sớm hơn hạn chót của chặng đứng trước "${prevCp.title || prevCp.name}" (${new Date(prevDeadlineMs).toLocaleString('vi-VN')}).`,
-            'error'
-          );
-          return;
-        }
-      }
+    const cascadeSummary =
+      cascadedAfter.length > 0
+        ? ` Các chặng kế tiếp (${cascadedAfter.map((c) => c.title).join(', ')}) sẽ tự động cập nhật nối tiếp theo thời lượng đã cấu hình.`
+        : '';
 
-      const nextCp = editingIndex < checkpoints.length - 1 ? checkpoints[editingIndex + 1] : undefined;
-      if (nextCp && !nextCp.isFinalCheckpoint) {
-        const nextDeadlineMs = new Date(nextCp.deadline).getTime();
-        if (Number.isFinite(nextDeadlineMs) && deadlineDate.getTime() > nextDeadlineMs) {
-          showAlert(
-            `Hạn chót mới (${deadlineDate.toLocaleString('vi-VN')}) vượt quá hạn chót của chặng kế tiếp "${nextCp.title || nextCp.name}" (${new Date(nextDeadlineMs).toLocaleString('vi-VN')}). Vui lòng giảm thời lượng hoặc lùi hạn chặng kế tiếp trước.`,
-            'error'
-          );
-          return;
-        }
-      }
-    }
-
-    if (effectiveIsFinal) {
-      const maxProgressDeadline = Math.max(
-        0,
-        ...checkpoints
-          .filter((c) => !c.isFinalCheckpoint && c.id !== editingCp.id)
-          .map((c) => new Date(c.deadline).getTime())
-          .filter(Number.isFinite)
-      );
-      if (maxProgressDeadline > 0 && deadlineDate.getTime() < maxProgressDeadline) {
-        showAlert(
-          `Hạn chót Chặng Chung kết (${deadlineDate.toLocaleString('vi-VN')}) không được sớm hơn hạn chót của các chặng tiến độ (${new Date(maxProgressDeadline).toLocaleString('vi-VN')}).`,
-          'error'
-        );
-        return;
-      }
-    }
-
-    if (!await confirm({title: 'Lưu thay đổi chặng nộp bài?', description: `Chặng: ${editingCp.title} → ${editTitle.trim()}. Trọng số: ${editingCp.weight ?? 0}% → ${editWeight}%. Mở cổng: ${new Date(startMs).toLocaleString('vi-VN')} → Hạn mới: ${deadlineDate.toLocaleString('vi-VN')} (thời lượng ${editDurationMinutes} phút). Nội dung và yêu cầu nộp sẽ áp dụng cho các đội.`, confirmLabel: 'Xác nhận lưu chặng'})) return;
+    if (
+      !(await confirm({
+        title: 'Lưu thay đổi chặng nộp bài?',
+        description: `Chặng: ${editingCp.title} → ${editTitle.trim()}. Trọng số: ${editingCp.weight ?? 0}% → ${editWeight}%. Mở cổng: ${new Date(startMs).toLocaleString('vi-VN')} → Hạn mới: ${deadlineDate.toLocaleString('vi-VN')} (thời lượng ${editDurationMinutes} phút).${cascadeSummary}`,
+        confirmLabel: 'Xác nhận lưu chặng',
+      }))
+    )
+      return;
 
     setSubmitting(true);
     try {
@@ -851,10 +873,31 @@ export const AdminCheckpointsPage: React.FC = () => {
         }),
       };
 
-      await checkpointApi.updateCheckpoint(editingCp.id, payload);
+      const isExtended = !Number.isFinite(oldDeadlineMs) || deadlineDate.getTime() >= oldDeadlineMs;
+      if (isExtended && cascadedAfter.length > 0) {
+        // Khi tăng thời lượng: cập nhật từ Chặng cuối lùi về trước để luôn thỏa mãn ràng buộc tuần tự trên Backend
+        for (let i = cascadedAfter.length - 1; i >= 0; i -= 1) {
+          const item = cascadedAfter[i];
+          await checkpointApi.updateCheckpoint(item.id, {
+            start_time: item.start_time,
+            deadline: item.deadline,
+          });
+        }
+        await checkpointApi.updateCheckpoint(editingCp.id, payload);
+      } else {
+        // Khi thu ngắn thời lượng của chặng upcoming: cập nhật chặng hiện tại trước rồi kéo các chặng sau lên nối tiếp
+        await checkpointApi.updateCheckpoint(editingCp.id, payload);
+        for (let i = 0; i < cascadedAfter.length; i += 1) {
+          const item = cascadedAfter[i];
+          await checkpointApi.updateCheckpoint(item.id, {
+            start_time: item.start_time,
+            deadline: item.deadline,
+          });
+        }
+      }
       await loadCheckpoints();
       setEditingCp(null);
-      showAlert(`Đã cập nhật chặng nộp "${editTitle}" thành công lên máy chủ!`, 'success');
+      showAlert(`Đã cập nhật chặng nộp "${editTitle}" và tự động đồng bộ lịch trình nối tiếp thành công!`, 'success');
     } catch (err: unknown) {
       if (axios.isAxiosError(err)) {
         const msg = err.response?.data?.message || 'Có lỗi xảy ra khi cập nhật chặng nộp bài.';
@@ -905,21 +948,39 @@ export const AdminCheckpointsPage: React.FC = () => {
     const startDate = new Date(startMs);
     const deadlineDate = new Date(startMs + Number(newDurationMinutes) * 60 * 1000);
 
-    const existingFinalCp = finalCheckpointIndex >= 0 ? checkpoints[finalCheckpointIndex] : undefined;
-    if (!isFinal && existingFinalCp) {
-      const finalDeadlineMs = new Date(existingFinalCp.deadline).getTime();
-      if (Number.isFinite(finalDeadlineMs) && deadlineDate.getTime() > finalDeadlineMs) {
-        showAlert(
-          `Hạn chót dự kiến của chặng mới (${deadlineDate.toLocaleString('vi-VN')}) vượt quá hạn Chặng Chung kết (${new Date(finalDeadlineMs).toLocaleString('vi-VN')}). Vui lòng giảm thời lượng hoặc gia hạn Chặng Chung kết trước.`,
-          'error'
-        );
-        return;
+    // Tự động tính toán dây chuyền (Auto-Cascade) các chặng đứng sau vị trí chèn mới theo đúng thời lượng từng chặng
+    const cascadedAfterInsert: Array<{ id: string; display_order: number; start_time: string; deadline: string }> = [];
+    if (targetIndex < checkpoints.length) {
+      let cursorEndMs = deadlineDate.getTime();
+      for (let idx = targetIndex; idx < checkpoints.length; idx += 1) {
+        const nextCp = checkpoints[idx];
+        const nextDurMin = Math.max(15, Number(nextCp.durationMinutes) || 180);
+        const nextStartMs = cursorEndMs;
+        const nextEndMs = nextStartMs + nextDurMin * 60 * 1000;
+        cascadedAfterInsert.push({
+          id: nextCp.id,
+          display_order: idx + 2,
+          start_time: new Date(nextStartMs).toISOString(),
+          deadline: new Date(nextEndMs).toISOString(),
+        });
+        cursorEndMs = nextEndMs;
       }
     }
 
     setSubmitting(true);
     try {
       let freezeAssigned = false;
+
+      if (cascadedAfterInsert.length > 0) {
+        for (let i = cascadedAfterInsert.length - 1; i >= 0; i -= 1) {
+          const item = cascadedAfterInsert[i];
+          await checkpointApi.updateCheckpoint(item.id, {
+            display_order: item.display_order,
+            start_time: item.start_time,
+            deadline: item.deadline,
+          });
+        }
+      }
 
       const payload: CheckpointCreatePayload = {
         title: newTitle.trim(),
@@ -944,16 +1005,7 @@ export const AdminCheckpointsPage: React.FC = () => {
         }),
       };
 
-      const created = await checkpointApi.createCheckpoint(payload);
-      if (targetIndex < checkpoints.length) {
-        const orderedIds = checkpoints.map((cp) => cp.id);
-        orderedIds.splice(targetIndex, 0, created.id);
-        await Promise.all(
-          orderedIds.map((id, index) =>
-            checkpointApi.updateCheckpoint(id, { display_order: index + 1 })
-          )
-        );
-      }
+      await checkpointApi.createCheckpoint(payload);
       await loadCheckpoints();
 
       setIsAddOpen(false);
@@ -1069,6 +1121,27 @@ export const AdminCheckpointsPage: React.FC = () => {
             </Button>
           )}
 
+          <Button
+            variant={isProgressFocused ? 'primary' : 'secondary'}
+            size="sm"
+            onClick={() => {
+              if (isProgressFocused) {
+                setSearchParams({});
+              } else {
+                setSearchParams({ view: 'progress' });
+                setTimeout(() => {
+                  document
+                    .getElementById('admin-checkpoint-progress-matrix')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
+              }
+            }}
+            className="gap-1.5 text-xs"
+          >
+            <Users size={14} />
+            <span>{isProgressFocused ? 'Đang xem Ma trận Tiến độ' : 'Ma trận Tiến độ Đội thi'}</span>
+          </Button>
+
           <Button variant="primary" onClick={handleOpenAdd} className="gap-2">
             <Plus size={16} />
             <span>Thêm Chặng Nộp Mới</span>
@@ -1111,6 +1184,17 @@ export const AdminCheckpointsPage: React.FC = () => {
         </div>
       )}
 
+      {/* Cảnh báo nếu lịch mở/đóng giữa các chặng chưa đồng bộ tuần tự */}
+      {checkpointScheduleWarning(checkpoints) && (
+        <div
+          role="alert"
+          className="p-3.5 rounded-[10px] border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs sm:text-sm flex items-center gap-2"
+        >
+          <AlertCircle size={16} className="shrink-0" />
+          <span>{checkpointScheduleWarning(checkpoints)}</span>
+        </div>
+      )}
+
       {/* Checkpoints Cards */}
       <div className="space-y-4">
         {loading && checkpoints.length === 0 ? (
@@ -1133,7 +1217,8 @@ export const AdminCheckpointsPage: React.FC = () => {
         ) : (
           checkpoints.map((cp, idx) => {
             const cpSubmissions = submissions.filter((s) => s.checkpointId === cp.id);
-            const approvedTeamsCount = teams.filter((t) => String(t.status || '').toLowerCase() === 'approved' || t.approvalStatus === 'approved').length;
+            const { completedTeamsCount, approvedTeamsCount, completionPercent } =
+              getCheckpointCompletionStats(cp.id, submissions, teams, cp.status);
             const duration = cp.durationMinutes || 180;
 
             return (
@@ -1197,10 +1282,14 @@ export const AdminCheckpointsPage: React.FC = () => {
                     </div>
 
                     <h3 className="font-semibold tracking-tight text-foreground text-lg sm:text-xl">{cp.title}</h3>
-                    {cp.status === 'open' ? (
-                      <Badge variant="success">Đang mở nộp bài</Badge>
+                    {cp.status === 'open' || cp.status === 'grace_period' ? (
+                      <Badge variant="success">
+                        {config.isPaused ? 'Đang tạm dừng đếm ngược' : 'Đang mở nộp bài'}
+                      </Badge>
                     ) : cp.status === 'upcoming' ? (
                       <Badge variant="indigo">Chưa mở</Badge>
+                    ) : cp.status === 'late' ? (
+                      <Badge variant="warning">Đang mở nộp muộn</Badge>
                     ) : (
                       <Badge variant="neutral">Đã đóng</Badge>
                     )}
@@ -1210,6 +1299,12 @@ export const AdminCheckpointsPage: React.FC = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {cp.status === 'open' && (
+                      <CountdownTimer
+                        endTime={cp.deadline}
+                        isPaused={Boolean(config.isPaused)}
+                      />
+                    )}
                     <Badge variant="indigo" className="gap-1.5 py-1 px-3">
                       <Clock size={12} />
                       <span>{duration} phút ({formatDuration(duration)})</span>
@@ -1219,12 +1314,12 @@ export const AdminCheckpointsPage: React.FC = () => {
                       variant="secondary"
                       size="sm"
                       onClick={() => handleEdit(cp)}
-                      disabled={submitting || cp.status === 'closed'}
+                      disabled={submitting}
                       className="gap-1.5"
                       title={
-                        cp.status === 'closed'
-                          ? 'Chặng đã đóng, không thể chỉnh sửa cấu hình'
-                          : 'Cấu hình chặng nộp bài'
+                        cp.status === 'upcoming'
+                          ? 'Cấu hình thời lượng và yêu cầu chặng (chặng chưa mở được tăng/giảm thời lượng tự do)'
+                          : 'Gia hạn thêm thời lượng hoặc cập nhật yêu cầu chặng'
                       }
                     >
                       <Edit2 size={13} />
@@ -1238,16 +1333,18 @@ export const AdminCheckpointsPage: React.FC = () => {
                         submitting ||
                         Boolean(cp.isFinalCheckpoint) ||
                         cp.status === 'closed' ||
+                        cp.status === 'late' ||
                         cp.status === 'open' ||
+                        cp.status === 'grace_period' ||
                         cpSubmissions.length > 0
                       }
                       className="gap-1.5"
                       title={
                         cp.isFinalCheckpoint
                           ? 'Không thể xóa Chặng chung kết'
-                          : cp.status === 'closed'
-                          ? 'Không thể xóa chặng đã đóng'
-                          : cp.status === 'open'
+                          : cp.status === 'closed' || cp.status === 'late'
+                          ? 'Không thể xóa chặng đã qua thời hạn'
+                          : cp.status === 'open' || cp.status === 'grace_period'
                           ? 'Không thể xóa chặng đang mở nộp bài'
                           : cpSubmissions.length > 0
                           ? 'Không thể xóa chặng đã có bài nộp của đội thi'
@@ -1325,7 +1422,7 @@ export const AdminCheckpointsPage: React.FC = () => {
 
                     <div className="flex items-center gap-2">
                       <span>•</span>
-                      {cp.status === 'open' ? (
+                      {cp.status === 'open' || cp.status === 'grace_period' ? (
                         <div className="flex items-center gap-1.5 text-emerald-700 dark:text-emerald-400 font-semibold">
                           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                           <span>
@@ -1338,6 +1435,13 @@ export const AdminCheckpointsPage: React.FC = () => {
                             Chưa mở • Mở cổng: {cp.startTime ? `${new Date(cp.startTime).toLocaleTimeString('vi-VN')} ${new Date(cp.startTime).toLocaleDateString('vi-VN')}` : 'Sắp tới'} → Hạn chót: {new Date(cp.deadline).toLocaleTimeString('vi-VN')} {new Date(cp.deadline).toLocaleDateString('vi-VN')}
                           </span>
                         </div>
+                      ) : cp.status === 'late' ? (
+                        <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-medium">
+                          <span className="w-2 h-2 rounded-full bg-amber-400" />
+                          <span>
+                            Đang mở nộp muộn (Gắn cờ Nộp muộn) • Hạn chuẩn đã qua: {new Date(cp.deadline).toLocaleTimeString('vi-VN')} {new Date(cp.deadline).toLocaleDateString('vi-VN')}
+                          </span>
+                        </div>
                       ) : (
                         <div className="flex items-center gap-1.5 text-muted-foreground font-medium">
                           <span>
@@ -1348,19 +1452,307 @@ export const AdminCheckpointsPage: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
-                    <GitBranch size={14} className="text-emerald-700 dark:text-emerald-400" />
-                    <span>Tỷ lệ hoàn thành:</span>
-                    <span className="font-bold text-emerald-700 dark:text-emerald-400">
-                      {cpSubmissions.length} / {approvedTeamsCount} đội ({Math.round((cpSubmissions.length / (approvedTeamsCount || 1)) * 100)}%)
-                    </span>
+                  <div className="flex items-center gap-3 shrink-0 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <GitBranch size={14} className="text-emerald-700 dark:text-emerald-400" />
+                      <span>Tỷ lệ hoàn thành:</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400">
+                        {completedTeamsCount} / {approvedTeamsCount} đội ({completionPercent}%)
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setExpandedCpId((prev) => (prev === cp.id ? null : cp.id))}
+                      className="text-xs py-1 px-2.5 h-auto gap-1.5"
+                    >
+                      <Users size={12} />
+                      <span>{expandedCpId === cp.id ? 'Ẩn danh sách đội' : 'Xem tiến độ các đội'}</span>
+                    </Button>
                   </div>
                 </div>
+
+                {expandedCpId === cp.id && (
+                  <div className="pt-3 border-t border-border space-y-2.5 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-foreground flex items-center gap-1.5">
+                        <Users size={14} className="text-primary" />
+                        <span>Danh sách trạng thái nộp bài của các đội ở {cp.title}:</span>
+                      </span>
+                      <span className="text-muted-foreground">
+                        {completedTeamsCount}/{approvedTeamsCount} đội đã nộp
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto rounded-[10px] border border-border bg-muted/30">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-card border-b border-border text-muted-foreground uppercase text-[10px]">
+                          <tr>
+                            <th className="py-2.5 px-3">Đội thi & Đội trưởng</th>
+                            <th className="py-2.5 px-3">Trạng thái</th>
+                            <th className="py-2.5 px-3">Thời gian nộp</th>
+                            <th className="py-2.5 px-3">Tài nguyên & Ghi chú</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {teams
+                            .filter((t) => t.status.toLowerCase() === 'approved')
+                            .map((team) => {
+                              const sub =
+                                cp.status === 'upcoming'
+                                  ? undefined
+                                  : cpSubmissions.find((s) => s.teamId === team.id);
+                              const isLateSub = Boolean(
+                                sub &&
+                                  (sub.isAfterDeadline ||
+                                    String(sub.status || '').toLowerCase() === 'late')
+                              );
+                              return (
+                                <tr key={team.id} className="hover:bg-accent/50">
+                                  <td className="py-2.5 px-3 font-medium text-foreground">
+                                    <div>{team.name}</div>
+                                    <div className="text-[11px] text-muted-foreground font-normal">
+                                      {team.leaderName || '—'}
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    {sub ? (
+                                      isLateSub ? (
+                                        <Badge variant="warning" size="sm">
+                                          Đã nộp (Nộp muộn)
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="success" size="sm">
+                                          Đã nộp đúng hạn
+                                        </Badge>
+                                      )
+                                    ) : cp.status === 'upcoming' ? (
+                                      <Badge variant="indigo" size="sm">
+                                        Chưa mở
+                                      </Badge>
+                                    ) : cp.status === 'late' ? (
+                                      <Badge variant="warning" size="sm">
+                                        Quá hạn (Chưa nộp)
+                                      </Badge>
+                                    ) : (
+                                      <Badge variant="neutral" size="sm">
+                                        Chưa nộp
+                                      </Badge>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 px-3 font-mono text-[11px] text-muted-foreground">
+                                    {sub?.submittedAt
+                                      ? new Date(sub.submittedAt).toLocaleString('vi-VN')
+                                      : '—'}
+                                  </td>
+                                  <td className="py-2.5 px-3">
+                                    {sub ? (
+                                      <div className="space-y-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                          {sub.repoUrl && (
+                                            <a
+                                              href={sub.repoUrl}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                                            >
+                                              <GitBranch size={11} />
+                                              <span>Repo</span>
+                                              <ExternalLink size={10} />
+                                            </a>
+                                          )}
+                                          {sub.demoUrl && (
+                                            <a
+                                              href={sub.demoUrl}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="inline-flex items-center gap-1 text-sky-700 dark:text-cyan-400 hover:underline font-medium"
+                                            >
+                                              <Globe size={11} />
+                                              <span>Tài liệu / Demo</span>
+                                              <ExternalLink size={10} />
+                                            </a>
+                                          )}
+                                        </div>
+                                        {sub.description && (
+                                          <p className="text-[11px] text-muted-foreground italic line-clamp-1">
+                                            "{sub.description}"
+                                          </p>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span className="text-muted-foreground">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })
         )}
       </div>
+
+      {/* Ma Trận Tiến Độ Nộp Bài Của Các Đội Thi (Admin Overview) */}
+      {checkpoints.length > 0 && (
+        <div
+          id="admin-checkpoint-progress-matrix"
+          className={`rounded-[16px] border p-6 space-y-4 shadow-lg ${
+            isProgressFocused
+              ? 'border-[#6366F1] bg-card ring-1 ring-[#6366F1]/40'
+              : 'border-border bg-card'
+          }`}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border">
+            <div>
+              <h3 className="font-semibold tracking-tight text-foreground text-lg flex items-center gap-2">
+                <Users size={18} className="text-primary" />
+                <span>Ma Trận Tiến Độ Nộp Bài Các Chặng Theo Đội Thi</span>
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Theo dõi trực quan đội nào đã nộp đúng hạn, đội nào nộp muộn (gắn cờ Nộp muộn) hoặc chưa nộp ở từng chặng.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge variant="success">Đúng hạn</Badge>
+              <Badge variant="warning">Nộp muộn / Quá hạn</Badge>
+              <Badge variant="indigo">Chưa mở</Badge>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto rounded-[12px] border border-border bg-muted/40 dark:bg-slate-900/60">
+            <table className="w-full text-left text-xs sm:text-sm">
+              <thead className="bg-card border-b border-border text-muted-foreground font-semibold uppercase tracking-wider text-[11px]">
+                <tr>
+                  <th className="py-3.5 px-4">Tên Đội Thi</th>
+                  {checkpoints.map((cp, idx) => (
+                    <th key={cp.id} className="py-3.5 px-4 text-center">
+                      <div>CP #{idx + 1}</div>
+                      <div className="text-[10px] font-normal text-muted-foreground normal-case truncate max-w-[140px] mx-auto">
+                        {cp.title}
+                      </div>
+                    </th>
+                  ))}
+                  <th className="py-3.5 px-4 text-right">Tổng Tiến Độ</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border text-foreground">
+                {teams
+                  .filter((t) => t.status.toLowerCase() === 'approved')
+                  .map((team) => {
+                    const teamSubs = submissions.filter((s) => s.teamId === team.id);
+                    const completedCount = checkpoints.filter(
+                      (cp) =>
+                        cp.status !== 'upcoming' &&
+                        teamSubs.some((s) => s.checkpointId === cp.id)
+                    ).length;
+                    const totalCount = checkpoints.length;
+
+                    return (
+                      <tr key={team.id} className="hover:bg-accent transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-foreground">
+                          {team.name}
+                          <span className="text-[11px] text-muted-foreground block font-normal">
+                            {team.leaderName || '—'}
+                          </span>
+                        </td>
+
+                        {checkpoints.map((cp) => {
+                          const matchedSub =
+                            cp.status === 'upcoming'
+                              ? undefined
+                              : teamSubs.find((s) => s.checkpointId === cp.id);
+                          const isDone = Boolean(matchedSub);
+                          const isLateSub = Boolean(
+                            matchedSub &&
+                              (matchedSub.isAfterDeadline ||
+                                String(matchedSub.status || '').toLowerCase() === 'late')
+                          );
+                          return (
+                            <td key={cp.id} className="py-3.5 px-4 text-center align-middle">
+                              {isDone && matchedSub ? (
+                                <div className="inline-flex flex-col items-center gap-1">
+                                  {isLateSub ? (
+                                    <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold text-xs bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                                      <Clock size={12} />
+                                      <span>Đã nộp (Nộp muộn)</span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold text-xs bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                                      <CheckCircle2 size={12} />
+                                      <span>Đã nộp</span>
+                                    </span>
+                                  )}
+                                  <div className="flex items-center gap-2 text-[10px]">
+                                    {matchedSub.repoUrl && (
+                                      <a
+                                        href={matchedSub.repoUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-primary hover:underline inline-flex items-center gap-0.5"
+                                      >
+                                        <span>Repo</span>
+                                        <ExternalLink size={9} />
+                                      </a>
+                                    )}
+                                    {matchedSub.demoUrl && (
+                                      <a
+                                        href={matchedSub.demoUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-sky-700 dark:text-cyan-400 hover:underline inline-flex items-center gap-0.5"
+                                      >
+                                        <span>Demo</span>
+                                        <ExternalLink size={9} />
+                                      </a>
+                                    )}
+                                  </div>
+                                </div>
+                              ) : cp.status === 'upcoming' ? (
+                                <span className="inline-flex items-center gap-1 text-muted-foreground text-xs">
+                                  <Clock size={12} />
+                                  <span>Chưa mở</span>
+                                </span>
+                              ) : cp.status === 'late' ? (
+                                <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-medium text-xs">
+                                  <Clock size={12} />
+                                  <span>Quá hạn (Chưa nộp)</span>
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 text-muted-foreground text-xs">
+                                  <Clock size={12} />
+                                  <span>Chưa nộp</span>
+                                </span>
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        <td className="py-3.5 px-4 text-right">
+                          <Badge
+                            variant={
+                              totalCount > 0 && completedCount === totalCount
+                                ? 'success'
+                                : completedCount > 0
+                                ? 'indigo'
+                                : 'neutral'
+                            }
+                          >
+                            {completedCount}/{totalCount} chặng
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Add Modal */}
       <Modal
@@ -1628,36 +2020,58 @@ export const AdminCheckpointsPage: React.FC = () => {
               <div className="sm:col-span-4">
                 <Input
                   type="number"
-                  min={15}
+                  min={editingCp?.status === 'upcoming' ? 15 : Math.max(15, editingCp?.durationMinutes || 15)}
                   max={10080}
                   step={15}
                   value={editDurationMinutes}
-                  onChange={(e) => setEditDurationMinutes(Math.max(15, Number(e.target.value)))}
+                  onChange={(e) => {
+                    const minAllowed =
+                      editingCp?.status === 'upcoming'
+                        ? 15
+                        : Math.max(15, editingCp?.durationMinutes || 15);
+                    setEditDurationMinutes(Math.max(minAllowed, Number(e.target.value)));
+                  }}
                   required
                 />
               </div>
               <div className="sm:col-span-8">
                 <div className="flex flex-wrap gap-1.5">
-                  {durationPresets.map((preset) => (
-                    <button
-                      key={preset.value}
-                      type="button"
-                      onClick={() => setEditDurationMinutes(preset.value)}
-                      className={`px-2.5 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors cursor-pointer border ${
-                        editDurationMinutes === preset.value
-                          ? 'bg-[#6366F1] text-white border-[#6366F1]'
-                          : 'bg-card text-muted-foreground border-border hover:border-slate-400 hover:text-foreground'
-                      }`}
-                    >
-                      {preset.label}
-                    </button>
-                  ))}
+                  {durationPresets.map((preset) => {
+                    const isBelowCurrentForActive =
+                      editingCp?.status !== 'upcoming' &&
+                      preset.value < (editingCp?.durationMinutes || 15);
+                    return (
+                      <button
+                        key={preset.value}
+                        type="button"
+                        disabled={isBelowCurrentForActive}
+                        onClick={() => setEditDurationMinutes(preset.value)}
+                        className={`px-2.5 py-1.5 rounded-[6px] text-[11px] font-medium transition-colors border ${
+                          isBelowCurrentForActive
+                            ? 'bg-muted/20 text-muted-foreground/40 border-border/50 cursor-not-allowed'
+                            : editDurationMinutes === preset.value
+                            ? 'bg-[#6366F1] text-white border-[#6366F1] cursor-pointer'
+                            : 'bg-card text-muted-foreground border-border hover:border-slate-400 hover:text-foreground cursor-pointer'
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             <p className="text-[11px] text-muted-foreground leading-relaxed pt-1 border-t border-border">
-              💡 Hạn chót đóng cổng nộp bài sẽ tự động cập nhật đúng <strong>{editDurationMinutes} phút</strong> kể từ khi cuộc thi bắt đầu.
+              {editingCp?.status === 'upcoming' ? (
+                <>
+                  💡 <strong>Chặng chưa mở:</strong> Bạn có thể tự do tăng hoặc giảm thời lượng. Hệ thống sẽ <strong>tự động cấu hình lại lịch trình nối tiếp</strong> cho chặng này và toàn bộ các chặng phía sau.
+                </>
+              ) : (
+                <>
+                  💡 <strong>Chặng đang diễn ra / đã qua:</strong> Chỉ cho phép giữ nguyên hoặc <strong>gia hạn thêm thời lượng</strong> (tối thiểu {editingCp?.durationMinutes || 15} phút) để bảo vệ quyền lợi thí sinh. Các chặng phía sau sẽ tự động dời nối tiếp.
+                </>
+              )}
             </p>
           </div>
 

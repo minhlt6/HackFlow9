@@ -130,7 +130,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       title: 'Nội dung & Chấm thi',
       items: [
         { to: '/admin/topics', label: 'Quản lý Đề tài', icon: Lightbulb },
-        { to: '/admin/checkpoints', label: 'Cấu hình chặng nộp', icon: CheckSquare },
+        { to: '/admin/checkpoints', label: 'Chặng nộp & Tiến độ', icon: CheckSquare },
         { to: '/admin/criteria', label: 'Tiêu chí chấm điểm', icon: Scale },
         { to: '/admin/personnel', label: 'Giám khảo & Cố vấn', icon: GraduationCap },
         { to: '/admin/results', label: 'Kết quả & Công bố', icon: Award },

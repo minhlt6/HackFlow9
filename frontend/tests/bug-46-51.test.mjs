@@ -19,12 +19,13 @@ test('legacy schedules are flagged without silently changing deadlines',()=>{
   assert.equal(items[1].deadline,'2026-11-02T00:00:00Z');
   assert.equal(checkpointScheduleWarning([{deadline:'2026-11-02T00:00:00Z'},{deadline:'2026-11-03T00:00:00Z',is_final_checkpoint:true}]),null);
 });
-test('checkpoint state changes at open, deadline, grace and closed without a stale badge',()=>{
+test('checkpoint state changes at open, deadline, grace, late and closed without a stale badge',()=>{
   const start=Date.parse('2026-11-01T01:00:00Z'), end=start+10000;
   const cp={id:'cp',start_time:new Date(start).toISOString(),deadline:new Date(end).toISOString(),is_active:true,grace_period_seconds:5};
-  for(const [now,status,allowed] of [[start-1,'upcoming',false],[start,'open',true],[end,'open',true],[end+1,'grace_period',true],[end+5000,'grace_period',true],[end+5001,'closed',false]]) {
+  for(const [now,status,allowed] of [[start-1,'upcoming',false],[start,'open',true],[end,'open',true],[end+1,'grace_period',true],[end+5000,'grace_period',true],[end+5001,'late',true]]) {
     const actual=checkpointAtTime(cp,now);assert.equal(actual.status,status);assert.equal(actual.can_submit,allowed);
   }
+  assert.equal(checkpointAtTime({...cp,is_active:false},start).status,'closed');
   assert.equal(checkpointAtTime({...cp,is_active:false},start).can_submit,false);
   assert.equal(checkpointAtTime({...cp,availability_error:'Offline'},start).can_submit,false);
 });

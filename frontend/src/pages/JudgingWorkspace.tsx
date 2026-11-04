@@ -25,8 +25,6 @@ import {
   FileText,
   AlertTriangle,
   ShieldCheck,
-  Copy,
-  Check,
   Filter,
   MessageSquare,
 } from 'lucide-react';
@@ -579,7 +577,6 @@ export const JudgingWorkspace: React.FC = () => {
 
   // Filter: Tất cả | Chưa chấm | Bản nháp | Đã khóa điểm
   const [statusFilter, setStatusFilter] = useState<'all' | 'unscored' | 'draft' | 'locked'>('all');
-  const [copiedSha, setCopiedSha] = useState(false);
   const [alert, setAlert] = useState<string | null>(null);
 
   // Load rubrics and submissions from API service on mount (fallback to mock)
@@ -669,14 +666,6 @@ export const JudgingWorkspace: React.FC = () => {
   };
 
   const displayName = selectedTeam?.name || '';
-
-  const commitSha = finalSub?.commitSha || 'c8d4e2f89a1b2c3d';
-
-  const handleCopySha = () => {
-    navigator.clipboard.writeText(commitSha);
-    setCopiedSha(true);
-    setTimeout(() => setCopiedSha(false), 2000);
-  };
 
   const showAlert = (msg: string) => {
     setAlert(msg);
@@ -824,11 +813,14 @@ export const JudgingWorkspace: React.FC = () => {
           <div className="p-4 border-b border-border bg-muted/40 dark:bg-slate-900/60 shrink-0 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-semibold tracking-tight text-foreground text-xl text-foreground tracking-wide">
                     {displayName}
                   </h2>
                   <Badge variant="primary">CÔNG KHAI</Badge>
+                  {finalSub?.isLate && (
+                    <Badge variant="warning">NỘP MUỘN</Badge>
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
                   <Globe size={13} className="text-primary" />
@@ -865,34 +857,6 @@ export const JudgingWorkspace: React.FC = () => {
                   </a>
                 )}
               </div>
-            </div>
-
-            {/* Frozen Commit SHA Box with Copy Button */}
-            <div className="p-2.5 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs">
-                <ShieldCheck size={16} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
-                <span className="text-muted-foreground">Commit SHA đóng băng:</span>
-                <code className="px-2 py-0.5 rounded bg-card border border-border text-emerald-700 dark:text-emerald-400 font-mono font-semibold text-xs">
-                  {commitSha}
-                </code>
-              </div>
-              <button
-                onClick={handleCopySha}
-                className="flex items-center gap-1 px-2.5 py-1 rounded bg-card hover:bg-accent text-[11px] font-medium text-muted-foreground border border-border transition-all"
-                title="Sao chép Commit SHA"
-              >
-                {copiedSha ? (
-                  <>
-                    <Check size={12} className="text-emerald-700 dark:text-emerald-400" />
-                    <span className="text-emerald-700 dark:text-emerald-400">Đã chép</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={12} />
-                    <span>Sao chép</span>
-                  </>
-                )}
-              </button>
             </div>
 
             {/* Solution Summary */}
@@ -960,7 +924,7 @@ export const JudgingWorkspace: React.FC = () => {
                     Thông tin Kho Lưu Trữ (Repository)
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    Mã nguồn đã được hệ thống ghi nhận tại thời điểm đóng băng (Code Freeze).
+                    Mã nguồn và giao diện sản phẩm do đội thi cập nhật trên kho lưu trữ.
                   </p>
                   <div className="pt-2 flex items-center gap-2">
                     <a
@@ -979,7 +943,7 @@ export const JudgingWorkspace: React.FC = () => {
                 <div className="p-4 rounded-xl bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3 font-mono text-xs">
                   <div className="flex items-center justify-between text-muted-foreground border-b border-border pb-2">
                     <span>README.md (Trích đoạn dự án)</span>
-                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400">Verified Commit</span>
+                    <span className="text-[10px] text-emerald-700 dark:text-emerald-400">Repository Dự Án</span>
                   </div>
                   <pre className="text-muted-foreground whitespace-pre-wrap font-sans text-xs leading-relaxed">
                     {`# ${displayName} - HackFlow Project
@@ -1055,7 +1019,24 @@ export const JudgingWorkspace: React.FC = () => {
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-foreground">{chk.checkpointTitle || useMockStore.getState().checkpoints.find((cp) => cp.id === chk.checkpointId)?.title || `Chặng ${idx + 1}`}</span>
-                        <Badge variant={getSubmissionStatusMeta((chk.status || 'invalid') as SubmissionStatus, false).badgeVariant} size="sm">{getSubmissionStatusMeta((chk.status || 'invalid') as SubmissionStatus, false).badgeLabel}</Badge>
+                        <Badge
+                          variant={
+                            getSubmissionStatusMeta(
+                              (chk.status || 'invalid') as SubmissionStatus,
+                              false,
+                              Boolean(chk.isAfterDeadline)
+                            ).badgeVariant
+                          }
+                          size="sm"
+                        >
+                          {
+                            getSubmissionStatusMeta(
+                              (chk.status || 'invalid') as SubmissionStatus,
+                              false,
+                              Boolean(chk.isAfterDeadline)
+                            ).badgeLabel
+                          }
+                        </Badge>
                       </div>
                       <p className="text-muted-foreground text-[11px] leading-relaxed">
                         {chk.description || 'Đã nộp báo cáo kiến trúc và mã nguồn giai đoạn MVP.'}

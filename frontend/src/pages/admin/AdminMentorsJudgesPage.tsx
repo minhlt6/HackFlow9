@@ -13,6 +13,10 @@ import {
   CheckCircle2,
   Trash2,
   Edit2,
+  Eye,
+  EyeOff,
+  Copy,
+  KeyRound,
 } from 'lucide-react';
 
 interface JudgeRosterItem {
@@ -23,6 +27,7 @@ interface JudgeRosterItem {
   specialization: string;
   assignedCount: number;
   avatar: string;
+  issuedPassword: string;
 }
 
 interface MentorRosterItem {
@@ -33,6 +38,7 @@ interface MentorRosterItem {
   topic: string;
   openTickets: number;
   avatar: string;
+  issuedPassword: string;
 }
 
 export const AdminMentorsJudgesPage: React.FC = () => {
@@ -40,6 +46,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('123456');
   const [organization, setOrganization] = useState('Hội đồng Chuyên môn');
   const [specialization, setSpecialization] = useState('Computer Vision & LLMs');
 
@@ -50,10 +57,28 @@ export const AdminMentorsJudgesPage: React.FC = () => {
     email: string;
     organization: string;
     specialization: string;
+    issuedPassword: string;
   } | null>(null);
   const [editName, setEditName] = useState('');
   const [editOrganization, setEditOrganization] = useState('');
   const [editSpecialization, setEditSpecialization] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const togglePasswordVisibility = (id: string) => {
+    setVisiblePasswords((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleCopyCredentials = (id: string, userEmail: string, userPass: string) => {
+    const text = `Email đăng nhập: ${userEmail}\nMật khẩu: ${userPass}`;
+    void navigator.clipboard?.writeText(text);
+    setCopiedId(id);
+    setAlert(`Đã sao chép thông tin đăng nhập của ${userEmail} (Mật khẩu: ${userPass}).`);
+    window.setTimeout(() => {
+      setCopiedId((current) => (current === id ? null : current));
+    }, 2500);
+  };
 
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -87,6 +112,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         ? item.assigned_team_ids.length
         : 0;
       const avatarChar = fullName.trim().charAt(0).toUpperCase() || 'U';
+      const issuedPassword = String(item.issued_password ?? '123456');
       if (role === 'judge') {
         nextJudges.push({
           id: String(item.id),
@@ -96,6 +122,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           specialization: spec,
           assignedCount: assignedTeams,
           avatar: avatarChar,
+          issuedPassword,
         });
       } else if (role === 'mentor') {
         nextMentors.push({
@@ -106,6 +133,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           topic: spec,
           openTickets: 0,
           avatar: avatarChar,
+          issuedPassword,
         });
       }
     }
@@ -143,10 +171,12 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       email: j.email,
       organization: j.organization,
       specialization: j.specialization,
+      issuedPassword: j.issuedPassword,
     });
     setEditName(j.name);
     setEditOrganization(j.organization || 'Hội đồng Giám khảo');
     setEditSpecialization(j.specialization);
+    setEditPassword('');
   };
 
   const handleOpenEditMentor = (m: MentorRosterItem) => {
@@ -158,15 +188,22 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       email: m.email,
       organization: m.organization,
       specialization: m.topic,
+      issuedPassword: m.issuedPassword,
     });
     setEditName(m.name);
     setEditOrganization(m.organization || 'Ban Cố vấn Kỹ thuật');
     setEditSpecialization(m.topic);
+    setEditPassword('');
   };
 
   const handleUpdateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editTarget || !editName.trim() || mutationRef.current) return;
+    const cleanNewPass = editPassword.trim();
+    if (cleanNewPass && cleanNewPass.length < 6) {
+      setError('Mật khẩu mới phải có ít nhất 6 ký tự.');
+      return;
+    }
     mutationRef.current = true;
     setIsSaving(true);
     setError(null);
@@ -178,12 +215,16 @@ export const AdminMentorsJudgesPage: React.FC = () => {
           full_name: editName.trim(),
           organization: editOrganization.trim() || undefined,
           specialty: editSpecialization.trim(),
+          password: cleanNewPass || undefined,
         }
       );
       const updated = response.data?.data;
       const updatedName = String(updated?.full_name ?? editName.trim());
       const updatedOrg = String(updated?.organization ?? editOrganization.trim());
       const updatedSpec = String(updated?.specialty ?? editSpecialization.trim());
+      const updatedPass = String(
+        updated?.issued_password ?? (cleanNewPass || editTarget.issuedPassword || '123456')
+      );
       const avatarChar = updatedName.trim().charAt(0).toUpperCase() || 'U';
 
       if (editTarget.role === 'judge') {
@@ -196,6 +237,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
                   organization: updatedOrg,
                   specialization: updatedSpec,
                   avatar: avatarChar,
+                  issuedPassword: updatedPass,
                 }
               : item
           )
@@ -210,13 +252,19 @@ export const AdminMentorsJudgesPage: React.FC = () => {
                   organization: updatedOrg,
                   topic: updatedSpec,
                   avatar: avatarChar,
+                  issuedPassword: updatedPass,
                 }
               : item
           )
         );
       }
       setEditTarget(null);
-      setAlert(`Đã cập nhật thông tin ${updatedName} thành công.`);
+      setEditPassword('');
+      setAlert(
+        cleanNewPass
+          ? `Đã cập nhật thông tin và đặt lại mật khẩu mới (${cleanNewPass}) cho ${updatedName}.`
+          : `Đã cập nhật thông tin ${updatedName} thành công.`
+      );
     } catch (err) {
       setError(
         err instanceof Error
@@ -264,8 +312,13 @@ export const AdminMentorsJudgesPage: React.FC = () => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || mutationRef.current) return;
     const cleanEmail = email.trim().toLowerCase();
+    const cleanPass = password.trim() || '123456';
     setError(null);
     setAlert(null);
+    if (cleanPass.length < 6) {
+      setError('Mật khẩu đăng nhập phải có ít nhất 6 ký tự.');
+      return;
+    }
     if (
       [...judges, ...mentors].some(
         (item) => item.email.trim().toLowerCase() === cleanEmail
@@ -281,6 +334,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       const response = await apiClient.post('/admin/personnel', {
         full_name: name.trim(),
         email: cleanEmail,
+        password: cleanPass,
         role,
         organization: organization.trim() || undefined,
         specialty: specialization.trim(),
@@ -296,6 +350,7 @@ export const AdminMentorsJudgesPage: React.FC = () => {
         email: String(created.email),
         organization: String(created.organization || organization.trim() || 'Hội đồng Chuyên môn'),
         avatar: String(created.full_name).charAt(0).toUpperCase(),
+        issuedPassword: String(created.issued_password || cleanPass),
       };
       if (role === 'judge')
         setJudges((list) => [
@@ -320,8 +375,9 @@ export const AdminMentorsJudgesPage: React.FC = () => {
       setIsCreateOpen(false);
       setName('');
       setEmail('');
+      setPassword('123456');
       setAlert(
-        `Đã tạo tài khoản ${role === 'judge' ? 'giám khảo' : 'cố vấn'} ${created.email}.`
+        `Đã tạo tài khoản ${role === 'judge' ? 'giám khảo' : 'cố vấn'} ${created.email} (Mật khẩu đăng nhập: ${cleanPass}).`
       );
     } catch (err) {
       setError(
@@ -467,6 +523,38 @@ export const AdminMentorsJudgesPage: React.FC = () => {
                     <span className="text-muted-foreground block">Chuyên môn:</span>
                     <span className="text-foreground font-medium block">{j.specialization}</span>
                   </div>
+
+                  <div className="p-2.5 rounded-[10px] bg-indigo-500/5 border border-indigo-500/20 text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <KeyRound size={13} className="text-indigo-500 shrink-0" />
+                      <span className="text-muted-foreground shrink-0">Mật khẩu:</span>
+                      <code className="font-mono font-semibold text-foreground truncate">
+                        {visiblePasswords[j.id] ? j.issuedPassword : '••••••'}
+                      </code>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => togglePasswordVisibility(j.id)}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        title={visiblePasswords[j.id] ? 'Ẩn mật khẩu' : 'Xem lại mật khẩu'}
+                      >
+                        {visiblePasswords[j.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCredentials(j.id, j.email, j.issuedPassword)}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-indigo-600 transition-colors flex items-center gap-1 text-[11px] font-medium"
+                        title="Sao chép Email & Mật khẩu để gửi cho Giám khảo"
+                      >
+                        {copiedId === j.id ? (
+                          <CheckCircle2 size={13} className="text-emerald-500" />
+                        ) : (
+                          <Copy size={13} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
                 </div>
 
                 <div className="space-y-3 pt-2 border-t border-border">
@@ -526,6 +614,38 @@ export const AdminMentorsJudgesPage: React.FC = () => {
                     <span className="text-purple-700 dark:text-purple-400 font-medium block">
                       {m.topic}
                     </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-[10px] bg-purple-500/5 border border-purple-500/20 text-xs flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <KeyRound size={13} className="text-purple-500 shrink-0" />
+                      <span className="text-muted-foreground shrink-0">Mật khẩu:</span>
+                      <code className="font-mono font-semibold text-foreground truncate">
+                        {visiblePasswords[m.id] ? m.issuedPassword : '••••••'}
+                      </code>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => togglePasswordVisibility(m.id)}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        title={visiblePasswords[m.id] ? 'Ẩn mật khẩu' : 'Xem lại mật khẩu'}
+                      >
+                        {visiblePasswords[m.id] ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyCredentials(m.id, m.email, m.issuedPassword)}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-purple-600 transition-colors flex items-center gap-1 text-[11px] font-medium"
+                        title="Sao chép Email & Mật khẩu để gửi cho Cố vấn"
+                      >
+                        {copiedId === m.id ? (
+                          <CheckCircle2 size={13} className="text-emerald-500" />
+                        ) : (
+                          <Copy size={13} />
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -600,6 +720,20 @@ export const AdminMentorsJudgesPage: React.FC = () => {
               onChange={(e) => setEmail(e.target.value)}
               required
             />
+
+            <div className="space-y-1">
+              <Input
+                label="Mật khẩu đăng nhập ban đầu *"
+                type="text"
+                placeholder="Mặc định: 123456 (tối thiểu 6 ký tự)"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Giám khảo / Cố vấn dùng Email này và mật khẩu trên để đăng nhập tại trang <code className="font-mono text-foreground">/login</code> (hoặc mật khẩu mặc định <code className="font-mono text-foreground">123456</code>).
+              </p>
+            </div>
 
             <Input
               label="Đơn vị công tác"
@@ -687,6 +821,25 @@ export const AdminMentorsJudgesPage: React.FC = () => {
               onChange={(e) => setEditSpecialization(e.target.value)}
               required
             />
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs bg-muted/50 px-3 py-2 rounded-lg border border-border">
+                <span className="text-muted-foreground">Mật khẩu đang cấp phát hiện tại:</span>
+                <code className="font-mono font-bold text-foreground">
+                  {editTarget?.issuedPassword || '123456'}
+                </code>
+              </div>
+              <Input
+                label="Đặt lại mật khẩu mới (Tùy chọn)"
+                type="text"
+                placeholder="Để trống nếu giữ nguyên mật khẩu hiện tại"
+                value={editPassword}
+                onChange={(e) => setEditPassword(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground">
+                Nhập mật khẩu mới (tối thiểu 6 ký tự) nếu muốn đổi mật khẩu khác cho chuyên gia này.
+              </p>
+            </div>
 
             <div className="flex justify-end gap-3 pt-3">
               <Button

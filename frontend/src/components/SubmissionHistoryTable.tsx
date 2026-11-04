@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import {
   History,
-  GitCommit,
   Globe,
   ExternalLink,
   Clock,
@@ -9,15 +8,12 @@ import {
   FileText,
   MessageSquare,
   ShieldCheck,
-  AlertTriangle,
   AlertCircle,
   Inbox,
 } from 'lucide-react';
 import { Badge } from './Badge';
 import {
   type Submission,
-  formatCommitSha,
-  getCommitUrl,
   formatSubmissionTime,
   getSubmissionStatusMeta,
 } from '../types/checkpoint';
@@ -178,9 +174,6 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                 <th scope="col" className="py-3 px-4 min-w-[160px]">
                   Thời gian nộp
                 </th>
-                <th scope="col" className="py-3 px-4 min-w-[140px]">
-                  Commit SHA
-                </th>
                 <th scope="col" className="py-3 px-4 min-w-[180px]">
                   Tài nguyên nộp
                 </th>
@@ -198,9 +191,11 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                 // Phiên bản tăng dần theo thứ tự thời gian: bản cũ nhất là v1, bản mới nhất là vN
                 const versionNumber = sortedSubmissions.length - index;
                 const timeInfo = formatSubmissionTime(sub.submitted_at);
-                const statusMeta = getSubmissionStatusMeta(sub.status, isFinalCheckpoint);
-                const shortSha = formatCommitSha(sub.commit_sha);
-                const commitUrl = getCommitUrl(sub.repo_url, sub.commit_sha);
+                const statusMeta = getSubmissionStatusMeta(
+                  sub.status,
+                  isFinalCheckpoint,
+                  Boolean(sub.is_late)
+                );
 
                 return (
                   <tr
@@ -231,7 +226,13 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                         <span className="text-[11px] text-muted-foreground font-mono">
                           {timeInfo.absolute}
                         </span>
-                        {sub.grace_period_applied && (
+                        {(sub.is_late || statusMeta.normalizedStatus === 'late') && (
+                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 font-medium mt-0.5">
+                            <Clock size={11} className="shrink-0" />
+                            <span>Nộp muộn (Sau hạn chuẩn)</span>
+                          </span>
+                        )}
+                        {sub.grace_period_applied && !sub.is_late && statusMeta.normalizedStatus !== 'late' && (
                           <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 font-medium mt-0.5">
                             <ShieldCheck size={11} className="shrink-0" />
                             <span>Ân hạn mạng (Grace Period)</span>
@@ -240,55 +241,7 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                       </div>
                     </td>
 
-                    {/* Cột 3: Commit SHA (HF-31 AC-2 & Review Lỗi 3) */}
-                    <td className="py-3.5 px-4">
-                      {sub.commit_sha ? (
-                        commitUrl ? (
-                          <a
-                            href={commitUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            title={`Xem commit ${sub.commit_sha} trên GitHub (Click để mở tab mới)`}
-                            className="inline-flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-[8px] bg-muted/40 dark:bg-slate-900/60 hover:bg-accent text-primary hover:text-foreground border border-border hover:border-[#6366F1] transition-all group shadow-sm"
-                          >
-                            <GitCommit size={13} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
-                            <span className="font-semibold">{shortSha}</span>
-                            <ExternalLink
-                              size={11}
-                              className="text-muted-foreground group-hover:text-indigo-300 transition-colors"
-                            />
-                          </a>
-                        ) : (
-                          <span
-                            title={sub.commit_sha}
-                            className="inline-flex items-center gap-1.5 font-mono text-xs px-2.5 py-1 rounded-[8px] bg-muted/40 dark:bg-slate-900/60 text-primary border border-border"
-                          >
-                            <GitCommit size={13} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
-                            <span className="font-semibold">{shortSha}</span>
-                          </span>
-                        )
-                      ) : statusMeta.normalizedStatus === 'pending_sha_freeze' ? (
-                        <span className="inline-flex items-center gap-1 text-primary text-[11px] font-medium">
-                          <RefreshCw size={11} className="animate-spin text-primary shrink-0" />
-                          <span>Đang lấy SHA...</span>
-                        </span>
-                      ) : statusMeta.normalizedStatus === 'sha_verification_failed' ? (
-                        <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 text-[11px] font-medium">
-                          <AlertTriangle size={12} className="shrink-0 text-amber-700 dark:text-amber-400" />
-                          <span>Chờ xác minh</span>
-                        </span>
-                      ) : isFinalCheckpoint ? (
-                        <span className="text-muted-foreground font-mono text-xs italic">
-                          - (Chưa có SHA)
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground font-mono text-xs italic">
-                          - (Chặng tiến độ)
-                        </span>
-                      )}
-                    </td>
-
-                    {/* Cột 4: Tài nguyên nộp (Repo, Demo URL & Các link từ submission_data - Review Lỗi 3) */}
+                    {/* Cột 3: Tài nguyên nộp (Repo, Demo URL & Các link từ submission_data - Review Lỗi 3) */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-1.5">
                         {sub.repo_url && (
