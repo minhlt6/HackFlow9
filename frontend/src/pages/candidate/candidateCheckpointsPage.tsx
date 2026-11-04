@@ -21,7 +21,9 @@ import { useMockStore } from '../../store/useMockStore';
 import {
   type CheckpointWithSubmission,
   type Submission,
+  expandSubmissionHistory,
   getSubmissionStatusMeta,
+  hasOnTimeSubmissionHistory,
 } from '../../types/checkpoint';
 
 export const CandidateCheckpointsPage: React.FC = () => {
@@ -121,38 +123,65 @@ export const CandidateCheckpointsPage: React.FC = () => {
 
   // Callback khi nộp bài thành công từ CheckpointSubmissionForm
   const handleSubmissionSuccess = (newSub: Submission) => {
-    // 1. Cập nhật latest_submission trong danh sách checkpoint
+    // 1. Cập nhật latest_submission trong danh sách checkpoint và bảo toàn lịch sử phiên bản trước đó (BUG 57)
     setCheckpoints((prev) =>
       prev.map((cp) => {
         if (cp.id === newSub.checkpoint_id) {
+          const prevSub = cp.latest_submission;
+          const preservedHistory =
+            Array.isArray(newSub.version_history) && newSub.version_history.length > 0
+              ? newSub.version_history
+              : prevSub && prevSub.submitted_at !== newSub.submitted_at
+              ? [
+                  {
+                    ...prevSub,
+                    id: `${prevSub.id}-v${prevSub.version || 1}`,
+                    version: prevSub.version || 1,
+                  },
+                  ...(prevSub.version_history || []),
+                ]
+              : [];
+
           return {
             ...cp,
-            latest_submission: newSub,
+            latest_submission: {
+              ...newSub,
+              version: newSub.version || (prevSub ? (prevSub.version || 1) + 1 : 1),
+              version_history: preservedHistory,
+            },
           };
         }
         return cp;
       })
     );
 
-    // 2. Đẩy bài nộp mới lên đầu bảng lịch sử nộp bài (HF-31)
-    setSubmissions((prev) => [newSub, ...prev.filter((s) => s.id !== newSub.id)]);
+    // 2. Mở rộng và bảo lưu toàn bộ các phiên bản cũ (v1 đúng hạn) cùng bản cập nhật mới (v2+) trong bảng lịch sử (HF-31 & BUG 57)
+    setSubmissions((prev) => {
+      const convertedPrev = prev.map((s) =>
+        s.id === newSub.id && s.submitted_at !== newSub.submitted_at
+          ? { ...s, id: `${s.id}-v${s.version || 1}`, version: s.version || 1 }
+          : s
+      );
+      return expandSubmissionHistory([newSub, ...convertedPrev]);
+    });
+    void fetchSubmissions(newSub.checkpoint_id);
     void useMockStore.getState().syncFromBackend?.();
   };
 
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'open':
-        return <Badge variant="success">Đang mở nộp bài</Badge>;
+        return <Badge variant="success" size="sm">Đang mở nộp bài</Badge>;
       case 'grace_period':
-        return <Badge variant="warning">Ân hạn mạng (Grace Period)</Badge>;
+        return <Badge variant="warning" size="sm">Ân hạn mạng (Grace Period)</Badge>;
       case 'late':
-        return <Badge variant="warning">Nộp muộn (Quá hạn)</Badge>;
+        return <Badge variant="warning" size="sm">Quá hạn chuẩn (Mở nộp bổ sung)</Badge>;
       case 'upcoming':
-        return <Badge variant="indigo">Chưa mở</Badge>;
+        return <Badge variant="indigo" size="sm">Chưa mở</Badge>;
       case 'closed':
-        return <Badge variant="neutral">Đã đóng</Badge>;
+        return <Badge variant="neutral" size="sm">Đã đóng</Badge>;
       default:
-        return <Badge variant="neutral">Chưa mở</Badge>;
+        return <Badge variant="neutral" size="sm">Chưa mở</Badge>;
     }
   };
 
@@ -205,12 +234,17 @@ export const CandidateCheckpointsPage: React.FC = () => {
                 const isSelected = cp.id === selectedCheckpointId;
                 const hasSubmitted = cp.status !== 'upcoming' && !!cp.latest_submission;
                 const isFinal = Boolean(cp.is_final_checkpoint);
+                const onTimeHistory = hasOnTimeSubmissionHistory(
+                  cp.latest_submission,
+                  cp.id === selectedCheckpointId ? submissions : undefined
+                );
                 const subMeta =
                   hasSubmitted && cp.latest_submission
                     ? getSubmissionStatusMeta(
                         cp.latest_submission.status,
                         isFinal,
-                        Boolean(cp.latest_submission.is_late)
+                        Boolean(cp.latest_submission.is_late),
+                        onTimeHistory
                       )
                     : null;
 
@@ -234,25 +268,13 @@ export const CandidateCheckpointsPage: React.FC = () => {
                           <span className="text-xs font-mono font-bold text-primary">
                             {getCheckpointStageLabel(cp, idx)}
                           </span>
-                          {getStatusBadge(cp.status)}
-                          {isFinal ? (
-                            <Badge variant="danger" size="sm">
-                              Chặng cuối (Chung kết)
-                            </Badge>
-                          ) : (
-                            <Badge variant="indigo" size="sm">
-                              Chặng tiến độ
-                            </Badge>
-                          )}
-                          {hasSubmitted && subMeta && (
+                          {/* Chỉ hiển thị 1 nhãn trạng thái cốt lõi duy nhất (BUG 57) */}
+                          {hasSubmitted && subMeta ? (
                             <Badge variant={subMeta.badgeVariant} size="sm">
                               {subMeta.badgeLabel}
                             </Badge>
-                          )}
-                          {cp.latest_submission?.grace_period_applied && (
-                            <Badge variant="warning" size="sm">
-                              Grace Period
-                            </Badge>
+                          ) : (
+                            getStatusBadge(cp.status)
                           )}
                         </div>
 
@@ -283,23 +305,23 @@ export const CandidateCheckpointsPage: React.FC = () => {
                       {hasSubmitted && cp.latest_submission ? (
                         <span
                           className={`text-[10px] font-mono ${
-                            subMeta?.normalizedStatus === 'sha_verification_failed' ||
-                            subMeta?.normalizedStatus === 'late'
+                            onTimeHistory && subMeta?.normalizedStatus === 'late'
+                              ? 'text-emerald-700 dark:text-emerald-400'
+                              : subMeta?.normalizedStatus === 'sha_verification_failed' ||
+                                subMeta?.normalizedStatus === 'late'
                               ? 'text-amber-700 dark:text-amber-400'
                               : subMeta?.normalizedStatus === 'invalid'
                               ? 'text-rose-700 dark:text-rose-400'
                               : 'text-emerald-700 dark:text-emerald-400'
                           }`}
                         >
-                          {subMeta?.normalizedStatus === 'sha_verification_failed'
-                            ? 'Chờ đối soát repo'
-                            : subMeta?.normalizedStatus === 'late'
-                            ? 'Đã nộp (Nộp muộn)'
-                            : 'Đã nộp báo cáo'}
+                          {onTimeHistory && subMeta?.normalizedStatus === 'late'
+                            ? `Gốc v1 đúng hạn • Bản v${cp.latest_submission.version || 2}`
+                            : `Phiên bản v${cp.latest_submission.version || 1}`}
                         </span>
                       ) : cp.status === 'late' ? (
                         <span className="text-[10px] font-mono text-amber-700 dark:text-amber-400">
-                          Mở nộp muộn
+                          Chưa nộp bài
                         </span>
                       ) : null}
                     </div>
@@ -341,15 +363,6 @@ export const CandidateCheckpointsPage: React.FC = () => {
                           {getCheckpointStageLabel(selectedCheckpoint, selectedCheckpointIndex)}
                         </span>
                         {getStatusBadge(selectedCheckpoint.status)}
-                        {selectedCheckpoint.is_final_checkpoint ? (
-                          <Badge variant="danger" size="sm">
-                            Chặng chốt sản phẩm cuối cùng
-                          </Badge>
-                        ) : (
-                          <Badge variant="indigo" size="sm">
-                            Chặng nộp tiến độ
-                          </Badge>
-                        )}
                       </div>
                       <h2 className="text-lg sm:text-xl font-bold text-foreground">
                         {selectedCheckpoint.title}
@@ -440,14 +453,14 @@ export const CandidateCheckpointsPage: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                      { getStatusBadge(selectedCheckpoint.status) }
-                      {selectedCheckpoint.status !== 'upcoming' && selectedCheckpoint.latest_submission && (
+                      {selectedCheckpoint.status !== 'upcoming' && selectedCheckpoint.latest_submission ? (
                         <Badge
                           variant={
                             getSubmissionStatusMeta(
                               selectedCheckpoint.latest_submission.status,
                               Boolean(selectedCheckpoint.is_final_checkpoint),
-                              Boolean(selectedCheckpoint.latest_submission.is_late)
+                              Boolean(selectedCheckpoint.latest_submission.is_late),
+                              hasOnTimeSubmissionHistory(selectedCheckpoint.latest_submission, submissions)
                             ).badgeVariant
                           }
                           size="sm"
@@ -456,10 +469,13 @@ export const CandidateCheckpointsPage: React.FC = () => {
                             getSubmissionStatusMeta(
                               selectedCheckpoint.latest_submission.status,
                               Boolean(selectedCheckpoint.is_final_checkpoint),
-                              Boolean(selectedCheckpoint.latest_submission.is_late)
+                              Boolean(selectedCheckpoint.latest_submission.is_late),
+                              hasOnTimeSubmissionHistory(selectedCheckpoint.latest_submission, submissions)
                             ).badgeLabel
                           }
                         </Badge>
+                      ) : (
+                        getStatusBadge(selectedCheckpoint.status)
                       )}
                     </div>
                   </div>
@@ -473,6 +489,7 @@ export const CandidateCheckpointsPage: React.FC = () => {
                         ? null
                         : selectedCheckpoint.latest_submission
                     }
+                    submissionHistory={submissions}
                     userRole={userRole}
                     onSuccess={handleSubmissionSuccess}
                   />

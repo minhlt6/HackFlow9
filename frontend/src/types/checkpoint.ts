@@ -67,6 +67,7 @@ export interface Checkpoint {
 
 export interface Submission {
   id: string;
+  submission_id?: string;
   checkpoint_id: string;
   team_id: string;
   repo_url?: string | null;
@@ -76,6 +77,8 @@ export interface Submission {
   status: SubmissionStatus;
   grace_period_applied?: boolean;
   is_late?: boolean;
+  version?: number;
+  version_history?: Submission[];
   submitted_at: string;
   feedback?: string | null;
   note?: string | null;
@@ -160,14 +163,108 @@ export function getEffectiveSubmissionFields(checkpoint: Checkpoint): Submission
   ];
 }
 
+export function isSubmissionLate(
+  sub?: Pick<Submission, 'status' | 'is_late'> | null
+): boolean {
+  if (!sub) return false;
+  return Boolean(sub.is_late || String(sub.status || '').toLowerCase() === 'late');
+}
+
+export function isSubmissionOnTimeValid(
+  sub?: Pick<Submission, 'status' | 'is_late'> | null
+): boolean {
+  if (!sub || isSubmissionLate(sub)) return false;
+  const s = String(sub.status || '').toLowerCase();
+  return s === 'submitted' || s === 'evaluated' || s === 'sha_verification_failed';
+}
+
 /**
- * Phân tích trạng thái bài nộp (`Submission.status`) theo chuẩn SRS HF-23:
+ * Kiểm tra xem bài nộp hiện tại có bản gốc (v1) đã được nộp đúng hạn trước khi cập nhật bổ sung hay không (BUG 57).
+ */
+export function hasOnTimeSubmissionHistory(
+  sub?: Submission | null,
+  historyList?: Submission[]
+): boolean {
+  if (!sub) return false;
+  if (Array.isArray(sub.version_history) && sub.version_history.some((h) => isSubmissionOnTimeValid(h))) {
+    return true;
+  }
+  if (Array.isArray(historyList) && historyList.length > 0) {
+    const currentTime = new Date(sub.submitted_at).getTime() || 0;
+    const currentVer = sub.version || 0;
+    return historyList.some((h) => {
+      if (!isSubmissionOnTimeValid(h)) return false;
+      const hTime = new Date(h.submitted_at).getTime() || 0;
+      const hVer = h.version || 0;
+      return (
+        (currentVer > 1 && hVer > 0 && hVer < currentVer) ||
+        (currentTime > 0 && hTime > 0 && hTime < currentTime) ||
+        h.id !== sub.id
+      );
+    });
+  }
+  return false;
+}
+
+/**
+ * Mở rộng và khử trùng lặp danh sách lịch sử phiên bản bài nộp (kể cả các bản ghi lồng trong `version_history`),
+ * đảm bảo không bao giờ làm mất bản nộp đúng hạn ban đầu (v1) khi đội cập nhật bổ sung (v2+).
+ */
+export function expandSubmissionHistory(submissions: Submission[]): Submission[] {
+  const flat: Submission[] = [];
+  for (const sub of submissions) {
+    if (!sub) continue;
+    flat.push(sub);
+    if (Array.isArray(sub.version_history)) {
+      for (const hist of sub.version_history) {
+        if (hist && typeof hist === 'object') {
+          flat.push({
+            ...hist,
+            id: hist.id || `${sub.id}-v${hist.version || 1}`,
+            checkpoint_id: hist.checkpoint_id || sub.checkpoint_id,
+            team_id: hist.team_id || sub.team_id,
+          });
+        }
+      }
+    }
+  }
+
+  // Sắp xếp mới nhất lên đầu trước khi khử trùng lặp
+  flat.sort((a, b) => {
+    const verA = a.version ?? 0;
+    const verB = b.version ?? 0;
+    if (verA > 0 && verB > 0 && verA !== verB) {
+      return verB - verA;
+    }
+    const timeA = new Date(a.submitted_at).getTime() || 0;
+    const timeB = new Date(b.submitted_at).getTime() || 0;
+    return timeB - timeA;
+  });
+
+  const seenKeys = new Set<string>();
+  const deduped: Submission[] = [];
+  for (const item of flat) {
+    const verKey =
+      typeof item.version === 'number' && item.version > 0
+        ? `ver:${item.checkpoint_id}:${item.version}`
+        : `time:${item.checkpoint_id}:${item.submitted_at}:${item.status}`;
+    if (seenKeys.has(verKey)) continue;
+    seenKeys.add(verKey);
+    deduped.push(item);
+  }
+
+  return deduped;
+}
+
+/**
+ * Phân tích trạng thái bài nộp (`Submission.status`) theo chuẩn SRS HF-23 & BUG 57:
  * SUBMITTED | PENDING_SHA_FREEZE | SHA_VERIFICATION_FAILED | EVALUATED | LATE | INVALID
  */
 export function getSubmissionStatusMeta(
   status: SubmissionStatus,
   isFinal: boolean,
-  isLate?: boolean
+  isLate?: boolean,
+  hasOnTimeHistory?: boolean
 ): {
   normalizedStatus: string;
   badgeVariant: BadgeVariant;
@@ -186,7 +283,11 @@ export function getSubmissionStatusMeta(
       return {
         normalizedStatus,
         badgeVariant: 'success',
-        badgeLabel: isLate ? 'Đã chấm điểm (Nộp muộn)' : 'Đã chấm điểm',
+        badgeLabel: isLate
+          ? hasOnTimeHistory
+            ? 'Đã chấm điểm (Có cập nhật bổ sung)'
+            : 'Đã chấm điểm (Nộp muộn)'
+          : 'Đã chấm điểm',
         containerClass: 'bg-emerald-500/10 border-emerald-500/30',
         iconBgClass: 'bg-emerald-500/20 text-emerald-400',
         title: isFinal
@@ -216,13 +317,25 @@ export function getSubmissionStatusMeta(
           'Hệ thống vẫn bảo lưu thời điểm nộp đúng hạn của đội và đã báo Ban tổ chức kiểm tra kho mã nguồn.',
       };
     case 'late':
+      if (hasOnTimeHistory) {
+        return {
+          normalizedStatus: 'late',
+          badgeVariant: 'cyan',
+          badgeLabel: 'Cập nhật bổ sung (Muộn)',
+          containerClass: 'bg-sky-500/10 border-sky-500/30',
+          iconBgClass: 'bg-sky-500/20 text-sky-400',
+          title: 'Đã hoàn thành đúng hạn — Có bản cập nhật bổ sung (Sau hạn chuẩn)',
+          statusNote:
+            'Bản nộp gốc (v1) của đội đã được ghi nhận đúng hạn hợp lệ. Phiên bản cập nhật bổ sung mới nhất được gửi sau thời hạn chuẩn.',
+        };
+      }
       return {
         normalizedStatus: 'late',
         badgeVariant: 'warning',
         badgeLabel: 'Nộp muộn',
         containerClass: 'bg-amber-500/10 border-amber-500/30',
         iconBgClass: 'bg-amber-500/20 text-amber-400',
-        title: 'Đã ghi nhận bài nộp (Sau thời hạn chuẩn — Cờ Nộp muộn)',
+        title: 'Đã ghi nhận bài nộp (Sau thời hạn chuẩn)',
         statusNote:
           'Bài nộp được tiếp nhận sau thời hạn chuẩn của chặng và được hệ thống gắn cờ Nộp muộn.',
       };
@@ -241,12 +354,12 @@ export function getSubmissionStatusMeta(
       return {
         normalizedStatus: 'submitted',
         badgeVariant: 'success',
-        badgeLabel: 'Đã nộp',
+        badgeLabel: 'Đã nộp đúng hạn',
         containerClass: 'bg-emerald-500/10 border-emerald-500/30',
         iconBgClass: 'bg-emerald-500/20 text-emerald-400',
         title: isFinal
-          ? 'Đã ghi nhận bài nộp sản phẩm thành công!'
-          : 'Đã ghi nhận báo cáo tiến độ thành công!',
+          ? 'Đã ghi nhận bài nộp sản phẩm đúng hạn!'
+          : 'Đã ghi nhận báo cáo tiến độ đúng hạn!',
       };
     default:
       return {
