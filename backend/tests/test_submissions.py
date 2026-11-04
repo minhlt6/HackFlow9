@@ -482,7 +482,7 @@ async def test_uat_cp_06_deadline_exceeded_by_1_second(client: AsyncClient):
         await session.refresh(cp)
         cp_id = str(cp.id)
 
-    # Nộp tại deadline + 1 giây khi grace_period_seconds = 0 -> 400 DEADLINE_EXCEEDED
+    # Nộp tại deadline + 1 giây khi grace_period_seconds = 0 -> Được tiếp nhận nhưng gắn cờ Nộp muộn (status='late', is_late=True)
     res = await client.post(
         "/api/v1/submissions",
         headers={"Authorization": f"Bearer {tokens['leader']}"},
@@ -492,8 +492,11 @@ async def test_uat_cp_06_deadline_exceeded_by_1_second(client: AsyncClient):
             "simulate_time": (deadline + timedelta(seconds=1)).isoformat(),
         },
     )
-    assert res.status_code == 400
-    assert res.json()["error_code"] == "DEADLINE_EXCEEDED"
+    assert res.status_code == 200
+    data = res.json()["data"]
+    assert data["status"] == "late"
+    assert data["is_late"] is True
+    assert data["grace_period_applied"] is False
 
 
 # ─── UAT-CP-07 & UAT-FIX-06: Xử lý Repo Private/Inaccessible & Tự động Rollback an toàn ───
@@ -853,7 +856,7 @@ async def test_uat_cp_13_admin_extends_deadline_and_team_submits_with_audit_logs
         await session.refresh(cp)
         cp_id = str(cp.id)
 
-    # 1. Đội trưởng nộp khi đã quá hạn -> 400 DEADLINE_EXCEEDED
+    # 1. Đội trưởng nộp khi đã quá hạn -> Được tiếp nhận với trạng thái 'late' và cờ is_late=True
     res_expired = await client.post(
         "/api/v1/submissions",
         headers={"Authorization": f"Bearer {tokens['leader']}"},
@@ -862,8 +865,9 @@ async def test_uat_cp_13_admin_extends_deadline_and_team_submits_with_audit_logs
             "submission_data": {"demo_url": "https://demo.hackflow.dev"},
         },
     )
-    assert res_expired.status_code == 400
-    assert res_expired.json()["error_code"] == "DEADLINE_EXCEEDED"
+    assert res_expired.status_code == 200
+    assert res_expired.json()["data"]["status"] == "late"
+    assert res_expired.json()["data"]["is_late"] is True
 
     # 2. Admin gia hạn deadline thêm 2 giờ
     new_deadline = now + timedelta(hours=2)
@@ -874,7 +878,7 @@ async def test_uat_cp_13_admin_extends_deadline_and_team_submits_with_audit_logs
     )
     assert ext_res.status_code == 200
 
-    # 3. Đội trưởng nộp bài thành công sau khi được gia hạn
+    # 3. Đội trưởng nộp bài thành công sau khi được gia hạn (status chuyển về 'submitted', is_late=False)
     res_ok = await client.post(
         "/api/v1/submissions",
         headers={"Authorization": f"Bearer {tokens['leader']}"},
@@ -885,6 +889,7 @@ async def test_uat_cp_13_admin_extends_deadline_and_team_submits_with_audit_logs
     )
     assert res_ok.status_code == 200
     assert res_ok.json()["data"]["status"] == "submitted"
+    assert res_ok.json()["data"]["is_late"] is False
 
     # 4. Admin truy vấn Audit Log thấy cả CHECKPOINT_DEADLINE_EXTENDED và SUBMISSION_CREATED
     logs_res = await client.get(

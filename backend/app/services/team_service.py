@@ -178,6 +178,11 @@ class TeamService:
         config = await topic_repo.get_config(db)
         if not config:
             return
+        if bool((config.settings_data or {}).get("is_paused", False)):
+            raise ConflictException(
+                message="Cuộc thi đang tạm dừng theo lệnh của Ban Tổ Chức, tạm thời không thể tạo hoặc tham gia đội thi.",
+                error_code="CONTEST_PAUSED",
+            )
         status_code = str((config.settings_data or {}).get("status", "")).strip().lower()
         if status_code in {"judging", "completed"}:
             raise ConflictException(

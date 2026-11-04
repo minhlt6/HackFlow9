@@ -30,6 +30,7 @@ import {
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import type { EnrichedAdminTeam } from '../../api/adminTeamsApi';
+import { useMockStore } from '../../store/useMockStore';
 
 export interface TeamDetailDialogProps {
   team: EnrichedAdminTeam | null;
@@ -52,7 +53,9 @@ export const TeamDetailDialog: React.FC<TeamDetailDialogProps> = ({
   onReject,
   onEdit,
 }) => {
+  const { checkpoints, submissions } = useMockStore();
   if (!team) return null;
+  const teamSubmissions = submissions.filter((s) => s.teamId === team.id);
 
   const statusNormalized = team.status.toLowerCase();
 
@@ -133,6 +136,58 @@ export const TeamDetailDialog: React.FC<TeamDetailDialogProps> = ({
             <div className="sm:col-span-2 space-y-1 pt-2 border-t border-border">
               <span className="text-muted-foreground">Mô tả giải pháp kỹ thuật:</span>
               <p className="text-foreground leading-relaxed">{team.description}</p>
+              {checkpoints.length > 0 && (
+                <div className="space-y-2 pt-3 mt-2 border-t border-border">
+                  <span className="text-muted-foreground font-medium block">
+                    Chi tiết tiến độ từng chặng Checkpoint:
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {checkpoints.map((cp, idx) => {
+                      const sub =
+                        cp.status === 'upcoming'
+                          ? undefined
+                          : teamSubmissions.find((s) => s.checkpointId === cp.id);
+                      const isLateSub = Boolean(
+                        sub &&
+                          (sub.isAfterDeadline ||
+                            String(sub.status || '').toLowerCase() === 'late')
+                      );
+                      return (
+                        <div
+                          key={cp.id}
+                          className="flex items-center justify-between gap-2 rounded-md border border-border bg-card px-2.5 py-1.5"
+                        >
+                          <div className="min-w-0">
+                            <div className="font-semibold text-foreground truncate text-[11px]">
+                              CP #{idx + 1}: {cp.title || cp.name}
+                            </div>
+                            {sub?.submittedAt && (
+                              <div className="text-[10px] text-muted-foreground font-mono">
+                                {new Date(sub.submittedAt).toLocaleString('vi-VN')}
+                              </div>
+                            )}
+                          </div>
+                          <div className="shrink-0">
+                            {sub ? (
+                              isLateSub ? (
+                                <Badge variant="warning">Nộp muộn</Badge>
+                              ) : (
+                                <Badge variant="success">Đã nộp</Badge>
+                              )
+                            ) : cp.status === 'upcoming' ? (
+                              <Badge variant="indigo">Chưa mở</Badge>
+                            ) : cp.status === 'late' ? (
+                              <Badge variant="warning">Quá hạn</Badge>
+                            ) : (
+                              <Badge variant="neutral">Chưa nộp</Badge>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             {team.repoUrl && (

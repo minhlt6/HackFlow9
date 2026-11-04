@@ -8,6 +8,7 @@ class CheckpointStatus(str, Enum):
     UPCOMING = "upcoming"
     OPEN = "open"
     GRACE_PERIOD = "grace_period"
+    LATE = "late"
     CLOSED = "closed"
 
 
@@ -97,9 +98,12 @@ class CheckpointResponse(BaseModel):
     is_active: bool
     is_final_checkpoint: bool = Field(False, description="True nếu là checkpoint chốt sản phẩm HEAD Commit SHA")
     submission_fields: Optional[List[Dict[str, Any]]] = Field(None, description="Danh sách các trường nộp bài động")
-    status: str = Field(..., description="upcoming | open | grace_period | closed")
-    is_open: bool = Field(..., description="True nếu cổng đang mở hoặc đang trong thời gian ân hạn mạng")
+    status: str = Field(..., description="upcoming | open | grace_period | late | closed")
+    is_open: bool = Field(..., description="True nếu cổng đang mở, trong ân hạn mạng hoặc đang mở nộp muộn")
     can_submit: bool = Field(..., description="True nếu cho phép nộp bài tại thời điểm hiện tại")
+    is_late_window: bool = Field(False, description="True nếu đã quá hạn chuẩn và đang mở tiếp nhận bài nộp muộn")
+    contest_allows_submission: bool = Field(True, description="True nếu giai đoạn cuộc thi và trạng thái đội cho phép nộp bài")
+    submission_block_reason: Optional[str] = Field(None, description="Lý do khóa nộp bài từ giai đoạn cuộc thi hoặc trạng thái đội")
     grace_period_seconds: int = Field(5, description="Thời gian ân hạn mạng cho phép (giây)")
     time_remaining_seconds: int = Field(0, description="Số giây còn lại đến deadline chính thức (0 nếu đã quá hạn)")
     time_until_start_seconds: int = Field(0, description="Số giây đếm ngược đến lúc mở cổng (0 nếu đã mở)")
@@ -124,6 +128,9 @@ class CheckpointTimeGatedStatusResponse(BaseModel):
     is_open: bool
     status: str
     can_submit: bool
+    is_late_window: bool = False
+    contest_allows_submission: bool = True
+    submission_block_reason: Optional[str] = None
     grace_period_applied: bool
     grace_period_seconds: int = 5
     is_final_checkpoint: bool = False
@@ -135,6 +142,7 @@ class CheckpointTimeGatedStatusResponse(BaseModel):
 class ValidateSubmissionWindowResponse(BaseModel):
     is_valid: bool
     grace_period_applied: bool
+    is_late_window: bool = False
     checkpoint_id: str
     checkpoint_title: str
     server_time: datetime

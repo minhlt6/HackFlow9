@@ -2,6 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import apiClient, { lastApiMutationVersion } from '../api/axiosClient';
 import { notificationsApi } from '../api/notificationsApi';
+import {
+  buildConfigPatchPayload,
+  contestConfigService,
+  normalizeBackendConfig,
+} from '../services/contestConfigService';
 import { ticketService } from '../services/ticketService';
 import { useAuthStore } from './useAuthStore';
 
@@ -452,33 +457,11 @@ export const useMockStore = create<MockStoreState>()(
       // Config
       config: initialHackathonConfig,
       updateConfig: async (newConfig) => {
-        const minVal = newConfig.minTeamMembers ?? newConfig.minTeamSize;
-        const maxVal = newConfig.maxTeamMembers ?? newConfig.maxTeamSize;
-        const response = await apiClient.patch('/admin/config', {
-          name: newConfig.name,
-          end_time: newConfig.finalSubmissionDeadline,
-          minTeamSize: minVal,
-          minTeamMembers: minVal,
-          maxTeamSize: maxVal,
-          maxTeamMembers: maxVal,
-          currentPhase: newConfig.currentPhase,
-          blindJudgingEnabled: newConfig.blindJudgingMode ?? newConfig.blindJudging,
-          is_result_published: newConfig.resultsPublished,
-        });
-        const saved = response.data?.data;
-        if (!saved?.id || !saved.end_time) throw new Error('Phản hồi cấu hình không hợp lệ. Vui lòng tải lại trang.');
+        const currentCfg = get().config;
+        const payload = buildConfigPatchPayload(newConfig, currentCfg);
+        const saved = await contestConfigService.patchAdminConfig(payload);
         set((state) => ({
-          config: {
-            ...state.config,
-            ...newConfig,
-            name: String(saved.name), currentPhase: String(saved.currentPhase),
-            finalSubmissionDeadline: String(saved.end_time),
-            isContestStarted: ['hacking', 'judging', 'completed'].includes(
-              String(saved.status || '').toLowerCase()
-            ),
-            minTeamSize: Number(saved.minTeamSize), minTeamMembers: Number(saved.minTeamMembers),
-            maxTeamSize: Number(saved.maxTeamSize), maxTeamMembers: Number(saved.maxTeamMembers),
-          },
+          config: normalizeBackendConfig(saved, { ...state.config, ...newConfig }),
         }));
       },
       toggleBlindJudging: async () => {
@@ -491,10 +474,18 @@ export const useMockStore = create<MockStoreState>()(
         set((state) => ({ config: { ...state.config, resultsPublished: next } }));
       },
       toggleContestStarted: async () => {
-        const next = !get().config.isContestStarted;
-        const response = await apiClient.patch('/admin/config', { status: next ? 'hacking' : 'registration' });
-        const saved = response.data.data;
-        set((state) => ({ config: { ...state.config, isContestStarted: saved.status === 'hacking', currentPhase: String(saved.currentPhase) } }));
+        const currentCfg = get().config;
+        const isCurrentlyRunning = Boolean(currentCfg.isContestStarted) && !currentCfg.isPaused;
+        const payload: Record<string, unknown> = isCurrentlyRunning
+          ? { is_paused: true }
+          : { status: 'hacking', is_paused: false };
+        if (typeof currentCfg.version === 'number') {
+          payload.expected_version = currentCfg.version;
+        }
+        const saved = await contestConfigService.patchAdminConfig(payload);
+        set((state) => ({
+          config: normalizeBackendConfig(saved, state.config),
+        }));
       },
 
       // Whitelist
@@ -1469,7 +1460,7 @@ export const useMockStore = create<MockStoreState>()(
                 approvalNow === 'approved'
               ? apiClient.get('/tickets/me')
               : Promise.resolve({ data: null }),
-          roleNow === 'judge' || isUnapprovedCandidate ? Promise.resolve({ data: null }) : apiClient.get('/submissions'),
+          roleNow === 'judge' || isUnapprovedCandidate ? Promise.resolve({ data: null }) : apiClient.get('/submissions?include_history=false'),
           roleNow === 'judge' || roleNow === 'admin'
             ? apiClient.get('/evaluations/submissions')
             : Promise.resolve({ data: null }),
@@ -1519,9 +1510,12 @@ export const useMockStore = create<MockStoreState>()(
               const startStr = String(cp.start_time ?? deadlineStr);
               const deadlineMs = new Date(deadlineStr).getTime();
               const startMs = new Date(startStr).getTime();
-              let status: 'upcoming' | 'open' | 'closed' = 'open';
-              if (now > deadlineMs) status = 'closed';
-              else if (now < startMs) status = 'upcoming';
+              const isActive = cp.is_active !== false;
+              const rawStatus = String(cp.status ?? '').toLowerCase();
+              let status: 'upcoming' | 'open' | 'late' | 'closed' = 'open';
+              if (!isActive || rawStatus === 'closed') status = 'closed';
+              else if (rawStatus === 'late' || now > deadlineMs) status = 'late';
+              else if (rawStatus === 'upcoming' || now < startMs) status = 'upcoming';
 
               return {
                 id: String(cp.id),
@@ -1754,7 +1748,11 @@ export const useMockStore = create<MockStoreState>()(
           if (Array.isArray(subArr)) {
             const mappedSubs: CheckpointSubmission[] = [];
             const mappedFinals: FinalSubmission[] = [];
+            const seenTeamCheckpoint = new Set<string>();
+            const seenFinalTeam = new Set<string>();
             for (const raw of subArr as Array<Record<string, unknown>>) {
+              const rawId = String(raw.id ?? '');
+              if (/-v\d+$/i.test(rawId)) continue;
               const subData =
                 raw.submission_data && typeof raw.submission_data === 'object'
                   ? (raw.submission_data as Record<string, unknown>)
@@ -1765,11 +1763,32 @@ export const useMockStore = create<MockStoreState>()(
               const note = String(raw.note ?? subData.note ?? subData.description ?? '');
               const teamId = String(raw.team_id ?? '');
               const cpId = String(raw.checkpoint_id ?? '');
+              const matchedCp = (updates.checkpoints || get().checkpoints).find(
+                (cp) => cp.id === cpId,
+              );
+              if (matchedCp && matchedCp.status === 'upcoming') continue;
               const submittedAt = String(raw.submitted_at ?? new Date().toISOString());
               const commitSha = String(raw.commit_sha ?? '');
+              const subKey = `${cpId}:${teamId}`;
+              if (cpId && teamId) {
+                if (seenTeamCheckpoint.has(subKey)) continue;
+                seenTeamCheckpoint.add(subKey);
+              }
+
+              const isLateFlag = Boolean(
+                raw.is_late ||
+                  raw.grace_period_applied ||
+                  subData.is_late === true ||
+                  String(raw.status || '').toLowerCase() === 'late'
+              );
+              const normalizedSubStatus = (
+                isLateFlag && String(raw.status || '').toLowerCase() === 'submitted'
+                  ? 'late'
+                  : String(raw.status || 'invalid').toLowerCase()
+              ) as CheckpointSubmission['status'];
 
               mappedSubs.push({
-                id: String(raw.id),
+                id: rawId,
                 checkpointId: cpId,
                 teamId,
                 repoUrl,
@@ -1777,11 +1796,16 @@ export const useMockStore = create<MockStoreState>()(
                 description: note,
                 commitSha,
                 submittedAt,
-                isAfterDeadline: Boolean(raw.grace_period_applied),
-                status: String(raw.status || 'invalid').toLowerCase() as CheckpointSubmission['status'],
+                isAfterDeadline: isLateFlag,
+                status: normalizedSubStatus,
               });
 
-              if ((updates.checkpoints || get().checkpoints).some((cp) => cp.id === cpId && cp.isFinalCheckpoint) && raw.status === 'submitted') {
+              if (
+                (updates.checkpoints || get().checkpoints).some((cp) => cp.id === cpId && cp.isFinalCheckpoint) &&
+                (raw.status === 'submitted' || raw.status === 'late') &&
+                (!teamId || !seenFinalTeam.has(teamId))
+              ) {
+                if (teamId) seenFinalTeam.add(teamId);
                 mappedFinals.push({
                   teamId,
                   repoUrl,
@@ -1790,7 +1814,7 @@ export const useMockStore = create<MockStoreState>()(
                   summary: note,
                   commitSha,
                   submittedAt,
-                  isLate: Boolean(raw.grace_period_applied),
+                  isLate: isLateFlag,
                   status: 'submitted',
                 });
               }
@@ -1969,51 +1993,7 @@ export const useMockStore = create<MockStoreState>()(
         if (configRes.status === 'fulfilled' && configRes.value.data) {
           const cfgObj = unwrap(configRes.value.data) as Record<string, unknown> | null;
           if (cfgObj && typeof cfgObj === 'object') {
-            const currCfg = get().config;
-            const phaseMap: Record<string, string> = {
-              registration: 'Giai đoạn 1: Mở đăng ký & Thành lập Đội thi',
-              team_formation: 'Giai đoạn 2: Thành lập Đội thi & Chọn Đề tài',
-              hacking: 'Giai đoạn 3: Thực thi dự án và Nộp bài các chặng',
-              judging: 'Giai đoạn 4: Chấm điểm Độc lập & Bảo vệ Chung kết',
-              completed: 'Giai đoạn 5: Công bố Kết quả & Vinh danh Chung cuộc',
-            };
-            const rawPhaseStr = String(cfgObj.currentPhase ?? cfgObj.status ?? currCfg.currentPhase);
-            const mappedPhase = phaseMap[rawPhaseStr.toLowerCase()] || rawPhaseStr;
-            const minMembersVal = Math.max(
-              1,
-              Number(cfgObj.minTeamMembers ?? cfgObj.minTeamSize ?? currCfg.minTeamMembers ?? currCfg.minTeamSize ?? 3),
-            );
-            const maxMembersVal = Math.max(
-              minMembersVal,
-              Number(cfgObj.maxTeamMembers ?? cfgObj.maxTeamSize ?? currCfg.maxTeamMembers ?? currCfg.maxTeamSize ?? 5),
-            );
-            updates.config = {
-              ...currCfg,
-              name: String(cfgObj.name ?? cfgObj.eventName ?? currCfg.name),
-              currentPhase: mappedPhase,
-              isContestStarted:
-                ['hacking', 'judging', 'completed'].includes(
-                  String(cfgObj.status || '').toLowerCase()
-                ) ||
-                mappedPhase.includes('Giai đoạn 3') ||
-                mappedPhase.includes('Giai đoạn 4') ||
-                mappedPhase.includes('Giai đoạn 5'),
-              contestStart: String(cfgObj.start_time ?? ''),
-              contestEnd: String(cfgObj.end_time ?? ''),
-              blindJudging: Boolean(cfgObj.blindJudgingEnabled ?? currCfg.blindJudging),
-              blindJudgingMode: Boolean(cfgObj.blindJudgingEnabled ?? currCfg.blindJudgingMode),
-              resultsPublished: Boolean(cfgObj.is_result_published ?? cfgObj.leaderboardPublished ?? currCfg.resultsPublished),
-              minTeamSize: minMembersVal,
-              minTeamMembers: minMembersVal,
-              maxTeamSize: maxMembersVal,
-              maxTeamMembers: maxMembersVal,
-              finalSubmissionDeadline: String(cfgObj.end_time ?? cfgObj.endAt ?? currCfg.finalSubmissionDeadline),
-              discrepancyThreshold: Number(cfgObj.discrepancyThreshold ?? currCfg.discrepancyThreshold ?? 15),
-              expectedResultPublishAt:
-                cfgObj.expectedResultPublishAt !== undefined
-                  ? (cfgObj.expectedResultPublishAt as string | null)
-                  : currCfg.expectedResultPublishAt,
-            };
+            updates.config = normalizeBackendConfig(cfgObj, get().config);
           }
         }
 

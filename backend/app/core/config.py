@@ -1,9 +1,11 @@
 import json
-import os
 from functools import lru_cache
 from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+DEFAULT_DEV_SECRET_KEY = "hackflow9-super-secret-key-development-minimum-32-chars-long"
 
 
 class Settings(BaseSettings):
@@ -15,14 +17,40 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
     ENVIRONMENT: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     ENABLE_DEMO_DATA: bool = False
-    ENABLE_STARTUP_SEED: bool = True
+    ENABLE_STARTUP_SEED: bool = False
 
     @property
     def demo_enabled(self) -> bool:
-        return self.ENABLE_DEMO_DATA and self.ENVIRONMENT in {"development", "test"}
+        return self.ENABLE_DEMO_DATA and self.ENVIRONMENT in {"development", "test", "testing"}
 
+    def validate_production_readiness(self) -> List[str]:
+        """
+        Validate required security and operational settings when running in production.
+        Never includes secret values or passwords in error messages.
+        """
+        if str(self.ENVIRONMENT or "").strip().lower() != "production":
+            return []
+        errors: List[str] = []
+        if self.DEBUG:
+            errors.append("DEBUG must be False in production.")
+        if self.ENABLE_DEMO_DATA:
+            errors.append("ENABLE_DEMO_DATA must be False in production.")
+        if self.ENABLE_STARTUP_SEED:
+            errors.append("ENABLE_STARTUP_SEED must be False in production.")
+        secret = (self.SECRET_KEY or "").strip()
+        if len(secret) < 32 or secret == DEFAULT_DEV_SECRET_KEY:
+            errors.append("A distinct SECRET_KEY (>= 32 chars) must be configured in production.")
+        db_url = (self.DATABASE_URL or "").strip()
+        if not db_url:
+            errors.append("DATABASE_URL must be explicitly configured in production.")
+        return errors
+
+    def validate_production_config_or_raise(self) -> None:
+        errors = self.validate_production_readiness()
+        if errors:
+            raise RuntimeError("Production configuration check failed: " + "; ".join(errors))
 
     # CORS Configuration
     CORS_ORIGINS: Union[List[str], str] = [
@@ -61,10 +89,6 @@ class Settings(BaseSettings):
         url = (self.DATABASE_URL or "").strip()
         if not url or url == "sqlite":
             return "sqlite+aiosqlite:///./hackflow.db"
-        if "@db." in url and ".supabase.co" in url and (
-            os.getenv("RAILWAY_ENVIRONMENT") or os.getenv("RAILWAY_SERVICE_ID")
-        ):
-            return "sqlite+aiosqlite:///./hackflow.db"
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
@@ -79,7 +103,7 @@ class Settings(BaseSettings):
         return url
 
     # Security & JWT Token
-    SECRET_KEY: str = "hackflow9-super-secret-key-development-minimum-32-chars-long"
+    SECRET_KEY: str = DEFAULT_DEV_SECRET_KEY
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 24 hours
 

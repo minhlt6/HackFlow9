@@ -48,8 +48,11 @@ async def test_final_checks_role_deadline_and_real_sha(client, monkeypatch):
         cp = await session.get(Checkpoint, cp_id)
         cp.deadline = now-timedelta(minutes=1)
         await session.commit()
-    late = await client.post("/api/v1/submissions/final", headers={"Authorization": f"Bearer {tokens['leader']}"}, json=payload)
-    assert late.status_code == 400
+    with patch.object(github_service, "fetch_head_commit", new=AsyncMock(return_value=make_mock_verify_response())):
+        late = await client.post("/api/v1/submissions/final", headers={"Authorization": f"Bearer {tokens['leader']}"}, json=payload)
+    assert late.status_code == 200
+    assert late.json()["data"]["status"] == "late"
+    assert late.json()["data"]["is_late"] is True
 
 @pytest.mark.asyncio
 async def test_team_description_persists_and_member_cannot_edit(client):
@@ -155,8 +158,8 @@ async def test_production_lifespan_falls_back_to_sqlite_on_gaierror(monkeypatch)
     monkeypatch.setattr(db_module, "switch_to_sqlite_fallback", fake_switch)
 
     async with main_module.lifespan(main_module.app):
-        assert calls["switched"] is True
-        assert calls["count"] == 2
+        assert calls["switched"] is False
+        assert calls["count"] == 1
 
 
 @pytest.mark.asyncio

@@ -143,7 +143,7 @@ export interface Checkpoint {
   weight?: number;
   points?: number;
   penaltyPerDay?: number;
-  status?: 'upcoming' | 'open' | 'closed';
+  status?: 'upcoming' | 'open' | 'grace_period' | 'late' | 'closed';
   blockConsecutiveMissing?: boolean;
 }
 
@@ -253,9 +253,46 @@ export interface Announcement {
   isPinned?: boolean;
 }
 
+export interface ConfigHistoryEntry {
+  version: number;
+  updated_at: string;
+  updated_by: string;
+  changes: Record<string, { old: unknown; new: unknown }>;
+}
+
+export interface ConfigImpactPreview {
+  min_team_members: number;
+  max_team_members: number;
+  under_min_teams_count: number;
+  over_max_teams_count: number;
+  under_min_teams: Array<{ id: string; team_name: string; member_count: number; status: string }>;
+  over_max_teams: Array<{ id: string; team_name: string; member_count: number; status: string }>;
+  open_checkpoints_count: number;
+  open_checkpoints: Array<{ id: string; title: string; deadline: string }>;
+  unverified_final_submissions_count: number;
+  unverified_final_submissions: Array<{ id: string; team_id: string; status: string }>;
+}
+
+export type ContestPhaseCode = 'registration' | 'team_formation' | 'hacking' | 'judging' | 'completed';
+export type ContestStateCode = 'not_started' | 'running' | 'paused' | 'judging' | 'completed';
+export type TeamSizeEnforcementPolicy = 'grandfathered_approved' | 'strict_all' | 'before_lock_only';
+
 export interface HackathonConfig {
   name: string;
   currentPhase: string;
+  status?: ContestPhaseCode;
+  version?: number;
+  isPaused?: boolean;
+  pauseReason?: string | null;
+  pausedAt?: string | null;
+  contestState?: ContestStateCode;
+  contestStateLabel?: string;
+  teamSizeEnforcementPolicy?: TeamSizeEnforcementPolicy;
+  submissionFreezeEnabled?: boolean;
+  configHistory?: ConfigHistoryEntry[];
+  impactPreview?: ConfigImpactPreview;
+  currentPolicy?: Record<string, unknown>;
+  phasePolicies?: Record<string, Record<string, unknown>>;
   finalSubmissionDeadline: string;
   minTeamMembers?: number;
   maxTeamMembers: number;

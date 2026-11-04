@@ -59,6 +59,7 @@ class CheckpointService:
                 "status": CheckpointStatus.CLOSED.value,
                 "is_open": False,
                 "can_submit": False,
+                "is_late_window": False,
                 "grace_period_applied": False,
                 "grace_period_seconds": grace_sec,
                 "is_final_checkpoint": is_final,
@@ -76,6 +77,7 @@ class CheckpointService:
                 "status": CheckpointStatus.UPCOMING.value,
                 "is_open": False,
                 "can_submit": False,
+                "is_late_window": False,
                 "grace_period_applied": False,
                 "grace_period_seconds": grace_sec,
                 "is_final_checkpoint": is_final,
@@ -93,6 +95,7 @@ class CheckpointService:
                 "status": CheckpointStatus.OPEN.value,
                 "is_open": True,
                 "can_submit": True,
+                "is_late_window": False,
                 "grace_period_applied": False,
                 "grace_period_seconds": grace_sec,
                 "is_final_checkpoint": is_final,
@@ -110,6 +113,7 @@ class CheckpointService:
                 "status": CheckpointStatus.GRACE_PERIOD.value,
                 "is_open": True,
                 "can_submit": True,
+                "is_late_window": False,
                 "grace_period_applied": True,
                 "grace_period_seconds": grace_sec,
                 "is_final_checkpoint": is_final,
@@ -121,15 +125,16 @@ class CheckpointService:
                 "time_until_start_seconds": 0,
             }
 
-        # 5. Quá hạn nộp bài hoàn toàn (Sau deadline + grace_period_seconds)
+        # 5. Đã qua thời hạn chuẩn (Sau deadline + grace_period_seconds) -> Vẫn mở cổng tiếp nhận bài nộp muộn
         return {
-            "status": CheckpointStatus.CLOSED.value,
-            "is_open": False,
-            "can_submit": False,
+            "status": CheckpointStatus.LATE.value,
+            "is_open": True,
+            "can_submit": True,
+            "is_late_window": True,
             "grace_period_applied": False,
             "grace_period_seconds": grace_sec,
             "is_final_checkpoint": is_final,
-            "message": f"Đã quá thời hạn nộp bài cho checkpoint này (kể cả thời gian ân hạn mạng {grace_sec} giây).",
+            "message": "Đã qua thời hạn chuẩn — Cổng đang mở tiếp nhận bài nộp muộn (sẽ gắn cờ Nộp muộn).",
             "server_time": current_time,
             "start_time": start_time,
             "deadline": deadline,
@@ -180,9 +185,12 @@ class CheckpointService:
         now: Optional[datetime] = None,
         latest_submission: Optional[dict] = None,
         order: Optional[int] = None,
+        submission_block_reason: Optional[str] = None,
     ) -> CheckpointResponse:
         info = cls.calculate_time_gate_info(checkpoint, now)
         resolved_order = order if order is not None else (int(checkpoint.display_order or 0) + 1)
+        contest_allows = submission_block_reason is None
+        effective_can_submit = bool(info["can_submit"] and contest_allows)
         return CheckpointResponse(
             id=str(checkpoint.id),
             weight=checkpoint.weight,
@@ -199,7 +207,10 @@ class CheckpointService:
             submission_fields=checkpoint.submission_fields,
             status=info["status"],
             is_open=info["is_open"],
-            can_submit=info["can_submit"],
+            can_submit=effective_can_submit,
+            is_late_window=bool(info.get("is_late_window", False)),
+            contest_allows_submission=contest_allows,
+            submission_block_reason=submission_block_reason,
             grace_period_seconds=info["grace_period_seconds"],
             time_remaining_seconds=info["time_remaining_seconds"],
             time_until_start_seconds=info["time_until_start_seconds"],
@@ -214,8 +225,12 @@ class CheckpointService:
         cls,
         checkpoint: Checkpoint,
         now: Optional[datetime] = None,
+        submission_block_reason: Optional[str] = None,
     ) -> CheckpointTimeGatedStatusResponse:
         info = cls.calculate_time_gate_info(checkpoint, now)
+        contest_allows = submission_block_reason is None
+        effective_can_submit = bool(info["can_submit"] and contest_allows)
+        effective_message = submission_block_reason or info["message"]
         return CheckpointTimeGatedStatusResponse(
             checkpoint_id=str(checkpoint.id),
             title=checkpoint.title,
@@ -225,14 +240,72 @@ class CheckpointService:
             is_active=checkpoint.is_active,
             is_open=info["is_open"],
             status=info["status"],
-            can_submit=info["can_submit"],
+            can_submit=effective_can_submit,
+            is_late_window=bool(info.get("is_late_window", False)),
+            contest_allows_submission=contest_allows,
+            submission_block_reason=submission_block_reason,
             grace_period_applied=info["grace_period_applied"],
             grace_period_seconds=info["grace_period_seconds"],
             is_final_checkpoint=info["is_final_checkpoint"],
             time_remaining_seconds=info["time_remaining_seconds"],
             time_until_start_seconds=info["time_until_start_seconds"],
-            message=info["message"],
+            message=effective_message,
         )
+
+    async def _resolve_submission_block_reason(
+        self,
+        db: AsyncSession,
+        user_id: Optional[str] = None,
+    ) -> Optional[str]:
+        from app.repositories.topic_repo import topic_repo
+        from app.services.contest_policy_service import get_contest_runtime_state
+
+        cfg = await topic_repo.get_config(db)
+        runtime = get_contest_runtime_state(cfg)
+        if runtime["submission_block_reason"]:
+            return runtime["submission_block_reason"]
+
+        if user_id:
+            from app.models.team import TeamStatus
+            from app.repositories.team_repo import team_repo
+
+            membership = await team_repo.get_user_membership(db, str(user_id))
+            if membership:
+                team_obj = await team_repo.get_by_id(db, str(membership.team_id))
+                if team_obj:
+                    team_meta = (
+                        team_obj.admin_meta
+                        if isinstance(getattr(team_obj, "admin_meta", None), dict)
+                        else {}
+                    )
+                    if (
+                        getattr(team_obj, "status", None) == TeamStatus.REJECTED
+                        or str(team_meta.get("approval_status", "")).lower() == "rejected"
+                    ):
+                        return "Đội thi của bạn đã bị Ban Tổ Chức từ chối hoặc đình chỉ tư cách thi đấu."
+        return None
+
+    async def _resolve_effective_now(
+        self,
+        db: AsyncSession,
+        now: Optional[datetime] = None,
+    ) -> Optional[datetime]:
+        if now is not None:
+            return now
+        from app.repositories.topic_repo import topic_repo
+        from app.services.contest_policy_service import get_contest_runtime_state
+
+        cfg = await topic_repo.get_config(db)
+        runtime = get_contest_runtime_state(cfg)
+        if runtime.get("is_paused") and runtime.get("paused_at"):
+            try:
+                raw_paused = str(runtime["paused_at"]).strip()
+                if raw_paused.endswith("Z"):
+                    raw_paused = raw_paused[:-1] + "+00:00"
+                return ensure_utc(datetime.fromisoformat(raw_paused))
+            except Exception:
+                return None
+        return None
 
     async def list_checkpoints(
         self,
@@ -243,6 +316,8 @@ class CheckpointService:
     ) -> List[CheckpointResponse]:
         checkpoints = await checkpoint_repo.get_all(db, only_active=only_active)
         submissions_by_cp: dict = {}
+        block_reason = await self._resolve_submission_block_reason(db, user_id=user_id)
+        effective_now = await self._resolve_effective_now(db, now=now)
         if user_id:
             from app.repositories.team_repo import team_repo
             from app.repositories.submission_repo import submission_repo
@@ -261,9 +336,10 @@ class CheckpointService:
         return [
             self.build_checkpoint_response(
                 cp,
-                now,
+                effective_now,
                 latest_submission=submissions_by_cp.get(str(cp.id)),
                 order=idx + 1,
+                submission_block_reason=block_reason,
             )
             for idx, cp in enumerate(checkpoints)
         ]
@@ -279,6 +355,8 @@ class CheckpointService:
         if not cp:
             raise NotFoundException(message=f"Không tìm thấy checkpoint với ID '{checkpoint_id}'.")
 
+        block_reason = await self._resolve_submission_block_reason(db, user_id=user_id)
+        effective_now = await self._resolve_effective_now(db, now=now)
         latest_sub = None
         if user_id:
             from app.repositories.team_repo import team_repo
@@ -295,7 +373,12 @@ class CheckpointService:
                         mode="json"
                     )
 
-        return self.build_checkpoint_response(cp, now, latest_submission=latest_sub)
+        return self.build_checkpoint_response(
+            cp,
+            effective_now,
+            latest_submission=latest_sub,
+            submission_block_reason=block_reason,
+        )
 
 
     async def get_time_gated_status(
@@ -307,7 +390,9 @@ class CheckpointService:
         cp = await checkpoint_repo.get_by_id(db, checkpoint_id)
         if not cp:
             raise NotFoundException(message=f"Không tìm thấy checkpoint với ID '{checkpoint_id}'.")
-        return self.build_status_response(cp, now)
+        block_reason = await self._resolve_submission_block_reason(db)
+        effective_now = await self._resolve_effective_now(db, now=now)
+        return self.build_status_response(cp, effective_now, submission_block_reason=block_reason)
 
     async def verify_submission_window(
         self,
@@ -319,14 +404,22 @@ class CheckpointService:
         if not cp:
             raise NotFoundException(message=f"Không tìm thấy checkpoint với ID '{checkpoint_id}'.")
 
+        block_reason = await self._resolve_submission_block_reason(db)
+        if block_reason:
+            raise ForbiddenException(
+                message=block_reason,
+                error_code="CONTEST_SUBMISSION_LOCKED",
+            )
         is_valid, grace_applied, message = self.validate_checkpoint_submission_window(
             cp, now=simulate_time
         )
+        gate_info = self.calculate_time_gate_info(cp, now=simulate_time)
         server_time = ensure_utc(simulate_time or datetime.now(timezone.utc))
 
         return ValidateSubmissionWindowResponse(
             is_valid=is_valid,
             grace_period_applied=grace_applied,
+            is_late_window=bool(gate_info.get("is_late_window", False)),
             checkpoint_id=str(cp.id),
             checkpoint_title=cp.title,
             server_time=server_time,
@@ -378,8 +471,19 @@ class CheckpointService:
         if deadline_utc <= start_utc:
             raise BadRequestException(message="Hạn chót (deadline) phải diễn ra sau thời điểm mở cổng (start_time).")
 
-        if data.display_order is not None and not data.is_final_checkpoint:
-            existing_cps = await checkpoint_repo.get_all(db)
+        existing_cps = await checkpoint_repo.get_all(db)
+        if data.is_final_checkpoint:
+            existing_finals = [fcp for fcp in existing_cps if fcp.is_final_checkpoint]
+            if existing_finals:
+                raise BadRequestException(
+                    message="Hệ thống chỉ cho phép duy nhất 1 Chặng Chung kết (is_final_checkpoint=true)."
+                )
+            for pcp in existing_cps:
+                if not pcp.is_final_checkpoint and deadline_utc < ensure_utc(pcp.deadline):
+                    raise BadRequestException(
+                        message="Hạn chót của Chặng Chung kết không được sớm hơn hạn chót của các chặng tiến độ."
+                    )
+        else:
             final_deadlines = [
                 ensure_utc(fcp.deadline)
                 for fcp in existing_cps
@@ -389,6 +493,35 @@ class CheckpointService:
                 raise BadRequestException(
                     message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
                 )
+            eff_order = int(data.display_order or 0)
+            if eff_order > 0:
+                for neighbor in existing_cps:
+                    if neighbor.is_final_checkpoint:
+                        continue
+                    n_order = int(neighbor.display_order or 0)
+                    if n_order <= 0:
+                        continue
+                    n_deadline = ensure_utc(neighbor.deadline)
+                    if n_order == eff_order - 1 and deadline_utc < n_deadline:
+                        raise BadRequestException(
+                            message=f"Hạn chót của chặng #{eff_order} không được sớm hơn hạn chót của chặng đứng trước ({neighbor.title})."
+                        )
+                    if n_order == eff_order + 1 and deadline_utc > n_deadline:
+                        raise BadRequestException(
+                            message=f"Hạn chót của chặng #{eff_order} không được vượt quá hạn chót của chặng kế tiếp ({neighbor.title})."
+                        )
+
+        from sqlalchemy import select
+        from app.models.config import HackathonConfig
+        cfg_res = await db.execute(select(HackathonConfig).order_by(HackathonConfig.created_at.asc()))
+        cfg = cfg_res.scalars().first()
+        if cfg and data.is_final_checkpoint:
+            if cfg.start_time and deadline_utc <= ensure_utc(cfg.start_time):
+                raise BadRequestException(
+                    message="Hạn chót của Chặng Chung kết phải diễn ra sau thời gian bắt đầu cuộc thi."
+                )
+            cfg.end_time = deadline_utc
+            db.add(cfg)
 
         raw_fields = (
             [f.model_dump() for f in data.submission_fields]
@@ -469,48 +602,69 @@ class CheckpointService:
         if new_deadline <= new_start:
             raise BadRequestException(message="Hạn chót (deadline) phải diễn ra sau thời điểm mở cổng (start_time).")
 
-        if data.deadline is not None:
-            existing_cps = await checkpoint_repo.get_all(db)
-            if not effective_is_final:
-                final_deadlines = [
-                    ensure_utc(fcp.deadline)
-                    for fcp in existing_cps
-                    if fcp.is_final_checkpoint and fcp.is_active and str(fcp.id) != str(cp.id)
-                ]
-                if final_deadlines and new_deadline > max(final_deadlines):
-                    raise BadRequestException(
-                        message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
-                    )
-                # Khi chỉnh sửa hạn chót của một chặng có thứ tự xác định (display_order > 0),
-                # kiểm tra tính tuần tự với chặng liền trước và liền sau
-                curr_order = int(cp.display_order or 0)
-                if curr_order > 0 and data.display_order is None:
-                    for neighbor in existing_cps:
-                        if str(neighbor.id) == str(cp.id) or neighbor.is_final_checkpoint:
-                            continue
-                        n_order = int(neighbor.display_order or 0)
-                        if n_order <= 0:
-                            continue
-                        n_deadline = ensure_utc(neighbor.deadline)
-                        if n_order == curr_order - 1 and new_deadline < n_deadline:
-                            raise BadRequestException(
-                                message=f"Hạn chót của chặng #{curr_order} không được sớm hơn hạn chót của chặng đứng trước ({neighbor.title})."
-                            )
-                        if n_order == curr_order + 1 and new_deadline > n_deadline:
-                            raise BadRequestException(
-                                message=f"Hạn chót của chặng #{curr_order} không được vượt quá hạn chót của chặng kế tiếp ({neighbor.title})."
-                            )
-            else:
-                for pcp in existing_cps:
-                    if not pcp.is_final_checkpoint and str(pcp.id) != str(cp.id) and new_deadline < ensure_utc(pcp.deadline):
+        now_utc = datetime.now(timezone.utc)
+        if (
+            data.deadline is not None
+            and old_start <= now_utc
+            and new_deadline < old_deadline
+        ):
+            raise BadRequestException(
+                message="Chặng nộp bài đang diễn ra hoặc đã qua chỉ được phép gia hạn thêm thời gian, không được thu ngắn hạn chót gây thiệt hại cho thí sinh."
+            )
+
+        existing_cps = await checkpoint_repo.get_all(db)
+        eff_order = int(
+            data.display_order if data.display_order is not None else (cp.display_order or 0)
+        )
+        if not effective_is_final:
+            final_deadlines = [
+                ensure_utc(fcp.deadline)
+                for fcp in existing_cps
+                if fcp.is_final_checkpoint and fcp.is_active and str(fcp.id) != str(cp.id)
+            ]
+            if final_deadlines and new_deadline > max(final_deadlines):
+                raise BadRequestException(
+                    message="Hạn chót của chặng tiến độ không được muộn hơn hạn chót của Chặng Chung kết."
+                )
+            if eff_order > 0 and data.deadline is not None and data.display_order is None:
+                for neighbor in existing_cps:
+                    if str(neighbor.id) == str(cp.id) or neighbor.is_final_checkpoint:
+                        continue
+                    n_order = int(neighbor.display_order or 0)
+                    if n_order <= 0:
+                        continue
+                    n_deadline = ensure_utc(neighbor.deadline)
+                    if n_order == eff_order - 1 and new_deadline < n_deadline:
                         raise BadRequestException(
-                            message="Hạn chót của Chặng Chung kết không được sớm hơn hạn chót của các chặng tiến độ."
+                            message=f"Hạn chót của chặng #{eff_order} không được sớm hơn hạn chót của chặng đứng trước ({neighbor.title})."
                         )
-                from sqlalchemy import select
-                from app.models.config import HackathonConfig
-                cfg_res = await db.execute(select(HackathonConfig).order_by(HackathonConfig.created_at.asc()))
-                cfg = cfg_res.scalars().first()
-                if cfg and cfg.end_time and new_deadline > ensure_utc(cfg.end_time):
+                    if n_order == eff_order + 1 and new_deadline > n_deadline:
+                        raise BadRequestException(
+                            message=f"Hạn chót của chặng #{eff_order} không được vượt quá hạn chót của chặng kế tiếp ({neighbor.title})."
+                        )
+        else:
+            other_finals = [
+                fcp for fcp in existing_cps if fcp.is_final_checkpoint and str(fcp.id) != str(cp.id)
+            ]
+            if other_finals:
+                raise BadRequestException(
+                    message="Hệ thống chỉ cho phép duy nhất 1 Chặng Chung kết (is_final_checkpoint=true)."
+                )
+            for pcp in existing_cps:
+                if not pcp.is_final_checkpoint and str(pcp.id) != str(cp.id) and new_deadline < ensure_utc(pcp.deadline):
+                    raise BadRequestException(
+                        message="Hạn chót của Chặng Chung kết không được sớm hơn hạn chót của các chặng tiến độ."
+                    )
+            from sqlalchemy import select
+            from app.models.config import HackathonConfig
+            cfg_res = await db.execute(select(HackathonConfig).order_by(HackathonConfig.created_at.asc()))
+            cfg = cfg_res.scalars().first()
+            if cfg:
+                if cfg.start_time and new_deadline <= ensure_utc(cfg.start_time):
+                    raise BadRequestException(
+                        message="Hạn chót của Chặng Chung kết phải diễn ra sau thời gian bắt đầu cuộc thi."
+                    )
+                if data.deadline is not None:
                     cfg.end_time = new_deadline
                     db.add(cfg)
 

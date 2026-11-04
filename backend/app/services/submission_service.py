@@ -138,6 +138,11 @@ class SubmissionService:
         is_duplicate: bool = False,
     ) -> SubmissionResponse:
         grace = bool(getattr(submission, "grace_period_applied", False))
+        sub_data = getattr(submission, "submission_data", None)
+        is_late_flag = (
+            getattr(submission, "status", None) == SubmissionStatus.LATE.value
+            or bool(isinstance(sub_data, dict) and sub_data.get("is_late"))
+        )
         history = getattr(submission, "version_history", None)
         if not isinstance(history, list):
             history = []
@@ -157,6 +162,7 @@ class SubmissionService:
             status=submission.status,
             grace_period_applied=grace,
             late_grace_period=grace,
+            is_late=is_late_flag,
             version=getattr(submission, "version", 1) or 1,
             version_history=history,
             is_duplicate=is_duplicate,
@@ -247,14 +253,20 @@ class SubmissionService:
             )
 
         # ── Bước 2.2 & Mục 3: Kiểm tra trạng thái Cuộc thi, Checkpoint & Công thức Time-Gated + Grace Period ──
+        from app.services.contest_policy_service import get_contest_runtime_state
+
         contest_config = await topic_repo.get_config(db)
-        if contest_config and isinstance(contest_config.settings_data, dict):
-            contest_status = str(contest_config.settings_data.get("status") or "").strip().lower()
-            if contest_status in {"judging", "completed"}:
-                raise BadRequestException(
-                    message="Cuộc thi đã chuyển sang giai đoạn chấm điểm hoặc đã kết thúc, không thể nộp hoặc cập nhật bài thi.",
-                    error_code="CONTEST_CLOSED",
-                )
+        runtime_state = get_contest_runtime_state(contest_config)
+        if runtime_state["is_paused"]:
+            raise BadRequestException(
+                message=runtime_state["submission_block_reason"],
+                error_code="CONTEST_PAUSED",
+            )
+        if not runtime_state["allows_submission"]:
+            raise BadRequestException(
+                message=runtime_state["submission_block_reason"],
+                error_code="CONTEST_CLOSED",
+            )
 
         server_timestamp = ensure_utc((payload.simulate_time if settings.demo_enabled else None) or datetime.now(timezone.utc))
         gate_info = checkpoint_service.calculate_time_gate_info(checkpoint, now=server_timestamp)
@@ -279,6 +291,9 @@ class SubmissionService:
             )
 
         grace_period_applied = bool(gate_info["grace_period_applied"])
+        is_late_submission = bool(
+            gate_info.get("is_late_window") or gate_info["status"] == CheckpointStatus.LATE.value
+        )
 
         # ── Chuẩn hóa dữ liệu bài nộp động ──
         effective_data, raw_repo_url, raw_demo_url, note = self._extract_effective_submission_data(
@@ -297,6 +312,7 @@ class SubmissionService:
 
         if existing_sub and existing_sub.status in (
             SubmissionStatus.SUBMITTED.value,
+            SubmissionStatus.LATE.value,
             SubmissionStatus.SHA_VERIFICATION_FAILED.value,
             SubmissionStatus.EVALUATED.value,
         ):
@@ -314,8 +330,14 @@ class SubmissionService:
             elapsed_sec = abs(
                 (server_timestamp - ensure_utc(existing_sub.submitted_at)).total_seconds()
             )
+            expected_status = (
+                SubmissionStatus.LATE.value
+                if is_late_submission
+                else SubmissionStatus.SUBMITTED.value
+            )
             if (
                 elapsed_sec <= IDEMPOTENCY_WINDOW_SECONDS
+                and existing_sub.status == expected_status
                 and self._is_same_payload(existing_sub, effective_data, note)
                 and (not clean_idem_key or clean_idem_key == existing_sub.idempotency_key)
             ):
@@ -483,6 +505,7 @@ class SubmissionService:
                 "note": prev_snapshot["note"],
                 "status": prev_snapshot["status"],
                 "grace_period_applied": prev_snapshot["grace_period_applied"],
+                "is_late": prev_snapshot["status"] == SubmissionStatus.LATE.value,
                 "submitted_at": ensure_utc(prev_snapshot["submitted_at"]).isoformat(),
             }
             new_version_history = [history_item] + list(prev_snapshot["version_history"] or [])
@@ -495,7 +518,13 @@ class SubmissionService:
         if final_repo_url and "repo_url" in effective_data:
             effective_data["repo_url"] = final_repo_url
 
-        final_status = freeze_result.status or SubmissionStatus.SUBMITTED.value
+        if freeze_result.status == SubmissionStatus.SHA_VERIFICATION_FAILED.value:
+            final_status = SubmissionStatus.SHA_VERIFICATION_FAILED.value
+        elif is_late_submission:
+            final_status = SubmissionStatus.LATE.value
+            effective_data["is_late"] = True
+        else:
+            final_status = freeze_result.status or SubmissionStatus.SUBMITTED.value
 
         working_sub = await submission_repo.update(
             db,
@@ -514,7 +543,7 @@ class SubmissionService:
             submitted_at=server_timestamp,
         )
 
-        # Ghi vết vào bảng audit_logs kèm cờ late_grace_period
+        # Ghi vết vào bảng audit_logs kèm cờ late_grace_period / is_late
         if freeze_result.is_fallback:
             audit_action = "SUBMISSION_SHA_FALLBACK"
         elif prev_snapshot is not None:
@@ -531,13 +560,14 @@ class SubmissionService:
             action=audit_action,
             status=final_status,
             ip_address=client_ip,
-            late_grace_period=grace_period_applied,
+            late_grace_period=bool(grace_period_applied or is_late_submission),
             commit_sha=freeze_result.commit_sha,
             details={
                 "version": new_version,
                 "is_resubmission": prev_snapshot is not None,
                 "is_final_checkpoint": bool(checkpoint.is_final_checkpoint),
                 "grace_period_applied": grace_period_applied,
+                "is_late": is_late_submission,
                 "grace_period_seconds": grace_sec,
                 "repo_url": final_repo_url,
                 "demo_url": raw_demo_url,
@@ -557,6 +587,11 @@ class SubmissionService:
                 "Bài nộp đã được ghi nhận nhưng không thể lấy Commit SHA do GitHub API gián đoạn. "
                 "BTC sẽ xác thực thủ công."
             )
+        elif is_late_submission:
+            if prev_snapshot is not None:
+                message = f"Cập nhật bài nộp (phiên bản v{new_version}) thành công — Đã gắn cờ Nộp muộn."
+            else:
+                message = "Nộp bài thành công (Ghi nhận trạng thái Nộp muộn sau thời hạn chuẩn)."
         elif grace_period_applied:
             message = f"Nộp bài thành công trong thời gian ân hạn mạng (Grace Period {grace_sec}s)."
         elif prev_snapshot is not None:
@@ -617,6 +652,8 @@ class SubmissionService:
                         parsed_dt = ensure_utc(sub.submitted_at)
 
                     hist_grace = bool(hist.get("grace_period_applied", False))
+                    hist_status = str(hist.get("status") or SubmissionStatus.SUBMITTED.value)
+                    hist_late = hist_status == SubmissionStatus.LATE.value or bool(hist.get("is_late", False))
                     hist_id = str(hist.get("id") or f"{sub.id}-v{hist.get('version', 1)}")
                     results.append(
                         SubmissionResponse(
@@ -631,9 +668,10 @@ class SubmissionService:
                             submission_data=hist.get("submission_data"),
                             note=hist.get("note"),
                             feedback=None,
-                            status=str(hist.get("status") or SubmissionStatus.SUBMITTED.value),
+                            status=hist_status,
                             grace_period_applied=hist_grace,
                             late_grace_period=hist_grace,
+                            is_late=hist_late,
                             version=int(hist.get("version") or 1),
                             version_history=[],
                             is_duplicate=False,

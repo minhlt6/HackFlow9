@@ -75,13 +75,39 @@ export const MentorCheckpointsPage: React.FC = () => {
                     </td>
 
                     {checkpoints.map((cp) => {
-                      const isDone = teamSubs.some((s) => s.checkpointId === cp.id);
+                      const matchedSub =
+                        cp.status === 'upcoming'
+                          ? undefined
+                          : teamSubs.find((s) => s.checkpointId === cp.id);
+                      const isDone = Boolean(matchedSub);
+                      const isLateSub = Boolean(
+                        matchedSub &&
+                          (matchedSub.isAfterDeadline ||
+                            String(matchedSub.status || '').toLowerCase() === 'late')
+                      );
                       return (
                         <td key={cp.id} className="py-3.5 px-4 text-center">
                           {isDone ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold text-xs bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                              <CheckCircle2 size={12} />
-                              <span>Đã nộp</span>
+                            isLateSub ? (
+                              <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-semibold text-xs bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/30">
+                                <Clock size={12} />
+                                <span>Đã nộp (Nộp muộn)</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-semibold text-xs bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                                <CheckCircle2 size={12} />
+                                <span>Đã nộp</span>
+                              </span>
+                            )
+                          ) : cp.status === 'upcoming' ? (
+                            <span className="inline-flex items-center gap-1 text-muted-foreground text-xs">
+                              <Clock size={12} />
+                              <span>Chưa mở</span>
+                            </span>
+                          ) : cp.status === 'late' ? (
+                            <span className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 font-medium text-xs">
+                              <Clock size={12} />
+                              <span>Quá hạn (Chưa nộp)</span>
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-muted-foreground text-xs">

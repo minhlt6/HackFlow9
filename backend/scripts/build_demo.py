@@ -124,7 +124,7 @@ def build_dataset(stage, now, password):
     # Two open stages allow real writes; closed/upcoming stages demonstrate server-side time gates.
     cp_specs = [("closed", "Chặng 1 — Khởi động", -48, -24, False, 15),
                 ("open", "Chặng 2 — Nộp tiến độ trực tiếp", -12, 24, False, 20),
-                ("future", "Chặng 3 — Tích hợp và kiểm thử", 48, 72, False, 25),
+                ("future", "Chặng 3 — Tích hợp và kiểm thử", -8, 48, False, 25),
                 ("final", "Chung kết — Nộp bài và chấm điểm", -6, 96, True, 40)]
     for order, (slug, title, start, end, final, weight) in enumerate(cp_specs, 1):
         checkpoints[slug] = add(Checkpoint, f"checkpoint/{slug}", title=title,
@@ -150,7 +150,7 @@ def build_dataset(stage, now, password):
             sid = add(Submission, f"submission/{slug}/{cp}", team_id=team["id"], checkpoint_id=checkpoints[cp],
                 submitted_by=team["leader_id"], repo_url="https://github.com/minhlt6/HackFlow9", demo_url="https://example.com",
                 commit_sha=sha, status="submitted",
-                note="DỮ LIỆU MẪU: đã đóng băng mã commit SHA phục vụ chấm điểm demo.",
+                note="Dự án demo đã cập nhật báo cáo tiến độ và liên kết sản phẩm hợp lệ.",
                 submission_data={"repo_url": "https://github.com/minhlt6/HackFlow9", "demo_url": "https://example.com"},
                 submitted_at=submitted_at, version=2 if cp == "open" else 1, version_history=version_history)
             add(AuditLog, f"audit/{slug}/{cp}", user_id=team["leader_id"], team_id=team["id"],

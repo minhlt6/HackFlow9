@@ -14,6 +14,11 @@ def judging_block_reason(submission):
         return "Bài chung kết chưa có mã nguồn và SHA hợp lệ."
     cp = submission.checkpoint
     submitted = ensure_utc(submission.submitted_at)
-    if not ensure_utc(cp.start_time) <= submitted <= ensure_utc(cp.deadline) + timedelta(seconds=cp.grace_period_seconds or 0):
+    if submitted < ensure_utc(cp.start_time):
+        return "Bài chung kết được ghi nhận ngoài cửa sổ nộp hợp lệ."
+    if (
+        submission.status != "late"
+        and submitted > ensure_utc(cp.deadline) + timedelta(seconds=cp.grace_period_seconds or 0)
+    ):
         return "Bài chung kết được ghi nhận ngoài cửa sổ nộp hợp lệ."
     return None

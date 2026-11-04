@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Body, Depends, Query
@@ -167,10 +167,20 @@ class AdminPersonnelCreateRequest(BaseModel):
     full_name: str = Field(min_length=1, max_length=255)
     email: EmailStr
     role: str
+    password: Optional[str] = Field(default=None, max_length=128)
     organization: Optional[str] = ""
     specialty: Optional[str] = ""
     assigned_tracks: List[str] = Field(default_factory=list)
     assigned_team_ids: List[str] = Field(default_factory=list)
+
+
+class AdminPersonnelUpdateRequest(BaseModel):
+    full_name: Optional[str] = Field(default=None, max_length=255)
+    organization: Optional[str] = None
+    specialty: Optional[str] = None
+    password: Optional[str] = Field(default=None, max_length=128)
+    assigned_tracks: Optional[List[str]] = None
+    assigned_team_ids: Optional[List[str]] = None
 
 
 def _compute_eligibility(member_count: int, min_size: int = 3, max_size: int = 5) -> str:
@@ -1762,6 +1772,7 @@ async def list_personnel(
                 "specialty": extra.get("specialty", default_spec),
                 "assigned_tracks": extra.get("assigned_tracks", []),
                 "assigned_team_ids": list(dict.fromkeys(assigned_teams)),
+                "issued_password": str(extra.get("issued_password") or "123456"),
                 "is_active": u.is_active,
             }
         )
@@ -1789,10 +1800,13 @@ async def create_personnel(
         raise ConflictException(message="Email này đã tồn tại trong hệ thống.", error_code="EMAIL_ALREADY_EXISTS")
     if not body.full_name.strip():
         raise BadRequestException(message="Vui lòng nhập họ tên.")
+    raw_password = (body.password or "").strip() or "123456"
+    if len(raw_password) < 6:
+        raise BadRequestException(message="Mật khẩu đăng nhập phải có ít nhất 6 ký tự.")
     user_obj = User(
         email=clean_email,
         full_name=body.full_name.strip(),
-        hashed_password=hash_password("123456"),
+        hashed_password=hash_password(raw_password),
         role=role_val,
         approval_status=ApprovalStatus.APPROVED.value,
         is_active=True,
@@ -1808,6 +1822,7 @@ async def create_personnel(
             "specialty": body.specialty or "Công nghệ Phần mềm & AI",
             "assigned_tracks": body.assigned_tracks or [],
             "assigned_team_ids": body.assigned_team_ids or [],
+            "issued_password": raw_password,
         },
     )
 
@@ -1833,10 +1848,84 @@ async def create_personnel(
             "specialty": pers_meta["specialty"],
             "assigned_tracks": pers_meta["assigned_tracks"],
             "assigned_team_ids": pers_meta["assigned_team_ids"],
+            "issued_password": raw_password,
             "is_active": user_obj.is_active,
         },
         message=f"Đã tạo tài khoản '{user_obj.full_name}' thành công.",
         status_code=201,
+    )
+
+
+@router.patch(
+    "/personnel/{user_id}",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Cập nhật thông tin hoặc đặt lại mật khẩu Giám khảo / Cố vấn (Admin)",
+)
+@router.put(
+    "/personnel/{user_id}",
+    response_model=ApiResponse[Dict[str, Any]],
+    include_in_schema=False,
+)
+async def update_personnel(
+    user_id: str,
+    body: AdminPersonnelUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    u = await user_repo.get_by_id(db, user_id)
+    if not u:
+        lookup_email = _MOCK_PERSONNEL_ID_TO_EMAIL.get(user_id) or (
+            user_id if "@" in user_id else None
+        )
+        if lookup_email:
+            u = await user_repo.get_by_email(db, lookup_email.strip().lower())
+    if not u:
+        raise NotFoundException(message="Không tìm thấy tài khoản nhân sự.")
+
+    if body.full_name is not None:
+        if not body.full_name.strip():
+            raise BadRequestException(message="Họ và tên không được để trống.")
+        u.full_name = body.full_name.strip()
+
+    meta_updates: Dict[str, Any] = {}
+    if body.password is not None and body.password.strip():
+        new_pass = body.password.strip()
+        if len(new_pass) < 6:
+            raise BadRequestException(message="Mật khẩu mới phải có ít nhất 6 ký tự.")
+        u.hashed_password = hash_password(new_pass)
+        meta_updates["issued_password"] = new_pass
+
+    if body.organization is not None:
+        meta_updates["organization"] = body.organization.strip()
+    if body.specialty is not None:
+        meta_updates["specialty"] = body.specialty.strip()
+    if body.assigned_tracks is not None:
+        meta_updates["assigned_tracks"] = body.assigned_tracks
+    if body.assigned_team_ids is not None:
+        meta_updates["assigned_team_ids"] = body.assigned_team_ids
+
+    pers_meta = _update_personnel_meta(u, meta_updates)
+    db.add(u)
+    await db.commit()
+    await db.refresh(u)
+
+    default_org = "Hội đồng Giám khảo" if u.role == UserRole.JUDGE.value else "Ban Cố vấn Kỹ thuật"
+    default_spec = "Full-Stack & System Architecture" if u.role == UserRole.JUDGE.value else "AI & Cloud Engineering"
+
+    return success_response(
+        data={
+            "id": str(u.id),
+            "full_name": u.full_name,
+            "email": u.email,
+            "role": u.role,
+            "organization": pers_meta.get("organization", default_org),
+            "specialty": pers_meta.get("specialty", default_spec),
+            "assigned_tracks": pers_meta.get("assigned_tracks", []),
+            "assigned_team_ids": pers_meta.get("assigned_team_ids", []),
+            "issued_password": str(pers_meta.get("issued_password") or "123456"),
+            "is_active": u.is_active,
+        },
+        message=f"Đã cập nhật thông tin '{u.full_name}' thành công.",
     )
 
 
@@ -2303,16 +2392,16 @@ async def _get_or_create_hackathon_config(db: AsyncSession):
     return cfg
 
 
-_PHASE_LABELS: Dict[str, str] = {
-    "registration": "Giai đoạn 1: Mở đăng ký & Thành lập Đội thi",
-    "team_formation": "Giai đoạn 2: Thành lập Đội thi & Chọn Đề tài",
-    "hacking": "Giai đoạn 3: Thực thi dự án và Nộp bài các chặng",
-    "judging": "Giai đoạn 4: Chấm điểm Độc lập & Bảo vệ Chung kết",
-    "completed": "Giai đoạn 5: Công bố Kết quả & Vinh danh Chung cuộc",
-}
+def _serialize_hackathon_config(
+    cfg: Any,
+    impact_preview: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    from app.services.contest_policy_service import (
+        PHASE_LABELS,
+        PHASE_PERMISSION_MATRIX,
+        get_contest_runtime_state,
+    )
 
-
-def _serialize_hackathon_config(cfg: Any) -> Dict[str, Any]:
     def utc_iso(value: datetime) -> str:
         # SQLite returns naive datetimes; SQL timestamps in this application represent UTC.
         aware = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
@@ -2320,15 +2409,38 @@ def _serialize_hackathon_config(cfg: Any) -> Dict[str, Any]:
 
     start_iso = utc_iso(cfg.start_time) if cfg.start_time else "2026-10-15T01:00:00+00:00"
     end_iso = utc_iso(cfg.end_time) if cfg.end_time else "2026-12-31T11:00:00+00:00"
-    sdata = cfg.settings_data or {}
+    sdata = cfg.settings_data if isinstance(cfg.settings_data, dict) else {}
     raw_min, raw_max = config_team_limits(sdata)
-    raw_status = str(sdata.get("status") or "hacking")
-    current_phase = str(
-        sdata.get("currentPhase")
-        or _PHASE_LABELS.get(raw_status.lower(), raw_status)
+    runtime = get_contest_runtime_state(cfg)
+    raw_status = runtime["status"]
+    current_phase = PHASE_LABELS.get(raw_status, runtime["currentPhase"])
+    version_num = int(sdata.get("config_version") or 1)
+    updated_iso = (
+        utc_iso(cfg.updated_at)
+        if getattr(cfg, "updated_at", None)
+        else start_iso
     )
-    return {
+    enforcement_policy = str(
+        sdata.get("teamSizeEnforcementPolicy") or "grandfathered_approved"
+    )
+    history_entries = list(sdata.get("config_history") or [])[-20:]
+    curr_policy = {
+        **PHASE_PERMISSION_MATRIX.get(raw_status, PHASE_PERMISSION_MATRIX["hacking"]),
+        "is_paused": runtime["is_paused"],
+        "contest_state": runtime["contest_state"],
+        "contest_state_label": runtime["contest_state_label"],
+        "allows_submission": runtime["allows_submission"],
+        "submission_block_reason": runtime["submission_block_reason"],
+        "allows_registration": runtime["allows_registration"],
+        "registration_block_reason": runtime["registration_block_reason"],
+        "allows_topic_selection": runtime["allows_topic_selection"],
+        "topic_selection_block_reason": runtime["topic_selection_block_reason"],
+    }
+
+    payload: Dict[str, Any] = {
         "id": str(cfg.id),
+        "version": version_num,
+        "updated_at": updated_iso,
         "name": cfg.name,
         "start_time": start_iso,
         "end_time": end_iso,
@@ -2339,22 +2451,39 @@ def _serialize_hackathon_config(cfg: Any) -> Dict[str, Any]:
         "season": sdata.get("season", "Fall 2026"),
         "status": raw_status,
         "currentPhase": current_phase,
+        "uiPhaseLabel": runtime["uiPhaseLabel"],
+        "is_paused": runtime["is_paused"],
+        "isPaused": runtime["is_paused"],
+        "paused_at": runtime["paused_at"],
+        "pausedAt": runtime["paused_at"],
+        "pause_reason": runtime["pause_reason"],
+        "pauseReason": runtime["pause_reason"],
+        "contest_state": runtime["contest_state"],
+        "contestState": runtime["contest_state"],
+        "contest_state_label": runtime["contest_state_label"],
+        "contestStateLabel": runtime["contest_state_label"],
+        "isContestStarted": runtime["is_contest_started"],
         "startAt": start_iso,
         "endAt": end_iso,
-        "registrationDeadline": sdata.get(
-            "registrationDeadline", "2026-10-14T16:59:00.000Z"
-        ),
+        "registrationDeadline": sdata.get("registrationDeadline") or end_iso,
         "blindJudgingEnabled": bool(sdata.get("blindJudgingEnabled", True)),
         "leaderboardPublished": bool(cfg.is_result_published),
         "topicSelectionLocked": not bool(cfg.is_topic_published),
-        "submissionFreezeEnabled": bool(sdata.get("submissionFreezeEnabled", True)),
+        "submissionFreezeEnabled": True,
         "maxTeamSize": raw_max,
         "minTeamSize": raw_min,
         "maxTeamMembers": raw_max,
         "minTeamMembers": raw_min,
+        "teamSizeEnforcementPolicy": enforcement_policy,
         "discrepancyThreshold": int(sdata.get("discrepancyThreshold", 15)),
         "expectedResultPublishAt": sdata.get("expectedResultPublishAt"),
+        "phasePolicies": PHASE_PERMISSION_MATRIX,
+        "currentPolicy": curr_policy,
+        "configHistory": history_entries,
     }
+    if impact_preview is not None:
+        payload["impactPreview"] = impact_preview
+    return payload
 
 
 @router.get(
@@ -2366,10 +2495,33 @@ async def get_hackathon_config(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(require_role("admin")),
 ):
+    from app.services.contest_policy_service import compute_config_impact_preview
+
     cfg = await _get_or_create_hackathon_config(db)
+    impact = await compute_config_impact_preview(db, cfg)
     return success_response(
-        data=_serialize_hackathon_config(cfg),
+        data=_serialize_hackathon_config(cfg, impact_preview=impact),
         message="Tải cấu hình cuộc thi thành công.",
+    )
+
+
+@router.post(
+    "/config/preview",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Xem trước tác động khi thay đổi cấu hình cuộc thi (Admin)",
+)
+async def preview_hackathon_config_impact(
+    body: Dict[str, Any] = Body(default_factory=dict),
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(require_role("admin")),
+):
+    from app.services.contest_policy_service import compute_config_impact_preview
+
+    cfg = await _get_or_create_hackathon_config(db)
+    impact = await compute_config_impact_preview(db, cfg, proposed=body)
+    return success_response(
+        data=impact,
+        message="Đã tính toán xem trước tác động của thay đổi cấu hình.",
     )
 
 
@@ -2383,105 +2535,284 @@ async def update_hackathon_config(
     db: AsyncSession = Depends(get_db),
     current_admin: User = Depends(require_role("admin")),
 ):
+    from app.services.contest_policy_service import (
+        VALID_CONTEST_STATUSES,
+        VALID_TEAM_SIZE_POLICIES,
+        compute_config_impact_preview,
+        ensure_utc_dt,
+        parse_strict_bool,
+        parse_strict_datetime,
+        resolve_and_validate_phase,
+    )
+
     cfg = await _get_or_create_hackathon_config(db)
+    metadata = dict(cfg.settings_data or {})
+    curr_version = int(metadata.get("config_version") or 1)
+
+    # 0. Optimistic concurrency check (C08)
+    raw_expected_ver = body.get("expected_version", body.get("version"))
+    if raw_expected_ver is not None:
+        if isinstance(raw_expected_ver, bool) or not isinstance(raw_expected_ver, int):
+            raise BadRequestException(
+                message="Trường phiên bản cấu hình (expected_version) phải là số nguyên.",
+                error_code="INVALID_CONFIG_VERSION",
+            )
+        if raw_expected_ver != curr_version:
+            raise ConflictException(
+                message=(
+                    f"Cấu hình đã được cập nhật bởi phiên làm việc khác "
+                    f"(phiên bản gửi lên: {raw_expected_ver}, phiên bản hiện tại: {curr_version}). "
+                    "Vui lòng tải lại trang để tránh ghi đè dữ liệu."
+                ),
+                error_code="CONFIG_VERSION_CONFLICT",
+            )
+
+    before_snapshot = _serialize_hackathon_config(cfg)
 
     # 1. Name / eventName
-    new_name = body.get("name") or body.get("eventName")
-    if isinstance(new_name, str) and new_name.strip():
+    if "name" in body and "eventName" in body:
+        n1 = str(body["name"] or "").strip()
+        n2 = str(body["eventName"] or "").strip()
+        if n1 and n2 and n1 != n2:
+            raise BadRequestException(
+                message="Trường 'name' và 'eventName' mâu thuẫn nhau.",
+                error_code="CONFLICTING_NAME_FIELDS",
+            )
+    new_name = body.get("name") if "name" in body else body.get("eventName")
+    if new_name is not None:
+        if not isinstance(new_name, str) or not new_name.strip():
+            raise BadRequestException(
+                message="Tên cuộc thi không được để trống.",
+                error_code="INVALID_EVENT_NAME",
+            )
         cfg.name = new_name.strip()
 
-    # 2. Parse start_time / startAt & end_time / endAt
-    raw_start = body.get("start_time") or body.get("startAt")
-    raw_end = body.get("end_time") or body.get("endAt")
+    # 2. Strict boolean validations (C03 & C04)
+    bool_fields = (
+        "blindJudgingEnabled",
+        "is_topic_published",
+        "topicSelectionLocked",
+        "is_result_published",
+        "leaderboardPublished",
+        "submissionFreezeEnabled",
+        "is_paused",
+        "isPaused",
+    )
+    for bf in bool_fields:
+        if bf in body and body[bf] is not None:
+            parse_strict_bool(body[bf], bf)
 
-    def _parse_dt(val: Any) -> Optional[datetime]:
-        if isinstance(val, datetime):
-            return val if val.tzinfo else val.replace(tzinfo=timezone.utc)
-        if isinstance(val, str) and val.strip():
-            cleaned = val.strip().replace("Z", "+00:00")
-            try:
-                dt = datetime.fromisoformat(cleaned)
-            except ValueError:
-                raise BadRequestException(message="Thời gian cấu hình không hợp lệ.")
-            return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
-        return None
+    if (
+        "is_topic_published" in body
+        and body["is_topic_published"] is not None
+        and "topicSelectionLocked" in body
+        and body["topicSelectionLocked"] is not None
+        and body["is_topic_published"] == body["topicSelectionLocked"]
+    ):
+        raise BadRequestException(
+            message="Cờ 'is_topic_published' và 'topicSelectionLocked' mâu thuẫn nhau.",
+            error_code="CONFLICTING_BOOLEAN_FLAGS",
+        )
 
-    new_start = _parse_dt(raw_start) if raw_start is not None else cfg.start_time
-    new_end = _parse_dt(raw_end) if raw_end is not None else cfg.end_time
+    if (
+        "is_result_published" in body
+        and body["is_result_published"] is not None
+        and "leaderboardPublished" in body
+        and body["leaderboardPublished"] is not None
+        and body["is_result_published"] != body["leaderboardPublished"]
+    ):
+        raise BadRequestException(
+            message="Cờ 'is_result_published' và 'leaderboardPublished' mâu thuẫn nhau.",
+            error_code="CONFLICTING_BOOLEAN_FLAGS",
+        )
 
-    if new_start and new_end:
-        s_cmp = new_start if new_start.tzinfo else new_start.replace(tzinfo=timezone.utc)
-        e_cmp = new_end if new_end.tzinfo else new_end.replace(tzinfo=timezone.utc)
-        if s_cmp >= e_cmp:
-            raise BadRequestException(
-                message="Thời gian bắt đầu (start_time) phải nhỏ hơn thời gian kết thúc (end_time)."
-            )
+    if (
+        "is_paused" in body
+        and body["is_paused"] is not None
+        and "isPaused" in body
+        and body["isPaused"] is not None
+        and body["is_paused"] != body["isPaused"]
+    ):
+        raise BadRequestException(
+            message="Cờ 'is_paused' và 'isPaused' mâu thuẫn nhau.",
+            error_code="CONFLICTING_BOOLEAN_FLAGS",
+        )
+
+    if "submissionFreezeEnabled" in body and body["submissionFreezeEnabled"] is False:
+        raise BadRequestException(
+            message="Không thể tắt cơ chế bảo vệ đóng băng Commit SHA (submissionFreezeEnabled) đối với bài nộp Chặng Chung kết.",
+            error_code="SUBMISSION_FREEZE_REQUIRED",
+        )
+
+    # 3. Parse start_time / startAt & end_time / endAt and enforce bidirectional schedule bounds (C05)
+    raw_start = body.get("start_time") if "start_time" in body else body.get("startAt")
+    raw_end = body.get("end_time") if "end_time" in body else body.get("endAt")
+
+    if (
+        "start_time" in body
+        and "startAt" in body
+        and body["start_time"] is not None
+        and body["startAt"] is not None
+        and parse_strict_datetime(body["start_time"], "start_time")
+        != parse_strict_datetime(body["startAt"], "startAt")
+    ):
+        raise BadRequestException(
+            message="Trường 'start_time' và 'startAt' mâu thuẫn nhau.",
+            error_code="CONFLICTING_DATETIME_FIELDS",
+        )
+    if (
+        "end_time" in body
+        and "endAt" in body
+        and body["end_time"] is not None
+        and body["endAt"] is not None
+        and parse_strict_datetime(body["end_time"], "end_time")
+        != parse_strict_datetime(body["endAt"], "endAt")
+    ):
+        raise BadRequestException(
+            message="Trường 'end_time' và 'endAt' mâu thuẫn nhau.",
+            error_code="CONFLICTING_DATETIME_FIELDS",
+        )
+
+    new_start = (
+        parse_strict_datetime(raw_start, "start_time")
+        if raw_start is not None
+        else ensure_utc_dt(cfg.start_time)
+    )
+    new_end = (
+        parse_strict_datetime(raw_end, "end_time")
+        if raw_end is not None
+        else ensure_utc_dt(cfg.end_time)
+    )
+
+    if new_start and new_end and new_start >= new_end:
+        raise BadRequestException(
+            message="Thời gian bắt đầu (start_time) phải nhỏ hơn thời gian kết thúc (end_time).",
+            error_code="INVALID_SCHEDULE_WINDOW",
+        )
+
+    if raw_start is not None or raw_end is not None:
+        from app.repositories.checkpoint_repo import checkpoint_repo
+        from app.services.checkpoint_service import ensure_utc
+
+        all_cps = await checkpoint_repo.get_all(db)
+        if raw_start is not None:
+            for cp in all_cps:
+                if new_start > ensure_utc(cp.start_time):
+                    raise BadRequestException(
+                        message="Thời gian bắt đầu cuộc thi không được muộn hơn thời điểm mở cổng của các chặng nộp bài hiện có.",
+                        error_code="START_TIME_AFTER_CHECKPOINT",
+                    )
+        if raw_end is not None:
+            for pcp in all_cps:
+                if not pcp.is_final_checkpoint and new_end < ensure_utc(pcp.deadline):
+                    raise BadRequestException(
+                        message="Hạn chót cuộc thi không được sớm hơn hạn nộp bài của các chặng tiến độ.",
+                        error_code="END_TIME_BEFORE_PROGRESS_CHECKPOINT",
+                    )
+            for fcp in all_cps:
+                if fcp.is_final_checkpoint:
+                    if new_end <= ensure_utc(fcp.start_time):
+                        raise BadRequestException(
+                            message="Hạn chót cuộc thi phải diễn ra sau thời điểm mở cổng của Chặng Chung kết.",
+                            error_code="END_TIME_BEFORE_FINAL_START",
+                        )
+                    fcp.deadline = new_end
+                    db.add(fcp)
 
     if new_start is not None:
         cfg.start_time = new_start
     if new_end is not None:
-        if raw_end is not None:
-            from app.repositories.checkpoint_repo import checkpoint_repo
-            from app.services.checkpoint_service import ensure_utc
-
-            e_utc = ensure_utc(new_end)
-            all_cps = await checkpoint_repo.get_all(db)
-            for pcp in all_cps:
-                if not pcp.is_final_checkpoint and e_utc < ensure_utc(pcp.deadline):
-                    raise BadRequestException(
-                        message="Hạn chót cuộc thi không được sớm hơn hạn nộp bài của các chặng tiến độ."
-                    )
-            for fcp in all_cps:
-                if fcp.is_final_checkpoint and e_utc > ensure_utc(fcp.start_time):
-                    fcp.deadline = e_utc
-                    db.add(fcp)
         cfg.end_time = new_end
 
-    # 3. Topic & Result publish flags
+    # 4. Topic & Result publish flags
     if "is_topic_published" in body and body["is_topic_published"] is not None:
-        cfg.is_topic_published = bool(body["is_topic_published"])
+        cfg.is_topic_published = body["is_topic_published"]
     elif "topicSelectionLocked" in body and body["topicSelectionLocked"] is not None:
-        cfg.is_topic_published = not bool(body["topicSelectionLocked"])
+        cfg.is_topic_published = not body["topicSelectionLocked"]
 
     target_result_published: Optional[bool] = None
     if "is_result_published" in body and body["is_result_published"] is not None:
-        target_result_published = bool(body["is_result_published"])
+        target_result_published = body["is_result_published"]
     elif "leaderboardPublished" in body and body["leaderboardPublished"] is not None:
-        target_result_published = bool(body["leaderboardPublished"])
+        target_result_published = body["leaderboardPublished"]
 
+    # 5. Team size limits & enforcement policy (C03 & C07)
     for field in ("minTeamSize", "minTeamMembers", "maxTeamSize", "maxTeamMembers"):
         value = body.get(field)
-        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1):
-            raise BadRequestException(message="Giới hạn thành viên phải là số nguyên dương.")
+        if value is not None and (isinstance(value, bool) or not isinstance(value, int) or value < 1 or value > 20):
+            raise BadRequestException(
+                message="Giới hạn thành viên phải là số nguyên dương hợp lệ (1–20).",
+                error_code="INVALID_TEAM_SIZE",
+            )
     for first, second in (("minTeamSize", "minTeamMembers"), ("maxTeamSize", "maxTeamMembers")):
         if body.get(first) is not None and body.get(second) is not None and body[first] != body[second]:
-            raise BadRequestException(message="Các trường giới hạn thành viên không thống nhất.")
+            raise BadRequestException(
+                message="Các trường giới hạn thành viên không thống nhất.",
+                error_code="CONFLICTING_TEAM_SIZE_FIELDS",
+            )
 
-    # 4. Persist UI metadata with the competition record.
-    metadata = dict(cfg.settings_data or {})
-    for k in (
-        "season",
-        "status",
-        "currentPhase",
-        "registrationDeadline",
-        "blindJudgingEnabled",
-        "submissionFreezeEnabled",
-        "maxTeamSize",
-        "minTeamSize",
-        "maxTeamMembers",
-        "minTeamMembers",
-        "discrepancyThreshold",
-        "expectedResultPublishAt",
-    ):
-        if k in body and body[k] is not None:
-            metadata[k] = body[k]
+    if "teamSizeEnforcementPolicy" in body and body["teamSizeEnforcementPolicy"] is not None:
+        pol = str(body["teamSizeEnforcementPolicy"]).strip()
+        if pol not in VALID_TEAM_SIZE_POLICIES:
+            raise BadRequestException(
+                message=f"Chính sách áp dụng quy mô đội '{pol}' không hợp lệ.",
+                error_code="INVALID_TEAM_SIZE_POLICY",
+            )
+        metadata["teamSizeEnforcementPolicy"] = pol
+
+    # 6. Discrepancy threshold & secondary timestamps (C03 & C04)
+    if "discrepancyThreshold" in body and body["discrepancyThreshold"] is not None:
+        dt_val = body["discrepancyThreshold"]
+        if isinstance(dt_val, bool) or not isinstance(dt_val, (int, float)) or dt_val < 1 or dt_val > 100:
+            raise BadRequestException(
+                message="Ngưỡng cảnh báo chênh lệch điểm (discrepancyThreshold) phải nằm trong khoảng 1–100.",
+                error_code="INVALID_DISCREPANCY_THRESHOLD",
+            )
+        metadata["discrepancyThreshold"] = int(dt_val)
+
+    if "registrationDeadline" in body and body["registrationDeadline"] is not None:
+        reg_dt = parse_strict_datetime(body["registrationDeadline"], "registrationDeadline")
+        if new_end and reg_dt > new_end:
+            raise BadRequestException(
+                message="Hạn đăng ký (registrationDeadline) không được muộn hơn thời gian kết thúc cuộc thi.",
+                error_code="INVALID_REGISTRATION_DEADLINE",
+            )
+        metadata["registrationDeadline"] = reg_dt.isoformat()
+
+    if "expectedResultPublishAt" in body:
+        raw_exp_pub = body["expectedResultPublishAt"]
+        if raw_exp_pub is None or raw_exp_pub == "":
+            metadata["expectedResultPublishAt"] = None
+        else:
+            pub_dt = parse_strict_datetime(raw_exp_pub, "expectedResultPublishAt")
+            if new_start and pub_dt < new_start:
+                raise BadRequestException(
+                    message="Thời điểm dự kiến công bố kết quả không được sớm hơn thời gian bắt đầu cuộc thi.",
+                    error_code="INVALID_PUBLISH_TIME",
+                )
+            metadata["expectedResultPublishAt"] = pub_dt.isoformat()
+
+    if "season" in body and body["season"] is not None:
+        if not isinstance(body["season"], str) or not body["season"].strip():
+            raise BadRequestException(message="Trường 'season' không hợp lệ.")
+        metadata["season"] = body["season"].strip()
+
+    if "blindJudgingEnabled" in body and body["blindJudgingEnabled"] is not None:
+        metadata["blindJudgingEnabled"] = body["blindJudgingEnabled"]
+
+    metadata["submissionFreezeEnabled"] = True
+
     if "minTeamMembers" in body and body["minTeamMembers"] is not None:
         metadata["minTeamSize"] = int(body["minTeamMembers"])
+        metadata["minTeamMembers"] = int(body["minTeamMembers"])
     if "minTeamSize" in body and body["minTeamSize"] is not None:
+        metadata["minTeamSize"] = int(body["minTeamSize"])
         metadata["minTeamMembers"] = int(body["minTeamSize"])
     if "maxTeamMembers" in body and body["maxTeamMembers"] is not None:
         metadata["maxTeamSize"] = int(body["maxTeamMembers"])
+        metadata["maxTeamMembers"] = int(body["maxTeamMembers"])
     if "maxTeamSize" in body and body["maxTeamSize"] is not None:
+        metadata["maxTeamSize"] = int(body["maxTeamSize"])
         metadata["maxTeamMembers"] = int(body["maxTeamSize"])
 
     min_v, max_v = config_team_limits(metadata)
@@ -2489,22 +2820,191 @@ async def update_hackathon_config(
         raise BadRequestException(
             message=f"Số lượng thành viên tối thiểu ({min_v}) phải lớn hơn 0 và không vượt quá số lượng tối đa ({max_v})."
         )
-    if body.get("status") is not None and body.get("currentPhase") is None:
-        metadata["currentPhase"] = _PHASE_LABELS.get(str(body["status"]), str(body["status"]))
-    if body.get("currentPhase") is not None and body.get("status") is None:
-        phase_statuses = {label: status for status, label in _PHASE_LABELS.items()}
-        phase_statuses.update({
-            "Đăng ký tài khoản & Lập đội": "registration",
-            "Lựa chọn đề tài & Giới hạn số lượng": "team_formation",
-            "Thực thi dự án & Nộp bài các chặng": "hacking",
-            "Hội đồng chấm thi độc lập": "judging",
-            "Bế mạc & Công bố kết quả": "completed",
-        })
-        phase = str(body["currentPhase"])
-        if phase in phase_statuses:
-            metadata["status"] = phase_statuses[phase]
+
+    # 7. Validate & resolve Phase status + currentPhase (C03 & C06)
+    old_status = str(metadata.get("status") or "hacking").strip().lower()
+    if old_status not in VALID_CONTEST_STATUSES:
+        old_status = "hacking"
+    resolved_status, resolved_phase_label = resolve_and_validate_phase(
+        body.get("status") if "status" in body else None,
+        body.get("currentPhase") if "currentPhase" in body else None,
+        existing_status=old_status,
+    )
+    will_be_published = (
+        target_result_published
+        if target_result_published is not None
+        else bool(cfg.is_result_published)
+    )
+    is_phase_explicitly_set = (
+        ("status" in body and body["status"] is not None)
+        or ("currentPhase" in body and body["currentPhase"] is not None)
+    )
+    if (
+        is_phase_explicitly_set
+        and resolved_status != old_status
+        and resolved_status in {"registration", "team_formation", "hacking"}
+        and will_be_published
+    ):
+        raise ConflictException(
+            message="Không thể chuyển cuộc thi về giai đoạn trước chấm điểm khi Bảng xếp hạng đang được công bố công khai. Vui lòng ẩn bảng điểm trước.",
+            error_code="RESULTS_PUBLISHED_LOCKED",
+        )
+    metadata["status"] = resolved_status
+    metadata["currentPhase"] = resolved_phase_label
+
+    # 8. Pause / Resume state & Sequential Checkpoint Countdown Compensation (C01)
+    was_paused = bool(metadata.get("is_paused", False))
+    old_paused_at_raw = metadata.get("paused_at")
+    desired_paused: Optional[bool] = None
+    if "is_paused" in body and body["is_paused"] is not None:
+        desired_paused = body["is_paused"]
+    elif "isPaused" in body and body["isPaused"] is not None:
+        desired_paused = body["isPaused"]
+
+    now_utc = datetime.now(timezone.utc)
+    if desired_paused is not None:
+        metadata["is_paused"] = desired_paused
+        if desired_paused:
+            if not was_paused or not old_paused_at_raw:
+                metadata["paused_at"] = now_utc.isoformat()
+            raw_pause_reason = body.get("pause_reason") or body.get("pauseReason")
+            metadata["pause_reason"] = (
+                str(raw_pause_reason).strip()
+                if isinstance(raw_pause_reason, str) and raw_pause_reason.strip()
+                else "Tạm dừng theo điều hành của Ban Tổ Chức"
+            )
+        else:
+            metadata["resumed_at"] = now_utc.isoformat()
+            metadata["paused_at"] = None
+            metadata["pause_reason"] = None
+    elif (
+        resolved_status == "hacking"
+        and old_status != "hacking"
+        and was_paused
+    ):
+        # Starting/entering hacking explicitly clears stale pause unless is_paused=True was sent
+        metadata["is_paused"] = False
+        metadata["resumed_at"] = now_utc.isoformat()
+        metadata["paused_at"] = None
+        metadata["pause_reason"] = None
+
+    is_now_paused = bool(metadata.get("is_paused", False))
+    if raw_start is None and raw_end is None:
+        from app.repositories.checkpoint_repo import checkpoint_repo
+        from app.services.checkpoint_service import ensure_utc
+
+        # 8a. Nếu tiếp tục cuộc thi sau khi tạm dừng: cộng bù thời gian tạm dừng vào chặng đang mở và các chặng kế tiếp
+        if was_paused and not is_now_paused and old_paused_at_raw:
+            try:
+                paused_at_dt = parse_strict_datetime(str(old_paused_at_raw), "paused_at")
+                pause_delta = max(timedelta(0), now_utc - paused_at_dt)
+            except Exception:
+                paused_at_dt = None
+                pause_delta = timedelta(0)
+
+            if paused_at_dt is not None and pause_delta.total_seconds() > 0:
+                all_cps = await checkpoint_repo.get_all(db)
+                for cp in all_cps:
+                    cp_start = ensure_utc(cp.start_time)
+                    cp_end = ensure_utc(cp.deadline)
+                    if cp_end > paused_at_dt:
+                        if cp_start <= paused_at_dt:
+                            cp.deadline = cp_end + pause_delta
+                        else:
+                            cp.start_time = cp_start + pause_delta
+                            cp.deadline = cp_end + pause_delta
+                        if cp.is_final_checkpoint:
+                            cfg.end_time = cp.deadline
+                        db.add(cp)
+
+        # 8b. Nếu phát lệnh bắt đầu cuộc thi khi toàn bộ chặng đều còn ở tương lai (chưa mở chặng 1): neo Chặng 1 mở ngay từ now_utc và nối tiếp các chặng sau
+        elif (
+            resolved_status == "hacking"
+            and old_status in {"registration", "team_formation"}
+            and not is_now_paused
+        ):
+            all_cps = await checkpoint_repo.get_all(db)
+            if all_cps and ensure_utc(all_cps[0].start_time) > now_utc:
+                cursor = now_utc
+                if cfg.start_time and ensure_utc(cfg.start_time) > cursor:
+                    cfg.start_time = cursor
+                for cp in all_cps:
+                    dur = max(
+                        timedelta(minutes=5),
+                        ensure_utc(cp.deadline) - ensure_utc(cp.start_time),
+                    )
+                    cp.start_time = cursor
+                    cursor = cursor + dur
+                    cp.deadline = cursor
+                    if cp.is_final_checkpoint:
+                        cfg.end_time = cp.deadline
+                    db.add(cp)
+
+    # 9. Versioning & Audit History (C08)
+    next_version = curr_version + 1
+    metadata["config_version"] = next_version
+    cfg.settings_data = metadata
+
+    after_preview = _serialize_hackathon_config(cfg)
+    tracked_keys = (
+        "name",
+        "status",
+        "currentPhase",
+        "is_paused",
+        "start_time",
+        "end_time",
+        "registrationDeadline",
+        "minTeamSize",
+        "maxTeamSize",
+        "teamSizeEnforcementPolicy",
+        "is_topic_published",
+        "blindJudgingEnabled",
+        "discrepancyThreshold",
+        "expectedResultPublishAt",
+    )
+    diff: Dict[str, Any] = {}
+    for tk in tracked_keys:
+        if before_snapshot.get(tk) != after_preview.get(tk):
+            diff[tk] = {"from": before_snapshot.get(tk), "to": after_preview.get(tk)}
+
+    change_reason = str(
+        body.get("reason")
+        or body.get("changeReason")
+        or body.get("pause_reason")
+        or "Cập nhật cấu hình hệ thống"
+    ).strip()
+    history_list = list(metadata.get("config_history") or [])
+    history_list.append(
+        {
+            "version": next_version,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "updated_by": str(current_admin.email),
+            "reason": change_reason,
+            "diff": diff,
+        }
+    )
+    metadata["config_history"] = history_list[-30:]
     cfg.settings_data = metadata
     db.add(cfg)
+
+    from app.repositories.submission_repo import submission_repo
+
+    await submission_repo.create_audit_log(
+        db=db,
+        user_id=str(current_admin.id),
+        team_id=None,
+        checkpoint_id=None,
+        submission_id=None,
+        action="HACKATHON_CONFIG_UPDATED",
+        status="updated",
+        late_grace_period=False,
+        details={
+            "old_version": curr_version,
+            "new_version": next_version,
+            "reason": change_reason,
+            "diff": diff,
+        },
+    )
 
     if target_result_published is not None and target_result_published != bool(cfg.is_result_published):
         from app.schemas.leaderboard import PublishLeaderboardRequest
@@ -2517,12 +3017,14 @@ async def update_hackathon_config(
             ),
             current_admin,
         )
+        await db.refresh(cfg)
     else:
         await db.commit()
         await db.refresh(cfg)
 
+    impact = await compute_config_impact_preview(db, cfg)
     return success_response(
-        data=_serialize_hackathon_config(cfg),
+        data=_serialize_hackathon_config(cfg, impact_preview=impact),
         message="Đã lưu cấu hình toàn cục hệ thống thành công.",
     )
 

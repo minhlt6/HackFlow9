@@ -82,6 +82,10 @@ class SubmissionResponse(BaseModel):
         False,
         description="Cờ đánh dấu bài nộp trong vùng Grace Period (tương đương grace_period_applied)",
     )
+    is_late: bool = Field(
+        False,
+        description="True nếu bài nộp được gửi sau hạn chót chuẩn (Nộp muộn)",
+    )
     version: int = Field(1, description="Số thứ tự phiên bản nộp bài (v1, v2, ...)")
     version_history: List[Dict[str, Any]] = Field(
         default_factory=list,

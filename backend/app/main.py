@@ -78,7 +78,7 @@ async def _seed_default_accounts() -> None:
 
         await conn.run_sync(_ensure_schema_columns)
 
-    if not settings.ENABLE_STARTUP_SEED:
+    if not settings.ENABLE_STARTUP_SEED or str(settings.ENVIRONMENT).strip().lower() == "production":
         return
 
     is_test_env = settings.ENVIRONMENT in {"test", "testing"}
@@ -97,7 +97,7 @@ async def _seed_default_accounts() -> None:
     default_pw_hash = hash_password("123456")
 
     async def _reconcile_database_counters(session) -> None:
-        from app.models.team import Team, TeamMember
+        from app.models.team import Team, TeamMember, TeamStatus
         from app.models.topic import Topic, Subtopic
 
         all_teams = list((await session.execute(select(Team))).scalars().all())
@@ -115,10 +115,16 @@ async def _seed_default_accounts() -> None:
         changed = False
         for t in all_teams:
             tid = str(t.id)
-            if t.topic_id:
+            t_meta = t.admin_meta if isinstance(getattr(t, "admin_meta", None), dict) else {}
+            holds_slot = not (
+                getattr(t, "status", None) == TeamStatus.REJECTED
+                or str(t_meta.get("approval_status", "")).lower() == "rejected"
+                or bool(t_meta.get("topic_slot_released"))
+            )
+            if holds_slot and t.topic_id:
                 top_id = str(t.topic_id)
                 topic_counts[top_id] = topic_counts.get(top_id, 0) + 1
-            if t.subtopic_id:
+            if holds_slot and t.subtopic_id:
                 sub_id = str(t.subtopic_id)
                 subtopic_counts[sub_id] = subtopic_counts.get(sub_id, 0) + 1
             actual_mc = mem_counts.get(tid, 0)
@@ -135,8 +141,9 @@ async def _seed_default_accounts() -> None:
                 sub.current_teams = actual_sc
                 changed = True
             if sub.max_teams < actual_sc:
-                sub.max_teams = actual_sc
-                changed = True
+                logger.warning(
+                    f"Cảnh báo đối soát quota: Nhánh đề tài '{sub.title}' ({sub.id}) có {actual_sc} đội vượt quá max_teams={sub.max_teams}."
+                )
 
         for top in all_topics:
             actual_tc = topic_counts.get(str(top.id), 0)
@@ -144,8 +151,94 @@ async def _seed_default_accounts() -> None:
                 top.current_teams = actual_tc
                 changed = True
             if top.max_teams < actual_tc:
-                top.max_teams = actual_tc
+                logger.warning(
+                    f"Cảnh báo đối soát quota: Đề tài '{top.title}' ({top.id}) có {actual_tc} đội vượt quá max_teams={top.max_teams}."
+                )
+
+        from datetime import datetime, timezone
+        from app.models.checkpoint import AuditLog, Checkpoint, Submission
+        from app.models.evaluation import Evaluation
+        from app.services.checkpoint_service import ensure_utc
+        now_reconcile = datetime.now(timezone.utc)
+        all_cps = list(
+            (
+                await session.execute(
+                    select(Checkpoint).order_by(Checkpoint.display_order.asc(), Checkpoint.created_at.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+        for i in range(1, len(all_cps)):
+            curr_cp = all_cps[i]
+            prev_cp = all_cps[i - 1]
+            if curr_cp.start_time and prev_cp.deadline:
+                curr_start = ensure_utc(curr_cp.start_time)
+                prev_deadline = ensure_utc(prev_cp.deadline)
+                if curr_start < prev_deadline and ensure_utc(curr_cp.deadline) > prev_deadline:
+                    curr_cp.start_time = prev_deadline
+                    changed = True
+
+        # Loại bỏ các bản nộp demo bị sinh nhầm ở các chặng chưa mở (upcoming)
+        upcoming_cp_ids = {
+            str(cp.id)
+            for cp in all_cps
+            if cp.start_time and ensure_utc(cp.start_time) > now_reconcile
+        }
+        if upcoming_cp_ids:
+            eval_sub_ids = set(
+                str(sid)
+                for sid in (await session.execute(select(Evaluation.submission_id))).scalars().all()
+                if sid is not None
+            )
+            premature_subs = list(
+                (
+                    await session.execute(
+                        select(Submission).where(Submission.checkpoint_id.in_(upcoming_cp_ids))
+                    )
+                )
+                .scalars()
+                .all()
+            )
+            for p_sub in premature_subs:
+                if str(p_sub.id) not in eval_sub_ids:
+                    p_logs = list(
+                        (
+                            await session.execute(
+                                select(AuditLog).where(AuditLog.submission_id == str(p_sub.id))
+                            )
+                        )
+                        .scalars()
+                        .all()
+                    )
+                    for p_log in p_logs:
+                        await session.delete(p_log)
+                    await session.delete(p_sub)
+                    changed = True
+
+        # Làm sạch các chuỗi note / version_history bị lỗi encoding dấu '?' (BUG 54)
+        clean_demo_note = "Dự án demo đã cập nhật báo cáo tiến độ và liên kết sản phẩm hợp lệ."
+        all_subs = list((await session.execute(select(Submission))).scalars().all())
+        for sub_row in all_subs:
+            if isinstance(sub_row.note, str) and ("??" in sub_row.note or "D? ?n" in sub_row.note):
+                sub_row.note = clean_demo_note
                 changed = True
+            if isinstance(sub_row.version_history, list):
+                vh_changed = False
+                new_vh = []
+                for vh_item in sub_row.version_history:
+                    if isinstance(vh_item, dict):
+                        item_copy = dict(vh_item)
+                        raw_vh_note = item_copy.get("note")
+                        if isinstance(raw_vh_note, str) and ("??" in raw_vh_note or "D? ?n" in raw_vh_note):
+                            item_copy["note"] = clean_demo_note
+                            vh_changed = True
+                        new_vh.append(item_copy)
+                    else:
+                        new_vh.append(vh_item)
+                if vh_changed:
+                    sub_row.version_history = new_vh
+                    changed = True
 
         if changed:
             await session.commit()
@@ -155,13 +248,6 @@ async def _seed_default_accounts() -> None:
             await session.execute(select(User).where(User.email == "admin@demo.example.com"))
         ).scalar_one_or_none()
         if rehearsal_admin is not None:
-            if rehearsal_admin.hashed_password != default_pw_hash:
-                demo_users = (
-                    await session.execute(select(User).where(User.email.like("%@demo.example.com")))
-                ).scalars().all()
-                for u_demo in demo_users:
-                    u_demo.hashed_password = default_pw_hash
-                await session.commit()
             await _reconcile_database_counters(session)
             return
 
@@ -180,13 +266,6 @@ async def _seed_default_accounts() -> None:
                 )
                 session.add(existing)
                 await session.flush()
-            else:
-                if existing.hashed_password != default_pw_hash:
-                    existing.hashed_password = default_pw_hash
-                if existing.approval_status != approval_status:
-                    existing.approval_status = approval_status
-                if email == "leader@cybersamurai.team" and existing.full_name == "Trần Quốc Bảo":
-                    existing.full_name = "Nguyễn Văn Minh"
 
         if not is_test_env:
             import json
@@ -373,10 +452,10 @@ async def _seed_default_accounts() -> None:
             if not cp_res.scalar_one_or_none():
                 now_utc = datetime.now(timezone.utc)
                 default_checkpoints = [
-                    ("Chặng 1: Khởi tạo Kiến trúc & Đặc tả Giải pháp", "Nộp liên kết GitHub Repository và tài liệu kiến trúc hệ thống ban đầu.", now_utc - timedelta(hours=2), now_utc + timedelta(hours=12), False, 15.0, 1),
-                    ("Chặng 2: Phát triển Core AI / Backend Prototype", "Hoàn thiện pipeline xử lý dữ liệu và các API cốt lõi.", now_utc - timedelta(hours=1), now_utc + timedelta(hours=24), False, 20.0, 2),
-                    ("Chặng 3: Tích hợp Giao diện & Kiểm thử End-to-End", "Tích hợp toàn bộ hệ thống và chuẩn bị kịch bản kiểm thử.", now_utc, now_utc + timedelta(hours=36), False, 25.0, 3),
-                    ("Chặng Chung Cuộc: Đóng băng Commit SHA & Nộp Video Demo", "Chốt mã nguồn chính thức, slide thuyết trình và video demo sản phẩm để Hội đồng Giám khảo chấm điểm.", now_utc, now_utc + timedelta(hours=48), True, 40.0, 4),
+                    ("Chặng 1: Khởi tạo Kiến trúc & Đặc tả Giải pháp", "Nộp liên kết GitHub Repository và tài liệu kiến trúc hệ thống ban đầu.", now_utc - timedelta(hours=24), now_utc - timedelta(hours=2), False, 15.0, 1),
+                    ("Chặng 2: Phát triển Core AI / Backend Prototype", "Hoàn thiện pipeline xử lý dữ liệu và các API cốt lõi.", now_utc - timedelta(hours=2), now_utc + timedelta(hours=12), False, 20.0, 2),
+                    ("Chặng 3: Tích hợp Giao diện & Kiểm thử End-to-End", "Tích hợp toàn bộ hệ thống và chuẩn bị kịch bản kiểm thử.", now_utc + timedelta(hours=12), now_utc + timedelta(hours=24), False, 25.0, 3),
+                    ("Chặng Chung Cuộc: Nộp Sản Phẩm Hoàn Chỉnh & Video Demo", "Chốt mã nguồn chính thức, slide thuyết trình và video demo sản phẩm để Hội đồng Giám khảo chấm điểm.", now_utc + timedelta(hours=24), now_utc + timedelta(hours=48), True, 40.0, 4),
                 ]
                 for c_title, c_desc, s_time, d_time, is_final, c_weight, c_order in default_checkpoints:
                     session.add(
@@ -496,7 +575,9 @@ async def _seed_default_accounts() -> None:
                 cp_all_res = await session.execute(select(Checkpoint).order_by(Checkpoint.display_order.asc()))
                 all_cps = list(cp_all_res.scalars().all())
                 first_cp = all_cps[0] if all_cps else None
+                second_cp = all_cps[1] if len(all_cps) > 1 else None
                 final_cp = next((c for c in all_cps if c.is_final_checkpoint), (all_cps[-1] if all_cps else None))
+                now_seed_utc = datetime.now(timezone.utc)
 
                 created_final_submissions = []
                 for idx_t, t_obj in enumerate(existing_teams[:3]):
@@ -523,7 +604,30 @@ async def _seed_default_accounts() -> None:
                                 version=1,
                             )
                         )
-                    if final_cp and str(final_cp.id) != (str(first_cp.id) if first_cp else ""):
+                    if second_cp and (not second_cp.start_time or ensure_utc(second_cp.start_time) <= now_seed_utc):
+                        session.add(
+                            Submission(
+                                checkpoint_id=str(second_cp.id),
+                                team_id=str(t_obj.id),
+                                submitted_by=submitter_id,
+                                repo_url=f"https://github.com/hackflow-2026/{slug}",
+                                demo_url=f"https://youtu.be/demo-{slug}-cp2",
+                                commit_sha=f"b2c3d4e5f6a7000{idx_t + 1}",
+                                submission_data={
+                                    "repo_url": f"https://github.com/hackflow-2026/{slug}",
+                                    "demo_url": f"https://youtu.be/demo-{slug}-cp2",
+                                    "progress_summary": f"Hoàn thiện Core AI / Backend Prototype của đội {t_obj.team_name}.",
+                                },
+                                note=f"Dự án demo đã cập nhật báo cáo tiến độ và liên kết sản phẩm hợp lệ của đội {t_obj.team_name}.",
+                                status=SubmissionStatus.SUBMITTED.value,
+                                version=1,
+                            )
+                        )
+                    if (
+                        final_cp
+                        and str(final_cp.id) != (str(first_cp.id) if first_cp else "")
+                        and (not final_cp.start_time or ensure_utc(final_cp.start_time) <= now_seed_utc)
+                    ):
                         final_sub = Submission(
                             checkpoint_id=str(final_cp.id),
                             team_id=str(t_obj.id),
@@ -666,19 +770,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Startup
     logger.info(f"Khởi động {settings.PROJECT_NAME} v{settings.VERSION} [{settings.ENVIRONMENT}]")
+    prod_errors = settings.validate_production_readiness()
+    for err in prod_errors:
+        logger.error(f"Cảnh báo cấu hình Production: {err}")
     try:
         await _seed_default_accounts()
-        logger.info("Đã khởi tạo schema cơ sở dữ liệu và tài khoản mặc định thành công.")
+        logger.info("Đã khởi tạo schema cơ sở dữ liệu thành công.")
     except Exception as exc:
-        logger.warning(
-            f"Không thể kết nối DATABASE_URL từ xa ({exc}). Tự động chuyển sang SQLite dự phòng (hackflow.db)..."
+        logger.error(
+            f"Không thể kết nối DATABASE_URL đã cấu hình ({exc}). Giữ nguyên cấu hình đích lưu trữ để báo trạng thái sẵn sàng dịch vụ."
         )
-        try:
-            db_module.switch_to_sqlite_fallback()
-            await _seed_default_accounts()
-            logger.info("Đã khởi tạo SQLite dự phòng (hackflow.db) và tài khoản mặc định thành công.")
-        except Exception as fallback_exc:
-            logger.error(f"Lỗi khi khởi tạo SQLite dự phòng: {fallback_exc}")
     logger.info(f"CORS origins cho phép: {settings.CORS_ORIGINS}")
     logger.info(f"Docs UI sẵn sàng tại: http://localhost:8000/docs")
     yield

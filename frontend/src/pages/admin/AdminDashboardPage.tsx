@@ -32,6 +32,7 @@ export const AdminDashboardPage: React.FC = () => {
     teams,
     whitelist,
     pendingCandidates,
+    checkpoints,
     submissions,
     tickets,
     config,
@@ -167,10 +168,10 @@ export const AdminDashboardPage: React.FC = () => {
         <StatCard
           title="Bài nộp các chặng"
           value={submissions.length}
-          subtitle="Tổng số Commit SHA đã chốt"
+          subtitle="Xem ma trận tiến độ nộp bài"
           icon={<CheckSquare size={20} />}
           iconColor="emerald"
-          onClick={() => navigate('/admin/checkpoints')}
+          onClick={() => navigate('/admin/checkpoints?view=progress')}
         />
 
         <StatCard
@@ -244,6 +245,40 @@ export const AdminDashboardPage: React.FC = () => {
                   </div>
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     Import danh sách sinh viên hợp lệ qua CSV hoặc biểu mẫu trực tiếp.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/checkpoints?view=progress')}
+                  className="group rounded-lg border border-border bg-muted/30 p-4 text-left transition-all hover:border-primary/50 hover:bg-accent/50 cursor-pointer space-y-1.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors inline-flex items-center gap-1">
+                      Tiến độ Nộp bài các Chặng
+                      <ArrowUpRight size={14} className="opacity-60" />
+                    </span>
+                    <Badge variant="success">{submissions.length} bài nộp</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Theo dõi ma trận tiến độ các chặng theo đội thi, đối soát bài nộp đúng hạn / nộp muộn và xem tài nguyên sản phẩm.
+                  </p>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/admin/checkpoints')}
+                  className="group rounded-lg border border-border bg-muted/30 p-4 text-left transition-all hover:border-primary/50 hover:bg-accent/50 cursor-pointer space-y-1.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground text-sm group-hover:text-primary transition-colors inline-flex items-center gap-1">
+                      Cấu hình Chặng & Thời lượng
+                      <ArrowUpRight size={14} className="opacity-60" />
+                    </span>
+                    <Badge variant="indigo">{checkpoints.length} chặng</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Thiết lập thời lượng đếm ngược nối tiếp, trọng số điểm và các trường tài liệu yêu cầu cho từng mốc Checkpoint.
                   </p>
                 </button>
 

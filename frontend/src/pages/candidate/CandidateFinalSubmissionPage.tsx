@@ -9,7 +9,6 @@ import {
   Video,
   Presentation,
   FileCode,
-  GitCommit,
   ExternalLink,
   ShieldCheck,
   AlertCircle,
@@ -109,8 +108,11 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
           new Date(finalCheckpoint.startTime).getTime() > nowMs)),
   );
 
-  const isSubmissionClosed =
-    isDeadlinePassed || finalCheckpoint?.status === 'closed';
+  const isSubmissionClosed = finalCheckpoint?.status === 'closed';
+  const isLateWindow =
+    !isNotOpenYet &&
+    !isSubmissionClosed &&
+    (finalCheckpoint?.status === 'late' || isDeadlinePassed);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,12 +137,8 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
         description: summary.trim(),
       });
       const data = apiRes.data.data;
-      if (!data.commit_sha || data.status === 'sha_verification_failed') {
-        setError('Chưa xác minh được commit GitHub. Vui lòng kiểm tra kho mã nguồn và nộp lại.');
-        return;
-      }
       await syncFromBackend?.();
-      setSuccessSha(String(data.commit_sha));
+      setSuccessSha(String(data?.commit_sha || 'submitted'));
       setIsEditingSubmitted(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Không thể nộp bài. Vui lòng thử lại.');
@@ -196,6 +194,15 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
         </div>
       )}
 
+      {myTeam && isLateWindow && (
+        <div className="rounded-[14px] border border-amber-500/40 bg-amber-500/10 p-4 flex items-center gap-3">
+          <Clock size={20} className="text-amber-700 dark:text-amber-400 shrink-0" />
+          <div className="text-xs text-foreground">
+            <strong>Đang mở tiếp nhận Nộp muộn (Quá hạn chuẩn {formattedDeadline}):</strong> Hệ thống vẫn cho phép nộp hoặc cập nhật bài dự thi chung cuộc nhưng bài nộp sẽ được gắn cờ <strong>Nộp muộn</strong>.
+          </div>
+        </div>
+      )}
+
       {myTeam && isSubmissionClosed && (
         <div className="rounded-[14px] border border-rose-500/40 bg-rose-500/10 p-4 flex items-center gap-3">
           <AlertCircle size={20} className="text-rose-700 dark:text-rose-400 shrink-0" />
@@ -241,25 +248,11 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
                   <span>Cập nhật lại bài nộp</span>
                 </Button>
               )}
+              {existingFinal?.isLate && (
+                <Badge variant="warning">Nộp muộn</Badge>
+              )}
               <Badge variant="success">Trạng thái: Đã Chốt Bài Nộp</Badge>
             </div>
-          </div>
-
-          {/* Frozen Commit SHA Badge */}
-          <div className="rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs uppercase font-semibold tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <GitCommit size={15} className="text-primary" />
-                <span>Mã băm commit đóng băng an toàn</span>
-              </span>
-              <span className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">Bảo vệ tính toàn vẹn</span>
-            </div>
-            <div className="font-mono text-base font-bold text-foreground bg-muted/40 dark:bg-slate-900/60 p-3 rounded-[8px] border border-border overflow-x-auto text-emerald-700 dark:text-emerald-400">
-              {existingFinal?.commitSha || successSha}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              Giám khảo sẽ chỉ đánh giá mã nguồn tại chính xác commit hash này. Mọi thay đổi sau thời điểm nộp sẽ không được tính.
-            </p>
           </div>
 
           {/* Submission Details Summary */}
@@ -372,11 +365,11 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
             <div className="rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-amber-500/30 p-4 text-xs text-muted-foreground space-y-2">
               <div className="flex items-center gap-1.5 text-amber-700 dark:text-amber-400 font-semibold">
                 <AlertCircle size={15} />
-                <span>Cảnh báo trước khi nộp bài:</span>
+                <span>Lưu ý trước khi nộp bài:</span>
               </div>
               <p>
-                Sau khi nhấn Nộp bài chung cuộc, hệ thống sẽ thực hiện chốt commit SHA tự động. Sau thời hạn{' '}
-                <strong>{formattedDeadline}</strong>, mọi thao tác chỉnh sửa hoặc nộp lại sẽ bị vô hiệu hóa hoàn toàn.
+                Đội thi có thể cập nhật thêm giao diện, mã nguồn và tài liệu dự thi linh hoạt trước thời hạn{' '}
+                <strong>{formattedDeadline}</strong>. Sau thời hạn này, cổng nộp bài sẽ đóng hoàn toàn.
               </p>
             </div>
 
@@ -404,14 +397,18 @@ export const CandidateFinalSubmissionPage: React.FC = () => {
                 <Send size={16} />
                 <span>
                   {isSubmitting
-                    ? 'Đang đóng băng Commit SHA...'
+                    ? 'Đang gửi bài dự thi...'
                     : isSubmissionClosed
                       ? 'Đã đóng cổng nộp bài'
                       : isNotOpenYet
                         ? 'Chưa đến giờ mở cổng'
                         : isEditingSubmitted
-                          ? 'Cập Nhật & Chốt Lại Commit SHA'
-                          : 'Chốt Commit SHA & Nộp Bài Chung Cuộc'}
+                          ? isLateWindow
+                            ? 'Cập Nhật Bài (Nộp Muộn)'
+                            : 'Cập Nhật Lại Bài Nộp'
+                          : isLateWindow
+                            ? 'Nộp Bài Chung Cuộc (Nộp Muộn)'
+                            : 'Nộp Bài Dự Thi Chung Cuộc'}
                 </span>
               </Button>
             </div>

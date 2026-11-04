@@ -1,8 +1,7 @@
 import { useActionConfirmation } from '../../hooks/useActionConfirmation';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { useMockStore } from '../../store/useMockStore';
 import { toast } from '../../store/useToastStore';
-import { apiClient } from '../../api/axiosClient';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Badge } from '../../components/Badge';
@@ -25,12 +24,21 @@ import {
   CheckSquare,
   Scale,
   Megaphone,
+  History,
+  Eye,
 } from 'lucide-react';
 
 import { toLocalDateTime, configDeadlineToISO } from '../../utils/configForm';
 import { useUnsavedChangesWarning } from '../../hooks/useUnsavedChangesWarning';
 import { UnsavedChangesDialog } from '../../components/common/UnsavedChangesDialog';
 import { ConfirmDialog } from '../../components/patterns/ConfirmDialog';
+import {
+  contestConfigService,
+  deriveContestRuntimeState,
+  mapPhaseToCode,
+  normalizeBackendConfig,
+} from '../../services/contestConfigService';
+import type { TeamSizeEnforcementPolicy } from '../../types';
 
 export const AdminConfigPage: React.FC = () => {
   const { confirm, confirmationDialog } = useActionConfirmation();
@@ -50,6 +58,9 @@ export const AdminConfigPage: React.FC = () => {
   const [currentPhase, setCurrentPhase] = useState(config.currentPhase);
   const [minTeamMembers, setMinTeamMembers] = useState(config.minTeamMembers || config.minTeamSize || 3);
   const [maxTeamMembers, setMaxTeamMembers] = useState(config.maxTeamMembers || config.maxTeamSize || 5);
+  const [teamSizePolicy, setTeamSizePolicy] = useState<TeamSizeEnforcementPolicy>(
+    config.teamSizeEnforcementPolicy || 'grandfathered_approved'
+  );
   const [finalDeadline, setFinalDeadline] = useState(
     toLocalDateTime(config.finalSubmissionDeadline)
   );
@@ -57,99 +68,182 @@ export const AdminConfigPage: React.FC = () => {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const savingRef = useRef(false);
-  const [baseline, setBaseline] = useState({ name, currentPhase, minTeamMembers, maxTeamMembers, finalDeadline });
+  const [baseline, setBaseline] = useState({
+    name,
+    currentPhase,
+    minTeamMembers,
+    maxTeamMembers,
+    teamSizePolicy,
+    finalDeadline,
+  });
   const savedDeadlineRef = useRef(config.finalSubmissionDeadline);
   const [alert, setAlert] = useState<string | null>(null);
   const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
   const [isContestToggleConfirmOpen, setIsContestToggleConfirmOpen] = useState(false);
   const [isPublishToggleConfirmOpen, setIsPublishToggleConfirmOpen] = useState(false);
 
+  const localTimezoneLabel = useMemo(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local';
+      return `${tz}`;
+    } catch {
+      return 'UTC+7';
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
-    apiClient
-      .get('/admin/config')
-      .then((res) => {
+    contestConfigService
+      .fetchAdminConfig()
+      .then((data) => {
         if (!mounted) return;
-        const data = res.data?.data ?? res.data;
-        if (!data?.id || !data.end_time) throw new Error('Phản hồi cấu hình không hợp lệ.');
-        if (data && typeof data === 'object') {
-          setHasLoaded(true);
-          const currCfg = useMockStore.getState().config;
-          const nextName = String(data.name ?? data.eventName ?? currCfg.name);
-          const nextMinTeam = Number(data.minTeamMembers ?? data.minTeamSize ?? currCfg.minTeamMembers ?? currCfg.minTeamSize ?? 3);
-          const nextMaxTeam = Number(data.maxTeamMembers ?? data.maxTeamSize ?? currCfg.maxTeamMembers ?? currCfg.maxTeamSize ?? 5);
-          const nextPhase = String(data.currentPhase ?? currCfg.currentPhase);
-          const nextEnd = String(data.end_time ?? data.endAt ?? currCfg.finalSubmissionDeadline);
-          savedDeadlineRef.current = nextEnd;
-          setBaseline({ name: nextName, currentPhase: nextPhase, minTeamMembers: nextMinTeam,
-            maxTeamMembers: nextMaxTeam, finalDeadline: toLocalDateTime(nextEnd) });
-          setName(nextName);
-          setMinTeamMembers(nextMinTeam);
-          setMaxTeamMembers(nextMaxTeam);
-          if (nextPhase) setCurrentPhase(nextPhase);
-          if (nextEnd) {
-            setFinalDeadline(toLocalDateTime(nextEnd));
-          }
-          useMockStore.setState((state) => ({
-            config: {
-              ...state.config,
-              isContestStarted: ['hacking', 'judging', 'completed'].includes(
-                String(data.status || '').toLowerCase()
-              ),
-              name: nextName,
-              currentPhase: nextPhase || state.config.currentPhase,
-              minTeamSize: nextMinTeam,
-              minTeamMembers: nextMinTeam,
-              maxTeamSize: nextMaxTeam,
-              maxTeamMembers: nextMaxTeam,
-              finalSubmissionDeadline: nextEnd || state.config.finalSubmissionDeadline,
-              blindJudging: Boolean(data.blindJudgingEnabled ?? state.config.blindJudging),
-              blindJudgingMode: Boolean(data.blindJudgingEnabled ?? state.config.blindJudgingMode),
-              resultsPublished: Boolean(data.is_result_published ?? data.leaderboardPublished ?? state.config.resultsPublished),
-            },
-          }));
+        setHasLoaded(true);
+        const currCfg = useMockStore.getState().config;
+        const normalized = normalizeBackendConfig(data, currCfg);
+        const nextDeadlineLocal = toLocalDateTime(normalized.finalSubmissionDeadline);
+        savedDeadlineRef.current = normalized.finalSubmissionDeadline;
+        const nextMin = normalized.minTeamMembers ?? normalized.minTeamSize ?? 3;
+        const nextMax = normalized.maxTeamMembers ?? normalized.maxTeamSize ?? 5;
+        const nextPolicy = normalized.teamSizeEnforcementPolicy ?? 'grandfathered_approved';
+
+        setBaseline({
+          name: normalized.name,
+          currentPhase: normalized.currentPhase,
+          minTeamMembers: nextMin,
+          maxTeamMembers: nextMax,
+          teamSizePolicy: nextPolicy,
+          finalDeadline: nextDeadlineLocal,
+        });
+        setName(normalized.name);
+        setMinTeamMembers(nextMin);
+        setMaxTeamMembers(nextMax);
+        setTeamSizePolicy(nextPolicy);
+        if (normalized.currentPhase) setCurrentPhase(normalized.currentPhase);
+        if (normalized.finalSubmissionDeadline) {
+          setFinalDeadline(nextDeadlineLocal);
         }
+        useMockStore.setState({ config: normalized });
       })
-      .catch(() => { toast.error('Không thể tải cấu hình. Vui lòng tải lại trang trước khi lưu.'); })
-      .finally(() => { if (mounted) setIsLoading(false); });
+      .catch(() => {
+        toast.error('Không thể tải cấu hình. Vui lòng tải lại trang trước khi lưu.');
+      })
+      .finally(() => {
+        if (mounted) setIsLoading(false);
+      });
     return () => {
       mounted = false;
     };
   }, []);
 
-  const isDirty = name !== baseline.name || currentPhase !== baseline.currentPhase ||
-    Number(minTeamMembers) !== baseline.minTeamMembers || Number(maxTeamMembers) !== baseline.maxTeamMembers ||
+  const isDirty =
+    name !== baseline.name ||
+    currentPhase !== baseline.currentPhase ||
+    Number(minTeamMembers) !== baseline.minTeamMembers ||
+    Number(maxTeamMembers) !== baseline.maxTeamMembers ||
+    teamSizePolicy !== baseline.teamSizePolicy ||
     finalDeadline !== baseline.finalDeadline;
 
   const blocker = useUnsavedChangesWarning(isDirty);
 
+  const runtimeState = useMemo(
+    () => deriveContestRuntimeState(config.status, config.currentPhase, config.isPaused),
+    [config.status, config.currentPhase, config.isPaused]
+  );
+
+  const selectedPhaseCode = useMemo(() => mapPhaseToCode(currentPhase), [currentPhase]);
+
+  // Tính toán xem trước tác động (Impact Preview) trực tiếp khi Admin thay đổi thông số
+  const liveImpactPreview = useMemo(() => {
+    const serverPreview = config.impactPreview;
+    const activeTeams = teams.filter((t) => t.status !== 'rejected' && t.approvalStatus !== 'rejected');
+    const underMinTeams = activeTeams.filter(
+      (t) => (t.memberCount ?? t.members?.length ?? 0) < Number(minTeamMembers)
+    );
+    const overMaxTeams = activeTeams.filter(
+      (t) => (t.memberCount ?? t.members?.length ?? 0) > Number(maxTeamMembers)
+    );
+    const underMinCount =
+      Number(minTeamMembers) === serverPreview?.min_team_members
+        ? serverPreview.under_min_teams_count
+        : underMinTeams.length;
+    const overMaxCount =
+      Number(maxTeamMembers) === serverPreview?.max_team_members
+        ? serverPreview.over_max_teams_count
+        : overMaxTeams.length;
+    const openCheckpointsCount =
+      serverPreview?.open_checkpoints_count ??
+      checkpoints.filter((cp) => cp.status === 'open').length;
+    const unverifiedFinalsCount = serverPreview?.unverified_final_submissions_count ?? 0;
+
+    return {
+      underMinCount,
+      overMaxCount,
+      openCheckpointsCount,
+      unverifiedFinalsCount,
+    };
+  }, [config.impactPreview, teams, checkpoints, minTeamMembers, maxTeamMembers]);
+
   const saveConfig = async (alreadyConfirmed = false): Promise<boolean> => {
     if (savingRef.current || isLoading || !hasLoaded) return false;
-    if (!Number.isInteger(minTeamMembers) || minTeamMembers < 1 || !Number.isInteger(maxTeamMembers) || minTeamMembers > maxTeamMembers) {
+    if (
+      !Number.isInteger(minTeamMembers) ||
+      minTeamMembers < 1 ||
+      !Number.isInteger(maxTeamMembers) ||
+      minTeamMembers > maxTeamMembers
+    ) {
       toast.error('Số lượng thành viên phải là số nguyên dương và tối thiểu không vượt quá tối đa.');
       return false;
     }
-    if (isDirty && !alreadyConfirmed && !await confirm({title: 'Áp dụng thay đổi cấu hình cuộc thi?',
-      description: `Tên: ${baseline.name} → ${name}. Giai đoạn: ${baseline.currentPhase} → ${currentPhase}. Số thành viên: ${baseline.minTeamMembers}–${baseline.maxTeamMembers} → ${minTeamMembers}–${maxTeamMembers}. Hạn cuối: ${baseline.finalDeadline} → ${finalDeadline}. Thay đổi có hiệu lực ngay sau khi lưu.`, confirmLabel: 'Xác nhận lưu cấu hình'})) return false;
+    if (
+      isDirty &&
+      !alreadyConfirmed &&
+      !(await confirm({
+        title: 'Áp dụng thay đổi cấu hình cuộc thi?',
+        description: `Tên: ${baseline.name} → ${name}. Giai đoạn: ${baseline.currentPhase} → ${currentPhase}. Số thành viên: ${baseline.minTeamMembers}–${baseline.maxTeamMembers} → ${minTeamMembers}–${maxTeamMembers}. Hạn cuối: ${baseline.finalDeadline} → ${finalDeadline}. Thay đổi có hiệu lực ngay sau khi lưu.`,
+        confirmLabel: 'Xác nhận lưu cấu hình',
+      }))
+    ) {
+      return false;
+    }
     savingRef.current = true;
     setIsSaving(true);
     setAlert(null);
     try {
-      await updateConfig({ name, currentPhase, minTeamSize: minTeamMembers, minTeamMembers,
-        maxTeamSize: maxTeamMembers, maxTeamMembers,
-        finalSubmissionDeadline: configDeadlineToISO(finalDeadline, savedDeadlineRef.current) });
+      await updateConfig({
+        version: config.version,
+        name,
+        status: selectedPhaseCode,
+        currentPhase,
+        minTeamSize: minTeamMembers,
+        minTeamMembers,
+        maxTeamSize: maxTeamMembers,
+        maxTeamMembers,
+        teamSizeEnforcementPolicy: teamSizePolicy,
+        finalSubmissionDeadline: configDeadlineToISO(finalDeadline, savedDeadlineRef.current),
+      });
       const saved = useMockStore.getState().config;
-      const next = { name: saved.name, currentPhase: saved.currentPhase,
+      const next = {
+        name: saved.name,
+        currentPhase: saved.currentPhase,
         minTeamMembers: saved.minTeamMembers ?? saved.minTeamSize ?? 3,
         maxTeamMembers: saved.maxTeamMembers ?? saved.maxTeamSize ?? 5,
-        finalDeadline: toLocalDateTime(saved.finalSubmissionDeadline) };
+        teamSizePolicy: saved.teamSizeEnforcementPolicy ?? teamSizePolicy,
+        finalDeadline: toLocalDateTime(saved.finalSubmissionDeadline),
+      };
       savedDeadlineRef.current = saved.finalSubmissionDeadline;
-      setName(next.name); setCurrentPhase(next.currentPhase);
-      setMinTeamMembers(next.minTeamMembers); setMaxTeamMembers(next.maxTeamMembers);
-      setFinalDeadline(next.finalDeadline); setBaseline(next);
+      setName(next.name);
+      setCurrentPhase(next.currentPhase);
+      setMinTeamMembers(next.minTeamMembers);
+      setMaxTeamMembers(next.maxTeamMembers);
+      setTeamSizePolicy(next.teamSizePolicy);
+      setFinalDeadline(next.finalDeadline);
+      setBaseline(next);
       return true;
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Không thể lưu cấu hình. Vui lòng thử lại.');
+    } catch (error: unknown) {
+      const apiMsg =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (error instanceof Error ? error.message : 'Không thể lưu cấu hình. Vui lòng thử lại.');
+      toast.error(apiMsg);
       return false;
     } finally {
       savingRef.current = false;
@@ -184,7 +278,7 @@ export const AdminConfigPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6  w-full pb-10">
+    <div className="space-y-6 w-full pb-10">
       {confirmationDialog}
       {/* Top Header & Overview Bar */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-border">
@@ -193,9 +287,7 @@ export const AdminConfigPage: React.FC = () => {
             <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#6366F1]/20 border border-[#6366F1]/40 text-primary">
               <Settings size={20} />
             </div>
-            <h1
-              className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide"
-            >
+            <h1 className="font-semibold tracking-tight text-foreground text-2xl sm:text-3xl tracking-wide">
               Cấu Hình Hệ Thống Cuộc Thi
             </h1>
           </div>
@@ -206,18 +298,28 @@ export const AdminConfigPage: React.FC = () => {
 
         {/* Live Status Indicators */}
         <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
-          <Badge variant={config.isContestStarted ? 'success' : 'warning'} className="gap-1.5 py-1 px-3">
+          <Badge variant={runtimeState.badgeVariant} className="gap-1.5 py-1 px-3">
             <span
               className={`w-2 h-2 rounded-full ${
-                config.isContestStarted ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                runtimeState.isContestStarted
+                  ? 'bg-emerald-400 animate-pulse'
+                  : runtimeState.contestState === 'judging'
+                    ? 'bg-indigo-400'
+                    : 'bg-amber-400'
               }`}
             />
-            <span>{config.isContestStarted ? 'Cuộc thi đang diễn ra' : 'Cuộc thi chưa bắt đầu'}</span>
+            <span>{runtimeState.contestStateLabel}</span>
           </Badge>
 
           <Badge variant={config.resultsPublished ? 'success' : 'neutral'} className="py-1 px-2.5">
             Bảng điểm: {config.resultsPublished ? 'CÔNG BỐ' : 'ẨN'}
           </Badge>
+
+          {typeof config.version === 'number' && (
+            <Badge variant="neutral" className="py-1 px-2.5 font-mono text-[11px]">
+              v{config.version}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -251,343 +353,551 @@ export const AdminConfigPage: React.FC = () => {
         </div>
       )}
 
-      {!isLoading && !hasLoaded && <p role="alert" className="text-sm text-rose-600">Không thể tải cấu hình. Vui lòng tải lại trang.</p>}
+      {!isLoading && !hasLoaded && (
+        <p role="alert" className="text-sm text-rose-600">
+          Không thể tải cấu hình. Vui lòng tải lại trang.
+        </p>
+      )}
+
       {/* Main Form Grid: Left (Primary Config) & Right (Policies & System Ops) */}
       <form onSubmit={handleSave}>
         <fieldset disabled={isLoading || isSaving || !hasLoaded} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ========================================================
-            LEFT COLUMN (7 cols on lg, 8 cols on xl): Core Settings
-           ======================================================== */}
-        <div className="lg:col-span-7 xl:col-span-8 space-y-6">
-          {/* Card 1: Thông Tin Chung Cuộc Thi */}
-          <div className="rounded-[16px] border border-border bg-card p-6 sm:p-7 space-y-5 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-3 pb-3 border-b border-border">
-              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
-                <Sliders size={18} />
-              </div>
-              <div>
-                <h3 className="font-semibold tracking-tight text-foreground text-base sm:text-lg text-foreground">
-                  Thông Tin Chung & Quy Định Đội Thi
-                </h3>
-                <p className="text-xs text-muted-foreground">
-                  Tên định danh cuộc thi, tiến trình giai đoạn và quy định số lượng thành viên tham gia.
-                </p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <Input
-                label="Tên Cuộc Thi *"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-                placeholder="Ví dụ: HackFlow AI và DeepTech Hackathon 2026"
-              />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-muted-foreground font-medium text-xs flex items-center justify-between">
-                    <span>Giai đoạn hiện tại *</span>
-                    <span className="text-[10px] text-primary">Đang hoạt động</span>
-                  </label>
-                  <select
-                    value={currentPhase}
-                    onChange={(e) => setCurrentPhase(e.target.value)}
-                    className="w-full p-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none transition-colors"
-                  >
-                    {!['Đăng ký tài khoản & Lập đội', 'Lựa chọn đề tài & Giới hạn số lượng', 'Thực thi dự án & Nộp bài các chặng', 'Hội đồng chấm thi độc lập', 'Bế mạc & Công bố kết quả'].includes(currentPhase) && <option value={currentPhase}>{currentPhase}</option>}
-                    <option value="Đăng ký tài khoản & Lập đội">Giai đoạn 1: Đăng ký & Lập đội</option>
-                    <option value="Lựa chọn đề tài & Giới hạn số lượng">Giai đoạn 2: Chọn đề tài & Khóa số lượng</option>
-                    <option value="Thực thi dự án & Nộp bài các chặng">Giai đoạn 3: Thực thi & Nộp bài các chặng</option>
-                    <option value="Hội đồng chấm thi độc lập">Giai đoạn 4: Hội đồng chấm thi độc lập</option>
-                    <option value="Bế mạc & Công bố kết quả">Giai đoạn 5: Bế mạc & Bảng xếp hạng</option>
-                  </select>
-                  <span className="text-[11px] text-muted-foreground">
-                    Hiển thị thông báo tiến độ trên thanh điều hướng của toàn bộ người dùng.
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <Input
-                      label="Tối thiểu / đội (Để chọn đề tài) *"
-                      type="number"
-                      min={1}
-                      max={maxTeamMembers}
-                      value={minTeamMembers}
-                      onChange={(e) => setMinTeamMembers(Number(e.target.value))}
-                      required
-                    />
-                    <span className="text-[11px] text-muted-foreground">
-                      Đội thi phải đạt tối thiểu số lượng này mới được phép đăng ký đề tài (mặc định: 3).
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Input
-                      label="Tối đa / đội *"
-                      type="number"
-                      min={minTeamMembers}
-                      max={10}
-                      value={maxTeamMembers}
-                      onChange={(e) => setMaxTeamMembers(Number(e.target.value))}
-                      required
-                    />
-                    <span className="text-[11px] text-muted-foreground">
-                      Số lượng thành viên tối đa trong một đội thi (mặc định: 5).
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                <div className="flex flex-col gap-1.5">
-                  <Input
-                    label="Hạn chót Nộp Bài Chung Cuộc *"
-                    type="datetime-local"
-                    value={finalDeadline}
-                    onChange={(e) => setFinalDeadline(e.target.value)}
-                    required
-                  />
-                  <span className="text-[11px] text-muted-foreground">
-                    Mốc thời gian khóa cổng nộp sản phẩm chính thức của giải đấu.
-                  </span>
-                </div>
-
-                <div className="p-3.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col justify-between text-xs space-y-2">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar size={15} className="text-primary" />
-                    <span className="font-semibold text-foreground">Quy chế nộp bài</span>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Hệ thống sẽ ghi nhận commit SHA mới nhất trước mốc hạn chót này. Mọi lượt nộp sau hạn chót sẽ bị hệ thống tự động từ chối.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 2: Điều Khiển Thời Gian & Đồng Hồ Đếm Ngược */}
-          <div className="rounded-[16px] border border-border bg-card p-6 sm:p-7 space-y-5 shadow-lg shadow-black/20">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-                  <Clock size={18} />
+          {/* ========================================================
+              LEFT COLUMN (7 cols on lg, 8 cols on xl): Core Settings
+             ======================================================== */}
+          <div className="lg:col-span-7 xl:col-span-8 space-y-6">
+            {/* Card 1: Thông Tin Chung Cuộc Thi */}
+            <div className="rounded-[16px] border border-border bg-card p-6 sm:p-7 space-y-5 shadow-lg shadow-black/20">
+              <div className="flex items-center gap-3 pb-3 border-b border-border">
+                <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
+                  <Sliders size={18} />
                 </div>
                 <div>
                   <h3 className="font-semibold tracking-tight text-foreground text-base sm:text-lg text-foreground">
-                    Thời Gian Cuộc Thi & Đồng Hồ Đếm Ngược
+                    Thông Tin Chung & Quy Định Đội Thi
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Điều khiển kích hoạt thời gian thi đấu để đồng bộ đồng hồ đếm ngược trên giao diện thí sinh.
+                    Tên định danh cuộc thi, tiến trình giai đoạn và quy định số lượng thành viên tham gia.
                   </p>
                 </div>
               </div>
-            </div>
 
-            {/* Interactive Competition Clock Hub */}
-            <div
-              className={`p-5 rounded-[14px] border transition-all ${
-                config.isContestStarted
-                  ? 'bg-emerald-500/5 border-emerald-500/30'
-                  : 'bg-amber-500/5 border-amber-500/30'
-              }`}
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="space-y-1.5 max-w-md">
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full ${
-                        config.isContestStarted ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
-                      }`}
-                    />
-                    <span className="font-semibold tracking-tight text-foreground text-sm sm:text-base text-foreground">
-                      {config.isContestStarted
-                        ? 'Cuộc Thi Đang Diễn Ra (Đang Đếm Ngược)'
-                        : 'Cuộc Thi Chưa Bắt Đầu (Chế Độ Chờ)'}
+              <div className="space-y-4">
+                <Input
+                  label="Tên Cuộc Thi *"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  placeholder="Ví dụ: HackFlow AI và DeepTech Hackathon 2026"
+                />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-muted-foreground font-medium text-xs flex items-center justify-between">
+                      <span>Giai đoạn hiện tại *</span>
+                      <span className="text-[10px] text-primary">Mã: {selectedPhaseCode}</span>
+                    </label>
+                    <select
+                      value={currentPhase}
+                      onChange={(e) => setCurrentPhase(e.target.value)}
+                      className="w-full p-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none transition-colors"
+                    >
+                      {![
+                        'Đăng ký tài khoản & Lập đội',
+                        'Lựa chọn đề tài & Giới hạn số lượng',
+                        'Thực thi dự án & Nộp bài các chặng',
+                        'Hội đồng chấm thi độc lập',
+                        'Bế mạc & Công bố kết quả',
+                      ].includes(currentPhase) && <option value={currentPhase}>{currentPhase}</option>}
+                      <option value="Đăng ký tài khoản & Lập đội">Giai đoạn 1: Đăng ký & Lập đội</option>
+                      <option value="Lựa chọn đề tài & Giới hạn số lượng">Giai đoạn 2: Chọn đề tài & Khóa số lượng</option>
+                      <option value="Thực thi dự án & Nộp bài các chặng">Giai đoạn 3: Thực thi & Nộp bài các chặng</option>
+                      <option value="Hội đồng chấm thi độc lập">Giai đoạn 4: Hội đồng chấm thi độc lập</option>
+                      <option value="Bế mạc & Công bố kết quả">Giai đoạn 5: Bế mạc & Bảng xếp hạng</option>
+                    </select>
+                    <span className="text-[11px] text-muted-foreground">
+                      Điều khiển ma trận quyền nộp bài, chọn đề tài và chấm điểm trên toàn hệ thống.
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    {config.isContestStarted
-                      ? 'Đồng hồ đếm ngược đang đếm trực tiếp đến hạn chót nộp bài trên màn hình của toàn bộ thí sinh. Các chặng nộp bài đang mở tiếp nhận bài làm.'
-                      : 'Hệ thống đang ở chế độ chờ. Thí sinh nhìn thấy thông báo chuẩn bị và đồng hồ chưa kích hoạt cho đến khi Ban Quản Trị phát lệnh bắt đầu.'}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <Input
+                        label="Tối thiểu / đội (Để chọn đề tài) *"
+                        type="number"
+                        min={1}
+                        max={maxTeamMembers}
+                        value={minTeamMembers}
+                        onChange={(e) => setMinTeamMembers(Number(e.target.value))}
+                        required
+                      />
+                      <span className="text-[11px] text-muted-foreground">
+                        Đội thi phải đạt tối thiểu số lượng này mới được phép đăng ký đề tài (mặc định: 3).
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <Input
+                        label="Tối đa / đội *"
+                        type="number"
+                        min={minTeamMembers}
+                        max={10}
+                        value={maxTeamMembers}
+                        onChange={(e) => setMaxTeamMembers(Number(e.target.value))}
+                        required
+                      />
+                      <span className="text-[11px] text-muted-foreground">
+                        Số lượng thành viên tối đa trong một đội thi (mặc định: 5).
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Chính sách áp dụng khi thay đổi giới hạn thành viên (C07) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-muted-foreground font-medium text-xs">
+                      Chính sách áp dụng quy mô đội (Khi thay đổi Min/Max)
+                    </label>
+                    <select
+                      value={teamSizePolicy}
+                      onChange={(e) => setTeamSizePolicy(e.target.value as TeamSizeEnforcementPolicy)}
+                      className="w-full p-2.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border text-foreground text-xs focus:border-[#6366F1] focus:outline-none transition-colors"
+                    >
+                      <option value="grandfathered_approved">
+                        Bảo lưu đội đã được BTC phê duyệt (Grandfathered)
+                      </option>
+                      <option value="strict_all">
+                        Áp dụng nghiêm ngặt cho toàn bộ đội khi chọn đề tài
+                      </option>
+                      <option value="before_lock_only">
+                        Chỉ áp dụng cho đội mới tạo / chưa khóa đề tài
+                      </option>
+                    </select>
+                    <span className="text-[11px] text-muted-foreground">
+                      Xác định cách hệ thống kiểm tra các đội đã tồn tại khi BTC nâng/hạ số thành viên.
+                    </span>
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <Input
+                      label={`Hạn chót Nộp Bài Chung Cuộc (${localTimezoneLabel}) *`}
+                      type="datetime-local"
+                      value={finalDeadline}
+                      onChange={(e) => setFinalDeadline(e.target.value)}
+                      required
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      Đồng bộ hai chiều với deadline Chặng Chung Kết. Tự động chuyển đổi sang UTC khi lưu.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border flex flex-col justify-between text-xs space-y-1.5">
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Calendar size={15} className="text-primary" />
+                    <span className="font-semibold text-foreground">
+                      Quy chế Nộp Bài & Cập Nhật Sản Phẩm Linh Hoạt
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Các đội thi được phép cập nhật giao diện, mã nguồn và tài liệu linh hoạt tại các chặng đang mở trước mốc hạn chót. Tạm dừng cuộc thi sẽ khóa cổng nộp bài tạm thời nhưng <strong>giữ nguyên mốc hạn chót tuyệt đối</strong> trừ khi BTC chủ động gia hạn tại ô trên.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 2: Xem Trước Tác Động (Thay đổi này ảnh hưởng gì) — C06, C07 */}
+            <div className="rounded-[16px] border border-border bg-card p-6 sm:p-7 space-y-4 shadow-lg shadow-black/20">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
+                    <Eye size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-foreground text-base sm:text-lg text-foreground">
+                      Xem Trước Tác Động (Thay Đổi Này Ảnh Hưởng Gì)
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Đánh giá ảnh hưởng tới các đội thi, chặng nộp bài và quyền thao tác trước khi lưu cấu hình.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Đội thiếu thành viên (&lt; {minTeamMembers}):</span>
+                    <span
+                      className={`font-bold ${
+                        liveImpactPreview.underMinCount > 0
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
+                    >
+                      {liveImpactPreview.underMinCount} đội
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {teamSizePolicy === 'strict_all'
+                      ? 'Sẽ bị chặn chọn đề tài mới cho tới khi bổ sung đủ thành viên.'
+                      : 'Các đội đã được BTC phê duyệt vẫn được bảo lưu quyền chọn đề tài.'}
                   </p>
                 </div>
 
-                <div className="shrink-0">
-                  {config.isContestStarted ? (
-                    <button
-                      type="button"
-                      onClick={() => setIsContestToggleConfirmOpen(true)}
-                      className="w-full sm:w-auto px-4 py-2.5 rounded-[10px] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-amber-950/20"
+                <div className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Đội vượt tối đa (&gt; {maxTeamMembers}):</span>
+                    <span
+                      className={`font-bold ${
+                        liveImpactPreview.overMaxCount > 0
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
                     >
-                      <Pause size={15} />
-                      <span>Tạm Dừng / Dừng Cuộc Thi</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setIsContestToggleConfirmOpen(true)}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-600/30"
+                      {liveImpactPreview.overMaxCount} đội
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Không thể kết nạp thêm thành viên mới vượt ngưỡng {maxTeamMembers} người/đội.
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Chặng nộp đang mở khung giờ:</span>
+                    <span className="font-bold text-foreground">{liveImpactPreview.openCheckpointsCount} chặng</span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    {selectedPhaseCode === 'hacking' && !config.isPaused
+                      ? 'Thí sinh được phép nộp/cập nhật bài làm tại các chặng đang mở.'
+                      : 'Chuyển sang giai đoạn ngoài Thực thi hoặc Tạm dừng sẽ khóa quyền nộp bài ngay lập tức.'}
+                  </p>
+                </div>
+
+                <div className="p-3.5 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Bài chung kết chờ đối soát repo:</span>
+                    <span
+                      className={`font-bold ${
+                        liveImpactPreview.unverifiedFinalsCount > 0
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-emerald-600 dark:text-emerald-400'
+                      }`}
                     >
-                      <Play size={15} />
-                      <span>Phát Lệnh Bắt Đầu Cuộc Thi</span>
-                    </button>
-                  )}
+                      {liveImpactPreview.unverifiedFinalsCount} bài
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    Giám khảo chấm điểm các bài chung kết hợp lệ đã nộp trong khung giờ quy định.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 3: Điều Khiển Thời Gian & Đồng Hồ Đếm Ngược */}
+            <div className="rounded-[16px] border border-border bg-card p-6 sm:p-7 space-y-5 shadow-lg shadow-black/20">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-[10px] bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-foreground text-base sm:text-lg text-foreground">
+                      Thời Gian Cuộc Thi & Đồng Hồ Đếm Ngược
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Điều khiển kích hoạt hoặc tạm dừng thi đấu mà không làm mất giai đoạn hiện tại của cuộc thi.
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              {/* Live Preview of Countdown Timer */}
-              {config.isContestStarted && (
-                <div className="mt-4 pt-4 border-t border-emerald-500/20">
-                  <CountdownTimer
-                    compact
-                    targetDate={config.finalSubmissionDeadline}
-                    title="Đồng hồ đếm ngược trực tiếp (Xem trước giao diện thí sinh)"
-                    className="p-3 bg-muted/40 dark:bg-slate-900/60 border-border"
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Form Submit Bar */}
-          <div className="rounded-[16px] border border-border bg-card p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <CheckCircle2 size={16} className="text-primary" />
-              <span>Các thay đổi sẽ được áp dụng ngay trên toàn bộ giao diện sau khi lưu.</span>
-            </div>
-            <Button variant="primary" type="submit" isLoading={isSaving} disabled={isLoading || !hasLoaded} size="lg" className="w-full sm:w-auto gap-2 px-8">
-              <Save size={18} />
-              <span>Lưu Cấu Hình Hackathon</span>
-            </Button>
-          </div>
-        </div>
-
-        {/* ========================================================
-            RIGHT COLUMN (5 cols on lg, 4 cols on xl): Policies & Danger
-           ======================================================== */}
-        <div className="lg:col-span-5 xl:col-span-4 space-y-6">
-          {/* Card 3: Chế Độ Chấm Thi & Bảng Điểm */}
-          <div className="rounded-[16px] border border-border bg-card p-6 space-y-5 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-3 pb-3 border-b border-border">
-              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
-                <ShieldCheck size={18} />
-              </div>
-              <div>
-                <h3 className="font-semibold tracking-tight text-foreground text-base text-foreground">Chế Độ Chấm & Minh Bạch</h3>
-                <p className="text-xs text-muted-foreground">Quy tắc chấm độc lập và công bố thứ hạng.</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              {/* Toggle 2: Công Bố Bảng Xếp Hạng */}
-              <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <Trophy size={16} className={config.resultsPublished ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'} />
-                    <span className="font-bold text-foreground text-xs">Công Bố Bảng Xếp Hạng</span>
+              {/* Interactive Competition Clock Hub */}
+              <div
+                className={`p-5 rounded-[14px] border transition-all ${
+                  runtimeState.isContestStarted
+                    ? 'bg-emerald-500/5 border-emerald-500/30'
+                    : 'bg-amber-500/5 border-amber-500/30'
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="space-y-1.5 max-w-md">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full ${
+                          runtimeState.isContestStarted ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+                        }`}
+                      />
+                      <span className="font-semibold tracking-tight text-foreground text-sm sm:text-base text-foreground">
+                        {runtimeState.isContestStarted
+                          ? 'Cuộc Thi Đang Diễn Ra (Đang Đếm Ngược)'
+                          : runtimeState.isPaused
+                            ? 'Cuộc Thi Đang Tạm Dừng (Khóa Thao Tác Thí Sinh)'
+                            : runtimeState.contestStateLabel}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {runtimeState.isContestStarted
+                        ? 'Đồng hồ đếm ngược đang đếm trực tiếp đến hạn chót nộp bài trên màn hình của toàn bộ thí sinh. Các chặng nộp bài đang mở tiếp nhận bài làm.'
+                        : runtimeState.isPaused
+                          ? 'Hệ thống đang tạm dừng: đóng băng bộ đếm ngược của chặng đang chạy và khóa nộp bài. Khi tiếp tục, hệ thống tự động cộng bù khoảng thời gian đã dừng cho chặng hiện tại và các chặng kế tiếp.'
+                          : 'Hệ thống đang ở ngoài giai đoạn Thực thi. Khi Ban Quản Trị phát lệnh bắt đầu, cuộc thi sẽ chuyển sang giai đoạn Thực thi (hacking) và mở cổng nộp bài.'}
+                    </p>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => setIsPublishToggleConfirmOpen(true)}
-                    role="switch"
-                    aria-checked={config.resultsPublished}
-                    className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                      config.resultsPublished ? 'bg-emerald-500' : 'bg-muted'
-                    }`}
-                  >
-                    <span
-                      className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                        config.resultsPublished ? 'translate-x-5' : 'translate-x-0'
-                      }`}
+                  <div className="shrink-0">
+                    {runtimeState.isContestStarted ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsContestToggleConfirmOpen(true)}
+                        className="w-full sm:w-auto px-4 py-2.5 rounded-[10px] bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-amber-950/20"
+                      >
+                        <Pause size={15} />
+                        <span>Tạm Dừng / Dừng Cuộc Thi</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsContestToggleConfirmOpen(true)}
+                        className="w-full sm:w-auto px-5 py-2.5 rounded-[10px] bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-emerald-600/30"
+                      >
+                        <Play size={15} />
+                        <span>
+                          {runtimeState.isPaused ? 'Tiếp Tục Cuộc Thi' : 'Phát Lệnh Bắt Đầu Cuộc Thi'}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Preview of Countdown Timer */}
+                {runtimeState.isContestStarted && (
+                  <div className="mt-4 pt-4 border-t border-emerald-500/20">
+                    <CountdownTimer
+                      compact
+                      targetDate={config.finalSubmissionDeadline}
+                      title="Đồng hồ đếm ngược trực tiếp (Xem trước giao diện thí sinh)"
+                      className="p-3 bg-muted/40 dark:bg-slate-900/60 border-border"
                     />
-                  </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Form Submit Bar */}
+            <div className="rounded-[16px] border border-border bg-card p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-lg shadow-black/20">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <CheckCircle2 size={16} className="text-primary" />
+                <span>Các thay đổi sẽ được áp dụng ngay trên toàn bộ giao diện sau khi lưu.</span>
+              </div>
+              <Button
+                variant="primary"
+                type="submit"
+                isLoading={isSaving}
+                disabled={isLoading || !hasLoaded}
+                size="lg"
+                className="w-full sm:w-auto gap-2 px-8"
+              >
+                <Save size={18} />
+                <span>Lưu Cấu Hình Hackathon</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* ========================================================
+              RIGHT COLUMN (5 cols on lg, 4 cols on xl): Policies & Danger
+             ======================================================== */}
+          <div className="lg:col-span-5 xl:col-span-4 space-y-6">
+            {/* Card 4: Chế Độ Chấm Thi & Bảng Điểm */}
+            <div className="rounded-[16px] border border-border bg-card p-6 space-y-5 shadow-lg shadow-black/20">
+              <div className="flex items-center gap-3 pb-3 border-b border-border">
+                <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
+                  <ShieldCheck size={18} />
                 </div>
-                <p className="text-[11px] text-muted-foreground leading-relaxed">
-                  Mở công khai điểm số tổng hợp và xếp thứ hạng của các đội thi trên trang Leaderboard cho toàn bộ thí sinh.
+                <div>
+                  <h3 className="font-semibold tracking-tight text-foreground text-base text-foreground">
+                    Chế Độ Chấm & Minh Bạch
+                  </h3>
+                  <p className="text-xs text-muted-foreground">Quy tắc chấm độc lập và công bố thứ hạng.</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {/* Toggle: Công Bố Bảng Xếp Hạng */}
+                <div className="p-4 rounded-[12px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <Trophy
+                        size={16}
+                        className={
+                          config.resultsPublished
+                            ? 'text-emerald-700 dark:text-emerald-400'
+                            : 'text-muted-foreground'
+                        }
+                      />
+                      <span className="font-bold text-foreground text-xs">Công Bố Bảng Xếp Hạng</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsPublishToggleConfirmOpen(true)}
+                      role="switch"
+                      aria-checked={config.resultsPublished}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        config.resultsPublished ? 'bg-emerald-500' : 'bg-muted'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                          config.resultsPublished ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Mở công khai điểm số tổng hợp và xếp thứ hạng của các đội thi trên trang Leaderboard cho toàn bộ thí sinh.
+                  </p>
+                  <div className="flex items-center justify-between pt-2 border-t border-border text-[11px]">
+                    <span className="text-muted-foreground">Trạng thái hiện tại:</span>
+                    <span
+                      className={`font-semibold ${
+                        config.resultsPublished
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      {config.resultsPublished ? '● Đã công bố công khai' : '○ Tạm ẩn điểm'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 5: Tổng Quan Dữ Liệu Vận Hành */}
+            <div className="rounded-[16px] border border-border bg-card p-6 space-y-4 shadow-lg shadow-black/20">
+              <div className="flex items-center gap-3 pb-3 border-b border-border">
+                <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
+                  <Layers size={18} />
+                </div>
+                <div>
+                  <h3 className="font-semibold tracking-tight text-foreground text-base text-foreground">
+                    Tổng Quan Dữ Liệu
+                  </h3>
+                  <p className="text-xs text-muted-foreground">Quy mô các thực thể trong giải đấu.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                    <Users size={13} className="text-primary" />
+                    <span>Đội thi</span>
+                  </div>
+                  <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">
+                    {teams.length}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                    <CheckSquare size={13} className="text-emerald-700 dark:text-emerald-400" />
+                    <span>Chặng nộp</span>
+                  </div>
+                  <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">
+                    {checkpoints.length}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                    <Scale size={13} className="text-amber-700 dark:text-amber-400" />
+                    <span>Tiêu chí Rubric</span>
+                  </div>
+                  <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">
+                    {rubricCriteria.length}
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
+                    <Megaphone size={13} className="text-purple-700 dark:text-purple-400" />
+                    <span>Thông báo</span>
+                  </div>
+                  <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">
+                    {announcements.length}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Card 6: Lịch Sử Phiên Bản Cấu Hình (C08) */}
+            <div className="rounded-[16px] border border-border bg-card p-6 space-y-4 shadow-lg shadow-black/20">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
+                    <History size={18} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold tracking-tight text-foreground text-base text-foreground">
+                      Lịch Sử Phiên Bản Cấu Hình
+                    </h3>
+                    <p className="text-xs text-muted-foreground">
+                      Kiểm soát xung đột đồng thời (v{config.version ?? 1}) & vết chỉnh sửa.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {Array.isArray(config.configHistory) && config.configHistory.length > 0 ? (
+                <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1 text-xs">
+                  {[...config.configHistory]
+                    .slice(-5)
+                    .reverse()
+                    .map((entry) => (
+                      <div
+                        key={`${entry.version}-${entry.updated_at}`}
+                        className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1"
+                      >
+                        <div className="flex items-center justify-between font-medium text-foreground">
+                          <span className="font-mono text-[11px] text-primary">Phiên bản v{entry.version}</span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {new Date(entry.updated_at).toLocaleString('vi-VN')}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">
+                          Cập nhật các trường: {Object.keys(entry.changes || {}).join(', ') || 'Đồng bộ hệ thống'}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Chưa có bản ghi thay đổi cấu hình nào trong phiên hiện tại.
                 </p>
-                <div className="flex items-center justify-between pt-2 border-t border-border text-[11px]">
-                  <span className="text-muted-foreground">Trạng thái hiện tại:</span>
-                  <span
-                    className={`font-semibold ${
-                      config.resultsPublished ? 'text-emerald-700 dark:text-emerald-400' : 'text-muted-foreground'
-                    }`}
-                  >
-                    {config.resultsPublished ? '● Đã công bố công khai' : '○ Tạm ẩn điểm'}
-                  </span>
-                </div>
+              )}
+            </div>
+
+            {/* Card 7: Vùng Nguy Hiểm (Danger Zone) */}
+            <div className="rounded-[16px] border border-rose-500/30 bg-rose-500/10 p-6 space-y-3.5 shadow-lg shadow-rose-950/20">
+              <div className="flex items-center gap-2.5 text-rose-700 dark:text-rose-400">
+                <AlertTriangle size={18} className="shrink-0" />
+                <h3 className="font-semibold tracking-tight text-foreground text-base">Tải Lại Dữ Liệu</h3>
               </div>
+              <p className="text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
+                Xóa bộ nhớ đệm giao diện và tải lại dữ liệu cuộc thi từ máy chủ.
+              </p>
+              <button
+                type="button"
+                onClick={handleResetAll}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[10px] border border-rose-500/50 bg-rose-500/20 hover:bg-rose-500/30 text-rose-700 dark:text-rose-400 text-xs font-bold transition-all cursor-pointer shadow-md"
+              >
+                <RotateCcw size={15} />
+                <span>Tải lại từ máy chủ</span>
+              </button>
             </div>
           </div>
-
-          {/* Card 4: Tổng Quan Dữ Liệu Vận Hành */}
-          <div className="rounded-[16px] border border-border bg-card p-6 space-y-4 shadow-lg shadow-black/20">
-            <div className="flex items-center gap-3 pb-3 border-b border-border">
-              <div className="p-2 rounded-[10px] bg-indigo-500/10 text-primary border border-indigo-500/20">
-                <Layers size={18} />
-              </div>
-              <div>
-                <h3 className="font-semibold tracking-tight text-foreground text-base text-foreground">Tổng Quan Dữ Liệu</h3>
-                <p className="text-xs text-muted-foreground">Quy mô các thực thể trong giải đấu.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
-                <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
-                  <Users size={13} className="text-primary" />
-                  <span>Đội thi</span>
-                </div>
-                <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">{teams.length}</div>
-              </div>
-
-              <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
-                <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
-                  <CheckSquare size={13} className="text-emerald-700 dark:text-emerald-400" />
-                  <span>Chặng nộp</span>
-                </div>
-                <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">{checkpoints.length}</div>
-              </div>
-
-              <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
-                <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
-                  <Scale size={13} className="text-amber-700 dark:text-amber-400" />
-                  <span>Tiêu chí Rubric</span>
-                </div>
-                <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">{rubricCriteria.length}</div>
-              </div>
-
-              <div className="p-3 rounded-[10px] bg-muted/40 dark:bg-slate-900/60 border border-border space-y-1">
-                <div className="flex items-center gap-1.5 text-muted-foreground text-[11px]">
-                  <Megaphone size={13} className="text-purple-700 dark:text-purple-400" />
-                  <span>Thông báo</span>
-                </div>
-                <div className="font-semibold tracking-tight text-foreground text-lg text-foreground">{announcements.length}</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Card 5: Vùng Nguy Hiểm (Danger Zone) */}
-          <div className="rounded-[16px] border border-rose-500/30 bg-rose-500/10 p-6 space-y-3.5 shadow-lg shadow-rose-950/20">
-            <div className="flex items-center gap-2.5 text-rose-700 dark:text-rose-400">
-              <AlertTriangle size={18} className="shrink-0" />
-              <h3 className="font-semibold tracking-tight text-foreground text-base">Tải Lại Dữ Liệu</h3>
-            </div>
-            <p className="text-xs text-rose-700 dark:text-rose-400 leading-relaxed">
-              Xóa bộ nhớ đệm giao diện và tải lại dữ liệu cuộc thi từ máy chủ.
-            </p>
-            <button
-              type="button"
-              onClick={handleResetAll}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-[10px] border border-rose-500/50 bg-rose-500/20 hover:bg-rose-500/30 text-rose-700 dark:text-rose-400 text-xs font-bold transition-all cursor-pointer shadow-md"
-            >
-              <RotateCcw size={15} />
-              <span>Tải lại từ máy chủ</span>
-            </button>
-          </div>
-        </div>
-      </fieldset>
+        </fieldset>
       </form>
 
       {/* Unsaved Changes Route Navigation Blocker Modal */}
@@ -608,17 +918,25 @@ export const AdminConfigPage: React.FC = () => {
         open={isContestToggleConfirmOpen}
         onOpenChange={setIsContestToggleConfirmOpen}
         title={
-          config.isContestStarted
+          runtimeState.isContestStarted
             ? 'Xác nhận Tạm dừng / Dừng cuộc thi?'
-            : 'Xác nhận Phát lệnh Bắt đầu cuộc thi?'
+            : runtimeState.isPaused
+              ? 'Xác nhận Tiếp tục cuộc thi?'
+              : 'Xác nhận Phát lệnh Bắt đầu cuộc thi?'
         }
         description={
-          config.isContestStarted
-            ? 'Đồng hồ đếm ngược trên màn hình của toàn bộ thí sinh sẽ tạm dừng và hệ thống chuyển về chế độ chờ.'
-            : 'Đồng hồ đếm ngược sẽ được kích hoạt ngay lập tức trên giao diện của toàn bộ thí sinh và mở tiếp nhận bài làm các chặng.'
+          runtimeState.isContestStarted
+            ? 'Hệ thống sẽ chuyển sang trạng thái Tạm dừng (is_paused = true): khóa nộp bài, chọn đề tài và đăng ký đội của thí sinh, nhưng giữ nguyên giai đoạn hiện tại và mốc deadline gốc.'
+            : 'Đồng hồ đếm ngược sẽ được kích hoạt ngay lập tức trên giao diện của toàn bộ thí sinh và mở tiếp nhận bài làm các chặng đang trong khung giờ mở.'
         }
-        confirmLabel={config.isContestStarted ? 'Xác nhận tạm dừng' : 'Bắt đầu cuộc thi'}
-        variant={config.isContestStarted ? 'warning' : 'primary'}
+        confirmLabel={
+          runtimeState.isContestStarted
+            ? 'Xác nhận tạm dừng'
+            : runtimeState.isPaused
+              ? 'Tiếp tục cuộc thi'
+              : 'Bắt đầu cuộc thi'
+        }
+        variant={runtimeState.isContestStarted ? 'warning' : 'primary'}
         onConfirm={async () => {
           setIsContestToggleConfirmOpen(false);
           try {

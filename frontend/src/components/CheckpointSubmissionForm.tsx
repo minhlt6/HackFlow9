@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
-  GitCommit,
   Globe,
   FileText,
   AlertTriangle,
@@ -170,6 +169,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
   const isUpcoming = checkpoint.status === 'upcoming';
   const isClosed = checkpoint.status === 'closed';
   const isGracePeriod = checkpoint.status === 'grace_period';
+  const isLateWindow = checkpoint.status === 'late' || Boolean(checkpoint.is_late_window);
   const isInactive = checkpoint.is_active === false;
   const isCanSubmitFalse = checkpoint.can_submit === false;
   const isFormLocked = isUpcoming || isClosed || isInactive || isCanSubmitFalse;
@@ -356,12 +356,27 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
   };
 
   const statusMeta = lastSubmitted
-    ? getSubmissionStatusMeta(lastSubmitted.status, isFinal)
+    ? getSubmissionStatusMeta(lastSubmitted.status, isFinal, Boolean(lastSubmitted.is_late))
     : null;
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Banner thông báo trạng thái cổng thời gian (Upcoming / Grace Period / Closed) */}
+      {/* Banner thông báo trạng thái cổng thời gian (Upcoming / Grace Period / Late / Closed) */}
+      {isLateWindow && !isFormLocked && (
+        <div className="p-3.5 rounded-[12px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5">
+          <Clock size={18} className="text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-amber-700 dark:text-amber-400">
+              Chặng đã qua hạn chuẩn — Đang mở tiếp nhận Nộp muộn (Quá hạn)
+            </p>
+            <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+              Hệ thống vẫn cho phép Đội trưởng nộp hoặc cập nhật bài nộp cho chặng này, nhưng bài nộp sẽ được gắn cờ{' '}
+              <strong className="font-semibold">Nộp muộn (LATE)</strong> để Ban tổ chức và Ban giám khảo theo dõi.
+            </p>
+          </div>
+        </div>
+      )}
+
       {isGracePeriod && (
         <div className="p-3.5 rounded-[12px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5 animate-pulse">
           <Clock size={18} className="text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
@@ -400,6 +415,8 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
             <strong>Cổng nộp bài đã đóng:</strong>{' '}
             {isInactive
               ? 'Checkpoint này đang tạm khóa bởi Ban tổ chức.'
+              : checkpoint.submission_block_reason
+              ? checkpoint.submission_block_reason
               : 'Đã kết thúc thời gian tiếp nhận bài nộp cho chặng thi này.'}
           </span>
         </div>
@@ -442,41 +459,24 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                 </p>
               )}
 
-              {/* Hiển thị thông tin Commit SHA hoặc trạng thái SHA tương ứng */}
-              {isFinal ? (
-                lastSubmitted.commit_sha ? (
-                  <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1.5 font-mono">
-                    <GitCommit size={14} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
-                    <span>Frozen Commit SHA:</span>
-                    <span className="text-emerald-700 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
-                      {lastSubmitted.commit_sha.slice(0, 10)}...{lastSubmitted.commit_sha.slice(-6)}
-                    </span>
-                  </p>
-                ) : statusMeta.normalizedStatus === 'sha_verification_failed' ? (
-                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1.5 flex items-center gap-1.5">
-                    <AlertTriangle size={14} className="text-amber-700 dark:text-amber-400 shrink-0" />
-                    <span>
-                      Commit SHA: Đang chờ Ban tổ chức xác minh thủ công (Đã bảo lưu thời điểm nộp hợp lệ)
-                    </span>
-                  </p>
-                ) : statusMeta.normalizedStatus === 'pending_sha_freeze' ? (
-                  <p className="text-xs text-primary mt-1.5 flex items-center gap-1.5">
-                    <RefreshCw size={13} className="text-primary shrink-0 animate-spin" />
-                    <span>Commit SHA: Hệ thống đang truy xuất HEAD SHA từ GitHub API...</span>
-                  </p>
-                ) : null
-              ) : (
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
-                  <Info size={14} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
-                  <span>Chặng tiến độ: Không khóa Commit SHA (Đội thi tiếp tục code bình thường)</span>
-                </p>
-              )}
+              {/* Ghi chú linh hoạt cập nhật sản phẩm trong khung giờ mở cổng */}
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                <Info size={14} className="text-emerald-700 dark:text-emerald-400 shrink-0" />
+                <span>
+                  Đội thi được phép linh hoạt chỉnh sửa, bổ sung giao diện và cập nhật bài nộp trong thời gian cổng đang mở.
+                </span>
+              </p>
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground mt-1.5">
                 <span>
                   Thời gian nộp: {new Date(lastSubmitted.submitted_at).toLocaleString('vi-VN')}
                 </span>
-                {lastSubmitted.grace_period_applied && (
+                {(lastSubmitted.is_late || statusMeta.normalizedStatus === 'late') && (
+                  <span className="text-amber-700 dark:text-amber-400 font-medium">
+                    • Đã gắn cờ Nộp muộn (sau thời hạn chuẩn)
+                  </span>
+                )}
+                {lastSubmitted.grace_period_applied && !lastSubmitted.is_late && statusMeta.normalizedStatus !== 'late' && (
                   <span className="text-amber-700 dark:text-amber-400 font-medium">
                     • Ghi nhận hợp lệ trong khung giờ ân hạn mạng (Grace Period)
                   </span>
@@ -569,9 +569,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                     )}
                   </label>
                   <span className="text-[11px] text-muted-foreground">
-                    {field.apply_sha_freeze || isFinal
-                      ? 'Yêu cầu public repo để đóng băng Commit SHA'
-                      : 'Public GitHub repository'}
+                    Public GitHub repository
                   </span>
                 </div>
 
@@ -592,8 +590,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                     <code className="text-primary bg-muted/40 dark:bg-slate-900/60 px-1 py-0.5 rounded border border-border">
                       https://github.com/
                     </code>
-                    {(field.apply_sha_freeze || isFinal) &&
-                      ' và ở chế độ Public để hệ thống ghi nhận & khóa Commit SHA.'}
+                    {' '}và mở quyền truy cập để Ban Giám Khảo xem sản phẩm.
                   </span>
                 </div>
               </div>
@@ -671,12 +668,12 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
             {isFinal ? (
               <>
                 <AlertTriangle size={14} className="text-amber-700 dark:text-amber-400 shrink-0" />
-                <span>Chặng cuối: Đảm bảo repo public và đã push commit mới nhất trước khi chốt nộp</span>
+                <span>Chặng cuối: Đội thi có thể cập nhật thêm giao diện và tài liệu trước hạn chót</span>
               </>
             ) : (
               <>
                 <Info size={14} className="text-primary shrink-0" />
-                <span>Chặng tiến độ: Chỉ nộp tài liệu báo cáo theo cấu hình, không đóng băng Commit SHA</span>
+                <span>Chặng tiến độ: Nộp tài liệu báo cáo và tiếp tục phát triển sản phẩm linh hoạt</span>
               </>
             )}
           </div>
@@ -714,7 +711,11 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                 : isClosed
                 ? 'Đã đóng cổng nộp'
                 : lastSubmitted
-                ? 'Cập nhật bài nộp'
+                ? isLateWindow
+                  ? 'Cập nhật bài (Nộp muộn)'
+                  : 'Cập nhật bài nộp'
+                : isLateWindow
+                ? 'Nộp bài (Nộp muộn)'
                 : 'Nộp bài Checkpoint'}
             </Button>
           </div>
@@ -742,10 +743,10 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
               </span>
               <div className="space-y-1">
                 <h4 className="text-sm font-bold text-amber-700 dark:text-amber-400">
-                  Xác nhận nộp phiên bản chốt
+                  Xác nhận nộp sản phẩm chặng cuối
                 </h4>
                 <p className="text-sm text-foreground leading-relaxed font-medium">
-                  Bạn có chắc chắn nộp phiên bản này? (Hệ thống sẽ ghi nhận Commit hiện tại của repo)
+                  Bạn có chắc chắn nộp phiên bản này? Đội thi vẫn có thể cập nhật lại trước khi cổng đóng.
                 </p>
               </div>
             </div>
@@ -762,7 +763,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                   Bạn có chắc chắn muốn nộp báo cáo cho chặng thi này?
                 </p>
                 <p className="text-xs text-muted-foreground pt-0.5">
-                  Chặng tiến độ trung gian sẽ không đóng băng Commit SHA để bạn tiếp tục code bình thường.
+                  Đội thi có thể tiếp tục hoàn thiện mã nguồn và giao diện sản phẩm trong suốt thời gian mở cổng.
                 </p>
               </div>
             </div>
@@ -824,10 +825,10 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
             >
               {isSubmitting
                 ? isFinal
-                  ? 'Đang ghi nhận commit...'
+                  ? 'Đang gửi sản phẩm...'
                   : 'Đang gửi báo cáo...'
                 : isFinal
-                ? 'Xác nhận nộp & Chốt commit'
+                ? 'Xác nhận nộp sản phẩm'
                 : 'Xác nhận nộp báo cáo'}
             </Button>
           </div>
