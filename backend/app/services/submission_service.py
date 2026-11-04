@@ -122,11 +122,14 @@ class SubmissionService:
         Compares incoming normalized submission_data and note against an existing Submission
         for 10-second duplicate request detection (SRS HF-23 Mục 4.2).
         """
-        existing_data = existing_sub.submission_data or {}
+        existing_data = {
+            k: v for k, v in (existing_sub.submission_data or {}).items() if k != "is_late"
+        }
+        compare_new_data = {k: v for k, v in (new_data or {}).items() if k != "is_late"}
         existing_note = (existing_sub.note or "").strip() or None
         clean_new_note = (new_note or "").strip() or None
 
-        if existing_data == new_data and existing_note == clean_new_note:
+        if existing_data == compare_new_data and existing_note == clean_new_note:
             return True
 
         return False
@@ -589,7 +592,14 @@ class SubmissionService:
             )
         elif is_late_submission:
             if prev_snapshot is not None:
-                message = f"Cập nhật bài nộp (phiên bản v{new_version}) thành công — Đã gắn cờ Nộp muộn."
+                had_on_time = prev_snapshot["status"] == SubmissionStatus.SUBMITTED.value or any(
+                    isinstance(h, dict) and h.get("status") == SubmissionStatus.SUBMITTED.value
+                    for h in (prev_snapshot.get("version_history") or [])
+                )
+                if had_on_time:
+                    message = f"Cập nhật bổ sung (phiên bản v{new_version}) thành công — Đã bảo lưu bản nộp đúng hạn ban đầu."
+                else:
+                    message = f"Cập nhật bài nộp (phiên bản v{new_version}) thành công — Đã gắn cờ Nộp muộn."
             else:
                 message = "Nộp bài thành công (Ghi nhận trạng thái Nộp muộn sau thời hạn chuẩn)."
         elif grace_period_applied:

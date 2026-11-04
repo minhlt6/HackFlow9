@@ -28,6 +28,8 @@ import {
   SRS_HF23_ERROR_MESSAGES,
   getEffectiveSubmissionFields,
   getSubmissionStatusMeta,
+  hasOnTimeSubmissionHistory,
+  isSubmissionOnTimeValid,
 } from '../types/checkpoint';
 import { checkpointApi } from '../api/checkpointApi';
 import { useAuthStore } from '../store/useAuthStore';
@@ -131,6 +133,7 @@ const createCheckpointSubmissionSchema = (
 export interface CheckpointSubmissionFormProps {
   checkpoint: Checkpoint;
   currentSubmission?: Submission | null;
+  submissionHistory?: Submission[];
   userRole?: string; // Ví dụ: 'TEAM_LEADER' | 'MEMBER'
   isLeader?: boolean; // Tùy chọn truyền quyền đội trưởng trực tiếp
   onSuccess?: (submission: Submission) => void;
@@ -141,6 +144,7 @@ export interface CheckpointSubmissionFormProps {
 export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> = ({
   checkpoint,
   currentSubmission,
+  submissionHistory,
   userRole,
   isLeader: propIsLeader,
   onSuccess,
@@ -355,26 +359,64 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
     }
   };
 
+  const effectiveHistory = useMemo(() => {
+    const list = [...(submissionHistory || [])];
+    if (currentSubmission) {
+      list.push(currentSubmission);
+    }
+    return list;
+  }, [submissionHistory, currentSubmission]);
+
+  const hasPriorOnTime = useMemo(
+    () => hasOnTimeSubmissionHistory(lastSubmitted, effectiveHistory),
+    [lastSubmitted, effectiveHistory]
+  );
+
+  const hasAnyOnTimeSubmission = useMemo(
+    () => isSubmissionOnTimeValid(lastSubmitted) || hasPriorOnTime,
+    [lastSubmitted, hasPriorOnTime]
+  );
+
   const statusMeta = lastSubmitted
-    ? getSubmissionStatusMeta(lastSubmitted.status, isFinal, Boolean(lastSubmitted.is_late))
+    ? getSubmissionStatusMeta(
+        lastSubmitted.status,
+        isFinal,
+        Boolean(lastSubmitted.is_late),
+        hasPriorOnTime
+      )
     : null;
 
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Banner thông báo trạng thái cổng thời gian (Upcoming / Grace Period / Late / Closed) */}
       {isLateWindow && !isFormLocked && (
-        <div className="p-3.5 rounded-[12px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5">
-          <Clock size={18} className="text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
-          <div>
-            <p className="font-semibold text-amber-700 dark:text-amber-400">
-              Chặng đã qua hạn chuẩn — Đang mở tiếp nhận Nộp muộn (Quá hạn)
-            </p>
-            <p className="text-amber-700 dark:text-amber-400 mt-0.5">
-              Hệ thống vẫn cho phép Đội trưởng nộp hoặc cập nhật bài nộp cho chặng này, nhưng bài nộp sẽ được gắn cờ{' '}
-              <strong className="font-semibold">Nộp muộn (LATE)</strong> để Ban tổ chức và Ban giám khảo theo dõi.
-            </p>
+        hasAnyOnTimeSubmission ? (
+          <div className="p-3.5 rounded-[12px] bg-sky-500/10 border border-sky-500/30 text-sky-700 dark:text-sky-300 text-xs flex items-start gap-2.5">
+            <Info size={18} className="text-sky-700 dark:text-sky-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-sky-700 dark:text-sky-300">
+                Đã qua thời hạn chuẩn — Chế độ Cập nhật bổ sung
+              </p>
+              <p className="text-sky-700/90 dark:text-sky-300/90 mt-0.5">
+                Bản nộp đúng hạn ban đầu của đội đã được ghi nhận và bảo lưu trong lịch sử. Nếu cập nhật thêm lúc này, hệ thống sẽ lưu thêm phiên bản{' '}
+                <strong className="font-semibold">Cập nhật bổ sung (Muộn)</strong> mà không làm mất trạng thái nộp đúng hạn ban đầu.
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="p-3.5 rounded-[12px] bg-amber-500/15 border border-amber-500/40 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5">
+            <Clock size={18} className="text-amber-700 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-amber-700 dark:text-amber-400">
+                Chặng đã qua hạn chuẩn — Đang mở tiếp nhận Nộp muộn
+              </p>
+              <p className="text-amber-700 dark:text-amber-400 mt-0.5">
+                Hệ thống vẫn cho phép Đội trưởng nộp bài cho chặng này, nhưng bài nộp sau hạn chuẩn sẽ được ghi nhận trạng thái{' '}
+                <strong className="font-semibold">Nộp muộn</strong> để Ban tổ chức và Ban giám khảo theo dõi.
+              </p>
+            </div>
+          </div>
+        )
       )}
 
       {isGracePeriod && (
@@ -430,7 +472,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
           <div className="flex items-start gap-3">
             <span className={`p-2 rounded-lg shrink-0 mt-0.5 ${statusMeta.iconBgClass}`}>
               {statusMeta.normalizedStatus === 'sha_verification_failed' ||
-              statusMeta.normalizedStatus === 'late' ? (
+              (statusMeta.normalizedStatus === 'late' && !hasPriorOnTime) ? (
                 <AlertTriangle size={20} />
               ) : statusMeta.normalizedStatus === 'pending_sha_freeze' ? (
                 <RefreshCw size={20} className="animate-spin" />
@@ -446,11 +488,6 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                 <Badge variant={statusMeta.badgeVariant} size="sm">
                   {statusMeta.badgeLabel}
                 </Badge>
-                {lastSubmitted.grace_period_applied && (
-                  <Badge variant="warning" size="sm">
-                    Ân hạn mạng (Grace Period)
-                  </Badge>
-                )}
               </div>
 
               {statusMeta.statusNote && (
@@ -469,11 +506,11 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
 
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground mt-1.5">
                 <span>
-                  Thời gian nộp: {new Date(lastSubmitted.submitted_at).toLocaleString('vi-VN')}
+                  Thời gian nộp gần nhất: {new Date(lastSubmitted.submitted_at).toLocaleString('vi-VN')}
                 </span>
-                {(lastSubmitted.is_late || statusMeta.normalizedStatus === 'late') && (
-                  <span className="text-amber-700 dark:text-amber-400 font-medium">
-                    • Đã gắn cờ Nộp muộn (sau thời hạn chuẩn)
+                {hasPriorOnTime && statusMeta.normalizedStatus === 'late' && (
+                  <span className="text-emerald-700 dark:text-emerald-400 font-medium">
+                    • Đã bảo lưu bản nộp gốc đúng hạn (v1)
                   </span>
                 )}
                 {lastSubmitted.grace_period_applied && !lastSubmitted.is_late && statusMeta.normalizedStatus !== 'late' && (
@@ -712,7 +749,7 @@ export const CheckpointSubmissionForm: React.FC<CheckpointSubmissionFormProps> =
                 ? 'Đã đóng cổng nộp'
                 : lastSubmitted
                 ? isLateWindow
-                  ? 'Cập nhật bài (Nộp muộn)'
+                  ? 'Cập nhật bổ sung'
                   : 'Cập nhật bài nộp'
                 : isLateWindow
                 ? 'Nộp bài (Nộp muộn)'

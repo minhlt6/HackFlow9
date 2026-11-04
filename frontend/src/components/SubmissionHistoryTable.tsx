@@ -14,8 +14,10 @@ import {
 import { Badge } from './Badge';
 import {
   type Submission,
+  expandSubmissionHistory,
   formatSubmissionTime,
   getSubmissionStatusMeta,
+  isSubmissionOnTimeValid,
 } from '../types/checkpoint';
 
 const GithubIcon: React.FC<{ size?: number; className?: string }> = ({
@@ -66,13 +68,9 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Sắp xếp danh sách nộp bài theo thời gian submitted_at giảm dần (Mới nhất lên đầu) (HF-31 Review Lỗi 2)
+  // Mở rộng version_history và sắp xếp danh sách nộp bài mới nhất lên đầu (HF-31 & BUG 57)
   const sortedSubmissions = useMemo(() => {
-    return [...submissions].sort((a, b) => {
-      const timeA = new Date(a.submitted_at).getTime() || 0;
-      const timeB = new Date(b.submitted_at).getTime() || 0;
-      return timeB - timeA;
-    });
+    return expandSubmissionHistory(submissions);
   }, [submissions]);
 
   return (
@@ -189,17 +187,21 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
               {sortedSubmissions.map((sub, index) => {
                 const isLatest = index === 0;
                 // Phiên bản tăng dần theo thứ tự thời gian: bản cũ nhất là v1, bản mới nhất là vN
-                const versionNumber = sortedSubmissions.length - index;
+                const versionNumber = sub.version || sortedSubmissions.length - index;
                 const timeInfo = formatSubmissionTime(sub.submitted_at);
+                const hasOlderOnTimeVersion = sortedSubmissions
+                  .slice(index + 1)
+                  .some((older) => isSubmissionOnTimeValid(older));
                 const statusMeta = getSubmissionStatusMeta(
                   sub.status,
                   isFinalCheckpoint,
-                  Boolean(sub.is_late)
+                  Boolean(sub.is_late),
+                  hasOlderOnTimeVersion
                 );
 
                 return (
                   <tr
-                    key={sub.id || `sub-${index}`}
+                    key={`${sub.id || 'sub'}-v${versionNumber}-${index}`}
                     className={`hover:bg-accent transition-colors ${
                       isLatest ? 'bg-card' : ''
                     }`}
@@ -226,12 +228,6 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                         <span className="text-[11px] text-muted-foreground font-mono">
                           {timeInfo.absolute}
                         </span>
-                        {(sub.is_late || statusMeta.normalizedStatus === 'late') && (
-                          <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 font-medium mt-0.5">
-                            <Clock size={11} className="shrink-0" />
-                            <span>Nộp muộn (Sau hạn chuẩn)</span>
-                          </span>
-                        )}
                         {sub.grace_period_applied && !sub.is_late && statusMeta.normalizedStatus !== 'late' && (
                           <span className="inline-flex items-center gap-1 text-[10px] text-amber-700 dark:text-amber-400 font-medium mt-0.5">
                             <ShieldCheck size={11} className="shrink-0" />
@@ -306,17 +302,12 @@ export const SubmissionHistoryTable: React.FC<SubmissionHistoryTableProps> = ({
                       </div>
                     </td>
 
-                    {/* Cột 5: Trạng thái bài nộp (Badge SRS HF-23) */}
+                    {/* Cột 4: Trạng thái bài nộp (Chỉ hiển thị 1 Badge cốt lõi - BUG 57) */}
                     <td className="py-3.5 px-4">
                       <div className="flex flex-col gap-1 items-start">
                         <Badge variant={statusMeta.badgeVariant} size="sm">
                           {statusMeta.badgeLabel}
                         </Badge>
-                        {sub.grace_period_applied && (
-                          <Badge variant="warning" size="sm" className="text-[10px] px-1.5 py-0">
-                            Grace Period
-                          </Badge>
-                        )}
                       </div>
                     </td>
 

@@ -46,3 +46,17 @@ test('admin schema preserves long and legacy invite codes without accepting malf
   for(const code of ['ABC123','DEMOBLOCK','DEMOBUILDERS','ABCDEFGHIJKLMNO','ABCDEFGHIJKLMNOP','OLD4']) assert.equal(schema.parse(code),code);
   for(const code of ['ABC','A'.repeat(17),'BAD CODE']) assert.equal(schema.safeParse(code).success,false);
 });
+test('BUG 57: late resubmission preserves on-time v1 history and distinguishes supplementary update badge',()=>{
+  const {expandSubmissionHistory,hasOnTimeSubmissionHistory,getSubmissionStatusMeta}=load('../src/types/checkpoint.ts');
+  const v1={id:'sub-1',checkpoint_id:'cp-1',team_id:'t-1',version:1,status:'submitted',is_late:false,submitted_at:'2026-11-01T10:00:00Z'};
+  const v2={id:'sub-1',checkpoint_id:'cp-1',team_id:'t-1',version:2,status:'late',is_late:true,submitted_at:'2026-11-02T10:00:00Z',version_history:[{...v1,id:'sub-1-v1'}]};
+  const history=expandSubmissionHistory([v2,v1]);
+  assert.equal(history.length,2);
+  assert.equal(history[0].version,2);
+  assert.equal(history[1].version,1);
+  assert.equal(history[1].status,'submitted');
+  assert.equal(hasOnTimeSubmissionHistory(v2),true);
+  assert.equal(getSubmissionStatusMeta('submitted',false,false,false).badgeLabel,'Đã nộp đúng hạn');
+  assert.equal(getSubmissionStatusMeta('late',false,true,true).badgeLabel,'Cập nhật bổ sung (Muộn)');
+  assert.equal(getSubmissionStatusMeta('late',false,true,false).badgeLabel,'Nộp muộn');
+});
