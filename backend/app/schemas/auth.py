@@ -3,8 +3,8 @@ from pydantic import BaseModel, EmailStr, Field
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr = Field(..., description="Email tài khoản")
-    password: str = Field(..., min_length=6, description="Mật khẩu tài khoản (tối thiểu 6 ký tự)")
+    email: str = Field(..., min_length=1, description="Email hoặc tên tài khoản")
+    password: str = Field(..., min_length=1, description="Mật khẩu tài khoản")
 
 
 class RegisterRequest(BaseModel):

@@ -33,9 +33,18 @@ DEFAULT_DEMO_ACCOUNTS: Dict[str, Tuple[str, str, str]] = {
 }
 
 LOGIN_EMAIL_ALIASES: Dict[str, str] = {
+    "admin": "admin@hackflow.dev",
     "admin@hackflow.io": "admin@hackflow.dev",
+    "judge": "judge.tech@hackathon.org",
     "judge@hackflow.io": "judge.tech@hackathon.org",
+    "mentor": "mentor.ai@ailab.org.vn",
     "mentor@hackflow.io": "mentor.ai@ailab.org.vn",
+    "leader": "leader@cybersamurai.team",
+    "candidate": "leader@cybersamurai.team",
+    "user": "leader@cybersamurai.team",
+    "member": "member@cybersamurai.team",
+    "pending": "pending@hust.edu.vn",
+    "rejected": "rejected@fpt.edu.vn",
 }
 
 REHEARSAL_EMAIL_ALIASES: Dict[str, str] = {
@@ -46,6 +55,8 @@ REHEARSAL_EMAIL_ALIASES: Dict[str, str] = {
     "leader@cybersamurai.team": "cyber.leader@demo.example.com",
     "member@cybersamurai.team": "cyber.member1@demo.example.com",
     "member2@cybersamurai.team": "cyber.member2@demo.example.com",
+    "pending@hust.edu.vn": "pending@demo.example.com",
+    "rejected@fpt.edu.vn": "rejected@demo.example.com",
 }
 
 DEMO_PASSWORD_ALIASES = {
@@ -88,10 +99,15 @@ class AuthService:
         """
         raw_email = email.lower().strip()
         clean_email = LOGIN_EMAIL_ALIASES.get(raw_email, raw_email)
+        is_simple_alias = password in DEMO_PASSWORD_ALIASES or password in {"123", "12345", "123456", "admin"}
         effective_password = (
             "123456"
-            if (clean_email in DEFAULT_DEMO_ACCOUNTS or clean_email.endswith("@demo.example.com"))
-            and password in DEMO_PASSWORD_ALIASES
+            if (
+                clean_email in DEFAULT_DEMO_ACCOUNTS
+                or clean_email in REHEARSAL_EMAIL_ALIASES
+                or clean_email.endswith("@demo.example.com")
+            )
+            and is_simple_alias
             else password
         )
         user = await user_repo.get_by_email(db, clean_email)
@@ -118,7 +134,7 @@ class AuthService:
         if not (
             verify_password(password, user.hashed_password)
             or verify_password(effective_password, user.hashed_password)
-            or (password in DEMO_PASSWORD_ALIASES and verify_password("123456", user.hashed_password))
+            or (is_simple_alias and verify_password("123456", user.hashed_password))
         ):
             raise UnauthorizedException(message="Email hoặc mật khẩu không chính xác.")
 
